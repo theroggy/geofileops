@@ -21,6 +21,7 @@ from . import io_util
 from . import ogr_util
 from . import sqlite_util
 from . import general_util
+from . import geometry_util
 
 ################################################################################
 # Some init
@@ -37,6 +38,10 @@ def buffer(
         output_path: Path,
         distance: float,
         quadrantsegments: int = 5,
+        endcap_style: geometry_util.BufferCapStyle = geometry_util.BufferCapStyle.ROUND,
+        join_style: geometry_util.BufferJoinStyle = geometry_util.BufferJoinStyle.ROUND,
+        mitre_limit: float = 5.0,
+        single_sided: bool = False,
         input_layer: Optional[str] = None,
         output_layer: Optional[str] = None,
         columns: Optional[List[str]] = None,
@@ -58,6 +63,27 @@ def buffer(
               FROM "{{input_layer}}"
              WHERE 1=1 
                {{batch_filter}}'''
+    # Check which buffer operation to apply
+    if single_sided is False:
+        # Double sided buffer 
+        if distance < 0:
+            # For a double sided buffer, aA negative buffer is only relevant 
+            # for polygon types, so only keep polygon results
+            # Negative buffer creates invalid stuff, so use collectionextract
+            # to keep only polygons
+            sql_template = f'''
+                    SELECT ST_CollectionExtract(ST_buffer({{geometrycolumn}}, {distance}), 3) AS geom
+                        {{columns_to_select_str}} 
+                    FROM "{{input_layer}}" layer
+                    WHERE 1=1 
+                    {{batch_filter}}'''
+        else:
+            sql_template = f'''
+                    SELECT ST_Buffer({{geometrycolumn}}, {distance}) AS geom
+                        {{columns_to_select_str}} 
+                    FROM "{{input_layer}}" layer
+                    WHERE 1=1 
+                    {{batch_filter}}'''
     else:
         sql_template = f'''
             SELECT ST_Buffer({{geometrycolumn}}, {distance}, {quadrantsegments}) AS geom
@@ -65,6 +91,20 @@ def buffer(
               FROM "{{input_layer}}" layer
              WHERE 1=1 
                {{batch_filter}}'''
+                SELECT ST_SingleSidedBuffer({{geometrycolumn}}, {distance}) AS geom
+                    {{columns_to_select_str}} 
+                FROM "{{input_layer}}" layer
+                WHERE 1=1 
+                {{batch_filter}}'''
+
+    # Set buffer options via prelude statements
+    input_prelude_statements = []
+    input_prelude_statements.append(f"SELECT BufferOptions_SetQuadrantSegments({quadrantsegments})")
+    input_prelude_statements.append(f"SELECT BufferOptions_SetMitreLimit({mitre_limit})")
+    if endcap_style != geometry_util.BufferCapStyle.ROUND:
+        input_prelude_statements.append(f"SELECT BufferOptions_SetEndCapStyle('{endcap_style.name}')")
+    if join_style != geometry_util.BufferJoinStyle.ROUND:
+        input_prelude_statements.append(f"SELECT BufferOptions_SetJoinStyle('{join_style.name}')")
 
     # Buffer operation always results in polygons...
     force_output_geometrytype = GeometryType.MULTIPOLYGON
@@ -81,6 +121,7 @@ def buffer(
             force_output_geometrytype=force_output_geometrytype,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
+            input_prelude_statements=input_prelude_statements,
             verbose=verbose,
             force=force)
 
@@ -369,6 +410,7 @@ def _single_layer_vector_operation(
         filter_null_geoms: bool = True,
         nb_parallel: int = -1,
         batchsize: int = -1,
+        input_prelude_statements: List[str] = [],
         verbose: bool = False,
         force: bool = False):
 
@@ -465,6 +507,7 @@ def _single_layer_vector_operation(
                         create_spatial_index=False,
                         explodecollections=explodecollections,
                         force_output_geometrytype=force_output_geometrytype,
+                        input_prelude_statements=input_prelude_statements,
                         verbose=verbose)
                 future = calculate_pool.submit(
                         ogr_util.vector_translate_by_info,

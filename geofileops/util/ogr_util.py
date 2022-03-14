@@ -66,6 +66,7 @@ class VectorTranslateInfo:
             create_spatial_index: Optional[bool] = None,
             explodecollections: bool = False,
             force_output_geometrytype: Optional[GeometryType] = None,
+            input_prelude_statements: List[str] = [],
             sqlite_journal_mode: Optional[str] = None,
             verbose: bool = False):
         self.input_path = input_path
@@ -83,6 +84,7 @@ class VectorTranslateInfo:
         self.create_spatial_index = create_spatial_index
         self.explodecollections = explodecollections
         self.force_output_geometrytype = force_output_geometrytype
+        self.input_prelude_statements = input_prelude_statements
         self.sqlite_journal_mode = sqlite_journal_mode
         self.verbose = verbose
   
@@ -104,6 +106,7 @@ def vector_translate_by_info(info: VectorTranslateInfo):
             create_spatial_index=info.create_spatial_index,
             explodecollections=info.explodecollections,
             force_output_geometrytype=info.force_output_geometrytype,
+            input_prelude_statements=info.input_prelude_statements,
             sqlite_journal_mode=info.sqlite_journal_mode,
             verbose=info.verbose)
 
@@ -123,6 +126,7 @@ def vector_translate(
         create_spatial_index: Optional[bool] = None,
         explodecollections: bool = False,
         force_output_geometrytype: Optional[GeometryType] = None,
+        input_prelude_statements: List[str] = [],
         sqlite_journal_mode: Optional[str] = None,
         verbose: bool = False) -> bool:
 
@@ -152,6 +156,11 @@ def vector_translate(
     if sqlite_stmt is not None:
         args.extend(['-sql', sqlite_stmt, '-dialect', 'sqlite'])
     '''
+
+    # Input file open options
+    if len(input_prelude_statements) > 0:
+        input_prelude_statements_str = f'PRELUDE_STATEMENTS="{"; ".join(input_prelude_statements)}"'
+        args.extend(['-oo', input_prelude_statements_str])
 
     # Output file options
     if output_path.exists() is True:

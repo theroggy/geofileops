@@ -14,7 +14,15 @@ from geofileops import geofile
 from geofileops import geofileops
 from geofileops.geofile import GeometryType
 from geofileops.util import geofileops_sql
+from geofileops.util import geometry_util
 import test_helper
+
+def get_nb_parallel() -> int:
+    # The number of parallel processes to use for these tests.
+    return 2
+
+def get_batchsize() -> int:
+    return 5
 
 def test_buffer(tmpdir):
     # Init
@@ -56,19 +64,86 @@ def basetest_buffer(
     # Do operation
     geofileops_sql.buffer(input_path=input_path, output_path=output_path, distance=1)
 
+def test_buffer_options(tmpdir):    
+    # Prepare test data + run tests
+    tmp_dir = Path(tmpdir)
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    for suffix in test_helper.get_test_suffix_list():
+        # Buffer on not-projected data is weird, so not tested (at the moment)  
+        for crs_epsg in test_helper.get_test_crs_epsg_list():
+            # If test input file is in wrong format, convert it
+            input_path = test_helper.prepare_test_file(
+                    path=test_helper.TestFiles.polygons_parcels_gpkg,
+                    tmp_dir=tmp_dir,
+                    suffix=suffix,
+                    crs_epsg=crs_epsg)
+
+            # Now run test
+            output_path = tmp_dir / f"{input_path.stem}-output{suffix}"
+            print(f"Run test for suffix {suffix}, crs_epsg {crs_epsg}")
+            basetest_buffer_options(input_path, output_path)
+
+def basetest_buffer_options(input_path, output_path):
+
+    ### Init ###    
+    layerinfo_input = geofile.get_layerinfo(input_path)
+    assert layerinfo_input.crs is not None
+    distance = 1
+    if layerinfo_input.crs.is_projected is False:
+        # 1 degree = 111 km or 111000 m
+        distance /= 111000
+
+    ### First calculate default buffer for comparison ###
+    geofileops_sql.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            nb_parallel=get_nb_parallel())
+
     # Now check if the tmp file is correctly created
     layerinfo_orig = geofile.get_layerinfo(input_path)
+    layerinfo_input = geofile.get_layerinfo(input_path)
     layerinfo_output = geofile.get_layerinfo(output_path)
     assert layerinfo_orig.featurecount == layerinfo_output.featurecount
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
+    assert layerinfo_input.featurecount == layerinfo_output.featurecount
+    assert 'OIDN' in layerinfo_output.columns
+    assert 'UIDN' in layerinfo_output.columns
+    
+    # Read result for some more detailed checks
+    output_gdf = geofile.read_file(output_path)
+    assert output_gdf['geometry'][0] is not None
+    area_default_buffer = sum(output_gdf.area)
+
+    ### Test polygon buffer with square endcaps ###
+    output_path = output_path.parent / f"{output_path.stem}_endcap_join{output_path.suffix}"
+    geofileops_sql.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            endcap_style=geometry_util.BufferCapStyle.SQUARE,
+            join_style=geometry_util.BufferJoinStyle.MITRE,
+            nb_parallel=get_nb_parallel())
 
     # Buffer operations always result in a polygon
+    # Now check if the output file is correctly created
+    assert output_path.exists() == True
+    layerinfo_output = geofile.get_layerinfo(output_path)
+    assert layerinfo_input.featurecount == layerinfo_output.featurecount
+    assert len(layerinfo_output.columns) == len(layerinfo_input.columns)
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
 
     # Now check the contents of the result file
+    # Read result for some more detailed checks
     output_gdf = geofile.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
     geofile.remove(output_path)
+    area_square_buffer = sum(output_gdf.area)
+    assert area_square_buffer > area_default_buffer
+
+    ### Check if ... parameter works ###
+    # TODO: increase test coverage of other options...
+
 
 def test_convexhull(tmpdir):
     # Prepare test data + run tests
@@ -400,6 +475,7 @@ if __name__ == '__main__':
 
     # Single layer operations
     #test_buffer(tmpdir / "buffer")
+    test_buffer_options(tmpdir / "buffer_options")
     #test_convexhull(tmpdir / "convexhull")
     #test_delete_duplicate_geometries(tmpdir / "delete_duplicate_geometries")
     #test_makevalid(tmpdir / "makevalid")
