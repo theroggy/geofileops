@@ -15,7 +15,8 @@ def test_geofiletype_enum():
     ### Test ESRIShapefile geofiletype ###
     # Test getting a geofiletype for a suffix 
     assert GeofileType('.shp') == GeofileType.ESRIShapefile
-
+    assert GeofileType('.shp').ogrdriver == "ESRI Shapefile"
+    
     # Test getting a geofiletype for a Path (case insensitive)
     path = Path("/testje/path_naar_file.sHp") 
     assert GeofileType(path) == GeofileType.ESRIShapefile
@@ -26,7 +27,8 @@ def test_geofiletype_enum():
     ### GPKG geofiletype ###
     # Test getting a geofiletype for a suffix 
     assert GeofileType('.gpkg') == GeofileType.GPKG
-
+    assert GeofileType('.gpkg').ogrdriver == "GPKG"
+    
     # Test getting a geofiletype for a Path (case insensitive)
     path = Path("/testje/path_naar_file.gPkG") 
     assert GeofileType(path) == GeofileType.GPKG

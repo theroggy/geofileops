@@ -12,8 +12,8 @@ from typing import Any, List, Optional
 
 import pandas as pd
 
-from geofileops.util.geometry_util import GeometryType
-from geofileops import geofile
+import geofileops as gfo
+from geofileops import GeometryType
 from .general_util import MissingRuntimeDependencyError
 
 #-------------------------------------------------------------
@@ -108,7 +108,7 @@ def create_table_as_sql(
         raise Exception("Output and input2 paths don't have the same extension!")
         
     # Use crs epsg from input1_layer, if it has one
-    input1_layerinfo = geofile.get_layerinfo(input1_path, input1_layer)
+    input1_layerinfo = gfo.get_layerinfo(input1_path, input1_layer)
     crs_epsg = -1
     if input1_layerinfo.crs is not None and input1_layerinfo.crs.to_epsg() is not None: 
         crs_epsg = input1_layerinfo.crs.to_epsg()
@@ -367,7 +367,7 @@ def test_data_integrity(
         use_spatialite: bool = True):
 
     # Get list of layers in database 
-    layers = geofile.listlayers(path=path)
+    layers = gfo.listlayers(path=path)
 
     # Connect to database file
     conn = sqlite3.connect(path, detect_types=sqlite3.PARSE_DECLTYPES)

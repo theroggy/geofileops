@@ -2,6 +2,7 @@
 .coverage*
 *.log
 *.pyc
+*.gpkg-*
 .vscode/
 tests/data/testdata.qgz
 

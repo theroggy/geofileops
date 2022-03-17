@@ -11,11 +11,9 @@ import shapely.geometry as sh_geom
 
 # Add path so the local geofileops packages are found 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from geofileops import geofile
 from geofileops.util import geoseries_util
 from geofileops.util.geometry_util import GeometryType, PrimitiveType
 import test_helper 
-
 
 def test_get_geometrytypes():
     # None and empty geometries are by default ignored in get_geometrytypes
@@ -73,7 +71,7 @@ def test_harmonize_geometrytypes():
     test_result_gdf.geometry = geoseries_util.harmonize_geometrytypes(test_result_gdf.geometry)
     test_result_geometrytypes = geoseries_util.get_geometrytypes(test_result_gdf.geometry)
     assert len(test_result_geometrytypes) == 1
-    assert test_result_geometrytypes[0] == geofile.GeometryType.MULTIPOINT
+    assert test_result_geometrytypes[0] == GeometryType.MULTIPOINT
     for index, geom in test_result_gdf.geometry.iteritems():
         if index in [0, 1]:
             assert geom is None
@@ -91,30 +89,30 @@ def test_harmonize_geometrytypes():
     test_result_gdf.geometry = geoseries_util.harmonize_geometrytypes(test_result_gdf.geometry)
     test_result_geometrytypes = geoseries_util.get_geometrytypes(test_result_gdf.geometry)
     assert len(test_result_geometrytypes) == 1
-    assert test_result_geometrytypes[0] == geofile.GeometryType.MULTILINESTRING
+    assert test_result_geometrytypes[0] == GeometryType.MULTILINESTRING
     for index, geom in test_result_gdf.geometry.iteritems():
         if index in [0, 1]:
             assert geom is None
         else:
             assert geom is not None
 
-    # Test for gdf with linestring + multilinestring -> all multilinestring
+    # Test for gdf with polygon + multipolygon -> all multipolygon
     test_gdf = gpd.GeoDataFrame(geometry=[
+            test_helper.TestData.polygon_with_island,
             None, sh_geom.Polygon(),
-            test_helper.TestData.polygon_with_island, test_helper.TestData.multipolygon, 
-            test_helper.TestData.polygon_with_island, test_helper.TestData.multipolygon]) 
-    # Filter the gdf a bit to test that the indexes are retained properly in 
-    # harmonize_geometrytypes
+            test_helper.TestData.polygon_with_island, 
+            test_helper.TestData.multipolygon]) 
     test_gdf_geometrytypes = geoseries_util.get_geometrytypes(test_gdf.geometry)
     assert len(test_gdf_geometrytypes) == 2
-    test_gdf = test_gdf.iloc[[0, 3]]    # type: ignore
+    # Filter the gdf a bit to test that the indexes are retained properly in 
+    test_gdf = test_gdf.iloc[[1, 2, 3, 4]]    # type: ignore
     test_result_gdf = test_gdf.copy()
     test_result_gdf.geometry = geoseries_util.harmonize_geometrytypes(test_result_gdf.geometry)
     test_result_geometrytypes = geoseries_util.get_geometrytypes(test_result_gdf.geometry)
     assert len(test_result_geometrytypes) == 1
-    assert test_result_geometrytypes[0] == geofile.GeometryType.MULTIPOLYGON
+    assert test_result_geometrytypes[0] == GeometryType.MULTIPOLYGON
     for index, geom in test_result_gdf.geometry.iteritems():
-        if index in [0, 1]:
+        if index in [1, 2]:
             assert geom is None
         else:
             assert geom is not None
@@ -151,5 +149,5 @@ if __name__ == '__main__':
     tmpdir = test_helper.init_test_for_debug(Path(__file__).stem)
 
     #test_geometry_collection_extract()
-    #test_harmonize_geometrytypes()
-    test_polygons_to_lines()
+    test_harmonize_geometrytypes()
+    #test_polygons_to_lines()

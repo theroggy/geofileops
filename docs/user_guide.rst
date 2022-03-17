@@ -2,56 +2,106 @@
 
 User guide
 ==========
-The main objective of geofileops is to provide a high-level API to do spatial 
-operations on GIS files like GeoPackages or shapefiles in a fast way. 
-Most libraries only use one CPU to to spatial operations. GeofileOps use all
-available CPU's, so especially for large file processing time should be the 
-typical expected time divided by the number of available CPU's. 
 
-As a side product some functions that are used internally are also exposed in 
-the :mod:`geofileops.geofile` module. 
+The main objective of geofileops is to provide a simple to use but powerful 
+API to do fast spatial operations on GIS files. 
 
-:mod:`geofileops.geofileops`
-----------------------------
-The first type of operations are operations that are executed on one 
-file/layer. Examples are buffer, simplify, dissolve,...
+Spatial operations on one layer
+-------------------------------
 
-This is an example for a buffer operation:
+The first type of supported operations are operations that target one 
+file/layer. The output is always written to a seperate output file.
+
+The typical spatial operations are supported, eg. :meth:`~buffer`, 
+:meth:`~simplify`, :meth:`~dissolve`,... 
+
+You can also execute an sqlite sql statement (including  
+|spatialite functions|) on an input file using the :meth:`~select` operation. 
+
+A full list of operations can be found in the 
+:ref:`API reference<API-reference-single-layer>`. 
+
+This is how eg. a buffer operation can be applied on a file/layer:
 
 .. code-block:: python
 
-    from geofileops import geofileops
+    import geofileops as gfo
     
-    geofileops.buffer(
+    gfo.buffer(
             input_path='...',
             output_path='...',
             distance=2)
 
-By default all available CPU's will be used. You can specify the 
-number of CPU's to be used with the nb_parallel parameter. 
+Most spatial operations in geofileops have the same following optional 
+parameters:
 
-There are also operations between two files/layers. 
-Examples are intersection, erase, union,... 
+    * input_layer: if the file contains 1 layer, you don't need to specify a 
+      layer. For a file with multiple layers, use the "layer" parameter. 
+    * output_layer: if not specified, the output layer name will be 
+      output_path.stem.
+    * columns: if not specified, all columns will be retained in the output 
+      file. If you don't need all columns, specify the ones you want to keep.
+    * explodecollections: the output features will be "exploded", so multipart
+      features will be converted to single parts.
+    * nb_parallel: specify the number of CPU's to be used. By default all 
+      CPU's are used.
+    * batchsize: use this parameter to eg. reduce memory usage. 
+    * force: by default, if the output_path already exists, geofileops will  
+      just log that this is the fact and continue without throwing a error. 
+      To overwrite the existing output_path, specify force=True.
+    
+Spatial operation between two files/layers
+------------------------------------------
 
-This is an example for the intersection operation:
+For operations between two layers, obviously 2 input files/layers need to be 
+specified.
+
+The standard spatial operations are supported, eg. :meth:`~intersect`, 
+:meth:`~erase`, :meth:`~union`,...
+
+More specific features are:
+
+    * :meth:`~select_two_layers`: execute a select statement (including  
+      |spatialite functions|) on the input files. 
+    * :meth:`~join_nearest`: find the n nearest features from one layer 
+      compared the other.
+
+The full list of operations can be found in the 
+:ref:`API reference<API-reference-two-layers>`.
+
+This is a code example for the intersect operation:
 
 .. code-block:: python
 
-    from geofileops import geofileops
+    import geofileops as gfo
 
-    geofileops.intersect(
+    gfo.intersect(
             input1_path='...',
             input2_path='...',
             output_path='...')
 
-Please check out all available operations in the API reference.
+General file/layer operations
+-----------------------------
 
-:mod:`geofileops.geofile`
--------------------------
-This module contains some general purpose helper functions that might be of 
-use when working with geofiles (or layers).
+Finally there are also some functions available to manipulate geo files or 
+layers. Eg. :meth:`~copy`, :meth:`~move`, :meth:`~get_layerinfo`, 
+:meth:`~add_column`,...  
+
+For the full list of functions, check out the 
+:ref:`API reference<API-general-layer-ops>`.
+
+This is an example to get information about the (only) layer in a geo file: 
+
+.. code-block:: python
+
+    import geofileops as gfo
+
+    layerinfo = gfo.get_layerinfo(path='...')
+    print(f"Layer {layerinfo.name} contains {layerinfo.featurecount} features")
 
 Remark: some functions might only work on Geopackage files, not on 
 shapefiles.
 
-Check out the API reference for more info.
+.. |spatialite functions| raw:: html
+
+   <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite functions</a>

@@ -10,9 +10,8 @@ import geopandas as gpd
 
 # Add path so the local geofileops packages are found 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from geofileops import geofile
-from geofileops import geofileops
-from geofileops.geofile import GeometryType
+import geofileops as gfo
+from geofileops import GeometryType
 from geofileops.util import geofileops_sql
 from geofileops.util import geometry_util
 import test_helper
@@ -43,7 +42,7 @@ def test_buffer(tmpdir):
     # Prepare test data + run tests
     for suffix in test_helper.get_test_suffix_list():
         # Buffer on not-projected data is weird, so not tested (at the moment)  
-        for crs_epsg in [31370]:
+        for crs_epsg in test_helper.get_test_crs_epsg_list():
             for test_input in test_inputs: 
                 # If test input file is in wrong format, convert it
                 input_path = test_helper.prepare_test_file(
@@ -55,16 +54,130 @@ def test_buffer(tmpdir):
                 # Now run test
                 output_path = tmp_dir / f"{input_path.stem}-output{suffix}"
                 print(f"Run test for suffix {suffix}, crs_epsg {crs_epsg}, geometrytype {test_input['geometrytype']}")
-                basetest_buffer(input_path, output_path)
+                basetest_buffer(input_path, output_path, test_input['geometrytype'])
 
 def basetest_buffer(
         input_path: Path, 
-        output_path: Path):
-    
-    # Do operation
-    geofileops_sql.buffer(input_path=input_path, output_path=output_path, distance=1)
+        output_path: Path, 
+        input_geometry_type: GeometryType):
 
-def test_buffer_options(tmpdir):    
+    ### Init ###    
+    layerinfo_input = gfo.get_layerinfo(input_path)
+    assert layerinfo_input.crs is not None
+    distance = 1
+    if layerinfo_input.crs.is_projected is False:
+        # 1 degree = 111 km or 111000 m
+        distance /= 111000
+
+    ### Test positive buffer ###
+    gfo.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            nb_parallel=get_nb_parallel(),
+            batchsize=get_batchsize())
+
+    # Now check if the output file is correctly created
+    assert output_path.exists() == True
+    layerinfo_output = gfo.get_layerinfo(output_path)
+    assert layerinfo_input.featurecount == layerinfo_output.featurecount
+    assert len(layerinfo_output.columns) == len(layerinfo_input.columns)
+    
+    # Check geometry type
+    assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
+
+    # Read result for some more detailed checks
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf['geometry'][0] is not None
+
+    ### Test buffer to existing output path ###
+    assert output_path.exists() is True
+    mtime_orig = output_path.stat().st_mtime
+    gfo.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            nb_parallel=get_nb_parallel())
+    assert output_path.stat().st_mtime == mtime_orig
+
+    # With force=True
+    gfo.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            nb_parallel=get_nb_parallel(),
+            force=True)
+    assert output_path.stat().st_mtime != mtime_orig
+
+    ### Test negative buffer ###
+    distance = -10
+    if layerinfo_input.crs.is_projected is False:
+        # 1 degree = 111 km or 111000 m
+        distance /= 111000
+
+    output_path = output_path.parent / f"{output_path.stem}_m10m{output_path.suffix}"
+    gfo.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            nb_parallel=get_nb_parallel())
+
+    # Now check if the output file is correctly created
+    if input_geometry_type in [GeometryType.MULTIPOINT, GeometryType.MULTILINESTRING]:
+        # A Negative buffer of points or linestrings doesn't give a result.
+        assert output_path.exists() == False
+    else:    
+        # A Negative buffer of polygons gives a result for large polygons.
+        assert output_path.exists() == True
+        layerinfo_output = gfo.get_layerinfo(output_path)
+        assert len(layerinfo_output.columns) == len(layerinfo_input.columns) 
+        if layerinfo_input.crs.is_projected is True:
+            # 7 polygons disappear because of the negative buffer
+            assert layerinfo_output.featurecount == layerinfo_input.featurecount - 7
+        else:
+            assert layerinfo_output.featurecount == layerinfo_input.featurecount - 4
+        
+        # Check geometry type
+        assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
+
+        # Read result for some more detailed checks
+        output_gdf = gfo.read_file(output_path)
+        assert output_gdf['geometry'][0] is not None
+    
+    ### Test negative buffer with explodecollections ###
+    output_path = output_path.parent / f"{output_path.stem}_m10m_explode{output_path.suffix}"
+    gfo.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            explodecollections=True,
+            nb_parallel=get_nb_parallel())
+
+    # Now check if the output file is correctly created
+    if input_geometry_type in [GeometryType.MULTIPOINT, GeometryType.MULTILINESTRING]:
+        # A Negative buffer of points or linestrings doesn't give a result.
+        assert output_path.exists() == False
+    else:    
+        # A Negative buffer of polygons gives a result for large polygons
+        assert output_path.exists() == True
+        layerinfo_output = gfo.get_layerinfo(output_path)
+        assert len(layerinfo_output.columns) == len(layerinfo_input.columns) 
+
+        if layerinfo_input.crs.is_projected is True:
+            # 6 polygons disappear because of the negative buffer, 3 polygons are 
+            # split in 2 because of the negative buffer and/or explodecollections=True.
+            assert layerinfo_output.featurecount == layerinfo_input.featurecount - 7 + 3
+        else:
+            assert layerinfo_output.featurecount == layerinfo_input.featurecount - 3 + 3
+
+        # Check geometry type
+        assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
+
+        # Read result for some more detailed checks
+        output_gdf = gfo.read_file(output_path)
+        assert output_gdf['geometry'][0] is not None
+
+def test_buffer_ext(tmpdir):    
     # Prepare test data + run tests
     tmp_dir = Path(tmpdir)
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -81,69 +194,42 @@ def test_buffer_options(tmpdir):
             # Now run test
             output_path = tmp_dir / f"{input_path.stem}-output{suffix}"
             print(f"Run test for suffix {suffix}, crs_epsg {crs_epsg}")
-            basetest_buffer_options(input_path, output_path)
+            basetest_buffer_ext(input_path, output_path)
 
-def basetest_buffer_options(input_path, output_path):
+def basetest_buffer_ext(input_path, output_path):
 
     ### Init ###    
-    layerinfo_input = geofile.get_layerinfo(input_path)
+    layerinfo_input = gfo.get_layerinfo(input_path)
     assert layerinfo_input.crs is not None
     distance = 1
     if layerinfo_input.crs.is_projected is False:
         # 1 degree = 111 km or 111000 m
         distance /= 111000
 
-    ### First calculate default buffer for comparison ###
-    geofileops_sql.buffer(
+    ### Check if columns parameter works (case insensitive) ###
+    columns = ['OIDN', 'uidn', 'HFDTLT', 'lblhfdtlt', 'GEWASGROEP', 'lengte', 'OPPERVL']
+    gfo.buffer(
             input_path=input_path,
+            columns=columns,
             output_path=output_path,
             distance=distance,
             nb_parallel=get_nb_parallel())
 
     # Now check if the tmp file is correctly created
-    layerinfo_orig = geofile.get_layerinfo(input_path)
-    layerinfo_input = geofile.get_layerinfo(input_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
-    assert layerinfo_orig.featurecount == layerinfo_output.featurecount
-    assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
+    layerinfo_input = gfo.get_layerinfo(input_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_input.featurecount == layerinfo_output.featurecount
     assert 'OIDN' in layerinfo_output.columns
     assert 'UIDN' in layerinfo_output.columns
-    
+    assert len(layerinfo_output.columns) == len(columns)
+
     # Read result for some more detailed checks
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
     area_default_buffer = sum(output_gdf.area)
 
-    ### Test polygon buffer with square endcaps ###
-    output_path = output_path.parent / f"{output_path.stem}_endcap_join{output_path.suffix}"
-    geofileops_sql.buffer(
-            input_path=input_path,
-            output_path=output_path,
-            distance=distance,
-            endcap_style=geometry_util.BufferCapStyle.SQUARE,
-            join_style=geometry_util.BufferJoinStyle.MITRE,
-            nb_parallel=get_nb_parallel())
-
-    # Buffer operations always result in a polygon
-    # Now check if the output file is correctly created
-    assert output_path.exists() == True
-    layerinfo_output = geofile.get_layerinfo(output_path)
-    assert layerinfo_input.featurecount == layerinfo_output.featurecount
-    assert len(layerinfo_output.columns) == len(layerinfo_input.columns)
-    assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
-
-    # Now check the contents of the result file
-    # Read result for some more detailed checks
-    output_gdf = geofile.read_file(output_path)
-    assert output_gdf['geometry'][0] is not None
-    geofile.remove(output_path)
-    area_square_buffer = sum(output_gdf.area)
-    assert area_square_buffer > area_default_buffer
-
     ### Check if ... parameter works ###
     # TODO: increase test coverage of other options...
-
 
 def test_convexhull(tmpdir):
     # Prepare test data + run tests
@@ -168,12 +254,12 @@ def basetest_convexhull(
         output_path: Path):
     
     # Do operation  
-    geofileops_sql.convexhull(input_path=input_path, output_path=output_path)
+    gfo.convexhull(input_path=input_path, output_path=output_path)
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_orig = geofile.get_layerinfo(input_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_orig = gfo.get_layerinfo(input_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_orig.featurecount == layerinfo_output.featurecount
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
 
@@ -181,7 +267,7 @@ def basetest_convexhull(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_delete_duplicate_geometries(tmpdir):
@@ -198,18 +284,18 @@ def test_delete_duplicate_geometries(tmpdir):
             crs=test_helper.TestData.crs_epsg)
     suffix = ".gpkg"
     input_path = tmp_dir / f"input_test_data{suffix}"
-    geofile.to_file(test_gdf, input_path)
-    input_info = geofile.get_layerinfo(input_path)
+    gfo.to_file(test_gdf, input_path)
+    input_info = gfo.get_layerinfo(input_path)
     
     # Run test
     output_path = tmp_dir / f"{input_path.stem}-output{suffix}"
     print(f"Run test for suffix {suffix}")
-    geofileops.delete_duplicate_geometries(
+    gfo.delete_duplicate_geometries(
             input_path=input_path,
             output_path=output_path)
 
     # Check result, 2 duplicates should be removed
-    result_info = geofile.get_layerinfo(output_path)
+    result_info = gfo.get_layerinfo(output_path)
     assert result_info.featurecount == input_info.featurecount - 2
 
 def test_isvalid(tmpdir):
@@ -235,30 +321,30 @@ def basetest_isvalid(
         output_path: Path):
     
     # Do operation
-    input_layerinfo = geofile.get_layerinfo(input_path)
-    geofileops.isvalid(input_path=input_path, output_path=output_path, nb_parallel=2)
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    gfo.isvalid(input_path=input_path, output_path=output_path, nb_parallel=2)
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() is True
-    result_layerinfo = geofile.get_layerinfo(output_path)
+    result_layerinfo = gfo.get_layerinfo(output_path)
     assert input_layerinfo.featurecount == result_layerinfo.featurecount
     assert len(input_layerinfo.columns) == len(result_layerinfo.columns) - 2
 
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
     assert output_gdf['isvalid'][0] == 0
     
     # Do operation, without specifying output path
-    geofileops.isvalid(input_path=input_path, nb_parallel=2)
+    gfo.isvalid(input_path=input_path, nb_parallel=2)
 
     # Now check if the tmp file is correctly created
     output_auto_path = output_path.parent / f"{input_path.stem}_isvalid{output_path.suffix}"
     assert output_auto_path.exists() == True
-    result_auto_layerinfo = geofile.get_layerinfo(output_auto_path)
+    result_auto_layerinfo = gfo.get_layerinfo(output_auto_path)
     assert input_layerinfo.featurecount == result_auto_layerinfo.featurecount
     assert len(input_layerinfo.columns) == len(result_auto_layerinfo.columns) - 2
 
-    output_auto_gdf = geofile.read_file(output_auto_path)
+    output_auto_gdf = gfo.read_file(output_auto_path)
     assert output_auto_gdf['geometry'][0] is not None
     assert output_auto_gdf['isvalid'][0] == 0
 
@@ -285,12 +371,12 @@ def basetest_makevalid(
         output_path: Path):
 
     # Do operation
-    geofileops.makevalid(input_path=input_path, output_path=output_path, nb_parallel=2)
+    gfo.makevalid(input_path=input_path, output_path=output_path, nb_parallel=2)
 
     # Now check if the output file is correctly created
     assert output_path.exists() == True
-    layerinfo_orig = geofile.get_layerinfo(input_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_orig = gfo.get_layerinfo(input_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_orig.featurecount == layerinfo_output.featurecount
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
 
@@ -298,17 +384,17 @@ def basetest_makevalid(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
     # Make sure the input file was not valid
     output_isvalid_path = output_path.parent / f"{output_path.stem}_is-valid{output_path.suffix}"
-    isvalid = geofileops.isvalid(input_path=input_path, output_path=output_isvalid_path)
+    isvalid = gfo.isvalid(input_path=input_path, output_path=output_isvalid_path)
     assert isvalid is False, "Input file should contain invalid features"
 
     # Check if the result file is valid
     output_new_isvalid_path = output_path.parent / f"{output_path.stem}_new_is-valid{output_path.suffix}"
-    isvalid = geofileops.isvalid(input_path=output_path, output_path=output_new_isvalid_path)
+    isvalid = gfo.isvalid(input_path=output_path, output_path=output_new_isvalid_path)
     assert isvalid == True, "Output file shouldn't contain invalid features"
 
 def test_select(tmpdir):
@@ -335,15 +421,15 @@ def basetest_select(
         output_path: Path):
 
     # Run test
-    layerinfo_input = geofile.get_layerinfo(input_path)
+    layerinfo_input = gfo.get_layerinfo(input_path)
     sql_stmt = 'SELECT {geometrycolumn}, oidn, uidn FROM "{input_layer}"'
-    geofileops.select(
+    gfo.select(
             input_path=input_path,
             output_path=output_path,
             sql_stmt=sql_stmt)
 
     # Now check if the tmp file is correctly created
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_input.featurecount == layerinfo_output.featurecount
     assert 'OIDN' in layerinfo_output.columns
     assert 'UIDN' in layerinfo_output.columns
@@ -353,7 +439,7 @@ def basetest_select(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_select_various_options(tmpdir):
@@ -380,24 +466,24 @@ def basetest_select_various_options(
 
     ### Check if columns parameter works (case insensitive) ###
     columns = ['OIDN', 'uidn', 'HFDTLT', 'lblhfdtlt', 'GEWASGROEP', 'lengte', 'OPPERVL']
-    layerinfo_input = geofile.get_layerinfo(input_path)
+    layerinfo_input = gfo.get_layerinfo(input_path)
     sql_stmt = '''SELECT {geometrycolumn}
                         {columns_to_select_str} 
                     FROM "{input_layer}"'''
-    geofileops.select(
+    gfo.select(
             input_path=input_path,
             output_path=output_path,
             columns=columns,
             sql_stmt=sql_stmt)
 
     # Now check if the tmp file is correctly created
-    layerinfo_select = geofile.get_layerinfo(output_path)
+    layerinfo_select = gfo.get_layerinfo(output_path)
     assert layerinfo_input.featurecount == layerinfo_select.featurecount
     assert 'OIDN' in layerinfo_select.columns
     assert 'UIDN' in layerinfo_select.columns
     assert len(layerinfo_select.columns) == len(columns)
 
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
     ### Check if ... parameter works ###
@@ -441,7 +527,7 @@ def basetest_simplify(
         expected_output_geometrytype: GeometryType):
 
     ### Init ###
-    layerinfo_orig = geofile.get_layerinfo(input_path)
+    layerinfo_orig = gfo.get_layerinfo(input_path)
     assert layerinfo_orig.crs is not None
     if layerinfo_orig.crs.is_projected:
         tolerance = 5
@@ -457,8 +543,8 @@ def basetest_simplify(
 
     # Now check if the output file is correctly created
     assert output_path.exists() == True
-    layerinfo_orig = geofile.get_layerinfo(input_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_orig = gfo.get_layerinfo(input_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_orig.featurecount == layerinfo_output.featurecount
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
 
@@ -466,7 +552,7 @@ def basetest_simplify(
     assert layerinfo_output.geometrytype == expected_output_geometrytype 
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 if __name__ == '__main__':
@@ -474,12 +560,11 @@ if __name__ == '__main__':
     tmpdir = test_helper.init_test_for_debug(Path(__file__).stem)
 
     # Single layer operations
-    #test_buffer(tmpdir / "buffer")
-    test_buffer_options(tmpdir / "buffer_options")
+    test_buffer(tmpdir / "buffer")
     #test_convexhull(tmpdir / "convexhull")
     #test_delete_duplicate_geometries(tmpdir / "delete_duplicate_geometries")
     #test_makevalid(tmpdir / "makevalid")
-    test_isvalid(tmpdir / "isvalid")
+    #test_isvalid(tmpdir / "isvalid")
     #test_select(tmpdir / "select")
     #test_select_geos_version(tmpdir)
     #test_simplify(tmpdir / "simplify")

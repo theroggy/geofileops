@@ -33,11 +33,19 @@ logger = logging.getLogger(__name__)
 #-------------------------------------------------------------
 
 class BufferJoinStyle(enum.Enum):
+    """
+    Enumeration of the available buffer styles for the intermediate points of 
+    a line or polygon geometry.
+    """
     ROUND = 1
     MITRE = 2
     BEVEL = 3
 
-class BufferCapStyle(enum.Enum):
+class BufferEndCapStyle(enum.Enum):
+    """
+    Enumeration of the available buffer styles for the end points of 
+    a line or point geometry.
+    """
     ROUND = 1
     FLAT = 2
     SQUARE = 3
@@ -47,6 +55,9 @@ class BufferCapStyle(enum.Enum):
 #-------------------------------------------------------------
 
 class GeometryType(enum.Enum):
+    """
+    Enumeration of the different geometry types.
+    """
     MISSING = -1
     GEOMETRY = 0
     POINT = 1
@@ -83,12 +94,14 @@ class GeometryType(enum.Enum):
 
     @property
     def is_multitype(self):
+        """ Returns if the geometry type is a multi type. """
         return self in (
                 GeometryType.MULTIPOINT, GeometryType.MULTILINESTRING, 
                 GeometryType.MULTIPOLYGON, GeometryType.GEOMETRYCOLLECTION)
 
     @property
     def to_multitype(self):
+        """ Get the corresponding multitype. """
         if self in [GeometryType.MULTIPOINT, GeometryType.MULTILINESTRING, 
             GeometryType.MULTIPOLYGON, GeometryType.GEOMETRYCOLLECTION]:
             return self
@@ -103,7 +116,7 @@ class GeometryType(enum.Enum):
 
     @property
     def to_primitivetype(self):
-        # Lookup correct primitive type
+        """ Get the corresponding primitive type. """
         if self in [GeometryType.POINT, GeometryType.MULTIPOINT]:
             return PrimitiveType.POINT
         elif self in [GeometryType.LINESTRING, GeometryType.MULTILINESTRING]:
@@ -116,6 +129,9 @@ class GeometryType(enum.Enum):
             raise Exception(f"No primitive type implemented for {self}")
     
 class PrimitiveType(enum.Enum):
+    """
+    Enumeration of the different existing primitive types of a geometry.
+    """
     POINT = 1
     LINESTRING = 2
     POLYGON = 3
@@ -132,6 +148,7 @@ class PrimitiveType(enum.Enum):
 
     @property
     def to_multitype(self) -> GeometryType:
+        """ Get the corresponding multitype. """
         if self is PrimitiveType.POINT:
             return GeometryType.MULTIPOINT
         elif self is PrimitiveType.LINESTRING:
@@ -402,6 +419,9 @@ def remove_inner_rings(
 #-------------------------------------------------------------
 
 class SimplifyAlgorithm(enum.Enum):
+    """
+    Enumeration of the supported simplification algorythms.
+    """
     RAMER_DOUGLAS_PEUCKER = 'rdp'
     LANG = 'lang'
     VISVALINGAM_WHYATT = 'vw'

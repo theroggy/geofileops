@@ -8,9 +8,8 @@ import sys
 
 # Add path so the local geofileops packages are found 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from geofileops import geofile
-from geofileops import geofileops
-from geofileops.geofile import GeometryType, PrimitiveType
+import geofileops as gfo
+from geofileops import GeometryType, PrimitiveType
 from geofileops.util import io_util
 import test_helper
 
@@ -60,15 +59,15 @@ def basetest_erase(
         expected_output_geometrytype: GeometryType):
 
     ### Do standard operation ###
-    geofileops.erase(
+    gfo.erase(
             input_path=input_path, 
             erase_path=erase_path,
             output_path=output_path)
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_orig = geofile.get_layerinfo(input_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_orig = gfo.get_layerinfo(input_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
 
     # Checks depending on geometry type
@@ -83,12 +82,12 @@ def basetest_erase(
         raise Exception(f"Unsupported expected_output_geometrytype: {expected_output_geometrytype}")
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
     ### Do operation with explodecollections=True ###
     output_path = io_util.with_stem(output_path, f"{output_path.stem}_exploded")
-    geofileops.erase(
+    gfo.erase(
             input_path=input_path, 
             erase_path=erase_path,
             output_path=output_path,
@@ -96,8 +95,8 @@ def basetest_erase(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_orig = geofile.get_layerinfo(input_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_orig = gfo.get_layerinfo(input_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
 
     # Checks depending on geometry type
@@ -112,7 +111,7 @@ def basetest_erase(
         raise Exception(f"Unsupported expected_output_geometrytype: {expected_output_geometrytype}")
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
         
 def test_export_by_location(tmpdir):
@@ -145,15 +144,15 @@ def basetest_export_by_location(
         input_to_compare_with_path: Path, 
         output_path: Path):
 
-    geofileops.export_by_location(
+    gfo.export_by_location(
             input_to_select_from_path=input_to_select_from_path,
             input_to_compare_with_path=input_to_compare_with_path,
             output_path=output_path)
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_orig = geofile.get_layerinfo(input_to_select_from_path)
-    layerinfo_output = geofile.get_layerinfo(input_to_select_from_path)
+    layerinfo_orig = gfo.get_layerinfo(input_to_select_from_path)
+    layerinfo_output = gfo.get_layerinfo(input_to_select_from_path)
     assert layerinfo_orig.featurecount == layerinfo_output.featurecount
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
 
@@ -161,7 +160,7 @@ def basetest_export_by_location(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_export_by_distance(tmpdir):
@@ -197,7 +196,7 @@ def basetest_export_by_distance(
         input_to_compare_with_path: Path, 
         output_path: Path):
 
-    geofileops.export_by_distance(
+    gfo.export_by_distance(
             input_to_select_from_path=input_to_select_from_path,
             input_to_compare_with_path=input_to_compare_with_path,
             max_distance=10,
@@ -205,8 +204,8 @@ def basetest_export_by_distance(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_orig = geofile.get_layerinfo(input_to_select_from_path)
-    layerinfo_output = geofile.get_layerinfo(input_to_select_from_path)
+    layerinfo_orig = gfo.get_layerinfo(input_to_select_from_path)
+    layerinfo_output = gfo.get_layerinfo(input_to_select_from_path)
     assert layerinfo_orig.featurecount == layerinfo_output.featurecount
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
 
@@ -214,7 +213,7 @@ def basetest_export_by_distance(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_intersect(tmpdir):
@@ -248,7 +247,7 @@ def basetest_intersect(
         output_path: Path):
 
     # Do operation
-    geofileops.intersect(
+    gfo.intersect(
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path,
@@ -256,15 +255,15 @@ def basetest_intersect(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_input1 = geofile.get_layerinfo(input1_path)
-    layerinfo_input2 = geofile.get_layerinfo(input2_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_input1 = gfo.get_layerinfo(input1_path)
+    layerinfo_input2 = gfo.get_layerinfo(input2_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == 28
     assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns)) == len(layerinfo_output.columns)
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
     
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_join_by_location(tmpdir):
@@ -298,7 +297,7 @@ def basetest_join_by_location(
         output_path: Path):
         
     ### Test 1: inner join, intersect
-    geofileops.join_by_location(
+    gfo.join_by_location(
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path,
@@ -307,9 +306,9 @@ def basetest_join_by_location(
 
     # Now check if the output file is correctly created
     assert output_path.exists() == True
-    layerinfo_input1 = geofile.get_layerinfo(input1_path)
-    layerinfo_input2 = geofile.get_layerinfo(input2_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_input1 = gfo.get_layerinfo(input1_path)
+    layerinfo_input2 = gfo.get_layerinfo(input2_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == 28
     if input1_path.suffix == ".shp":
         assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns)) == len(layerinfo_output.columns)
@@ -318,11 +317,11 @@ def basetest_join_by_location(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
     ### Test 2: left outer join, intersect
-    geofileops.join_by_location(
+    gfo.join_by_location(
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path,
@@ -331,7 +330,7 @@ def basetest_join_by_location(
 
     # Now check if the output file is correctly created
     assert output_path.exists() == True
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == 48
     if input1_path.suffix == ".shp":
         assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns)) == len(layerinfo_output.columns)
@@ -340,7 +339,7 @@ def basetest_join_by_location(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_join_nearest(tmpdir):
@@ -375,7 +374,7 @@ def basetest_join_nearest(
         
     ### Test 1: inner join, intersect
     nb_nearest = 2
-    geofileops.join_nearest(
+    gfo.join_nearest(
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path,
@@ -384,9 +383,9 @@ def basetest_join_nearest(
 
     # Now check if the output file is correctly created
     assert output_path.exists() == True
-    layerinfo_input1 = geofile.get_layerinfo(input1_path)
-    layerinfo_input2 = geofile.get_layerinfo(input2_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_input1 = gfo.get_layerinfo(input1_path)
+    layerinfo_input2 = gfo.get_layerinfo(input2_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == nb_nearest * layerinfo_input1.featurecount
     assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns) + 2) == len(layerinfo_output.columns)
 
@@ -394,7 +393,7 @@ def basetest_join_nearest(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON 
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_select_two_layers(tmpdir):
@@ -429,8 +428,8 @@ def basetest_select_two_layers(
 
     # Prepare query to execute. At the moment this is just the query for the 
     # intersect() operation.
-    input1_layer_info = geofile.get_layerinfo(input1_path)
-    input2_layer_info = geofile.get_layerinfo(input2_path)
+    input1_layer_info = gfo.get_layerinfo(input1_path)
+    input2_layer_info = gfo.get_layerinfo(input2_path)
     primitivetype_to_extract = PrimitiveType(min(
             input1_layer_info.geometrytype.to_primitivetype.value, 
             input2_layer_info.geometrytype.to_primitivetype.value))
@@ -455,7 +454,7 @@ def basetest_select_two_layers(
                 AND ST_Intersects(layer1.{{input1_geometrycolumn}}, layer2.{{input2_geometrycolumn}}) = 1
                 AND ST_Touches(layer1.{{input1_geometrycolumn}}, layer2.{{input2_geometrycolumn}}) = 0
             '''
-    geofileops.select_two_layers(
+    gfo.select_two_layers(
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path,
@@ -463,15 +462,15 @@ def basetest_select_two_layers(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_input1 = geofile.get_layerinfo(input1_path)
-    layerinfo_input2 = geofile.get_layerinfo(input2_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_input1 = gfo.get_layerinfo(input1_path)
+    layerinfo_input2 = gfo.get_layerinfo(input2_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == 28
     assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns) + 1) == len(layerinfo_output.columns)
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_split(tmpdir):
@@ -505,22 +504,22 @@ def basetest_split_layers(
         output_path: Path):
 
     # Do operation
-    geofileops.split(
+    gfo.split(
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path)
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_input1 = geofile.get_layerinfo(input1_path)
-    layerinfo_input2 = geofile.get_layerinfo(input2_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_input1 = gfo.get_layerinfo(input1_path)
+    layerinfo_input2 = gfo.get_layerinfo(input2_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == 65
     assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns)) == len(layerinfo_output.columns)
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_union(tmpdir):
@@ -554,7 +553,7 @@ def basetest_union(
         output_path: Path):
 
     # Do operation
-    geofileops.union(
+    gfo.union(
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path,
@@ -562,15 +561,15 @@ def basetest_union(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_input1 = geofile.get_layerinfo(input1_path)
-    layerinfo_input2 = geofile.get_layerinfo(input2_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_input1 = gfo.get_layerinfo(input1_path)
+    layerinfo_input2 = gfo.get_layerinfo(input2_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == 69
     assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns)) == len(layerinfo_output.columns)
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 def test_union_circles(tmpdir):
@@ -607,7 +606,7 @@ def basetest_union_circles(
     
     ##### Also run some tests on basic data with circles #####
     ### Union the single circle towards the 2 circles ###
-    geofileops.union( 
+    gfo.union( 
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path,
@@ -615,9 +614,9 @@ def basetest_union_circles(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_input1 = geofile.get_layerinfo(input1_path)
-    layerinfo_input2 = geofile.get_layerinfo(input2_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_input1 = gfo.get_layerinfo(input1_path)
+    layerinfo_input2 = gfo.get_layerinfo(input2_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == 5
     assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns)) == len(layerinfo_output.columns)
 
@@ -625,14 +624,14 @@ def basetest_union_circles(
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
     ### Union the two circles towards the single circle ###
     input1_path = test_helper.TestFiles.polygons_overlappingcircles_twothree_gpkg
     input2_path = test_helper.TestFiles.polygons_overlappingcircles_one_gpkg
     output_path = Path(tmp_dir) / f"{input1_path.stem}_union_{input2_path.stem}.gpkg"
-    geofileops.union( 
+    gfo.union( 
             input1_path=input1_path,
             input2_path=input2_path,
             output_path=output_path,
@@ -640,9 +639,9 @@ def basetest_union_circles(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists() == True
-    layerinfo_input1 = geofile.get_layerinfo(input1_path)
-    layerinfo_input2 = geofile.get_layerinfo(input2_path)
-    layerinfo_output = geofile.get_layerinfo(output_path)
+    layerinfo_input1 = gfo.get_layerinfo(input1_path)
+    layerinfo_input2 = gfo.get_layerinfo(input2_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_output.featurecount == 5
     assert (len(layerinfo_input1.columns) + len(layerinfo_input2.columns)) == len(layerinfo_output.columns)
 
@@ -654,7 +653,7 @@ def basetest_union_circles(
         assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
     # Now check the contents of the result file
-    output_gdf = geofile.read_file(output_path)
+    output_gdf = gfo.read_file(output_path)
     assert output_gdf['geometry'][0] is not None
 
 if __name__ == '__main__':

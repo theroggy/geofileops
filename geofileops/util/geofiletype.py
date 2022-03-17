@@ -48,6 +48,9 @@ def init_geofiletypes():
                     suffixes_extrafiles=suffixes_extrafiles)
 
 class GeofileType(enum.Enum):
+    """
+    Enumeration of relevant geo file types and their properties.  
+    """
     ESRIShapefile = enum.auto()
     GeoJSON = enum.auto()
     GPKG = enum.auto()

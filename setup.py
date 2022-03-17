@@ -3,7 +3,7 @@ import setuptools
 with open('README.md', 'r') as fh:
     long_description = fh.read()
 
-with open('version.txt', mode='r') as file:
+with open('geofileops/version.txt', mode='r') as file:
     version = file.readline()
 
 setuptools.setup(

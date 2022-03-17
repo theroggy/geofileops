@@ -14,7 +14,7 @@ import shapely.geometry as sh_geom
 
 # Add path so the local geofileops packages are found 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from geofileops import geofile
+import geofileops as gfo
 
 class TestData:
     crs_epsg = 31370
@@ -81,7 +81,7 @@ def get_test_crs_epsg_list() -> List[int]:
     return [31370, 4326]
 
 def get_test_suffix_list() -> List[str]:
-    return [".shp", ".gpkg"]
+    return [".gpkg", ".shp"]
 
 def init_test_for_debug(test_module_name: str) -> Path:
     # Init logging
@@ -90,7 +90,7 @@ def init_test_for_debug(test_module_name: str) -> Path:
             datefmt="%H:%M:%S", level=logging.INFO)
 
     # Prepare tmpdir
-    tmp_basedir = Path(tempfile.gettempdir()) / test_module_name
+    tmp_basedir = Path(tempfile.gettempdir()) / "geofileops_test_debug" / test_module_name
     tmpdir = create_tempdir(parent_dir=tmp_basedir, base_dirname='debugrun')
     
     """
@@ -110,22 +110,22 @@ def prepare_test_file(
     # If sufixx the same, copy to tmp_dir, if not, convert
     new_path = tmp_dir / f"{path.stem}{suffix}"
     if path.suffix == suffix:    
-        geofile.copy(path, new_path)
+        gfo.copy(path, new_path)
     else:
-        geofile.convert(path, new_path)
+        gfo.convert(path, new_path)
     path = new_path
 
     # If crs_epsg specified and test input file in wrong crs_epsg, reproject
     if crs_epsg is not None:
-        input_layerinfo = geofile.get_layerinfo(path)
+        input_layerinfo = gfo.get_layerinfo(path)
         assert input_layerinfo.crs is not None
         if input_layerinfo.crs.to_epsg() != crs_epsg:
             new_path = tmp_dir / f"{path.stem}_{crs_epsg}{suffix}"
             if new_path.exists() is False:
-                test_gdf = geofile.read_file(path)
+                test_gdf = gfo.read_file(path)
                 test_gdf = test_gdf.to_crs(crs_epsg)
                 assert isinstance(test_gdf, gpd.GeoDataFrame)
-                geofile.to_file(test_gdf, new_path)
+                gfo.to_file(test_gdf, new_path)
             path = new_path
 
     return path

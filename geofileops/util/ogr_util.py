@@ -13,7 +13,6 @@ from pathlib import Path
 import pprint
 import re
 import subprocess
-import sys
 import tempfile
 from threading import Lock
 import time
@@ -24,7 +23,8 @@ from osgeo import gdal
 gdal.UseExceptions() 
 gdal.ConfigurePythonLogging(logger_name='gdal', enable_debug=False)
 
-from geofileops import geofile
+import geofileops as gfo
+from geofileops.util.geofiletype import GeofileType
 from geofileops.util.geometry_util import GeometryType
 
 #-------------------------------------------------------------
@@ -195,11 +195,11 @@ def vector_translate(
                 layerCreationOptions.extend(['SPATIAL_INDEX=NO'])
     
     # Get output format from the filename
-    output_filetype = geofile.GeofileType(output_path)
+    output_filetype = GeofileType(output_path)
 
     # Sqlite specific options
     datasetCreationOptions = []
-    if output_filetype == geofile.GeofileType.SQLite:
+    if output_filetype == GeofileType.SQLite:
         # Use the spatialite type of sqlite
         #datasetCreationOptions.extend(['-dsco', 'SPATIALITE=YES'])
         datasetCreationOptions.append('SPATIALITE=YES')
@@ -277,7 +277,7 @@ def vector_translate(
             if result_ds.GetLayerCount() == 0:
                 del result_ds
                 if output_path.exists():
-                    geofile.remove(output_path)
+                    gfo.remove(output_path)
     except Exception as ex:
         message = f"Error executing {sql_stmt}"
         logger.exception(message)
@@ -375,8 +375,8 @@ def vector_translate_exe(
         args.extend(['-gt', str(transaction_size)])
     
     # Sqlite specific options:
-    output_filetype = geofile.GeofileType(output_path)
-    if output_filetype == geofile.GeofileType.SQLite:
+    output_filetype = GeofileType(output_path)
+    if output_filetype == GeofileType.SQLite:
         # Use the spatialite type of sqlite
         args.extend(['-dsco', 'SPATIALITE=YES'])
 
@@ -430,7 +430,7 @@ def vector_translate_exe(
                 # If output_path didn't exist yet before, clean it up... if it exists
                 if not output_path_exists_already:
                     if output_path.exists():
-                        geofile.remove(output_path)
+                        gfo.remove(output_path)
                 raise Exception(f"Error executing {pprint.pformat(args)}\n\t-> Return code: {returncode}\n\t-> Error: {err}\n\t->Output: {output}")
         elif(err is not None and err != ""
              and not str(err).startswith(r"Warning 1: Layer creation options ignored since an existing layer is")):
@@ -648,5 +648,5 @@ def _execute_sql(
                 sql_dialect=sql_dialect)
         
         # Return result
-        install_info_gdf = geofile.read_file(tmp_path)
+        install_info_gdf = gfo.read_file(tmp_path)
         return install_info_gdf

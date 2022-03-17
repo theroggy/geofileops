@@ -25,7 +25,7 @@ import geopandas as gpd
 import psutil
 import shapely.geometry as sh_geom
 
-from geofileops import geofile
+import geofileops as gfo
 from geofileops.util import general_util
 from geofileops.util import geofileops_sql
 from geofileops.util import geometry_util
@@ -188,7 +188,7 @@ def buffer(
         output_path: Path,
         distance: float,
         quadrantsegments: int = 5,
-        endcap_style: geometry_util.BufferCapStyle = geometry_util.BufferCapStyle.ROUND,
+        endcap_style: geometry_util.BufferEndCapStyle = geometry_util.BufferEndCapStyle.ROUND,
         join_style: geometry_util.BufferJoinStyle = geometry_util.BufferJoinStyle.ROUND,
         mitre_limit: float = 5.0,
         single_sided: bool = False,
@@ -361,17 +361,17 @@ def _apply_geooperation_to_layer(
     ##### Init #####
     start_time = datetime.datetime.now()
     if input_layer is None:
-        input_layer = geofile.get_only_layer(input_path)
+        input_layer = gfo.get_only_layer(input_path)
     if output_path.exists():
         if force is False:
             logger.info(f"Stop {operation}: output exists already {output_path}")
             return
         else:
-            geofile.remove(output_path)
+            gfo.remove(output_path)
     if input_layer is None:
-        input_layer = geofile.get_only_layer(input_path)
+        input_layer = gfo.get_only_layer(input_path)
     if output_layer is None:
-        output_layer = geofile.get_default_layer(output_path)
+        output_layer = gfo.get_default_layer(output_path)
 
     ##### Prepare tmp files #####
     tempdir = io_util.create_tempdir(f"geofileops/{operation.value}")
@@ -384,7 +384,7 @@ def _apply_geooperation_to_layer(
 
         # Calculate the best number of parallel processes and batches for 
         # the available resources
-        layerinfo = geofile.get_layerinfo(input_path, input_layer)
+        layerinfo = gfo.get_layerinfo(input_path, input_layer)
         nb_rows_total = layerinfo.featurecount
         if batchsize > 0:
             parallellization_config = ParallelizationConfig(max_avg_rows_per_batch=batchsize)
@@ -399,7 +399,7 @@ def _apply_geooperation_to_layer(
         # in some case improve performance
         '''
         sql_stmt = f'SELECT MIN(rowid) as min_rowid, MAX(rowid) as max_rowid FROM "{input_layer}"'
-        result = geofile.read_file_sql(path=temp_path, sql_stmt=sql_stmt, layer=input_layer)
+        result = geogfo.read_file_sql(path=temp_path, sql_stmt=sql_stmt, layer=input_layer)
         if len(result) == 1:
             min_rowid = result['min_rowid'].values[0]
             max_rowid = result['max_rowid'].values[0]
@@ -466,11 +466,11 @@ def _apply_geooperation_to_layer(
                     batch_id = future_to_batch_id[future]
                     tmp_partial_output_path = batches[batch_id]['tmp_partial_output_path']
                     if tmp_partial_output_path.exists() and tmp_partial_output_path.stat().st_size > 0:
-                        geofile.append_to(
+                        gfo.append_to(
                                 src=tmp_partial_output_path, 
                                 dst=output_tmp_path, 
                                 create_spatial_index=False)
-                        geofile.remove(tmp_partial_output_path)
+                        gfo.remove(tmp_partial_output_path)
                     
                 except Exception as ex:
                     batch_id = future_to_batch_id[future]
@@ -484,8 +484,8 @@ def _apply_geooperation_to_layer(
         ##### Round up and clean up ##### 
         # Now create spatial index and move to output location
         if output_tmp_path.exists():
-            geofile.create_spatial_index(path=output_tmp_path, layer=output_layer)
-            geofile.move(output_tmp_path, output_path)
+            gfo.create_spatial_index(path=output_tmp_path, layer=output_layer)
+            gfo.move(output_tmp_path, output_path)
         else:
             logger.warning(f"Result of {operation} was empty!f")
 
@@ -513,11 +513,11 @@ def _apply_geooperation(
             message = f"Stop {operation}: output exists already {output_path}"
             return message
         else:
-            geofile.remove(output_path)
+            gfo.remove(output_path)
 
     ##### Now go! #####
     start_time = datetime.datetime.now()
-    data_gdf = geofile.read_file(path=input_path, layer=input_layer, columns=columns, rows=rows)
+    data_gdf = gfo.read_file(path=input_path, layer=input_layer, columns=columns, rows=rows)
     if len(data_gdf) == 0:
         message = f"No input geometries found for rows: {rows} in layer: {input_layer} in input_path: {input_path}"
         return message
@@ -549,8 +549,8 @@ def _apply_geooperation(
         raise Exception(f"Operation not supported: {operation}")     
 
     # Remove rows where geom is empty
-    data_gdf = data_gdf[~data_gdf.is_empty] 
-    data_gdf = data_gdf[~data_gdf.isna()] 
+    data_gdf = data_gdf[~data_gdf.geometry.is_empty] 
+    data_gdf = data_gdf[~data_gdf.geometry.isna()] 
     
     if explodecollections:
         data_gdf = data_gdf.explode(ignore_index=True) # type: ignore
@@ -560,7 +560,7 @@ def _apply_geooperation(
         assert isinstance(data_gdf, gpd.GeoDataFrame)
         # Use force_multitype, to evade warnings when some batches contain 
         # singletype and some contain multitype geometries  
-        geofile.to_file(
+        gfo.to_file(
                 gdf=data_gdf, path=output_path, layer=output_layer, index=False,
                 force_multitype=True)
 
@@ -583,7 +583,7 @@ def dissolve(
         verbose: bool = False,
         force: bool = False) -> dict:
     """
-    Function that applies a dissolve on the input file.
+    Function that applies a dissolve on the input gfo.
 
     More detailed documentation in module geofileops!
     """
@@ -600,7 +600,7 @@ def dissolve(
         raise Exception(f"groupby_columns == [] is not supported. It should be None in this case")
     if not input_path.exists():
         raise Exception(f"input_path does not exist: {input_path}")
-    layerinfo = geofile.get_layerinfo(input_path, input_layer)
+    layerinfo = gfo.get_layerinfo(input_path, input_layer)
     if layerinfo.geometrytype.to_primitivetype in [PrimitiveType.POINT, PrimitiveType.LINESTRING]:
         if tiles_path is not None or nb_squarish_tiles > 1:
             raise Exception(f"Dissolve to tiles (tiles_path, nb_squarish_tiles) is not supported for {layerinfo.geometrytype}")
@@ -610,7 +610,7 @@ def dissolve(
             logger.info(result_info['message'])
             return result_info
         else:
-            geofile.remove(output_path)
+            gfo.remove(output_path)
     
     # Prepare columns to retain
     if columns is None:
@@ -627,17 +627,17 @@ def dissolve(
     # If a tiles_path is specified, read those tiles... 
     result_tiles_gdf = None
     if tiles_path is not None:
-        result_tiles_gdf = geofile.read_file(tiles_path)
+        result_tiles_gdf = gfo.read_file(tiles_path)
         if nb_parallel == -1:
             nb_cpu = multiprocessing.cpu_count()
             nb_parallel = nb_cpu #int(1.25 * nb_cpu)
             logger.debug(f"Nb cpus found: {nb_cpu}, nb_parallel: {nb_parallel}")
     else:
         # Else, create a grid based on the number of tiles wanted as result
-        layerinfo = geofile.get_layerinfo(input_path, input_layer)
+        layerinfo = gfo.get_layerinfo(input_path, input_layer)
         result_tiles_gdf = grid_util.create_grid2(layerinfo.total_bounds, nb_squarish_tiles, layerinfo.crs)
         if len(result_tiles_gdf) > 1:
-            geofile.to_file(result_tiles_gdf, output_path.parent / f"{output_path.stem}_tiles.gpkg")
+            gfo.to_file(result_tiles_gdf, output_path.parent / f"{output_path.stem}_tiles.gpkg")
 
     ##### Now start dissolving... #####
     # Line and point layers are:
@@ -647,7 +647,7 @@ def dissolve(
     # rounding issues at the borders of tiles... so just dissolve them using 
     # geopandas.   
     if layerinfo.geometrytype.to_primitivetype in [PrimitiveType.POINT, PrimitiveType.LINESTRING]:
-        input_gdf = geofile.read_file(input_path, input_layer)
+        input_gdf = gfo.read_file(input_path, input_layer)
 
         # Geopandas < 0.9 didn't support dissolving without groupby
         if groupby_columns is None or len(groupby_columns) == 0:
@@ -669,7 +669,7 @@ def dissolve(
         # Now write to file
         # assert to evade pyLance warning
         assert isinstance(diss_gdf, gpd.GeoDataFrame)
-        geofile.to_file(diss_gdf, output_path, output_layer)
+        gfo.to_file(diss_gdf, output_path, output_layer)
 
     elif layerinfo.geometrytype.to_primitivetype is PrimitiveType.POLYGON:
 
@@ -680,7 +680,7 @@ def dissolve(
         try:
             pass_input_path = input_path
             if output_layer is None:
-                output_layer = geofile.get_default_layer(output_path)
+                output_layer = gfo.get_default_layer(output_path)
             output_tmp_path = tempdir / f"{output_path.stem}.gpkg"
             prev_nb_batches = None
             last_pass = False
@@ -689,7 +689,7 @@ def dissolve(
             while True:
                 
                 # Get some info of the file that needs to be dissolved
-                layerinfo = geofile.get_layerinfo(pass_input_path, input_layer)
+                layerinfo = gfo.get_layerinfo(pass_input_path, input_layer)
                 nb_rows_total = layerinfo.featurecount
                 
                 # Calculate the best number of parallel processes and batches for 
@@ -726,7 +726,7 @@ def dissolve(
                     # creating new one...
                     tiles_gdf = grid_util.split_tiles(
                             result_tiles_gdf, nb_batches_recommended)
-                geofile.to_file(tiles_gdf, tempdir / f"{output_path.stem}_{pass_id}_tiles.gpkg")
+                gfo.to_file(tiles_gdf, tempdir / f"{output_path.stem}_{pass_id}_tiles.gpkg")
 
                 # If the number of tiles ends up as 1, it is the last pass anyway...
                 if len(tiles_gdf) == 1:
@@ -734,7 +734,7 @@ def dissolve(
 
                 # If we are not in the last pass, onborder parcels will need extra 
                 # processing still in further passes, so are saved in a seperate 
-                # file. The notonborder rows are final immediately 
+                # gfo. The notonborder rows are final immediately 
                 if last_pass is not True:
                     output_tmp_onborder_path = tempdir / f"{output_path.stem}_{pass_id}_onborder.gpkg"
                 else:
@@ -771,7 +771,7 @@ def dissolve(
             # If there is a result on border, append it to the rest
             if(str(output_tmp_onborder_path) != str(output_tmp_path) 
                     and output_tmp_onborder_path.exists()):
-                geofile.append_to(output_tmp_onborder_path, output_tmp_path, dst_layer=output_layer)
+                gfo.append_to(output_tmp_onborder_path, output_tmp_path, dst_layer=output_layer)
 
             # If there is a result...
             if output_tmp_path.exists():
@@ -853,7 +853,7 @@ def _dissolve_polygons_pass(
     start_time = datetime.datetime.now()
     result_info = {}
     start_time = datetime.datetime.now()
-    input_layerinfo = geofile.get_layerinfo(input_path, input_layer)
+    input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
     nb_rows_total = input_layerinfo.featurecount
     with futures.ProcessPoolExecutor(
             max_workers=nb_parallel, 
@@ -916,18 +916,18 @@ def _dissolve_polygons_pass(
                     # If the calculate gave results, copy to output
                     output_notonborder_tmp_partial_path = batches[batch_id]['output_notonborder_tmp_partial_path']
                     if output_notonborder_tmp_partial_path.exists() and output_notonborder_tmp_partial_path.stat().st_size > 0:
-                        geofile.append_to(
+                        gfo.append_to(
                                 src=output_notonborder_tmp_partial_path, 
                                 dst=output_notonborder_path)
-                        geofile.remove(output_notonborder_tmp_partial_path)
+                        gfo.remove(output_notonborder_tmp_partial_path)
                             
                     # If the calculate gave results, copy to output
                     output_onborder_tmp_partial_path = batches[batch_id]['output_onborder_tmp_partial_path']
                     if output_onborder_tmp_partial_path.exists() and output_onborder_tmp_partial_path.stat().st_size > 0:
-                        geofile.append_to(
+                        gfo.append_to(
                                 src=output_onborder_tmp_partial_path, 
                                 dst=output_onborder_path)
-                        geofile.remove(output_onborder_tmp_partial_path)
+                        gfo.remove(output_onborder_tmp_partial_path)
 
             except Exception as ex:
                 batch_id = future_to_batch_id[future]
@@ -974,7 +974,7 @@ def _dissolve_polygons(
     start_read = datetime.datetime.now()
     while True:
         try:
-            input_gdf = geofile.read_file(
+            input_gdf = gfo.read_file(
                     path=input_path, layer=input_layer, bbox=bbox, columns=columns)
             break
         except Exception as ex:
@@ -1055,7 +1055,7 @@ def _dissolve_polygons(
         assert isinstance(diss_gdf, gpd.GeoDataFrame)
         # Use force_multitype, to evade warnings when some batches contain 
         # singletype and some contain multitype geometries  
-        geofile.to_file(
+        gfo.to_file(
                 diss_gdf, output_notonborder_path, 
                 layer=output_layer, force_multitype=True)
     else:
@@ -1071,7 +1071,7 @@ def _dissolve_polygons(
             assert isinstance(onborder_gdf, gpd.GeoDataFrame)
             # Use force_multitype, to evade warnings when some batches contain 
             # singletype and some contain multitype geometries  
-            geofile.to_file(
+            gfo.to_file(
                     onborder_gdf, output_onborder_path, 
                     layer=output_layer, force_multitype=True)
         
@@ -1081,7 +1081,7 @@ def _dissolve_polygons(
             assert isinstance(notonborder_gdf, gpd.GeoDataFrame) 
             # Use force_multitype, to evade warnings when some batches contain 
             # singletype and some contain multitype geometries  
-            geofile.to_file(
+            gfo.to_file(
                     notonborder_gdf, output_notonborder_path, 
                     layer=output_layer, force_multitype=True)
     perfinfo['time_to_file'] = (datetime.datetime.now()-start_to_file).total_seconds()
@@ -1114,7 +1114,7 @@ def _add_orderby_column(
     ### Prepare the expression to calculate the orderby column. ###
     # In a spatial file, a spatial order will make later use more efficiënt, 
     # so use a geohash.
-    layerinfo = geofile.get_layerinfo(path)
+    layerinfo = gfo.get_layerinfo(path)
     if layerinfo.crs is not None and layerinfo.crs.is_geographic:
         # If the coordinates are geographic (in lat/lon degrees), ok
         expression = f"ST_GeoHash({layerinfo.geometrycolumn}, 10)"
@@ -1134,7 +1134,7 @@ def _add_orderby_column(
                 ((MbrMinY({layerinfo.geometrycolumn})+MbrMaxY({layerinfo.geometrycolumn}))/2)*{to_geographic_factor_approx}, 4326), 10)"""      
     
     ### Now we can actually add the column. ###
-    geofile.add_column(
-            path=path, name=name, type=geofile.DataType.TEXT, expression=expression)
+    gfo.add_column(
+            path=path, name=name, type=gfo.DataType.TEXT, expression=expression)
     sqlite_stmt = f'CREATE INDEX {name}_idx ON "{layer}"({name})' 
     ogr_util.vector_info(path=path, sql_stmt=sqlite_stmt, readonly=False)

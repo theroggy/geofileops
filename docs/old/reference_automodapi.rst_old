@@ -1,0 +1,8 @@
+
+API Reference
+=============
+
+.. automodapi:: geofileops
+  :no-inheritance-diagram:
+  :skip: Path
+  

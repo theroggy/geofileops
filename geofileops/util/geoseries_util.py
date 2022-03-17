@@ -3,10 +3,13 @@
 Module containing utilities regarding operations on geoseries.
 """
 
+import datetime
 import logging
 from typing import List
 
 import geopandas as gpd
+import numpy as np
+import pygeos as pg
 from shapely import geometry as sh_geom
 
 from . import geometry_util
@@ -121,54 +124,43 @@ def harmonize_geometrytypes(
 def _harmonize_to_multitype(
         geoseries: gpd.GeoSeries,
         dest_geometrytype: GeometryType) -> gpd.GeoSeries:
-    # Loop over copy of the geoseries, and cast geometries that are not of the 
-    # correct multitype yet... 
-    # Remark: when not all indexers are filled in the geoseries, important that
-    # the same indexers are used!!! 
-    geoseries_copy = geoseries.copy()
-    if dest_geometrytype is GeometryType.MULTIPOLYGON:
-        for index, geom in geoseries_copy.iteritems():
-            if geom is None or isinstance(geom, sh_geom.MultiPolygon):
-                # If the geom is already ok, just continue
-                continue
-            if geom.is_empty:
-                # If the geom is already ok, just continue
-                geoseries_copy[index] = None
-            elif isinstance(geom, sh_geom.Polygon):
-                # If is is a Polygon, convert to MultiPolygon
-                geoseries_copy[index] = sh_geom.MultiPolygon([geom])
-            else:
-                raise Exception(f"geom of geom_type {geom.geom_type} cannot be harmonized to {dest_geometrytype}")
+    
+    # Copy geoseries to pygeos array
+    geometries_arr = geoseries.array.data.copy() # type: ignore
+
+    # Set empty geometries to None
+    empty_idxs = pg.get_type_id(geometries_arr) == 7
+    if empty_idxs.sum():
+        geometries_arr[empty_idxs] = None
+
+    # Cast all geometries that are not of the correct multitype yet
+    # Remark: all rows need to be retained, so the same indexers exist in the 
+    # returned geoseries 
+    if dest_geometrytype is GeometryType.MULTIPOLYGON:        
+        # Convert polygons to multipolygons
+        single_idxs = pg.get_type_id(geometries_arr) == 3
+        if single_idxs.sum():
+            geometries_arr[single_idxs] = np.apply_along_axis(
+                pg.multipolygons, arr=(np.expand_dims(geometries_arr[single_idxs], 1)), axis=1)
     elif dest_geometrytype is GeometryType.MULTILINESTRING:
-        for index, geom in geoseries_copy.iteritems():
-            if geom is None or isinstance(geom, sh_geom.MultiLineString):
-                # If the geom is already ok, just continue
-                continue
-            if geom.is_empty:
-                # If the geom is already ok, just continue
-                geoseries_copy[index] = None
-            elif isinstance(geom, sh_geom.LineString):
-                geoseries_copy[index] = sh_geom.MultiLineString([geom])
-            else:
-                raise Exception(f"geom of geom_type {geom.geom_type} cannot be harmonized to {dest_geometrytype}")
+        # Convert linestrings to multilinestrings
+        single_idxs = pg.get_type_id(geometries_arr) == 1
+        if single_idxs.sum():
+            geometries_arr[single_idxs] = np.apply_along_axis(
+                pg.multilinestrings, arr=(np.expand_dims(geometries_arr[single_idxs], 1)), axis=1)
     elif dest_geometrytype is GeometryType.MULTIPOINT:
-        for index, geom in geoseries_copy.iteritems():
-            if geom is None or isinstance(geom, sh_geom.MultiPoint):
-                # If the geom is already ok, just continue
-                continue
-            if geom.is_empty:
-                # If the geom is already ok, just continue
-                geoseries_copy[index] = None
-            elif isinstance(geom, sh_geom.Point):
-                geoseries_copy[index] = sh_geom.MultiPoint([geom])
-            else:
-                raise Exception(f"geom of geom_type {geom.geom_type} cannot be harmonized to {dest_geometrytype}")
+        single_idxs = pg.get_type_id(geometries_arr) == 0
+        if single_idxs.sum():
+            geometries_arr[single_idxs] = np.apply_along_axis(
+                pg.multipoints, arr=(np.expand_dims(geometries_arr[single_idxs], 1)), axis=1)
     else:
         raise Exception(f"Unsupported destination GeometryType: {dest_geometrytype}")
-
-    # assert to evade pyLance warning
-    assert isinstance(geoseries_copy, gpd.GeoSeries)
-    return geoseries_copy
+    
+    # Prepare result to return
+    geoseries_result = geoseries.copy()
+    geoseries_result.array.data = geometries_arr  # type: ignore
+    assert isinstance(geoseries_result, gpd.GeoSeries)
+    return geoseries_result
 
 def polygons_to_lines(geoseries: gpd.GeoSeries) -> gpd.GeoSeries:
     polygons_lines = []

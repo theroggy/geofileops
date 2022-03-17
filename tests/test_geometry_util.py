@@ -11,9 +11,9 @@ import shapely.geometry as sh_geom
 
 # Add path so the local geofileops packages are found
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from geofileops import geofile
-from geofileops.util import geometry_util
-from geofileops.util.geometry_util import GeometryType, PrimitiveType
+import geofileops as gfo
+from geofileops import geometry_util
+from geofileops import GeometryType, PrimitiveType
 from geofileops.util import grid_util
 import test_helper
 
@@ -351,8 +351,8 @@ def test_simplify_ext_keep_points_on(tmpdir):
     ## First init some stuff ##
     # Read the test data
     input_path = test_helper.TestFiles.polygons_simplify_onborder_testcase_gpkg
-    geofile.copy(input_path, tmpdir / input_path.name)
-    input_gdf = geofile.read_file(input_path)
+    gfo.copy(input_path, tmpdir / input_path.name)
+    input_gdf = gfo.read_file(input_path)
 
     # Create geometry where we want the points kept
     grid_gdf = grid_util.create_grid(
@@ -360,7 +360,7 @@ def test_simplify_ext_keep_points_on(tmpdir):
             nb_columns=2,
             nb_rows=2,
             crs='epsg:31370')
-    geofile.to_file(grid_gdf, tmpdir / "grid.gpkg")
+    gfo.to_file(grid_gdf, tmpdir / "grid.gpkg")
     grid_coords = [tile.exterior.coords for tile in grid_gdf['geometry']]
     grid_lines_geom = sh_geom.MultiLineString(grid_coords)
     
@@ -384,7 +384,7 @@ def test_simplify_ext_keep_points_on(tmpdir):
             lambda geom: geometry_util.simplify_ext(
                     geom, algorithm=geometry_util.SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER, 
                     tolerance=tolerance_rdp))
-    geofile.to_file(simplified_gdf, tmpdir / f"simplified_rdp{tolerance_rdp}.gpkg")
+    gfo.to_file(simplified_gdf, tmpdir / f"simplified_rdp{tolerance_rdp}.gpkg")
     assert len(simplified_gdf[simplified_gdf.intersects(point_on_input_and_border)]) != nb_intersects_with_input
     
     # With keep_points_on specified, the number of intersections stays the same 
@@ -395,7 +395,7 @@ def test_simplify_ext_keep_points_on(tmpdir):
             lambda geom: geometry_util.simplify_ext(
                     geom, algorithm=geometry_util.SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER, 
                     tolerance=tolerance_rdp, keep_points_on=grid_lines_geom))
-    geofile.to_file(simplified_gdf, tmpdir / f"simplified_rdp{tolerance_rdp}_keep_points_on.gpkg")
+    gfo.to_file(simplified_gdf, tmpdir / f"simplified_rdp{tolerance_rdp}_keep_points_on.gpkg")
     assert len(simplified_gdf[simplified_gdf.intersects(point_on_input_and_border)]) == nb_intersects_with_input
     
     ## Test vw (visvalingam-whyatt) ##
@@ -418,7 +418,7 @@ def test_simplify_ext_keep_points_on(tmpdir):
             lambda geom: geometry_util.simplify_ext(
                     geom, algorithm=geometry_util.SimplifyAlgorithm.VISVALINGAM_WHYATT, 
                     tolerance=tolerance_vw))
-    geofile.to_file(simplified_gdf, tmpdir / f"simplified_vw{tolerance_vw}.gpkg")
+    gfo.to_file(simplified_gdf, tmpdir / f"simplified_vw{tolerance_vw}.gpkg")
     assert len(simplified_gdf[simplified_gdf.intersects(point_on_input_and_border)]) != nb_intersects_with_input
     
     # With keep_points_on specified, the number of intersections stays the same 
@@ -430,7 +430,7 @@ def test_simplify_ext_keep_points_on(tmpdir):
                     geom, algorithm=geometry_util.SimplifyAlgorithm.VISVALINGAM_WHYATT, 
                     tolerance=tolerance_vw, 
                     keep_points_on=grid_lines_geom))
-    geofile.to_file(simplified_gdf, tmpdir / f"simplified_vw{tolerance_vw}_keep_points_on.gpkg")
+    gfo.to_file(simplified_gdf, tmpdir / f"simplified_vw{tolerance_vw}_keep_points_on.gpkg")
     assert len(simplified_gdf[simplified_gdf.intersects(point_on_input_and_border)]) == nb_intersects_with_input
     
     ## Test lang ##
@@ -454,7 +454,7 @@ def test_simplify_ext_keep_points_on(tmpdir):
             lambda geom: geometry_util.simplify_ext(
                     geom, algorithm=geometry_util.SimplifyAlgorithm.LANG, 
                     tolerance=tolerance_lang, lookahead=step_lang))
-    geofile.to_file(simplified_gdf, tmpdir / f"simplified_lang;{tolerance_lang};{step_lang}.gpkg")
+    gfo.to_file(simplified_gdf, tmpdir / f"simplified_lang;{tolerance_lang};{step_lang}.gpkg")
     assert len(simplified_gdf[simplified_gdf.intersects(point_on_input_and_border)]) != nb_intersects_with_input
     
     # With keep_points_on specified, the number of intersections stays the same 
@@ -466,7 +466,7 @@ def test_simplify_ext_keep_points_on(tmpdir):
                     geom, algorithm=geometry_util.SimplifyAlgorithm.LANG, 
                     tolerance=tolerance_lang, lookahead=step_lang, 
                     keep_points_on=grid_lines_geom))
-    geofile.to_file(simplified_gdf, tmpdir / f"simplified_lang;{tolerance_lang};{step_lang}_keep_points_on.gpkg")
+    gfo.to_file(simplified_gdf, tmpdir / f"simplified_lang;{tolerance_lang};{step_lang}_keep_points_on.gpkg")
     assert len(simplified_gdf[simplified_gdf.intersects(point_on_input_and_border)]) == nb_intersects_with_input
 
 def test_simplify_ext_no_simplification():

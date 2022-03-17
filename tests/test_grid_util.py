@@ -8,7 +8,7 @@ import sys
 
 # Add path so the local geofileops packages are found 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from geofileops import geofile
+import geofileops as gfo
 from geofileops.util import grid_util
 import test_helper
 
@@ -30,13 +30,13 @@ def test_create_grid2():
 
 def test_split_tiles():
     input_tiles_path = test_helper.TestFiles.BEFL_kbl_gpkg
-    input_tiles = geofile.read_file(input_tiles_path)
+    input_tiles = gfo.read_file(input_tiles_path)
     nb_tiles_wanted = len(input_tiles) * 8
     result = grid_util.split_tiles(
             input_tiles=input_tiles,
             nb_tiles_wanted=nb_tiles_wanted)
 
-    #geofile.to_file(result, r"C:\temp\BEFL_kbl_split.gpkg")
+    #geogfo.to_file(result, r"C:\temp\BEFL_kbl_split.gpkg")
 
     assert len(result) == len(input_tiles) * 8
 

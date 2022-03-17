@@ -35,7 +35,7 @@ author = 'Pieter Roggemans'
 # built documents.
 #import geofileops
 #version = release = geofileops.__version__
-version = release = '0.3.1'
+version = release = '0.4.0'
 
 # -- General configuration ---------------------------------------------------
 
