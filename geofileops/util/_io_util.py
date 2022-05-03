@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from typing import Any, Optional, Tuple, Union
 
+
 def create_tempdir(base_dirname: str) -> Path:
     """
     Creates a new tempdir in the default temp location.
@@ -21,13 +22,13 @@ def create_tempdir(base_dirname: str) -> Path:
             be attended to this to make the directory name unique.
 
     Raises:
-        Exception: if it wasn't possible to create the temp dir because there 
+        Exception: if it wasn't possible to create the temp dir because there
             wasn't found a unique directory name.
 
     Returns:
         Path: the path to the temp dir created.
     """
-    
+
     defaulttempdir = Path(tempfile.gettempdir())
 
     for i in range(1, 999999):
@@ -38,31 +39,35 @@ def create_tempdir(base_dirname: str) -> Path:
         except FileExistsError:
             continue
 
-    raise Exception(f"Wasn't able to create a temporary dir with basedir: {defaulttempdir / base_dirname}") 
+    raise Exception(
+        f"Wasn't able to create a temporary dir with basedir: {defaulttempdir / base_dirname}"
+    )
+
 
 def get_tempfile_locked(
-        base_filename: str,
-        suffix: str = '.tmp',
-        dirname: Optional[str] = None,
-        tempdir: Optional[Path] = None) -> Tuple[Path, Path]:
+    base_filename: str,
+    suffix: str = ".tmp",
+    dirname: Optional[str] = None,
+    tempdir: Optional[Path] = None,
+) -> Tuple[Path, Path]:
     """
-    Formats a temp file path, and creates a corresponding lock file so you can 
+    Formats a temp file path, and creates a corresponding lock file so you can
     treat it immediately as being locked.
 
     Args:
-        base_filename (str): The base filename to use. A numeric suffix will be 
+        base_filename (str): The base filename to use. A numeric suffix will be
             appended to make the filename unique.
-        suffix (str, optional): The suffix/extension of the tempfile. 
+        suffix (str, optional): The suffix/extension of the tempfile.
             Defaults to '.tmp'.
-        dirname (str, optional): Name of the subdir to put the tempfile in. 
-            Defaults to None, then the tempfile created is put directly in the 
+        dirname (str, optional): Name of the subdir to put the tempfile in.
+            Defaults to None, then the tempfile created is put directly in the
             root of the tempdir.
-        tempdir (Path, optional): Root temp dir to create the file in. If no 
+        tempdir (Path, optional): Root temp dir to create the file in. If no
             tempdir is specified, the default temp dir will be used.
             Defaults to None.
 
     Raises:
-        Exception: if it wasn't possible to create the temp dir because there 
+        Exception: if it wasn't possible to create the temp dir because there
             wasn't found a unique file name.
 
     Returns:
@@ -85,48 +90,49 @@ def get_tempfile_locked(
                 # OK!
                 return (tempfile_path, tempfilelock_path)
             else:
-                # Apparently the lock file didn't exist yet, but the file did. 
+                # Apparently the lock file didn't exist yet, but the file did.
                 # So delete lock file and try again.
                 tempfilelock_path.unlink()
 
-    raise Exception(f"Wasn't able to create a temporary file with base_filename: {base_filename}, dir: {dir}") 
- 
-def copyfile(
-        src: Union[str, 'os.PathLike[Any]'], 
-        dst: Union[str, 'os.PathLike[Any]']):
+    raise Exception(
+        f"Wasn't able to create a temporary file with base_filename: {base_filename}, dir: {dir}"
+    )
+
+
+def copyfile(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
     """
-    Copy the source file to the destination specified. 
+    Copy the source file to the destination specified.
 
     Standard shutil.copyfile is very slow on windows for large files.
 
     Args:
         src (PathLike): the source file to copy.
         dst (PathLike): the destination file or directory to copy to.
-    
+
     Raises:
         Exception: when anything went wrong.
     """
-    if os.name == 'nt':
+    if os.name == "nt":
         # On windows, this is a lot faster than all shutil alternatives
-        #command = f'copy "{src}" "{dst}"'
+        # command = f'copy "{src}" "{dst}"'
         command = f'xcopy /j "{src}" "{dst}*"'
-        output = ''
+        output = ""
         try:
             output = subprocess.check_output(command, shell=True)
         except Exception as ex:
             raise Exception(f"Error executing {command}, with output {output}") from ex
-        
+
     else:
-        # If the destination is a dir, make it a full file path 
+        # If the destination is a dir, make it a full file path
         dst_p = Path(dst)
         if dst_p.is_dir():
             src_p = Path(src)
             dst_p = dst_p / src_p.name
-            
-        buffer_size = 1024*1024*5
-        with open(src, 'rb') as fsrc, \
-             open(dst_p, 'wb') as fdest:
+
+        buffer_size = 1024 * 1024 * 5
+        with open(src, "rb") as fsrc, open(dst_p, "wb") as fdest:
             shutil.copyfileobj(fsrc, fdest, buffer_size)
+
 
 '''
 def is_locked(filepath):
@@ -153,6 +159,7 @@ def is_locked(filepath):
         raise Exception(f"Not implemented on os: {os.name}")
 '''
 
+
 def create_file_atomic(filename) -> bool:
     """
     Create a lock file in an atomic way, so it is threadsafe.
@@ -160,7 +167,7 @@ def create_file_atomic(filename) -> bool:
     Returns True if the file was created by this thread, False if the file existed already.
     """
     try:
-        fd = os.open(filename,  os.O_CREAT | os.O_EXCL)
+        fd = os.open(filename, os.O_CREAT | os.O_EXCL)
         os.close(fd)
         return True
     except FileExistsError:
@@ -171,7 +178,8 @@ def create_file_atomic(filename) -> bool:
         else:
             raise Exception("Error creating lock file {filename}") from ex
 
+
 def with_stem(path: Path, new_stem) -> Path:
-    # Remark: from python 3.9 this is available on any Path, but to evade 
-    # having to require 3.9 for this, this hack...  
+    # Remark: from python 3.9 this is available on any Path, but to evade
+    # having to require 3.9 for this, this hack...
     return path.parent / f"{new_stem}{path.suffix}"

@@ -12,45 +12,54 @@ from typing import List, Optional, Union
 
 geofiletypes = {}
 
+
 @dataclass
 class GeofileTypeInfo:
     """
     Class with properties of a GeofileType.
     """
+
     geofiletype: str
     ogrdriver: str
     suffixes: Optional[List[str]]
     is_spatialite_based: bool
     suffixes_extrafiles: Optional[List[str]]
 
+
 def init_geofiletypes():
-    geofiletypes_path = Path(__file__).resolve().parent / 'geofiletypes.csv'
-    with open(geofiletypes_path, 'r') as file:
+    geofiletypes_path = Path(__file__).resolve().parent / "geofiletypes.csv"
+    with open(geofiletypes_path, "r") as file:
         # Set skipinitialspace to True so the csv can be formatted for readability
-        csv.register_dialect('geofiletype_dialect', skipinitialspace=True, strict=True)
-        reader = csv.DictReader(file, dialect='geofiletype_dialect')
+        csv.register_dialect("geofiletype_dialect", skipinitialspace=True, strict=True)
+        reader = csv.DictReader(file, dialect="geofiletype_dialect")
 
         for row in reader:
-            # Prepare optional values that need eval first  
+            # Prepare optional values that need eval first
             suffixes = None
-            if row['suffixes'] is not None and row['suffixes'] != '':
-                suffixes = ast.literal_eval(row['suffixes'])
+            if row["suffixes"] is not None and row["suffixes"] != "":
+                suffixes = ast.literal_eval(row["suffixes"])
             suffixes_extrafiles = None
-            if row['suffixes_extrafiles'] is not None and row['suffixes_extrafiles'] != '':
-                suffixes_extrafiles = ast.literal_eval(row['suffixes_extrafiles'])
-            
+            if (
+                row["suffixes_extrafiles"] is not None
+                and row["suffixes_extrafiles"] != ""
+            ):
+                suffixes_extrafiles = ast.literal_eval(row["suffixes_extrafiles"])
+
             # Add geofiletype
-            geofiletypes[row['geofiletype']] = GeofileTypeInfo(
-                    geofiletype=row['geofiletype'],
-                    ogrdriver=row['ogrdriver'],
-                    suffixes=suffixes,
-                    is_spatialite_based=ast.literal_eval(row['is_spatialite_based']),
-                    suffixes_extrafiles=suffixes_extrafiles)
+            geofiletypes[row["geofiletype"]] = GeofileTypeInfo(
+                geofiletype=row["geofiletype"],
+                ogrdriver=row["ogrdriver"],
+                suffixes=suffixes,
+                is_spatialite_based=ast.literal_eval(row["is_spatialite_based"]),
+                suffixes_extrafiles=suffixes_extrafiles,
+            )
+
 
 class GeofileType(enum.Enum):
     """
-    Enumeration of relevant geo file types and their properties.  
+    Enumeration of relevant geo file types and their properties.
     """
+
     ESRIShapefile = enum.auto()
     GeoJSON = enum.auto()
     GPKG = enum.auto()
@@ -60,15 +69,16 @@ class GeofileType(enum.Enum):
     def _missing_(cls, value: Union[str, int, Path]):
         """
         Expand options in the GeofileType() constructor.
-        
+
         Args:
-            value (Union[str, int, Driver]): 
+            value (Union[str, int, Driver]):
                 * string: lookup using case insensitive name
                 * GeofileType: create the same GeometryType as the one passed in
 
         Returns:
             [GeofileType]: The corresponding GeometryType.
         """
+
         def get_geofiletype_for_suffix(suffix: str):
             suffix_lower = suffix.lower()
             for geofiletype in geofiletypes:
@@ -76,7 +86,7 @@ class GeofileType(enum.Enum):
                 if suffixes is not None and suffix_lower in suffixes:
                     return GeofileType[geofiletype]
             raise ValueError(f"Unknown extension {suffix}")
-        
+
         def get_geofiletype_for_ogrdriver(ogrdriver: str):
             for geofiletype in geofiletypes:
                 driver = geofiletypes[geofiletype].ogrdriver
@@ -90,7 +100,7 @@ class GeofileType(enum.Enum):
             # If it is a Path, return Driver based on the suffix
             return get_geofiletype_for_suffix(value.suffix)
         elif isinstance(value, str):
-            if value.startswith('.'):
+            if value.startswith("."):
                 # If it start with a point, it is a suffix
                 return get_geofiletype_for_suffix(value)
             else:
@@ -121,6 +131,7 @@ class GeofileType(enum.Enum):
             return False
         else:
             return True
+
 
 # Init!
 init_geofiletypes()

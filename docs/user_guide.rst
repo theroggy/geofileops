@@ -69,13 +69,13 @@ More specific features are:
 The full list of operations can be found in the 
 :ref:`API reference<API-reference-two-layers>`.
 
-This is a code example for the intersect operation:
+This is a code example for the intersection operation:
 
 .. code-block:: python
 
     import geofileops as gfo
 
-    gfo.intersect(
+    gfo.intersection(
             input1_path='...',
             input2_path='...',
             output_path='...')

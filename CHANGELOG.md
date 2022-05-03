@@ -8,9 +8,11 @@
 - Add support to all relevant spatial operations to join_by_location (#79)
 - Add support to reproject to `gfo.convert` (#89)
 - Add function to drop a column (#92)
+- Add detailed column info in get_layerinfo (#110)
 - Add support to specify (any) gdal options in relevant fileops (#83)
 - Speed up creation of an index on a geopackage (#87)
 - Some improvements to the benchmarks
+- Use black to comply to pep8 + minor general improvements (#113)
 
 ### Bugs fixed
 
@@ -19,12 +21,20 @@
       the json output is not correct.
     - when combining tiled output with explodecollections=False, the output 
       is still ~exploded.
+- For gfo.intersection() some attribute data is NULL if output format is .shp (#102)
+- Dissolve gives error if a linestring input layer contains special characters (#108)
 
 ### Deprecations and compatibility notes
 
+- Property column of get_layerinfo is now a Dict[str, ColumnInfo] instead of a 
+  List[str] (#110)
+- Always use simplify that preserves topology (#105)
 - Removed deprecated `verbose` parameter in some functions 
 - Rename some files in util that are rather private (#84)
 - Remove long-time deprecated clip_on_tiles parameter in dissolve (#95)
+- Deprecate `gfo.intersect()` for new name `gfo.intersection()` to be 
+  consistent with most other libraries. Now a warning is given, in the future 
+  `gfo.intersect()` will be removed (#99).
 
 ## 0.4.0 (2022-03-31)
 

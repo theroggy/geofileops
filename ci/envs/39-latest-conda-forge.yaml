@@ -4,19 +4,19 @@ channels:
 dependencies:
   - python=3.9
   - pip
-  #- six
   # required
   - cloudpickle
+  - fiona
+  - gdal
   - geopandas
-  - pyproj
+  - numpy
+  - pandas
   - psutil
+  - pygeos
+  - pyproj
+  - shapely
   # testing
   - pytest
   - pytest-cov
-  # optional
-  - pygeos 
-  # TEMP: workaround until conda-forge fixes the issues with gdal
-  #- zstd
   - pip:
-    #- codecov
     - simplification
