@@ -4,11 +4,12 @@
 
 ### Improvements
 
-- Add clip geo operation. Info on how to use it can be found [here](https://geofileops.readthedocs.io/en/latest/api/geofileops.clip.html) (#4)
-- Add support to all relevant spatial operations to join_by_location (#79)
+- Add `gfo.clip` geo operation, more info [here](https://geofileops.readthedocs.io/en/latest/api/geofileops.clip.html) (#4)
+- Add `gfo.symmetric_difference` geo operation, more info [here](https://geofileops.readthedocs.io/en/latest/api/geofileops.symmetric_difference.html) (#85)
+- Add support for all relevant spatial operations to join_by_location (#79)
 - Add support to reproject to `gfo.convert` (#89)
-- Add function to drop a column (#92)
-- Add detailed column info in get_layerinfo (#110)
+- Add function `gfo.drop_column` (#92)
+- Add detailed column info in `gfo.get_layerinfo` (#110)
 - Add support to specify (any) gdal options in relevant fileops (#83)
 - Speed up creation of an index on a geopackage (#87)
 - Some improvements to the benchmarks
@@ -17,24 +18,24 @@
 ### Bugs fixed
 
 - Fix dissolve bugs (#93)
-    - When agg_columns=json is used and the dissolve needs multiple passes, 
+    - When `agg_columns="json"` is used and the dissolve needs multiple passes, 
       the json output is not correct.
-    - when combining tiled output with explodecollections=False, the output 
+    - when combining tiled output with `explodecollections=False`, the output 
       is still ~exploded.
-- For gfo.intersection() some attribute data is NULL if output format is .shp (#102)
-- Dissolve gives error if a linestring input layer contains special characters (#108)
+- For e.g. `gfo.intersection` some attribute data is NULL if output format is .shp (#102)
+- `gfo.dissolve` gives error if a linestring input layer contains special characters (#108)
 
 ### Deprecations and compatibility notes
 
-- Property column of get_layerinfo is now a Dict[str, ColumnInfo] instead of a 
+- Property column of `gfo.get_layerinfo` is now a Dict[str, ColumnInfo] instead of a 
   List[str] (#110)
-- Always use simplify that preserves topology (#105)
+- For the simplify operation, use rdp version that preserves topology (#105)
 - Removed deprecated `verbose` parameter in some functions 
 - Rename some files in util that are rather private (#84)
-- Remove long-time deprecated clip_on_tiles parameter in dissolve (#95)
-- Deprecate `gfo.intersect()` for new name `gfo.intersection()` to be 
+- Remove long-time deprecated `clip_on_tiles` parameter in `gfo.dissolve` (#95)
+- Deprecate `gfo.intersect` for new name `gfo.intersection` to be 
   consistent with most other libraries. Now a warning is given, in the future 
-  `gfo.intersect()` will be removed (#99).
+  `gfo.intersect` will be removed (#99).
 
 ## 0.4.0 (2022-03-31)
 

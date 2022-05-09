@@ -42,11 +42,12 @@ Spatial operations on two layers
    erase
    export_by_distance
    export_by_location
-   intersect
+   intersection
    join_by_location
    join_nearest
    select_two_layers
    split
+   symmetric_difference
    union
 
 .. _API-general-layer-ops:
@@ -61,6 +62,7 @@ General layer operations
    add_column
    convert
    create_spatial_index
+   drop_column
    execute_sql
    get_crs
    get_default_layer

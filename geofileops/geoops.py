@@ -225,11 +225,11 @@ def buffer(
            - |buffer_mitre_25|
            - |buffer_mitre_10|
 
-    .. |buffer_quadrantsegments_5| image:: ../_static/images/buffer_quadrantsegments_5.png  # noqa: E501
+    .. |buffer_quadrantsegments_5| image:: ../_static/images/buffer_quadrantsegments_5.png
         :alt: Buffer with quadrantsegments=5
-    .. |buffer_quadrantsegments_2| image:: ../_static/images/buffer_quadrantsegments_2.png  # noqa: E501
+    .. |buffer_quadrantsegments_2| image:: ../_static/images/buffer_quadrantsegments_2.png
         :alt: Buffer with quadrantsegments=2
-    .. |buffer_quadrantsegments_1| image:: ../_static/images/buffer_quadrantsegments_1.png  # noqa: E501
+    .. |buffer_quadrantsegments_1| image:: ../_static/images/buffer_quadrantsegments_1.png
         :alt: Buffer with quadrantsegments=1
     .. |buffer_endcap_round| image:: ../_static/images/buffer_endcap_round.png
         :alt: Buffer with endcap_style=BufferEndCapStyle.ROUND (default)
@@ -409,11 +409,66 @@ def dissolve(
     force: bool = False,
 ):
     """
-    Applies a dissolve operation on the geometry column of the input file.
+    Applies a dissolve operation on the input file.
 
-    For the other columns, only aggfunc = 'first' is supported at the moment.
+    If columns are specified with ``groupby_columns``, the data is first grouped
+    on those columns before the geometries are merged.
 
-    If the output is tiled (by specifying a tiles_path or nb_squarish_tiles > 1),
+    Data in other columns can be retained in the output by specifying the
+    ``agg_columns`` parameter.
+
+    This is an example of how data in the columns that isn't grouped on can be
+    aggregated to be added to the output file:
+    ::
+
+        import geofileops as gfo
+
+        gfo.dissolve(
+            input_path=...,
+            output_path=...,
+            groupby_columns=["cropgroup"],
+            agg_columns={
+                "columns": [
+                    {"column": "crop", "agg": "max", "as": "crop_max"},
+                    {"column": "crop", "agg": "count", "as": "crop_count"},
+                    {
+                        "column": "crop",
+                        "agg": "concat",
+                        "distinct": True,
+                        "sep": ";",
+                        "as": "crop_concat",
+                    },
+                    {"column": "area", "agg": "mean", "as": "area_mean"},
+                ]
+            },
+            explodecollections=False,
+        )
+
+    The following example will save all detailed data for the columns
+    "crop_label" and "area" in the output file. The detailed data is encoded
+    per group/row in a "json" text field. Shapefiles only support up to 254
+    characters in a text field, so this format won't be very suited as output
+    format for this option.
+    ::
+
+        import geofileops as gfo
+
+        gfo.dissolve(
+            input_path=...,
+            output_path=...,
+            groupby_columns=["cropgroup"],
+            agg_columns={"json": ["crop", "area"]},
+            explodecollections=False,
+        )
+
+    This results in this type of output:
+    ::
+
+        cropgroup  json
+        Grasses    ["{"crop":"Meadow","area":1290,"fid_orig":5}","{"crop":"Pasture",...
+        Maize      ["{"crop":"Silo","area":3889.29,"fid_orig":2}","{"crop":"Fodder",...
+
+    If the output is tiled (by specifying ``tiles_path`` or ``nb_squarish_tiles`` > 1),
     the result will be clipped on the output tiles and the tile borders are
     never crossed.
 
@@ -421,8 +476,8 @@ def dissolve(
         input_path (PathLike): the input file
         output_path (PathLike): the file to write the result to
         explodecollections (bool): True to output only simple geometries. If
-            False is specified, this can result in huge geometries for large
-            files, so beware...
+            False, this can result in huge geometries for large files,
+            especially if no groupby_columns are specified.
         groupby_columns (List[str], optional): columns to group on while
             aggregating. Defaults to None, resulting in a spatial union of all
             geometries that touch.
@@ -850,7 +905,6 @@ def clip(
     explodecollections: bool = False,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    verbose: bool = False,
     force: bool = False,
 ):
     """
@@ -897,8 +951,6 @@ def clip(
             batch. A smaller batch size, possibly in combination with a
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
-        verbose (bool, optional): write more info to the output.
-             Defaults to False.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -920,7 +972,6 @@ def clip(
         explodecollections=explodecollections,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
-        verbose=verbose,
         force=force,
     )
 
@@ -1275,6 +1326,7 @@ def join_by_location(
     The spatial_relations_query can be specified either with named spatial
     predicates or masks as defined by the
     [DE-9IM]](https://en.wikipedia.org/wiki/DE-9IM) model:
+
         - "overlaps is True and contains is False"
         - "(T*T***T** is True or 1*T***T** is True) and T*****FF* is False"
 
@@ -1616,14 +1668,14 @@ def symmetric_difference(
     explodecollections: bool = False,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    verbose: bool = False,
     force: bool = False,
 ):
     """
-    Calculates the pairwise "symmtric difference" of the two input layers.
+    Calculates the "symmetric difference" of the two input layers.
 
     Alternative names:
-        - GeoPandas: overlay(how="symmtric_difference")
+        - GeoPandas: overlay(how="symmetric_difference")
+        - QGIS, ArcMap: symmetrical difference
 
     Args:
         input1_path (PathLike): the 1st input file
@@ -1648,8 +1700,6 @@ def symmetric_difference(
             smaller nb_parallel, will reduc
             e the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
-        verbose (bool, optional): write more info to the output.
-            Defaults to False.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
     """
@@ -1671,7 +1721,6 @@ def symmetric_difference(
         explodecollections=explodecollections,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
-        verbose=verbose,
         force=force,
     )
 

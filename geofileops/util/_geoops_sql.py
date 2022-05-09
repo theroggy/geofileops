@@ -329,7 +329,8 @@ def select(
             input_path, input_layer
         ).geometrytype
         logger.info(
-            f"No force_output_geometrytype specified, so defaults to input layer geometrytype: {force_output_geometrytype}"
+            "No force_output_geometrytype specified, so defaults to input layer "
+            f"geometrytype: {force_output_geometrytype}"
         )
 
     # Go!
@@ -586,7 +587,6 @@ def clip(
     output_with_spatial_index: bool = True,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    verbose: bool = False,
     force: bool = False,
 ):
 
@@ -657,7 +657,6 @@ def clip(
         output_with_spatial_index=output_with_spatial_index,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
-        verbose=verbose,
         force=force,
     )
 
@@ -1458,7 +1457,6 @@ def symmetric_difference(
     explodecollections: bool = False,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    verbose: bool = False,
     force: bool = False,
 ):
 
@@ -1490,7 +1488,6 @@ def symmetric_difference(
             output_with_spatial_index=False,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
-            verbose=verbose,
             force=force,
         )
 
@@ -1521,7 +1518,6 @@ def symmetric_difference(
             output_with_spatial_index=False,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
-            verbose=verbose,
             force=force,
         )
 

@@ -722,7 +722,8 @@ def drop_column(
         path (PathLike): The file path.
         column_name (str): the column name.
         layer (Optional[str]): The layer name. If not specified, and there is only
-            one layer in the file, this layer is used. Otherwise exception.
+            one layer in the file, this layer is used. Otherwise a ValueError is
+            raised.
     """
     # Check input parameters
     path = Path(path)
@@ -730,9 +731,7 @@ def drop_column(
         layer = get_only_layer(path)
     info = get_layerinfo(path, layer)
     if column_name not in info.columns:
-        logger.info(
-            f"Column {column_name} not present so cannot be dropped, so just return"
-        )
+        logger.info(f"Column {column_name} not present so cannot be dropped.")
         return
 
     # Now really rename
