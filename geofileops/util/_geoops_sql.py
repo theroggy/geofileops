@@ -878,22 +878,28 @@ def export_by_distance(
 ):
 
     # Prepare sql template for this operation
+    layer1_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
+    layer2_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
     sql_template = f"""
             SELECT geom
                   {{layer1_columns_prefix_alias_str}}
                 FROM {{input1_databasename}}."{{input1_layer}}" layer1
-                JOIN {{input1_databasename}}."rtree_{{input1_layer}}_{{input1_geometrycolumn}}" layer1tree ON layer1.fid = layer1tree.id
+                JOIN {{input1_databasename}}."{layer1_rtree}" layer1tree
+                  ON layer1.fid = layer1tree.id
                 WHERE 1=1
                   {{batch_filter}}
                   AND EXISTS (
                       SELECT 1
                         FROM {{input2_databasename}}."{{input2_layer}}" layer2
-                        JOIN {{input2_databasename}}."rtree_{{input2_layer}}_{{input2_geometrycolumn}}" layer2tree ON layer2.fid = layer2tree.id
+                        JOIN {{input2_databasename}}."{layer2_rtree}" layer2tree
+                          ON layer2.fid = layer2tree.id
                         WHERE (layer1tree.minx-{max_distance}) <= layer2tree.maxx
                           AND (layer1tree.maxx+{max_distance}) >= layer2tree.minx
                           AND (layer1tree.miny-{max_distance}) <= layer2tree.maxy
                           AND (layer1tree.maxy+{max_distance}) >= layer2tree.miny
-                          AND ST_distance(layer1.{{input1_geometrycolumn}}, layer2.{{input2_geometrycolumn}}) <= {max_distance})"""
+                          AND ST_distance(layer1.{{input1_geometrycolumn}},
+                                          layer2.{{input2_geometrycolumn}}
+                                         ) <= {max_distance})"""
 
     input_layer_info = gfo.get_layerinfo(input_to_select_from_path, input1_layer)
 
