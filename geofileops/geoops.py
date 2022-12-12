@@ -19,6 +19,8 @@ from geofileops.util.geometry_util import (
     SimplifyAlgorithm,
     GeometryType,
 )
+from geofileops.util._general_util import logit
+
 
 ################################################################################
 # Some init
@@ -418,6 +420,7 @@ def delete_duplicate_geometries(
     )
 
 
+@logit
 def dissolve(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],

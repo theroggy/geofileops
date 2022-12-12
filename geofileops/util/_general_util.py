@@ -4,7 +4,8 @@ Module containing some general utilities.
 """
 
 from concurrent import futures
-import datetime
+from datetime import datetime
+from functools import wraps
 import logging
 import os
 from typing import Iterable, List, Optional
@@ -40,9 +41,7 @@ class MissingRuntimeDependencyError(Exception):
 ################################################################################
 
 
-def align_casing(
-    string_to_align: str, strings_to_align_to: Iterable
-) -> str:
+def align_casing(string_to_align: str, strings_to_align_to: Iterable) -> str:
     """
     Align the casing of a string to the strings in strings_to_align_to so they
     have the same casing.
@@ -99,7 +98,7 @@ def align_casing_list(
 
 
 def report_progress(
-    start_time: datetime.datetime,
+    start_time: datetime,
     nb_done: int,
     nb_todo: int,
     operation: Optional[str] = None,
@@ -124,7 +123,7 @@ def report_progress(
 
 
 def format_progress(
-    start_time: datetime.datetime,
+    start_time: datetime,
     nb_done: int,
     nb_todo: int,
     operation: Optional[str] = None,
@@ -132,7 +131,7 @@ def format_progress(
 ) -> Optional[str]:
 
     # Init
-    time_passed = (datetime.datetime.now() - start_time).total_seconds()
+    time_passed = (datetime.now() - start_time).total_seconds()
     pct_progress = 100.0 - (nb_todo - nb_done) * 100 / nb_todo
     nb_todo_str = f"{nb_todo:n}"
     nb_decimal = len(nb_todo_str)
@@ -317,3 +316,20 @@ def initialize_worker():
     nice_value = 15
     if getprocessnice() < nice_value:
         setprocessnice(nice_value)
+
+
+def logit(func):
+    """
+    Writes a log when the decorated function starts and ends (with execution time).
+    """
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = datetime.now()
+        logger.info(f"{func.__name__} start", stacklevel=2)
+        result = func(*args, **kwargs)
+        end = datetime.now()
+        logger.info(f"{func.__name__} finished in {end - start}", stacklevel=2)
+        return result
+
+    return wrapper
