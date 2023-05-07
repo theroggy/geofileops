@@ -9,10 +9,11 @@
 - Improve performance of spatial operations when only one batch is used (#271)
 - Add checks that `output_path` must not be equal to the/an `input_path` for geo
   operations (#246)
-- Many small improvements to logging, documentation,...
+- Many small improvements to logging, documentation, error messages,...
 
 ### Bugs fixed
 
+- Fix parameter `index` in `to_file` being ~ ignored (#285)
 - Fix "json" aggregate column handling in dissolve on line and point input files gives
   wrong results (#257)
 

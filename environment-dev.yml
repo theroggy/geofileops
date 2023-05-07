@@ -8,7 +8,7 @@ dependencies:
   - cloudpickle
   - fiona
   - gdal >=3.6.3
-  - geopandas>=0.11,<1
+  - geopandas>=0.11,<0.13
   - libspatialite>=5.0
   - numpy
   - pandas
