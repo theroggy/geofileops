@@ -8,7 +8,7 @@ dependencies:
   - cloudpickle
   - fiona
   - gdal
-  - geopandas >=0.11,<0.13
+  - geopandas >=0.11
   - numpy
   - pandas
   - psutil

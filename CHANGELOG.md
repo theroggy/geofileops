@@ -9,6 +9,7 @@
 - Improve performance of spatial operations when only one batch is used (#271)
 - Add checks that `output_path` must not be equal to the/an `input_path` for geo
   operations (#246)
+- Add support for geopandas 0.13 (#289)
 - Many small improvements to logging, documentation, error messages,...
 
 ### Bugs fixed

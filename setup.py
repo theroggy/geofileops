@@ -21,7 +21,7 @@ setuptools.setup(
         "cloudpickle",
         "fiona",
         "gdal",
-        "geopandas>=0.11,<0.13",
+        "geopandas>=0.11,<1",
         "numpy",
         "pandas",
         "psutil",

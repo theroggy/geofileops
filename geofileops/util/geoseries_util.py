@@ -175,8 +175,9 @@ def _harmonize_to_multitype(
         raise Exception(f"Unsupported destination GeometryType: {dest_geometrytype}")
 
     # Prepare result to return
-    geoseries_result = geoseries.copy()
-    geoseries_result.array.data = geometries_arr  # type: ignore
+    geoseries_result = gpd.GeoSeries(
+        geometries_arr, index=geoseries.index, crs=geoseries.crs
+    )  # type: ignore
     assert isinstance(geoseries_result, gpd.GeoSeries)
     return geoseries_result
 
@@ -267,16 +268,16 @@ def simplify_topo_ext(
             else:
                 topo.output["arcs"][index] = list(topoline_simpl)
 
-    topo_simpl_geoseries = topo.to_gdf(crs=geoseries.crs).geometry
-    topo_simpl_geoseries.array.data = pygeos.make_valid(topo_simpl_geoseries.array.data)
+    topo_simpl_gdf = topo.to_gdf(crs=geoseries.crs)
+    topo_simpl_gdf.geometry = pygeos.make_valid(topo_simpl_gdf.geometry.array.data)
     geometry_types_orig = geoseries.geom_type.unique()
-    geometry_types_simpl = topo_simpl_geoseries.geom_type.unique()
+    geometry_types_simpl = topo_simpl_gdf.geometry.geom_type.unique()
     if len(geometry_types_orig) == 1 and len(geometry_types_simpl) > 1:
-        topo_simpl_geoseries = geometry_collection_extract(
-            topo_simpl_geoseries,
+        topo_simpl_gdf.geometry = geometry_collection_extract(
+            topo_simpl_gdf.geometry,
             GeometryType(geometry_types_orig[0]).to_primitivetype,
         )
-    return topo_simpl_geoseries
+    return topo_simpl_gdf.geometry
 
 
 def simplify_ext(
