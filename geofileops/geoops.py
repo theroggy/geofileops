@@ -473,9 +473,9 @@ def dissolve(
                     {
                         "column": "crop",
                         "agg": "concat",
+                        "as": "crop_concat",
                         "distinct": True,
                         "sep": ";",
-                        "as": "crop_concat",
                     },
                     {"column": "area", "agg": "mean", "as": "area_mean"},
                 ]
@@ -534,18 +534,20 @@ def dissolve(
                       "fid", a unique index available in all input files.
                     - "agg": aggregation to use:
 
-                        - count: the number of items
-                        - sum:
-                        - mean
-                        - min
-                        - max
-                        - median
-                        - concat
+                        - count: the number of values in the group
+                        - sum: the sum of the values in the group
+                        - mean: the mean/average of the values in the group
+                        - min: the minimum value in the group
+                        - max: the maximum value in the group
+                        - median: the median value in the group
+                        - concat: all non-null values in the group concatenated (in
+                          arbitrary order)
 
                     - "as": column name in the output file. Note: using "fid" as alias
                       is not recommended: it can cause errors or odd behaviour.
                     - "distinct" (optional): True to distinct the values before
                       aggregation.
+                    - "sep" (optional): the separator to use for concat. Default: ",".
 
         tiles_path (PathLike, optional): a path to a geofile containing tiles.
             If specified, the output will be dissolved/unioned only within the
