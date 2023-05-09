@@ -335,12 +335,12 @@ def test_dissolve_linestrings_aggcolumns_columns(tmp_path, suffix, epsg):
 
     # Some more default checks for NISCODE 12009
     niscode_idx = output_gdf[output_gdf["NIScode"] == "12009"].index.item()
+    fid_concat_result = sorted(output_gdf["fid_concat"][niscode_idx].split(","))
     if gfo.GeofileType(input_path).is_fid_zerobased:
-        assert output_gdf["fid_concat"][niscode_idx] == "38,42,44,54"
+        assert fid_concat_result == ["38", "42", "44", "54"]
     else:
-        assert output_gdf["fid_concat"][niscode_idx] == "39,43,45,55"
+        assert fid_concat_result == ["39", "43", "45", "55"]
     assert output_gdf["naam_MAX"][niscode_idx] == "Vosbergbeek"
-    # TODO: add more in depth check of result
 
 
 @pytest.mark.parametrize("agg_columns", [{"json": ["fid", "NaaM"]}, {"json": None}])
@@ -390,14 +390,19 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
     json_value = json.loads(str(output_gdf["json"][niscode_idx]))
 
     # Check NAAM
-    naam_str = ",".join([value["NAAM"] for value in json_value])
-    exp = "Duffelse en Rumstse Scheibeek,Vosbergbeek,Maltaveldenloop,Grote Nete"
-    assert naam_str == exp
-    fid_str = ",".join([str(value["fid_orig"]) for value in json_value])
+    naam_result = sorted([value["NAAM"] for value in json_value])
+    exp = [
+        "Duffelse en Rumstse Scheibeek",
+        "Grote Nete",
+        "Maltaveldenloop",
+        "Vosbergbeek",
+    ]
+    assert naam_result == exp
+    fid_result = sorted([str(value["fid_orig"]) for value in json_value])
     if gfo.GeofileType(input_path).is_fid_zerobased:
-        assert fid_str == "38,42,44,54"
+        assert fid_result == ["38", "42", "44", "54"]
     else:
-        assert fid_str == "39,43,45,55"
+        assert fid_result == ["39", "43", "45", "55"]
 
     # Some specific tests depending on whether all columns asked or not
     if agg_columns["json"] is None:
@@ -838,10 +843,11 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
         "f{output_gdf['lbl_conc_d'][groenten_idx]}"
     )
     assert output_gdf["lbl_cnt_d"][groenten_idx] == 4
+    fid_concat_result = sorted(output_gdf["fid_concat"][groenten_idx].split(","))
     if gfo.GeofileType(input_path).is_fid_zerobased:
-        assert output_gdf["fid_concat"][groenten_idx] == "41,42,43,44,45"
+        assert fid_concat_result == ["41", "42", "43", "44", "45"]
     else:
-        assert output_gdf["fid_concat"][groenten_idx] == "42,43,44,45,46"
+        assert fid_concat_result == ["42", "43", "44", "45", "46"]
 
 
 @pytest.mark.parametrize(
