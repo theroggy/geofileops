@@ -9,8 +9,13 @@ from typing import Optional, Union
 import sys
 
 import geopandas as gpd
+import geopandas._compat as gpd_compat
 import geopandas.testing as gpd_testing
-import pygeos
+
+if gpd_compat.USE_PYGEOS:
+    import pygeos as shapely2_or_pygeos
+else:
+    import shapely as shapely2_or_pygeos
 import shapely.geometry as sh_geom
 
 # Add path so the local geofileops packages are found
@@ -241,8 +246,12 @@ def assert_geodataframe_equal(
 
     if sort_values:
         if normalize:
-            left.geometry = gpd.GeoSeries(pygeos.normalize(left.geometry.array.data))
-            right.geometry = gpd.GeoSeries(pygeos.normalize(right.geometry.array.data))
+            left.geometry = gpd.GeoSeries(
+                shapely2_or_pygeos.normalize(left.geometry.array.data)
+            )
+            right.geometry = gpd.GeoSeries(
+                shapely2_or_pygeos.normalize(right.geometry.array.data)
+            )
         if promote_to_multi:
             left.geometry = geoseries_util.harmonize_geometrytypes(
                 left.geometry, force_multitype=True

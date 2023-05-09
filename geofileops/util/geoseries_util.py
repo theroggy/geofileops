@@ -7,9 +7,14 @@ import logging
 from typing import List, Optional
 
 import geopandas as gpd
+import geopandas._compat as gpd_compat
 import numpy as np
 import pandas as pd
-import pygeos
+
+if gpd_compat.USE_PYGEOS:
+    import pygeos as shapely2_or_pygeos
+else:
+    import shapely as shapely2_or_pygeos
 from shapely import geometry as sh_geom
 
 from . import geometry_util
@@ -126,7 +131,7 @@ def harmonize_geometrytypes(
 def is_valid_reason(geoseries: gpd.GeoSeries) -> pd.Series:
     # Get result and keep geoseries indexes
     return pd.Series(
-        data=pygeos.is_valid_reason(geoseries.array.data),  # type: ignore
+        data=shapely2_or_pygeos.is_valid_reason(geoseries.array.data),  # type: ignore
         index=geoseries.index,
     )
 
@@ -134,11 +139,11 @@ def is_valid_reason(geoseries: gpd.GeoSeries) -> pd.Series:
 def _harmonize_to_multitype(
     geoseries: gpd.GeoSeries, dest_geometrytype: GeometryType
 ) -> gpd.GeoSeries:
-    # Copy geoseries to pygeos array
+    # Copy geoseries data to new array
     geometries_arr = geoseries.array.data.copy()  # type: ignore
 
     # Set empty geometries to None
-    empty_idxs = pygeos.is_empty(geometries_arr)
+    empty_idxs = shapely2_or_pygeos.is_empty(geometries_arr)
     if empty_idxs.sum():
         geometries_arr[empty_idxs] = None
 
@@ -147,27 +152,27 @@ def _harmonize_to_multitype(
     # returned geoseries
     if dest_geometrytype is GeometryType.MULTIPOLYGON:
         # Convert polygons to multipolygons
-        single_idxs = pygeos.get_type_id(geometries_arr) == 3
+        single_idxs = shapely2_or_pygeos.get_type_id(geometries_arr) == 3
         if single_idxs.sum():
             geometries_arr[single_idxs] = np.apply_along_axis(
-                pygeos.multipolygons,
+                shapely2_or_pygeos.multipolygons,
                 arr=(np.expand_dims(geometries_arr[single_idxs], 1)),
                 axis=1,
             )
     elif dest_geometrytype is GeometryType.MULTILINESTRING:
         # Convert linestrings to multilinestrings
-        single_idxs = pygeos.get_type_id(geometries_arr) == 1
+        single_idxs = shapely2_or_pygeos.get_type_id(geometries_arr) == 1
         if single_idxs.sum():
             geometries_arr[single_idxs] = np.apply_along_axis(
-                pygeos.multilinestrings,
+                shapely2_or_pygeos.multilinestrings,
                 arr=(np.expand_dims(geometries_arr[single_idxs], 1)),
                 axis=1,
             )
     elif dest_geometrytype is GeometryType.MULTIPOINT:
-        single_idxs = pygeos.get_type_id(geometries_arr) == 0
+        single_idxs = shapely2_or_pygeos.get_type_id(geometries_arr) == 0
         if single_idxs.sum():
             geometries_arr[single_idxs] = np.apply_along_axis(
-                pygeos.multipoints,
+                shapely2_or_pygeos.multipoints,
                 arr=(np.expand_dims(geometries_arr[single_idxs], 1)),
                 axis=1,
             )
@@ -269,7 +274,9 @@ def simplify_topo_ext(
                 topo.output["arcs"][index] = list(topoline_simpl)
 
     topo_simpl_gdf = topo.to_gdf(crs=geoseries.crs)
-    topo_simpl_gdf.geometry = pygeos.make_valid(topo_simpl_gdf.geometry.array.data)
+    topo_simpl_gdf.geometry = shapely2_or_pygeos.make_valid(
+        topo_simpl_gdf.geometry.array.data
+    )
     geometry_types_orig = geoseries.geom_type.unique()
     geometry_types_simpl = topo_simpl_gdf.geometry.geom_type.unique()
     if len(geometry_types_orig) == 1 and len(geometry_types_simpl) > 1:

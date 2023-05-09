@@ -12,7 +12,6 @@ dependencies:
   - numpy
   - pandas
   - psutil
-  - pygeos
   - pyogrio
   - pyproj
   - shapely

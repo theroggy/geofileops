@@ -1,7 +1,14 @@
 from pathlib import Path
 import os
 
-os.environ["USE_PYGEOS"] = "1"
+# Import geopandas here so the warning about pygeos <> shapely2 is given, but set
+# USE_PYGEOS to avoid further warnings
+import geopandas._compat as gpd_compat
+
+if gpd_compat.USE_PYGEOS:
+    os.environ["USE_PYGEOS"] = "1"
+else:
+    os.environ["USE_PYGEOS"] = "0"
 
 from geofileops.fileops import *  # noqa: F403, F401
 from geofileops.geoops import *  # noqa: F403, F401

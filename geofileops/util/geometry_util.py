@@ -10,12 +10,11 @@ from typing import List, Optional, Union
 
 import geopandas as gpd
 import numpy as np
-import pygeos
 import pyproj
 import shapely.coords as sh_coords
-import shapely.wkb as sh_wkb
 import shapely.geometry as sh_geom
 import shapely.ops as sh_ops
+import shapely.validation
 
 
 #####################################################################
@@ -359,9 +358,7 @@ def make_valid(
     if geometry is None:
         return None
     else:
-        return sh_wkb.loads(
-            pygeos.io.to_wkb(pygeos.make_valid(pygeos.io.from_shapely(geometry)))
-        )
+        return shapely.validation.make_valid(geometry)
 
 
 def numberpoints(geometry: Optional[sh_geom.base.BaseGeometry]) -> int:
