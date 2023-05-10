@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 from typing import Optional
 
 from osgeo import gdal
@@ -96,26 +97,27 @@ def add_layerstyle(
         )
         raise ValueError(f"layer style exists already: {styles_found}")
 
+    # Insert style
+    conn = sqlite3.connect(path)
+    sql = """
+        INSERT INTO layer_styles (
+                id, f_table_catalog, f_table_schema, f_table_name,
+                f_geometry_column, styleName, styleQML, styleSLD, useAsDefault,
+                description, owner, ui
+            )
+            VALUES (NULL, '', '', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
     try:
-        datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
-
-        sql = f"""
-            INSERT INTO layer_styles (
-                    id, f_table_catalog, f_table_schema, f_table_name,
-                    f_geometry_column, styleName, styleQML, styleSLD, useAsDefault,
-                    description, owner, ui
-                )
-                VALUES (
-                    NULL, '', '', '{layer}',
-                    'geom', '{name}', '{qml}', '{sld}', {use_as_default_str},
-                    '{description}', '{owner}', '{ui}'
-                )
-        """
-        result = datasource.ExecuteSQL(sql, dialect="SQLITE")
-        datasource.ReleaseResultSet(result)
-
+        conn.execute(
+            sql,
+            (layer, "geom", name, qml, sld, use_as_default_str, description, owner, ui),
+        )
+        conn.commit()
+    except Exception as ex:
+        conn.rollback()
+        raise Exception(f"Error {ex} executing {sql}") from ex
     finally:
-        datasource = None
+        conn.close()
 
 
 def remove_layerstyle(path: Path, id: int):

@@ -1,4 +1,4 @@
-<!DOCTYPE qgis PUBLIC "http://mrcc.com/qgis.dtd" "SYSTEM">
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
 <qgis simplifyDrawingHints="1" readOnly="0" labelsEnabled="0" simplifyLocal="1" maxScale="0" minScale="100000000" simplifyMaxScale="1" simplifyDrawingTol="1" version="3.22.0-Białowieża" hasScaleBasedVisibilityFlag="0" symbologyReferenceScale="-1" styleCategories="AllStyleCategories" simplifyAlgorithm="0">
 	<flags>
 		<Identifiable>1</Identifiable>
