@@ -10,16 +10,17 @@ To get the most out of geofileops, these are some things to note:
 
   * Geofileops is tested on geopackage and shapefile input/output files. However,
     geopackage is highly recommended because it will offer better performance in
-    geofileops as well as for the reasons listed here: www.switchfromshapefile.org.
-  * For spatial operations it is typically not supported to directly append a layer in
-    an existing Geopackage file. If wanted, it is possible to append it in a seperate
-    step using :meth:`~append_to`.
+    geofileops as well as for the reasons listed here: |www.switchfromshapefile.org|.
   * A typical use case for geofileops is to script complex GIS analysis involving many
     spatial operations on multiple large input files. To support this use case, if an
     output file already exists, all spatial operations will by default just return
     without error or further processing. This way it is easy to incrementally develop/
     run the script and only new/missing output files (or output files you remove) will
     be (re)processed.
+  * Because of the previous point, it is typically not supported for spatial operations
+    to directly append a layer in an existing Geopackage file. If wanted, it is
+    possible to append it in a seperate step using :meth:`~append_to`.
+  
 
 
 Spatial operations on one layer
@@ -57,9 +58,13 @@ Most spatial operations in geofileops have the same optional parameters:
       "fid" in addition to the standard attribute columns you want to retain.
     * explodecollections: the output features will be "exploded", so multipart
       features will be converted to single parts.
+    * gridsize: the size of the grid the coordinates of the ouput will be rounded to.
+      Eg. 0.001 to keep 3 decimals. If eg. a polygon is narrower than the gridsize, it
+      will be removed. Value 0.0, the default, doesn't change the precision.
     * nb_parallel: specify the number of CPU's to be used. By default all 
       CPU's are used.
-    * batchsize: use this parameter to eg. reduce memory usage. 
+    * batchsize: indication of the number of rows to be processed per batch. You can
+      use this parameter to reduce memory usage. 
     * force: by default, if the output_path already exists, geofileops will  
       just log that this is the fact and return without throwing a error. 
       To overwrite the existing output_path, specify force=True.
@@ -70,7 +75,7 @@ Spatial operations between two files/layers
 For operations between two layers, obviously 2 input files/layers need to be 
 specified.
 
-The standard spatial operations are supported, eg. :meth:`~intersect`, 
+The standard spatial operations are supported, eg. :meth:`~intersection`, 
 :meth:`~erase`, :meth:`~union`,...
 
 More specific features are:
@@ -121,3 +126,7 @@ shapefiles.
 .. |spatialite functions| raw:: html
 
    <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite functions</a>
+
+.. |www.switchfromshapefile.org| raw:: html
+
+   <a href="http://www.switchfromshapefile.org" target="_blank">www.switchfromshapefile.org</a>

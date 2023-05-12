@@ -5,22 +5,19 @@ Tests for functionalities in geofileops.general.
 
 import os
 from pathlib import Path
-import sys
 
 import geopandas as gpd
 import pandas as pd
 import pytest
 import shapely.geometry as sh_geom
 
-# Add path so the local geofileops packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # noqa: E402
 import geofileops as gfo
 from geofileops import fileops
 from geofileops.util import geoseries_util
 from geofileops.util.geometry_util import GeometryType
 from geofileops.util import _io_util
 from tests import test_helper
-from tests.test_helper import DEFAULT_SUFFIXES
+from tests.test_helper import SUFFIXES
 from tests.test_helper import assert_geodataframe_equal
 
 
@@ -139,7 +136,7 @@ def test_append_different_layer(tmp_path):
     assert dst_layer1_info.featurecount == dst_layer2_info.featurecount
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_append_different_columns(tmp_path, suffix):
     src_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix
@@ -157,7 +154,7 @@ def test_append_different_columns(tmp_path, suffix):
     assert len(src_info.columns) == len(res_info.columns) + 1
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_cmp(tmp_path, suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
     src2 = test_helper.get_testfile("polygon-invalid", suffix=suffix)
@@ -171,7 +168,7 @@ def test_cmp(tmp_path, suffix):
     assert gfo.cmp(src2, dst) is False
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_convert(tmp_path, suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
@@ -186,7 +183,7 @@ def test_convert(tmp_path, suffix):
     assert len(src_layerinfo.columns) == len(dst_layerinfo.columns)
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_convert_emptyfile(tmp_path, suffix):
     # Convert
     src = test_helper.get_testfile(
@@ -268,7 +265,7 @@ def test_convert_preserve_fid(
         assert src_gdf.index.tolist() != dst_gdf.index.tolist()
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_convert_reproject(tmp_path, suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
@@ -296,7 +293,7 @@ def test_convert_reproject(tmp_path, suffix):
         assert x < 100 and y < 100
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_copy(tmp_path, suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
@@ -351,7 +348,7 @@ def test_driver_enum():
     assert geofiletype == gfo.GeofileType.SQLite
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_drop_column(tmp_path, suffix):
     test_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix
@@ -367,14 +364,14 @@ def test_drop_column(tmp_path, suffix):
     gfo.drop_column(test_path, "NOT_EXISTING_COLUMN")
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_get_crs(suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
     crs = gfo.get_crs(src)
     assert crs.to_epsg() == 31370
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_get_default_layer(suffix):
     # Prepare test data + test
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -382,7 +379,7 @@ def test_get_default_layer(suffix):
     assert layer == src.stem
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_get_layer_geometrytypes(suffix):
     # Prepare test data + test
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -390,7 +387,7 @@ def test_get_layer_geometrytypes(suffix):
     assert geometrytypes == ["POLYGON", "MULTIPOLYGON"]
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_get_layer_geometrytypes_empty(tmp_path, suffix):
     # Prepare test data + test
     src = test_helper.get_testfile(
@@ -456,7 +453,7 @@ def test_get_layerinfo(testfile, suffix, layer):
             layerinfo = gfo.get_layerinfo(src)
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_get_only_layer_one_layer(suffix):
     # Test Geopackage with 1 layer
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -491,7 +488,7 @@ def test_listlayers_errors():
         _ = gfo.listlayers(path)
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_listlayers_one_layer(suffix):
     # Test with 1 layer
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -510,7 +507,7 @@ def test_listlayers_two_layers():
     assert "zones" in layers
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_move(tmp_path, suffix):
     src = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path, suffix=suffix)
 
@@ -587,7 +584,7 @@ def test_update_column_error(tmp_path):
         gfo.update_column(test_path, name="OPPERVL", expression="invalid_expression")
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_read_file(suffix, engine_setter):
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -630,7 +627,7 @@ def test_read_file_invalid_params(tmp_path, engine_setter):
         _ = gfo.read_file(src)
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_read_file_fid_as_index(suffix, engine_setter):
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -654,7 +651,7 @@ def test_read_file_fid_as_index(suffix, engine_setter):
         assert read_gdf.index[0] == 6
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_read_file_sql(suffix, engine_setter):
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -672,7 +669,7 @@ def test_read_file_sql(suffix, engine_setter):
     assert len(read_gdf) == 46
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_read_file_sql_deprecated(suffix, engine_setter):
     if engine_setter == "fiona":
         pytest.skip("sql_stmt param not supported for fiona engine")
@@ -687,7 +684,7 @@ def test_read_file_sql_deprecated(suffix, engine_setter):
     assert len(read_gdf) == 46
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_read_file_sql_no_geom(suffix, engine_setter):
     if engine_setter == "fiona":
         pytest.skip("sql_stmt param not supported for fiona engine")
@@ -704,7 +701,7 @@ def test_read_file_sql_no_geom(suffix, engine_setter):
     assert read_df.aantal.item() == 46
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize("columns", [["OIDN", "UIDN"], ["OidN", "UidN"]])
 def test_read_file_sql_placeholders(suffix, engine_setter, columns):
     """
@@ -745,7 +742,7 @@ def test_read_file_two_layers(engine_setter):
     assert len(read_gdf) == 46
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_rename_column(tmp_path, suffix):
     test_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix
@@ -872,7 +869,7 @@ def test_spatial_index_unsupported(tmp_path):
         _ = gfo.remove_spatial_index(path, "layer")
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_spatial_index(tmp_path, suffix):
     test_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix
@@ -908,7 +905,7 @@ def test_spatial_index(tmp_path, suffix):
         assert qix_path.stat().st_mtime > qix_modified_time_orig
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_to_file(tmp_path, suffix, engine_setter):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
     output_path = tmp_path / f"{src.stem}-output{suffix}"
@@ -926,7 +923,7 @@ def test_to_file(tmp_path, suffix, engine_setter):
     assert 2 * len(read_gdf) == len(written_gdf)
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_to_file_append_to_unexisting_file(tmp_path, suffix, engine_setter):
     test_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix
@@ -995,7 +992,7 @@ def test_to_file_create_spatial_index(
     assert gfo.has_spatial_index(output_path) is expected_spatial_index
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_to_file_emptyfile(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -1056,7 +1053,7 @@ def test_to_file_force_geometrytype_multitype(tmp_path, engine_setter):
     assert output_force_info.geometrytype == GeometryType.MULTIPOLYGON
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_to_file_geomempty(tmp_path, suffix, engine_setter):
     # Test for gdf with an empty polygon + a polygon
     test_gdf = gpd.GeoDataFrame(
@@ -1095,7 +1092,7 @@ def test_to_file_geomempty(tmp_path, suffix, engine_setter):
         assert test_read_geometrytypes[0] is GeometryType.POLYGON
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_to_file_geomnone(tmp_path, suffix, engine_setter):
     # Test for gdf with a None geometry + a polygon
     test_gdf = gpd.GeoDataFrame(
@@ -1123,7 +1120,7 @@ def test_to_file_geomnone(tmp_path, suffix, engine_setter):
     assert test_read_geometrytypes == test_geometrytypes
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
     """Strongly based on similar test in geopandas."""
 
@@ -1290,7 +1287,7 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
     do_checks(gdf, index_is_used=True)
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_remove(tmp_path, suffix):
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path, suffix=suffix)

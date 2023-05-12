@@ -4,6 +4,7 @@ Tests for functionalities in _processing_util.
 """
 
 import re
+
 import pytest
 
 from geofileops.helpers import _parameter_helper

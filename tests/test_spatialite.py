@@ -4,13 +4,9 @@ Tests for functionalities in ogr_util.
 """
 
 import os
-from pathlib import Path
-import sys
 
 import pytest
 
-# Add path so the local geofileops packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import geofileops as gfo
 from tests import test_helper
 

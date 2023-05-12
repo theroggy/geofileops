@@ -3,14 +3,10 @@
 Tests for functionalities in sql_util.
 """
 
-from pathlib import Path
-import sys
 from typing import Iterable, List, Optional
 
 import pytest
 
-# Add path so the local geofileops packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from geofileops.util import _ogr_sql_util
 
 

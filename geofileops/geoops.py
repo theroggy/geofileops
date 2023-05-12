@@ -41,6 +41,7 @@ def apply(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -79,6 +80,9 @@ def apply(
         force_output_geometrytype (GeometryType, optional): The output geometry type to
             force. If None, a best-effort guess is made and will always result in a
             multi-type. Defaults to None.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -99,6 +103,7 @@ def apply(
         columns=columns,
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -118,6 +123,7 @@ def buffer(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -166,6 +172,9 @@ def buffer(
             "fid" will be aliased eg. to "fid_1". Defaults to None.
         explodecollections (bool, optional): True to output only simple geometries.
             Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -273,6 +282,7 @@ def buffer(
             output_layer=output_layer,
             columns=columns,
             explodecollections=explodecollections,
+            gridsize=gridsize,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -292,6 +302,7 @@ def buffer(
             output_layer=output_layer,
             columns=columns,
             explodecollections=explodecollections,
+            gridsize=gridsize,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -326,7 +337,7 @@ def clip_by_geometry(
             "fid" will be aliased eg. to "fid_1". Defaults to None.
         explodecollections (bool, optional): True to output only simple geometries.
             Defaults to False.
-       force (bool, optional): overwrite existing output file(s).
+        force (bool, optional): overwrite existing output file(s).
             Defaults to False.
     """
     return _geoops_ogr.clip_by_geometry(
@@ -348,6 +359,7 @@ def convexhull(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -370,6 +382,9 @@ def convexhull(
             "fid" will be aliased eg. to "fid_1". Defaults to None.
         explodecollections (bool, optional): True to output only simple geometries.
             Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -387,6 +402,7 @@ def convexhull(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -400,6 +416,7 @@ def delete_duplicate_geometries(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     force: bool = False,
 ):
     """
@@ -418,6 +435,9 @@ def delete_duplicate_geometries(
             "fid" will be aliased eg. to "fid_1". Defaults to None.
         explodecollections (bool, optional): True to output only simple geometries.
             Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
     """
@@ -429,6 +449,7 @@ def delete_duplicate_geometries(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         force=force,
     )
 
@@ -443,6 +464,7 @@ def dissolve(
     nb_squarish_tiles: int = 1,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -567,6 +589,9 @@ def dissolve(
             file only contains one layer.
         output_layer (str, optional): input layer name. Optional if the
             file only contains one layer.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -600,6 +625,7 @@ def dissolve(
         nb_squarish_tiles=nb_squarish_tiles,
         input_layer=input_layer,
         output_layer=output_layer,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -730,7 +756,7 @@ def makevalid(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Optional[GeometryType] = None,
-    gridsize: Optional[float] = None,
+    gridsize: float = 0.0,
     precision: Optional[float] = None,
     validate_attribute_data: bool = False,
     nb_parallel: int = -1,
@@ -761,9 +787,9 @@ def makevalid(
         force_output_geometrytype (GeometryType, optional): The output geometry type to
             force the output to. If None, the geometry type of the input is used.
             Defaults to None.
-        gridsize (float, optional): the size of the grid the coordinates will be rounded
-            to. Eg. 0.001 to keep 3 decimals. None doesn't change the precision.
-            Defaults to None.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         validate_attribute_data (bool, optional): True to validate if all attribute data
             can be read. Raises an exception if an error is found, as this type of error
             cannot be fixed using makevalid. Defaults to False.
@@ -778,7 +804,9 @@ def makevalid(
     """
 
     logger.info(f"Start makevalid on {input_path}")
-    if precision is not None and gridsize is not None:
+    if gridsize is None:
+        gridsize = 0.0
+    if precision is not None and gridsize != 0.0:
         raise ValueError(
             "the precision parameter is deprecated and cannot be combined with gridsize"
         )
@@ -875,6 +903,7 @@ def select(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
@@ -953,6 +982,9 @@ def select(
             singular ones after the dissolve. Defaults to False.
         force_output_geometrytype (GeometryType, optional): The output geometry type to
             force. Defaults to None, and then the geometry type of the input is used
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to 1. If nb_parallel != 1, make sure your query still returns
             correct results if it is executed per batch of rows instead of in one go
@@ -981,6 +1013,7 @@ def select(
         columns=columns,
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -997,6 +1030,7 @@ def simplify(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1030,6 +1064,9 @@ def simplify(
             "fid" will be aliased eg. to "fid_1". Defaults to None.
         explodecollections (bool, optional): True to output only simple geometries.
             Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1049,6 +1086,7 @@ def simplify(
             output_layer=output_layer,
             columns=columns,
             explodecollections=explodecollections,
+            gridsize=gridsize,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -1064,6 +1102,7 @@ def simplify(
             output_layer=output_layer,
             columns=columns,
             explodecollections=explodecollections,
+            gridsize=gridsize,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -1084,6 +1123,7 @@ def clip(
     clip_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1128,6 +1168,9 @@ def clip(
             file only contains one layer.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1153,6 +1196,7 @@ def clip(
         clip_layer=clip_layer,
         output_layer=output_layer,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1168,6 +1212,7 @@ def erase(
     erase_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1199,6 +1244,9 @@ def erase(
             file only contains one layer.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1219,6 +1267,7 @@ def erase(
         erase_layer=erase_layer,
         output_layer=output_layer,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1235,6 +1284,7 @@ def export_by_location(
     input1_columns: Optional[List[str]] = None,
     input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1265,6 +1315,9 @@ def export_by_location(
         input2_columns (List[str], optional): NA.
         output_layer (str, optional): output layer name. Optional if the
             file only contains one layer.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1288,6 +1341,7 @@ def export_by_location(
         input_columns=input1_columns,
         input_to_compare_with_layer=input2_layer,
         output_layer=output_layer,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1303,6 +1357,7 @@ def export_by_distance(
     input1_columns: Optional[List[str]] = None,
     input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1326,6 +1381,9 @@ def export_by_distance(
             file only contains one layer.
         output_layer (str, optional): output layer name. Optional if the
             file only contains one layer.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1349,6 +1407,7 @@ def export_by_distance(
         input1_columns=input1_columns,
         input2_layer=input2_layer,
         output_layer=output_layer,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1367,6 +1426,7 @@ def intersect(
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1388,6 +1448,7 @@ def intersect(
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1406,6 +1467,7 @@ def intersection(
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1441,6 +1503,9 @@ def intersection(
             is used. Defaults to None.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1465,6 +1530,7 @@ def intersection(
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1486,6 +1552,7 @@ def join_by_location(
     input2_columns: Optional[List[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1547,6 +1614,9 @@ def join_by_location(
             Defaults to "l2_".
         output_layer (str, optional): output layer name. If None, the output_path stem
             is used. Defaults to None.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1576,6 +1646,7 @@ def join_by_location(
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
         explodecollections=False,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1594,6 +1665,7 @@ def join_nearest(
     input2_columns: Optional[List[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1626,6 +1698,9 @@ def join_nearest(
             Defaults to "l2_".
         output_layer (str, optional): output layer name. If None, the output_path stem
             is used. Defaults to None.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1652,6 +1727,7 @@ def join_nearest(
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
         explodecollections=False,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1672,6 +1748,7 @@ def select_two_layers(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Optional[GeometryType] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
@@ -1779,6 +1856,9 @@ def select_two_layers(
         force_output_geometrytype (GeometryType, optional): The output geometry
             type to force. Defaults to None, and then the geometry type of the
             input1 layer is used.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1842,6 +1922,7 @@ def select_two_layers(
         output_layer=output_layer,
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1860,6 +1941,7 @@ def symmetric_difference(
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1895,6 +1977,9 @@ def symmetric_difference(
             is used. Defaults to None.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1921,6 +2006,7 @@ def symmetric_difference(
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1939,6 +2025,7 @@ def split(
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1977,6 +2064,9 @@ def split(
             is used. Defaults to None.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1999,6 +2089,7 @@ def split(
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -2017,6 +2108,7 @@ def union(
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -2051,6 +2143,9 @@ def union(
             is used. Defaults to None.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -2075,6 +2170,7 @@ def union(
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,

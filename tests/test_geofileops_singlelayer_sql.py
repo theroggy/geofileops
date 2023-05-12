@@ -6,18 +6,25 @@ Tests for operations that are executed using a sql statement on one layer.
 import math
 
 import geopandas as gpd
+import geopandas._compat as gpd_compat
 import pytest
+
+if gpd_compat.USE_PYGEOS:
+    import pygeos as shapely2_or_pygeos
+else:
+    import shapely as shapely2_or_pygeos
 from shapely.geometry import MultiPolygon, Polygon
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops.util import _geoops_sql
+from geofileops.util import _geoops_sql as geoops_sql
 from tests import test_helper
-from tests.test_helper import DEFAULT_EPSGS, DEFAULT_SUFFIXES
+from tests.test_helper import EPSGS, SUFFIXES
 from tests.test_helper import assert_geodataframe_equal
 
 
-def test_delete_duplicate_geometries(tmp_path):
+@pytest.mark.parametrize("gridsize", [0.0, 0.1])
+def test_delete_duplicate_geometries(tmp_path, gridsize):
     # Prepare test data
     test_gdf = gpd.GeoDataFrame(
         geometry=[  # type: ignore
@@ -29,6 +36,7 @@ def test_delete_duplicate_geometries(tmp_path):
         ],
         crs=test_helper.TestData.crs_epsg,  # type: ignore
     )
+    expected_gdf = test_gdf.iloc[[0, 2, 4]].reset_index(drop=True)
     suffix = ".gpkg"
     input_path = tmp_path / f"input_test_data{suffix}"
     gfo.to_file(test_gdf, input_path)
@@ -38,11 +46,19 @@ def test_delete_duplicate_geometries(tmp_path):
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
     print(f"Run test for suffix {suffix}")
     # delete_duplicate_geometries isn't multiprocess, so no batchsize needed
-    gfo.delete_duplicate_geometries(input_path=input_path, output_path=output_path)
+    gfo.delete_duplicate_geometries(
+        input_path=input_path, output_path=output_path, gridsize=gridsize
+    )
 
     # Check result, 2 duplicates should be removed
     result_info = gfo.get_layerinfo(output_path)
     assert result_info.featurecount == input_info.featurecount - 2
+    result_gdf = gfo.read_file(output_path)
+    if gridsize != 0.0:
+        expected_gdf.geometry = shapely2_or_pygeos.set_precision(
+            expected_gdf.geometry.array.data, grid_size=gridsize
+        )
+    assert_geodataframe_equal(result_gdf, expected_gdf)
 
 
 def test_dissolve_singlethread_output_exists(tmp_path):
@@ -52,7 +68,7 @@ def test_dissolve_singlethread_output_exists(tmp_path):
     output_path.touch()
 
     # Run test without force
-    _geoops_sql.dissolve_singlethread(
+    geoops_sql.dissolve_singlethread(
         input_path=input_path,
         output_path=output_path,
     )
@@ -60,7 +76,7 @@ def test_dissolve_singlethread_output_exists(tmp_path):
     assert output_path.stat().st_size == 0
 
     # Run test with force
-    _geoops_sql.dissolve_singlethread(
+    geoops_sql.dissolve_singlethread(
         input_path=input_path,
         output_path=output_path,
         force=True,
@@ -69,8 +85,8 @@ def test_dissolve_singlethread_output_exists(tmp_path):
     assert output_path.stat().st_size != 0
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
-@pytest.mark.parametrize("epsg", DEFAULT_EPSGS)
+@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("epsg", EPSGS)
 def test_isvalid(tmp_path, suffix, epsg):
     # Prepare test data
     input_path = test_helper.get_testfile(
@@ -112,7 +128,7 @@ def test_isvalid(tmp_path, suffix, epsg):
     assert output_auto_gdf["isvalid"][0] == 0
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize("input_empty", [True, False])
 def test_makevalid(tmp_path, suffix, input_empty):
     # Prepare test data
@@ -229,26 +245,34 @@ def test_makevalid_invalidparams():
         )
 
 
-@pytest.mark.parametrize("input_suffix", DEFAULT_SUFFIXES)
-@pytest.mark.parametrize("output_suffix", DEFAULT_SUFFIXES)
-def test_select(tmp_path, input_suffix, output_suffix):
+@pytest.mark.parametrize("input_suffix", SUFFIXES)
+@pytest.mark.parametrize("output_suffix", SUFFIXES)
+@pytest.mark.parametrize("gridsize", [0.0, 0.01])
+def test_select(tmp_path, input_suffix, output_suffix, gridsize):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
 
     # Now run test
-    output_path = (
-        tmp_path
-        / f"{input_path.stem}-{input_suffix.replace('.', '')}-output{output_suffix}"
-    )
+    name = f"{input_path.stem}-{input_suffix.replace('.', '')}-output{output_suffix}"
+    output_path = tmp_path / name
     layerinfo_input = gfo.get_layerinfo(input_path)
-    sql_stmt = 'SELECT {geometrycolumn}, oidn, uidn FROM "{input_layer}"'
-    gfo.select(input_path=input_path, output_path=output_path, sql_stmt=sql_stmt)
+    # Column casing seems to behave odd: without gridsize (=subselect) results in upper
+    # casing rgardless of quotes or not, with gridsize (=subselect) casing in select is
+    # retained in output.
+    sql_stmt = 'SELECT {geometrycolumn}, "oidn", "UIDN" FROM "{input_layer}"'
+    gfo.select(
+        input_path=input_path,
+        output_path=output_path,
+        sql_stmt=sql_stmt,
+        gridsize=gridsize,
+    )
 
     # Now check if the tmp file is correctly created
     layerinfo_output = gfo.get_layerinfo(output_path)
     assert layerinfo_input.featurecount == layerinfo_output.featurecount
-    assert "OIDN" in layerinfo_output.columns
-    assert "UIDN" in layerinfo_output.columns
+    columns_output_upper = [col.upper() for col in layerinfo_output.columns]
+    assert "OIDN" in columns_output_upper
+    assert "UIDN" in columns_output_upper
     assert len(layerinfo_output.columns) == 2
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
@@ -257,7 +281,7 @@ def test_select(tmp_path, input_suffix, output_suffix):
     assert output_gdf["geometry"][0] is not None
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_select_column_casing(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", tmp_path, suffix)
@@ -287,8 +311,8 @@ def test_select_column_casing(tmp_path, suffix):
     assert output_gdf["geometry"][0] is not None
 
 
-@pytest.mark.parametrize("input_suffix", DEFAULT_SUFFIXES)
-@pytest.mark.parametrize("output_suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("input_suffix", SUFFIXES)
+@pytest.mark.parametrize("output_suffix", SUFFIXES)
 def test_select_emptyinput(tmp_path, input_suffix, output_suffix):
     # Prepare test data
     input_path = test_helper.get_testfile(
@@ -351,8 +375,8 @@ def test_select_emptyinput_operation(tmp_path, input_suffix, output_suffix):
     assert output_layerinfo.featurecount == 0
 
 
-@pytest.mark.parametrize("input_suffix", DEFAULT_SUFFIXES)
-@pytest.mark.parametrize("output_suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("input_suffix", SUFFIXES)
+@pytest.mark.parametrize("output_suffix", SUFFIXES)
 def test_select_emptyresult(tmp_path, input_suffix, output_suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
@@ -373,7 +397,7 @@ def test_select_emptyresult(tmp_path, input_suffix, output_suffix):
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_select_invalid_sql(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -398,7 +422,7 @@ def test_select_output_exists(tmp_path):
     assert output_path.stat().st_size == 0
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
     "nb_parallel, has_batch_filter, exp_raise",
     [(1, False, False), (2, True, False), (2, False, True)],
@@ -428,3 +452,38 @@ def test_select_batch_filter(
             gfo.select(input_path, output_path, sql_stmt, nb_parallel=nb_parallel)
     else:
         gfo.select(input_path, output_path, sql_stmt, nb_parallel=nb_parallel)
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("explodecollections", [True, False])
+def test_select_star(tmp_path, suffix, explodecollections):
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+
+    # Now run test
+    name = f"{input_path.stem}-output{suffix}"
+    output_path = tmp_path / name
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    sql_stmt = 'SELECT * FROM "{input_layer}"'
+    gfo.select(
+        input_path=input_path,
+        output_path=output_path,
+        sql_stmt=sql_stmt,
+        explodecollections=explodecollections,
+    )
+
+    # Now check if the tmp file is correctly created
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    if explodecollections:
+        assert output_layerinfo.featurecount == input_layerinfo.featurecount + 2
+    else:
+        assert output_layerinfo.featurecount == input_layerinfo.featurecount
+    columns_output_upper = [col.upper() for col in output_layerinfo.columns]
+    assert "OIDN" in columns_output_upper
+    assert "UIDN" in columns_output_upper
+    assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
+    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+    # Now check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None

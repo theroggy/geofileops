@@ -1,33 +1,43 @@
 run_datetime,package,package_version,operation,operation_descr,secs_taken,run_details
 2020-11-16 13:50:11.690659,geofileops,0.1.0,buffer_spatialite,,53.579026,"{'nb_cpu': 20}"
 2020-11-16 13:51:38.348909,geofileops,0.1.0,buffer,,86.65652,"{'nb_cpu': 20}"
-2020-11-16 13:53:11.482978,geofileops,0.1.0,intersect,,93.122083,"{'nb_cpu': 20}"
+2020-11-16 13:53:11.482978,geofileops,0.1.0,intersection,,93.122083,"{'nb_cpu': 20}"
 2020-11-16 13:57:02.642874,geofileops,0.1.0,union,,231.158898,"{'nb_cpu': 20}"
 2020-11-23 15:07:01.465543,geofileops,0.1.1,buffer_spatialite,,47.740183,"{'nb_cpu': 20}"
 2020-11-23 15:08:17.318605,geofileops,0.1.1,buffer,,75.851675,"{'nb_cpu': 20}"
-2020-11-23 15:09:37.742564,geofileops,0.1.1,intersect,,80.411759,"{'nb_cpu': 20}"
+2020-11-23 15:09:37.742564,geofileops,0.1.1,intersection,,80.411759,"{'nb_cpu': 20}"
 2020-11-23 15:13:02.943686,geofileops,0.1.1,union,,205.200124,"{'nb_cpu': 20}"
 2021-02-03 09:20:07.926815,geofileops,0.2.0,buffer_spatialite,,47.505688,"{'nb_cpu': 20}"
 2021-02-03 09:21:28.493934,geofileops,0.2.0,buffer,,80.553449,"{'nb_cpu': 20}"
-2021-02-03 09:22:53.420793,geofileops,0.2.0,intersect,,84.912886,"{'nb_cpu': 20}"
+2021-02-03 09:22:53.420793,geofileops,0.2.0,intersection,,84.912886,"{'nb_cpu': 20}"
 2021-02-03 09:26:31.219814,geofileops,0.2.0,union,,217.789125,"{'nb_cpu': 20}"
 2021-03-05 17:34:51.035511,geofileops,0.2.1a1,buffer_spatialite,,49.595615,"{'nb_cpu': 20}"
 2021-03-05 17:36:04.581566,geofileops,0.2.1a1,buffer,,73.545057,"{'nb_cpu': 20}"
-2021-03-05 17:37:28.602636,geofileops,0.2.1a1,intersect,,84.019076,"{'nb_cpu': 20}"
+2021-03-05 17:37:28.602636,geofileops,0.2.1a1,intersection,,84.019076,"{'nb_cpu': 20}"
 2021-03-05 17:40:59.131782,geofileops,0.2.1a1,union,,210.529146,"{'nb_cpu': 20}"
 2021-03-05 17:42:42.505503,geofileops,0.2.1a1,dissolve,,103.361138,"{'nb_cpu': 20}"
 2021-03-05 17:45:24.626859,geofileops,0.2.1a1,dissolve_groupby,,162.121356,"{'nb_cpu': 20}"
 2021-03-05 17:47:58.201918,geofileops,0.2.1a1,dissolve_groupby,,153.575059,"{'nb_cpu': 20}"
-2021-04-03 09:17:00.124104,geofileops,0.2.2a1,intersect,,74.923183,"{'nb_cpu': 20}"
+2021-04-03 09:17:00.124104,geofileops,0.2.2a1,intersection,,74.923183,"{'nb_cpu': 20}"
 2021-04-03 09:20:34.170386,geofileops,0.2.2a1,union,,214.029732,"{'nb_cpu': 20}"
-2021-04-10 17:18:54.786867,geofileops,0.2.2a2,intersect,,60.412638,"{'nb_cpu': 20}"
+2021-04-10 17:18:54.786867,geofileops,0.2.2a2,intersection,,60.412638,"{'nb_cpu': 20}"
 2021-04-10 17:21:48.564592,geofileops,0.2.2a2,union,,173.776728,"{'nb_cpu': 20}"
 2022-03-18 13:21:37.484847,geofileops,0.4.0a1,buffer,buffer agri parcels BEFL (~500.000 polygons),42.514781,{'nb_cpu': 12}
 2022-03-18 13:22:48.129930,geofileops,0.4.0a1,buffer_gpd,"buffer agri parcels BEFL (~500.000 polygons), using gpd",70.645083,{'nb_cpu': 12}
 2022-03-18 13:23:29.811440,geofileops,0.4.0a1,buffer_spatialite,"buffer agri parcels BEFL (~500.000 polygons), using spatialite",41.68151,{'nb_cpu': 12}
 2022-03-18 13:24:47.657572,geofileops,0.4.0a1,dissolve,dissolve on agri parcels BEFL (~500.000 polygons),77.846132,{'nb_cpu': 12}
 2022-03-18 13:26:18.864636,geofileops,0.4.0a1,dissolve_groupby,"dissolve on agri parcels BEFL (~500.000 polygons), groupby=[GEWASGROEP]",91.207064,{'nb_cpu': 12}
-2022-03-18 13:27:34.052120,geofileops,0.4.0a1,intersect,intersect between 2 agri parcel layers BEFL (2*~500.000 polygons),75.187484,{'nb_cpu': 12}
+2022-03-18 13:27:34.052120,geofileops,0.4.0a1,intersection,intersect between 2 agri parcel layers BEFL (2*~500.000 polygons),75.187484,{'nb_cpu': 12}
 2022-03-18 13:31:14.315586,geofileops,0.4.0a1,union,union between 2 agri parcel layers BEFL (2*~500.000 polygons),220.263466,{'nb_cpu': 12}
 2022-04-06 15:55:43.385668,geofileops,0.5.0a1,join_by_location_intersects,join_by_location_intersects between 2 agri parcel layers BEFL (2*~500.000 polygons),129.905555,{'nb_cpu': 12}
 2022-04-02 02:36:17.305600,geofileops,0.5.0a1,clip,clip between 2 agri parcel layers BEFL (2*~500.000 polygons),141.366765,{'nb_cpu': 12}
+2023-05-10 21:08:57.866953,geofileops,0.8.0a5,buffer,buffer on agri parcel layer BEFL (~500.000 polygons),24.266553,{'nb_cpu': 12}
+2023-05-10 21:09:21.112647,geofileops,0.8.0a5,buffer_gpd,buffer on agri parcel layer BEFL (~500.000 polygons),23.166611,{'nb_cpu': 12}
+2023-05-10 21:09:50.128700,geofileops,0.8.0a5,buffer_gridsize_spatialite,buffer with gridsize 0.1 on agri parcel layer BEFL (~500.000 polygons),28.925787,{'nb_cpu': 20}
+2023-05-10 21:10:14.897837,geofileops,0.8.0a5,buffer_spatialite,buffer on agri parcel layer BEFL (~500.000 polygons),24.667242,{'nb_cpu': 12}
+2023-05-10 21:11:42.943664,geofileops,0.8.0a5,clip,clip between 2 agri parcel layers BEFL (2*~500.000 polygons),87.928801,{'nb_cpu': 12}
+2023-05-10 21:12:42.522490,geofileops,0.8.0a5,dissolve_groupby,"dissolve on agri parcels BEFL (~500.000 polygons), groupby=[GEWASGROEP]",59.563317,{'nb_cpu': 12}
+2023-05-10 21:13:47.932053,geofileops,0.8.0a5,dissolve,dissolve on agri parcels BEFL (~500.000 polygons),65.361621,{'nb_cpu': 12}
+2023-05-10 21:14:49.679396,geofileops,0.8.0a5,intersection,intersection between 2 agri parcel layers BEFL (2*~500.000 polygons),61.688351,{'nb_cpu': 12}
+2023-05-10 21:16:04.696494,geofileops,0.8.0a5,join_by_location_intersects,join_by_location_intersects between 2 agri parcel layers BEFL (2*~500.000 polygons),74.924186,{'nb_cpu': 12}
+2023-05-10 21:19:11.007878,geofileops,0.8.0a5,union,union between 2 agri parcel layers BEFL (2*~500.000 polygons),186.127072,{'nb_cpu': 12}

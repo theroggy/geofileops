@@ -3,16 +3,10 @@
 Tests for functionalities in geoseries_util.
 """
 
-from pathlib import Path
-import sys
-
 import geopandas as gpd
 import pytest
 import shapely.geometry as sh_geom
 
-# Add path so the local geofileops packages are found
-# Add path so the local geofileops packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import geofileops as gfo
 import geofileops._compat as compat
 from geofileops.util import geoseries_util

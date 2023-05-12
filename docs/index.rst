@@ -17,8 +17,8 @@ a lot of CPU power, but calculating the intersection between two large files,
 dissolving large files,... will be a lot faster.
 The aim is that there is no size limit on the files that can be processed. 
 
-Most typical operations are available: buffer, simplify, dissolve, union, 
-erase, intersect,... 
+Most typical operations are available: :meth:`~buffer`, :meth:`~simplify`,
+:meth:`~dissolve`, :meth:`~union`, :meth:`~erase`, :meth:`~intersection`,... 
 
 Geofileops is tested on geopackage and shapefile input files. However, geopackage
 is recommended as it will give better performance for most operations.

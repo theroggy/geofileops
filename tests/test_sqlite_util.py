@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 import geofileops as gfo
-from geofileops.util import _sqlite_util
+from geofileops.util import _sqlite_util as sqlite_util
 from tests import test_helper
 
 
@@ -40,7 +40,7 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
                AND ST_Touches(layer1.geom, layer2.geometry) = 0
             """
 
-    _sqlite_util.create_table_as_sql(
+    sqlite_util.create_table_as_sql(
         input1_path=input1_path,
         input1_layer="parcels",
         input2_path=input2_path,
@@ -48,7 +48,7 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
         output_layer=output_path.stem,
         output_geometrytype=gfo.GeometryType.MULTIPOLYGON,
         sql_stmt=sql_stmt,
-        profile=_sqlite_util.SqliteProfile.SPEED,
+        profile=sqlite_util.SqliteProfile.SPEED,
         create_spatial_index=create_spatial_index,
     )
 
@@ -95,7 +95,7 @@ def test_create_table_as_sql_invalidparams(kwargs, expected_error):
         kwargs["output_geometrytype"] = None
 
     with pytest.raises(ValueError, match=expected_error):
-        _sqlite_util.create_table_as_sql(**kwargs)
+        sqlite_util.create_table_as_sql(**kwargs)
 
 
 def test_execute_sql(tmp_path):
@@ -106,13 +106,13 @@ def test_execute_sql(tmp_path):
 
     # Execute one statement
     sql_stmt = "DELETE FROM parcels WHERE rowid = (SELECT MIN(rowid) FROM parcels)"
-    _sqlite_util.execute_sql(test_path, sql_stmt=sql_stmt)
+    sqlite_util.execute_sql(test_path, sql_stmt=sql_stmt)
     nb_deleted += 1
     info = gfo.get_layerinfo(test_path)
     assert info.featurecount == info_input.featurecount - nb_deleted
 
     # Execute a list of statements
-    _sqlite_util.execute_sql(test_path, sql_stmt=[sql_stmt, sql_stmt])
+    sqlite_util.execute_sql(test_path, sql_stmt=[sql_stmt, sql_stmt])
     nb_deleted += 2
     info = gfo.get_layerinfo(test_path)
     assert info.featurecount == info_input.featurecount - nb_deleted

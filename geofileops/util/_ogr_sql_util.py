@@ -183,3 +183,10 @@ class ColumnFormatter:
         prefix = "" if subselect_alias == "" else f"{subselect_alias}."
         columns_from_subselect = [f'{prefix}"{alias}"' for alias in self._aliases()]
         return f",{', '.join(columns_from_subselect)}"
+
+
+def columns_quoted(columns: List[str]):
+    if len(columns) == 0:
+        return ""
+    columns_quoted = [f'"{column}"' for column in columns]
+    return f",{', '.join(columns_quoted)}"

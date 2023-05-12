@@ -30,9 +30,15 @@ import warnings
 
 import cloudpickle
 import geopandas as gpd
+import geopandas._compat as gpd_compat
 import numpy as np
 import pandas as pd
 import psutil
+
+if gpd_compat.USE_PYGEOS:
+    import pygeos as shapely2_or_pygeos
+else:
+    import shapely as shapely2_or_pygeos
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
@@ -210,6 +216,7 @@ def apply(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -231,6 +238,7 @@ def apply(
         columns=columns,
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -250,6 +258,7 @@ def buffer(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -281,6 +290,7 @@ def buffer(
         columns=columns,
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -294,6 +304,7 @@ def convexhull(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -311,6 +322,7 @@ def convexhull(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -327,6 +339,7 @@ def simplify(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -348,6 +361,7 @@ def simplify(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -364,6 +378,7 @@ def _apply_geooperation_to_layer(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -417,6 +432,9 @@ def _apply_geooperation_to_layer(
             singular ones during the geooperation. Defaults to False.
         force_output_geometrytype (GeometryType, optional): The output geometry type to
             force. If None, a best-effort guess is made. Defaults to None.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
         nb_parallel (int, optional): [description]. Defaults to -1.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
@@ -541,6 +559,7 @@ def _apply_geooperation_to_layer(
                     output_layer=output_layer,
                     rows=rows,
                     explodecollections=explodecollections,
+                    gridsize=gridsize,
                     force=force,
                 )
                 future_to_batch_id[future] = batch_id
@@ -601,9 +620,9 @@ def _apply_geooperation_to_layer(
             logger.debug(f"Result of {operation} was empty!")
 
     finally:
-        # Clean tmp dir
-        shutil.rmtree(tempdir)
-        logger.info(f"{operation} ready, took {datetime.now()-start_time_global}!")
+        shutil.rmtree(tempdir, ignore_errors=True)
+
+    logger.info(f"{operation} ready, took {datetime.now()-start_time_global}!")
 
 
 def _apply_geooperation(
@@ -616,6 +635,7 @@ def _apply_geooperation(
     columns: Optional[List[str]] = None,
     rows=None,
     explodecollections: bool = False,
+    gridsize: float = 0.0,
     force: bool = False,
 ) -> str:
     # Init
@@ -661,7 +681,10 @@ def _apply_geooperation(
         raise ValueError(f"operation not supported: {operation}")
 
     # Remove rows where geom is empty
+    assert isinstance(data_gdf, gpd.GeoDataFrame)
+    assert data_gdf.geometry is not None
     data_gdf = data_gdf[~data_gdf.geometry.is_empty]
+    assert isinstance(data_gdf, gpd.GeoDataFrame)
     data_gdf = data_gdf[~data_gdf.geometry.isna()]
 
     # If there is an fid column in the dataset, rename it, because the fid column is a
@@ -677,6 +700,12 @@ def _apply_geooperation(
                 )
     if explodecollections:
         data_gdf = data_gdf.explode(ignore_index=True)  # type: ignore
+
+    if gridsize != 0.0:
+        assert isinstance(data_gdf, gpd.GeoDataFrame)
+        data_gdf.geometry = shapely2_or_pygeos.set_precision(
+            data_gdf.geometry.array.data, grid_size=gridsize
+        )
 
     # If the result is empty, and no output geometrytype specified, use input
     # geometrytype
@@ -713,6 +742,7 @@ def dissolve(
     nb_squarish_tiles: int = 1,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
+    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -820,6 +850,7 @@ def dissolve(
             agg_columns=agg_columns,
             input_layer=input_layer,
             output_layer=output_layer,
+            gridsize=gridsize,
             force=force,
         )
 
@@ -935,6 +966,7 @@ def dissolve(
                     tiles_gdf=tiles_gdf,
                     input_layer=input_layer,
                     output_layer=output_layer,
+                    gridsize=gridsize,
                     nb_parallel=nb_parallel,
                 )
 
@@ -1117,9 +1149,7 @@ def dissolve(
                 )
 
         finally:
-            # Clean tmp dir if it exists...
-            if tempdir.exists():
-                shutil.rmtree(tempdir)
+            shutil.rmtree(tempdir, ignore_errors=True)
     else:
         raise NotImplementedError(
             f"Unsupported input geometrytype: {input_layerinfo.geometrytype}"
@@ -1143,6 +1173,7 @@ def _dissolve_polygons_pass(
     tiles_gdf: gpd.GeoDataFrame,
     input_layer: Optional[str],
     output_layer: Optional[str],
+    gridsize: float,
     nb_parallel: int,
 ) -> dict:
     # Make sure the input file has a spatial index
@@ -1204,6 +1235,7 @@ def _dissolve_polygons_pass(
                 output_layer=output_layer,
                 bbox=tile_row.geometry.bounds,
                 tile_id=tile_id,
+                gridsize=gridsize,
             )
             future_to_batch_id[future] = batch_id
 
@@ -1294,6 +1326,7 @@ def _dissolve_polygons(
     output_layer: Optional[str],
     bbox: Tuple[float, float, float, float],
     tile_id: Optional[int],
+    gridsize: float,
 ) -> dict:
     # Init
     perfinfo = {}
@@ -1304,6 +1337,7 @@ def _dissolve_polygons(
         "output_onborder_path": output_onborder_path,
         "bbox": bbox,
         "tile_id": tile_id,
+        "gridsize": gridsize,
         "nb_rows_done": 0,
         "total_time": 0,
         "perfinfo": "",
@@ -1458,8 +1492,14 @@ def _dissolve_polygons(
         return return_info
 
     # Add column with tile_id
+    assert isinstance(diss_gdf, gpd.GeoDataFrame)
     if tile_id is not None:
         diss_gdf["tile_id"] = tile_id
+
+    if gridsize != 0.0:
+        diss_gdf.geometry = shapely2_or_pygeos.set_precision(
+            diss_gdf.geometry.array.data, grid_size=gridsize
+        )
 
     # Save the result to destination file(s)
     start_to_file = datetime.now()

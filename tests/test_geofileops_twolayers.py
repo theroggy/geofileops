@@ -4,25 +4,28 @@ Tests for operations that are executed using a sql statement on two layers.
 """
 
 import math
-from pathlib import Path
-import sys
 
 import geopandas as gpd
+import geopandas._compat as gpd_compat
 import pandas as pd
 import pytest
 
-# Add path so the local geofileops packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+if gpd_compat.USE_PYGEOS:
+    import pygeos as shapely2_or_pygeos
+else:
+    import shapely as shapely2_or_pygeos
+
+
 import geofileops as gfo
 from geofileops import GeometryType, PrimitiveType
-from geofileops.util import _geoops_sql
+from geofileops.util import _geoops_sql as geoops_sql
 from tests import test_helper
-from tests.test_helper import DEFAULT_SUFFIXES, DEFAULT_TESTFILES
+from tests.test_helper import SUFFIXES, TESTFILES
 from tests.test_helper import assert_geodataframe_equal
 
 
-@pytest.mark.parametrize("testfile", DEFAULT_TESTFILES)
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("testfile", TESTFILES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_clip(tmp_path, testfile, suffix):
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
     clip_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
@@ -48,9 +51,10 @@ def test_clip(tmp_path, testfile, suffix):
     )
 
 
-@pytest.mark.parametrize("testfile", DEFAULT_TESTFILES)
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
-def test_erase(tmp_path, testfile, suffix):
+@pytest.mark.parametrize("testfile", TESTFILES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("gridsize", [0.0, 0.001])
+def test_erase(tmp_path, testfile, suffix, gridsize):
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
     erase_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
     input_layerinfo = gfo.get_layerinfo(input_path)
@@ -61,6 +65,7 @@ def test_erase(tmp_path, testfile, suffix):
         input_path=input_path,
         erase_path=erase_path,
         output_path=output_path,
+        gridsize=gridsize,
         batchsize=batchsize,
     )
 
@@ -73,6 +78,10 @@ def test_erase(tmp_path, testfile, suffix):
     output_gpd_gdf = gpd.overlay(
         input_gdf, erase_gdf, how="difference", keep_geom_type=True
     )
+    if gridsize != 0.0:
+        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+        )
     assert_geodataframe_equal(
         output_gdf,
         output_gpd_gdf,
@@ -118,8 +127,9 @@ def test_erase_explodecollections(tmp_path):
     )
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
-def test_export_by_location(tmp_path, suffix):
+@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("gridsize", [0.0, 0.001])
+def test_export_by_location(tmp_path, suffix, gridsize):
     input_to_select_from_path = test_helper.get_testfile(
         "polygon-parcel", suffix=suffix
     )
@@ -133,6 +143,7 @@ def test_export_by_location(tmp_path, suffix):
         input_to_select_from_path=input_to_select_from_path,
         input_to_compare_with_path=input_to_compare_with_path,
         output_path=output_path,
+        gridsize=gridsize,
         batchsize=batchsize,
     )
 
@@ -151,7 +162,7 @@ def test_export_by_location(tmp_path, suffix):
 
 
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_export_by_distance(tmp_path, testfile, suffix):
     input_to_select_from_path = test_helper.get_testfile(testfile, suffix=suffix)
     input_to_compare_with_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
@@ -184,16 +195,17 @@ def test_export_by_distance(tmp_path, testfile, suffix):
 
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
 @pytest.mark.parametrize(
-    "suffix, epsg, nb_parallel",
+    "suffix, epsg, gridsize, nb_parallel",
     [
-        (".gpkg", 31370, 1),
-        (".gpkg", 31370, 2),
-        (".gpkg", 4326, 2),
-        (".shp", 31370, 1),
-        (".shp", 31370, 2),
+        (".gpkg", 31370, 0.0, 1),
+        (".gpkg", 31370, 0.01, 1),
+        (".gpkg", 31370, 0.0, 2),
+        (".gpkg", 4326, 0.0, 2),
+        (".shp", 31370, 0.0, 1),
+        (".shp", 31370, 0.0, 2),
     ],
 )
-def test_intersection(tmp_path, testfile, suffix, epsg, nb_parallel):
+def test_intersection(tmp_path, testfile, suffix, epsg, gridsize, nb_parallel):
     input1_path = test_helper.get_testfile(testfile, suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
 
@@ -209,6 +221,7 @@ def test_intersection(tmp_path, testfile, suffix, epsg, nb_parallel):
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,
+        gridsize=gridsize,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
     )
@@ -239,6 +252,10 @@ def test_intersection(tmp_path, testfile, suffix, epsg, nb_parallel):
         for name_gpd, name_gfo in zip(output_gpd_gdf.columns, output_gdf.columns)
     }
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
+    if gridsize != 0.0:
+        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+        )
     assert_geodataframe_equal(
         output_gdf, output_gpd_gdf, check_dtype=False, sort_values=True
     )
@@ -368,7 +385,7 @@ def test_intersection_resultempty(tmp_path, suffix):
 
 
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_intersection_columns_fid(tmp_path, testfile, suffix):
     input1_path = test_helper.get_testfile(testfile, suffix=suffix)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
@@ -426,7 +443,7 @@ def test_prepare_spatial_relations_filter():
     ]
     for relation in named_relations:
         query = f"{relation} is True"
-        filter = _geoops_sql._prepare_spatial_relations_filter(query)
+        filter = geoops_sql._prepare_spatial_relations_filter(query)
         assert filter is not None and filter != ""
 
     # Test extra queries that should work
@@ -436,7 +453,7 @@ def test_prepare_spatial_relations_filter():
         "(((T******** is False)))",
     ]
     for query in ok_queries:
-        filter = _geoops_sql._prepare_spatial_relations_filter(query)
+        filter = geoops_sql._prepare_spatial_relations_filter(query)
         assert filter is not None and filter != ""
 
     # Test queries that should fail
@@ -455,7 +472,7 @@ def test_prepare_spatial_relations_filter():
     ]
     for query, error_reason in error_queries:
         try:
-            _ = _geoops_sql._prepare_spatial_relations_filter(query)
+            _ = geoops_sql._prepare_spatial_relations_filter(query)
             error = False
         except Exception:
             error = True
@@ -529,9 +546,10 @@ def test_join_by_location(
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg", [(".gpkg", 31370), (".gpkg", 4384), (".shp", 31370)]
+    "suffix, epsg, gridsize",
+    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.001)],
 )
-def test_join_nearest(tmp_path, suffix, epsg):
+def test_join_nearest(tmp_path, suffix, epsg, gridsize):
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
@@ -548,6 +566,7 @@ def test_join_nearest(tmp_path, suffix, epsg):
         input2_path=input2_path,
         output_path=output_path,
         nb_nearest=nb_nearest,
+        gridsize=gridsize,
         batchsize=batchsize,
         force=True,
     )
@@ -574,9 +593,10 @@ def test_join_nearest(tmp_path, suffix, epsg):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg", [(".gpkg", 31370), (".gpkg", 4326), (".shp", 31370)]
+    "suffix, epsg, gridsize",
+    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.001)],
 )
-def test_select_two_layers(tmp_path, suffix, epsg):
+def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
@@ -629,6 +649,7 @@ def test_select_two_layers(tmp_path, suffix, epsg):
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,
+        gridsize=gridsize,
         sql_stmt=sql_stmt,
     )
 
@@ -678,7 +699,7 @@ def test_select_two_layers(tmp_path, suffix, epsg):
         ),
     ],
 )
-def test_select_two_layers_invalid_params(
+def test_select_two_layers_invalid_paths(
     tmp_path, input1_path, input2_path, output_path, expected_error
 ):
     """
@@ -706,7 +727,7 @@ def test_select_two_layers_invalid_params(
         )
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_select_two_layers_invalid_sql(tmp_path, suffix):
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -733,7 +754,7 @@ def test_select_two_layers_invalid_sql(tmp_path, suffix):
         )
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
     "nb_parallel, has_batch_filter, exp_raise",
     [(1, False, False), (2, True, False), (2, False, True)],
@@ -772,10 +793,114 @@ def test_select_two_layers_batch_filter(
         )
 
 
+@pytest.mark.parametrize("suffix", SUFFIXES)
+def test_select_two_layers_select_star_fids_not_unique(tmp_path, suffix):
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
+
+    # Now run test
+    output_path = tmp_path / f"output{suffix}"
+    sql_stmt = """
+        SELECT layer1.*
+          FROM {input1_databasename}."{input1_layer}" layer1
+          CROSS JOIN {input2_databasename}."{input2_layer}" layer2
+         WHERE 1=1
+           AND ST_Area(layer1.{input1_geometrycolumn}) > 5
+    """
+    with pytest.raises(Exception, match="Error <Error UNIQUE constraint failed"):
+        gfo.select_two_layers(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=output_path,
+            sql_stmt=sql_stmt,
+        )
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES)
+def test_select_two_layers_select_star_fids_unique(tmp_path, suffix):
+    """
+    Test for a join where the fid of one layer is selected (select *), but where this
+    fid will stay unique because the rows in this layer won't be duplicated.
+    """
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
+    one_zone_path = tmp_path / f"one_zone{suffix}"
+    input2_gdf = gfo.read_file(input2_path)
+    gfo.to_file(input2_gdf.iloc[[0]], one_zone_path)
+    one_zone_layerinfo = gfo.get_layerinfo(one_zone_path)
+    assert one_zone_layerinfo.featurecount == 1
+
+    # Test with 1 * in the select
+    # ---------------------------
+    output_path = tmp_path / f"output_1star{suffix}"
+    sql_stmt = """
+        SELECT layer1.*
+          FROM {input1_databasename}."{input1_layer}" layer1
+          CROSS JOIN {input2_databasename}."{input2_layer}" layer2
+         WHERE 1=1
+    """
+    gfo.select_two_layers(
+        input1_path=input1_path,
+        input2_path=one_zone_path,
+        output_path=output_path,
+        sql_stmt=sql_stmt,
+    )
+    assert output_path.exists()
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    # Same number of columns expected as layer1: fid is "reused"
+    assert len(output_layerinfo.columns) == len(input1_layerinfo.columns)
+
+    # Test with 2 *'s in select
+    # -------------------------
+    output_path = tmp_path / f"output_2stars{suffix}"
+    sql_stmt = """
+        SELECT layer1.*, layer2.*
+          FROM {input1_databasename}."{input1_layer}" layer1
+          CROSS JOIN {input2_databasename}."{input2_layer}" layer2
+         WHERE 1=1
+    """
+    gfo.select_two_layers(
+        input1_path=input1_path,
+        input2_path=one_zone_path,
+        output_path=output_path,
+        sql_stmt=sql_stmt,
+    )
+    assert output_path.exists()
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    # 2 extra columns expected: layer2.fid is aliased + the layer2.geom is aliased
+    exp_nb_columns = len(input1_layerinfo.columns) + len(one_zone_layerinfo.columns) + 2
+    assert len(output_layerinfo.columns) == exp_nb_columns
+
+    # Test with 2 fid's in select
+    # -------------------------
+    output_path = tmp_path / f"output_2fids{suffix}"
+    sql_stmt = """
+        SELECT layer1.{input1_geometrycolumn}, layer1.fid, layer2.fid
+          FROM {input1_databasename}."{input1_layer}" layer1
+          CROSS JOIN {input2_databasename}."{input2_layer}" layer2
+         WHERE 1=1
+    """
+    gfo.select_two_layers(
+        input1_path=input1_path,
+        input2_path=one_zone_path,
+        output_path=output_path,
+        sql_stmt=sql_stmt,
+    )
+    assert output_path.exists()
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    # 1 attribute column expected: layer2.fid is aliased
+    exp_nb_columns = 1
+    assert len(output_layerinfo.columns) == exp_nb_columns
+
+
 @pytest.mark.parametrize(
-    "suffix, epsg", [(".gpkg", 31370), (".gpkg", 4326), (".shp", 31370)]
+    "suffix, epsg, gridsize",
+    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.001)],
 )
-def test_split(tmp_path, suffix, epsg):
+def test_split(tmp_path, suffix, epsg, gridsize):
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
@@ -788,6 +913,7 @@ def test_split(tmp_path, suffix, epsg):
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,
+        gridsize=gridsize,
         batchsize=batchsize,
     )
 
@@ -814,6 +940,10 @@ def test_split(tmp_path, suffix, epsg):
         for name_gpd, name_gfo in zip(output_gpd_gdf.columns, output_gfo_gdf.columns)
     }
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
+    if gridsize != 0.0:
+        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+        )
     # OIDN is float vs int? -> check_column_type=False
     assert_geodataframe_equal(
         output_gfo_gdf,
@@ -827,9 +957,10 @@ def test_split(tmp_path, suffix, epsg):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg", [(".gpkg", 31370), (".gpkg", 4326), (".shp", 31370)]
+    "suffix, epsg, gridsize",
+    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.0)],
 )
-def test_symmetric_difference(tmp_path, suffix, epsg):
+def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
     input1_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input1_layerinfo = gfo.get_layerinfo(input1_path)
@@ -841,6 +972,7 @@ def test_symmetric_difference(tmp_path, suffix, epsg):
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,
+        gridsize=gridsize,
         batchsize=batchsize,
     )
 
@@ -859,6 +991,10 @@ def test_symmetric_difference(tmp_path, suffix, epsg):
         for name_gpd, name_gfo in zip(output_gpd_gdf.columns, output_gfo_gdf.columns)
     }
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
+    if gridsize != 0.0:
+        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+        )
     assert_geodataframe_equal(
         output_gfo_gdf,
         output_gpd_gdf,
@@ -872,9 +1008,10 @@ def test_symmetric_difference(tmp_path, suffix, epsg):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg", [(".gpkg", 31370), (".gpkg", 4326), (".shp", 31370)]
+    "suffix, epsg, gridsize",
+    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.0)],
 )
-def test_union(tmp_path, suffix, epsg):
+def test_union(tmp_path, suffix, epsg, gridsize):
     # Prepare test files
     input1_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix, epsg=epsg
@@ -888,13 +1025,14 @@ def test_union(tmp_path, suffix, epsg):
 
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+    output_path = tmp_path / f"{input1_path.stem}_union_{input2_path.stem}{suffix}"
 
     # Test
-    output_path = tmp_path / f"{input1_path.stem}_union_{input2_path.stem}{suffix}"
     gfo.union(
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,
+        gridsize=gridsize,
         batchsize=batchsize,
     )
 
@@ -921,6 +1059,10 @@ def test_union(tmp_path, suffix, epsg):
     }
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     output_gpd_gdf["l1_DATUM"] = pd.to_datetime(output_gpd_gdf["l1_DATUM"])
+    if gridsize != 0.0:
+        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+        )
     assert_geodataframe_equal(
         output_gfo_gdf,
         output_gpd_gdf,

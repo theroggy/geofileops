@@ -3,20 +3,15 @@
 Tests for operations using GeoPandas.
 """
 
-from pathlib import Path
-import sys
-
 import pytest
 
-# Add path so the local geofileops packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import geofileops as gfo
 from geofileops import GeometryType
 from tests import test_helper
-from tests.test_helper import DEFAULT_SUFFIXES
+from tests.test_helper import SUFFIXES
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_clip_by_geometry(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -45,7 +40,7 @@ def test_clip_by_geometry(tmp_path, suffix):
     assert output_gdf["geometry"][0] is not None
 
 
-@pytest.mark.parametrize("suffix", DEFAULT_SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES)
 def test_export_by_bounds(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)

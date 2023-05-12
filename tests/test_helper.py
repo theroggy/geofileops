@@ -6,7 +6,6 @@ Helper functions for all tests.
 from pathlib import Path
 import tempfile
 from typing import Optional, Union
-import sys
 
 import geopandas as gpd
 import geopandas._compat as gpd_compat
@@ -18,16 +17,15 @@ else:
     import shapely as shapely2_or_pygeos
 import shapely.geometry as sh_geom
 
-# Add path so the local geofileops packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import geofileops as gfo
 from geofileops.util import geodataframe_util
 from geofileops.util import geoseries_util
 
 _data_dir = Path(__file__).parent.resolve() / "data"
-DEFAULT_EPSGS = [31370, 4326]
-DEFAULT_SUFFIXES = [".gpkg", ".shp"]
-DEFAULT_TESTFILES = ["polygon-parcel", "linestring-row-trees", "point"]
+EPSGS = [31370, 4326]
+GRIDSIZE_DEFAULT = 0.0
+SUFFIXES = [".gpkg", ".shp"]
+TESTFILES = ["polygon-parcel", "linestring-row-trees", "point"]
 
 
 def prepare_test_file(
@@ -139,11 +137,11 @@ class TestData:
         [linestring.coords, [(100, 100), (110, 110), (120, 120)]]
     )
     polygon_with_island = sh_geom.Polygon(
-        shell=[(0, 0), (0, 10), (1, 10), (10, 10), (10, 0), (0, 0)],
+        shell=[(0.01, 0), (0.01, 10), (1, 10), (10, 10), (10, 0), (0.01, 0)],
         holes=[[(2, 2), (2, 8), (8, 8), (8, 2), (2, 2)]],
     )
     polygon_no_islands = sh_geom.Polygon(
-        shell=[(100, 100), (100, 110), (110, 110), (110, 100), (100, 100)]
+        shell=[(100.01, 100), (100.01, 110), (110, 110), (110, 100), (100.01, 100)]
     )
     polygon_with_island2 = sh_geom.Polygon(
         shell=[(20, 20), (20, 30), (21, 30), (30, 30), (30, 20), (20, 20)],

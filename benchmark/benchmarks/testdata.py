@@ -137,8 +137,7 @@ def download_samplefile(
                 logger.info(f"Convert tmp file to {dst_path}")
                 gfo.makevalid(tmp_path, dst_path)
         finally:
-            if tmp_dir.exists():
-                shutil.rmtree(tmp_dir)
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return dst_path
 

@@ -3,11 +3,6 @@
 Tests for functionalities in vector_util.
 """
 
-from pathlib import Path
-import sys
-
-# Add path so the local geofileops packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import geofileops as gfo
 from geofileops.util import grid_util
 from tests import test_helper

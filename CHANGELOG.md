@@ -5,12 +5,15 @@
 ## Improvements
 
 - Add support to read/add/remove embedded layer styles in gpkg (#263)
+- Add `gridsize` parameter to most spatial operations (#261)
 - Improve performance of makevalid and isvalid (#258)
 - Improve performance of spatial operations when only one batch is used (#271)
 - Add checks that `output_path` must not be equal to the/an `input_path` for geo
   operations (#246)
 - Follow geopandas behaviour of using shapely2 and/or pygeos instead of forcing pygeos
   (#294)
+- Improve handling of "SELECT * ..." style queries in `gfo.select` and 
+  `gfo.select_two_layers` (#283)
 - Many small improvements to logging, documentation, error messages,...
 
 ### Bugs fixed
