@@ -165,7 +165,7 @@ class LayerInfo:
         name (str): the name of the layer.
         featurecount (int): the number of features (rows) in the layer.
         total_bounds (Tuple[float, float, float, float]): the bounding box of
-            the layer.
+            the layer: (minx, miny, maxx, maxy).
         geometrycolumn (str): name of the column that contains the
             primary geometry.
         geometrytypename (str): the geometry type name of the geometrycolumn.
@@ -1913,6 +1913,7 @@ def append_to(
     dst_layer: Optional[str] = None,
     src_crs: Union[int, str, None] = None,
     dst_crs: Union[int, str, None] = None,
+    where: Optional[str] = None,
     reproject: bool = False,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
@@ -1955,6 +1956,11 @@ def append_to(
             by the OGRSpatialReference.SetFromUserInput() call, which includes
             an EPSG string (eg. "EPSG:4326"), a well known text (WKT) CRS
             definition,... Defaults to None.
+        where (str, optional): only append the rows from src that comply to the filter
+            specified. Applied before explodecollections. Filter should be in sqlite
+            SQL WHERE syntax and |spatialite_reference_link| functions can be used. If
+            where contains the {geometrycolumn} placeholder, it is filled out with the
+            geometry column name of the src file. Defaults to None.
         reproject (bool, optional): True to reproject while converting the
             file. Defaults to False.
         explodecollections (bool), optional): True to output only simple geometries.
@@ -1968,8 +1974,7 @@ def append_to(
             Defaults to True.
         append_timeout_s (int, optional): timeout to use if the output file is
             being written to by another process already. Defaults to 600.
-        transaction_size (int, optional): Transaction size.
-            Defaults to 50000.
+        transaction_size (int, optional): Transaction size. Defaults to 50000.
         preserve_fid (bool, optional): True to make an extra effort to preserve fid's of
             the source layer to the destination layer. False not to do any effort. None
             to use the default behaviour of gdal, that already preserves in some cases.
@@ -2013,6 +2018,7 @@ def append_to(
                     dst_layer=dst_layer,
                     src_crs=src_crs,
                     dst_crs=dst_crs,
+                    where=where,
                     reproject=reproject,
                     explodecollections=explodecollections,
                     force_output_geometrytype=force_output_geometrytype,
@@ -2043,6 +2049,7 @@ def _append_to_nolock(
     dst_layer: Optional[str] = None,
     src_crs: Union[int, str, None] = None,
     dst_crs: Union[int, str, None] = None,
+    where: Optional[str] = None,
     reproject: bool = False,
     explodecollections: bool = False,
     create_spatial_index: Optional[bool] = True,
@@ -2059,20 +2066,50 @@ def _append_to_nolock(
     ):
         options["LAYER_CREATION.SPATIAL_INDEX"] = create_spatial_index
 
-    # When creating/appending to a shapefile, launder the columns names via
-    # a sql statement, otherwise when appending the laundered columns will
-    # get NULL values instead of the data.
-    sql_stmt = None
     src_layerinfo = None
+    if where is not None:
+        if src_layerinfo is None:
+            src_layerinfo = get_layerinfo(src, src_layer)
+        where = where.format(geometrycolumn=src_layerinfo.geometrycolumn)
+
+    # When creating/appending to a shapefile, some extra things need to be done/checked.
+    sql_stmt = None
     if dst.suffix.lower() == ".shp":
-        src_layerinfo = get_layerinfo(src, src_layer)
+        # If the destination file doesn't exist yet, and the source file has
+        # geometrytype "Geometry", raise because type is not supported by shp (and will
+        # default to linestring).
+        if src_layerinfo is None:
+            src_layerinfo = get_layerinfo(src, src_layer)
+        if (
+            force_output_geometrytype is None
+            and src_layerinfo.geometrytype
+            in [GeometryType.GEOMETRY, GeometryType.GEOMETRYCOLLECTION]
+            and not dst.exists()
+        ):
+            raise ValueError(
+                f"src file {src} has geometrytype {src_layerinfo.geometrytypename} "
+                "which is not supported in .shp. Maybe use force_output_geometrytype?"
+            )
+
+        # Launder the columns names via a sql statement, otherwise when appending the
+        # laundered columns will get NULL values instead of the data.
         src_columns = src_layerinfo.columns
         columns_laundered = _launder_column_names(src_columns)
         columns_aliased = [
             f'"{column}" AS "{laundered}"' for column, laundered in columns_laundered
         ]
         layer = src_layer if src_layer is not None else get_only_layer(src)
-        sql_stmt = f'SELECT {", ".join(columns_aliased)} FROM "{layer}"'
+        # If there is a where specified, integrate it...
+        where_clause = ""
+        if where is not None:
+            where_clause = f"WHERE {where}"
+            where = None
+        sql_stmt = f"""
+            SELECT {src_layerinfo.geometrycolumn}
+                  ,{", ".join(columns_aliased)}
+              FROM "{layer}"
+             {where_clause}
+        """
 
     # When dst file doesn't exist and src is empty force_output_geometrytype should be
     # specified, otherwise invalid output.
@@ -2090,7 +2127,8 @@ def _append_to_nolock(
         input_srs=src_crs,
         output_srs=dst_crs,
         sql_stmt=sql_stmt,
-        sql_dialect="OGRSQL",
+        sql_dialect="SQLITE",
+        where=where,
         reproject=reproject,
         transaction_size=transaction_size,
         append=True,
@@ -2110,6 +2148,7 @@ def convert(
     dst_layer: Optional[str] = None,
     src_crs: Union[str, int, None] = None,
     dst_crs: Union[str, int, None] = None,
+    where: Optional[str] = None,
     reproject: bool = False,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
@@ -2153,6 +2192,11 @@ def convert(
             by the OGRSpatialReference.SetFromUserInput() call, which includes
             an EPSG string (eg. "EPSG:4326"), a well known text (WKT) CRS
             definition,... Defaults to None.
+        where (str, optional): only append the rows from src that comply to the filter
+            specified. Applied before explodecollections. Filter should be in sqlite
+            SQL WHERE syntax and |spatialite_reference_link| functions can be used. If
+            where contains the {geometrycolumn} placeholder, it is filled out with the
+            geometry column name of the src file. Defaults to None.
         reproject (bool, optional): True to reproject while converting the
             file. Defaults to False.
         explodecollections (bool, optional): True to output only simple
@@ -2199,6 +2243,7 @@ def convert(
         dst_layer,
         src_crs=src_crs,
         dst_crs=dst_crs,
+        where=where,
         reproject=reproject,
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,

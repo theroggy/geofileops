@@ -60,6 +60,7 @@ class VectorTranslateInfo:
         clip_geometry: Optional[Union[Tuple[float, float, float, float], str]] = None,
         sql_stmt: Optional[str] = None,
         sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+        where: Optional[str] = None,
         transaction_size: int = 65536,
         append: bool = False,
         update: bool = False,
@@ -81,6 +82,7 @@ class VectorTranslateInfo:
         self.clip_geometry = clip_geometry
         self.sql_stmt = sql_stmt
         self.sql_dialect = sql_dialect
+        self.where = where
         self.transaction_size = transaction_size
         self.append = append
         self.update = update
@@ -105,6 +107,7 @@ def vector_translate_by_info(info: VectorTranslateInfo):
         clip_geometry=info.clip_geometry,
         sql_stmt=info.sql_stmt,
         sql_dialect=info.sql_dialect,  # type: ignore
+        where=info.where,
         transaction_size=info.transaction_size,
         append=info.append,
         update=info.update,
@@ -129,6 +132,7 @@ def vector_translate(
     clip_geometry: Optional[Union[Tuple[float, float, float, float], str]] = None,
     sql_stmt: Optional[str] = None,
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    where: Optional[str] = None,
     transaction_size: int = 65536,
     append: bool = False,
     update: bool = False,
@@ -179,6 +183,8 @@ def vector_translate(
             args.extend(bounds)
     if columns is not None:
         args.extend(["-select", ",".join(columns)])
+    if sql_stmt is not None and where is not None:
+        raise ValueError("it is not supported to specify both sql_stmt and where")
 
     # Warp
     if warp is not None:
@@ -279,7 +285,7 @@ def vector_translate(
             reproject=reproject,
             SQLStatement=sql_stmt,
             SQLDialect=sql_dialect,
-            where=None,  # "geom IS NOT NULL",
+            where=where,
             selectFields=None,
             addFields=False,
             forceNullable=False,
@@ -377,7 +383,7 @@ def vector_translate(
         message = f"Error {ex} while creating {output_path}"
         if sql_stmt is not None:
             message = f"{message} using sql_stmt {sql_stmt}"
-        raise GFOError(message)
+        raise GFOError(message) from ex
     finally:
         result_ds = None
 

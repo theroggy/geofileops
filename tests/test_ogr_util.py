@@ -6,8 +6,10 @@ Tests for functionalities in ogr_util.
 import os
 
 from osgeo import gdal
+import pytest
 
 from geofileops.util import _ogr_util
+from tests import test_helper
 
 
 def test_get_drivers():
@@ -93,3 +95,20 @@ def test_set_config_options():
     # If option via env is changed, it changes here as well
     os.environ[test3_config_envset] = "test3_new_env_value"
     assert gdal.GetConfigOption(test3_config_envset) == "test3_new_env_value"
+
+
+@pytest.mark.parametrize(
+    "expected_error, kwargs",
+    [
+        (
+            "it is not supported to specify both sql_stmt and where",
+            {"where": "abc", "sql_stmt": "def"},
+        )
+    ],
+)
+def test_vector_translate_invalid_params(tmp_path, kwargs, expected_error):
+    input_path = test_helper.get_testfile("polygon-parcel")
+    output_path = tmp_path / f"output{input_path.suffix}"
+
+    with pytest.raises(Exception, match=expected_error):
+        _ogr_util.vector_translate(str(input_path), output_path, **kwargs)
