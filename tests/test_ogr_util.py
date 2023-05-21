@@ -8,6 +8,7 @@ import os
 from osgeo import gdal
 import pytest
 
+import geofileops as gfo
 from geofileops.util import _ogr_util
 from tests import test_helper
 
@@ -103,7 +104,11 @@ def test_set_config_options():
         (
             "it is not supported to specify both sql_stmt and where",
             {"where": "abc", "sql_stmt": "def"},
-        )
+        ),
+        (
+            "Error input_layers .* not found in",
+            {"input_layers": "unexisting"},
+        ),
     ],
 )
 def test_vector_translate_invalid_params(tmp_path, kwargs, expected_error):
@@ -112,3 +117,15 @@ def test_vector_translate_invalid_params(tmp_path, kwargs, expected_error):
 
     with pytest.raises(Exception, match=expected_error):
         _ogr_util.vector_translate(str(input_path), output_path, **kwargs)
+
+
+def test_vector_translate_input_nolayer(tmp_path):
+    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    output_path = tmp_path / f"output{input_path.suffix}"
+    layer = gfo.get_only_layer(input_path)
+    gfo.execute_sql(input_path, sql_stmt=f'DROP TABLE "{layer}"')
+
+    with pytest.raises(
+        Exception, match="Error .* not recognized as a supported file format"
+    ):
+        _ogr_util.vector_translate(str(input_path), output_path)

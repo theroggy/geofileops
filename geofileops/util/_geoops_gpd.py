@@ -46,6 +46,7 @@ from geofileops import fileops
 from geofileops.util import _general_util
 from geofileops.util import _geoops_sql
 from geofileops.util import _io_util
+from geofileops.util import _ogr_util
 from geofileops.helpers import _parameter_helper
 from geofileops.util import _processing_util
 from geofileops.util.geometry_util import GeometryType, PrimitiveType, SimplifyAlgorithm
@@ -217,6 +218,8 @@ def apply(
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     gridsize: float = 0.0,
+    keep_empty_geoms: bool = True,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -239,6 +242,8 @@ def apply(
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -259,6 +264,8 @@ def buffer(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    keep_empty_geoms: bool = True,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -291,6 +298,8 @@ def buffer(
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -305,6 +314,8 @@ def convexhull(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    keep_empty_geoms: bool = True,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -322,7 +333,10 @@ def convexhull(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
+        force_output_geometrytype=None,
         gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -340,6 +354,8 @@ def simplify(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    keep_empty_geoms: bool = True,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -361,7 +377,10 @@ def simplify(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
+        force_output_geometrytype=None,
         gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -373,15 +392,17 @@ def _apply_geooperation_to_layer(
     output_path: Path,
     operation: GeoOperation,
     operation_params: dict,
-    input_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
-    output_layer: Optional[str] = None,
-    explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
-    gridsize: float = 0.0,
-    nb_parallel: int = -1,
-    batchsize: int = -1,
-    force: bool = False,
+    input_layer: Optional[str],  # = None
+    columns: Optional[List[str]],  # = None
+    output_layer: Optional[str],  # = None
+    explodecollections: bool,  # = False
+    force_output_geometrytype: Union[GeometryType, str, None],  # = None
+    gridsize: float,  # = 0.0
+    keep_empty_geoms: bool,  # = True
+    where: Optional[str],  # = None
+    nb_parallel: int,  # = -1
+    batchsize: int,  # = -1
+    force: bool,  # = False
 ):
     """
     Applies a geo operation on a layer.
@@ -435,12 +456,24 @@ def _apply_geooperation_to_layer(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
+            in the output. Defaults to True.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): [description]. Defaults to -1.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): [description]. Defaults to False.
+
+    Technical remarks:
+        - Retaining None geometry values in the output files is hard, because when
+          calculating partial files, a partial file can have only None geometries which
+          makes it impossible to know the geometry type. Once an output file is created,
+          it is also impossible to change the type afterwards (without making a copy).
+          If force_output_type is specified, the problem is gone.
     """
     # Init
     start_time_global = datetime.now()
@@ -466,6 +499,16 @@ def _apply_geooperation_to_layer(
     if isinstance(force_output_geometrytype, GeometryType):
         force_output_geometrytype = force_output_geometrytype.name
 
+    # Prepare where_to_apply and filter_null_geoms
+    input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
+    if where is not None:
+        if where == "":
+            where = None
+        else:
+            # Always set geometrycolumn to "geom", because where parameter for shp
+            # doesn't seem to work... so create temp partial files always as gpkg.
+            where = where.format(geometrycolumn="geom")
+
     # Prepare tmp files
     tempdir = _io_util.create_tempdir(f"geofileops/{operation.value}")
     logger.info(f"Start calculation to temp files in {tempdir}")
@@ -477,7 +520,6 @@ def _apply_geooperation_to_layer(
 
         # Calculate the best number of parallel processes and batches for
         # the available resources
-        input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
         nb_rows_total = input_layerinfo.featurecount
         if batchsize > 0:
             parallellization_config = ParallelizationConfig(
@@ -534,7 +576,7 @@ def _apply_geooperation_to_layer(
                 # Output each batch to a seperate temporary file, otherwise there
                 # are timeout issues when processing large files
                 output_tmp_partial_path = (
-                    tempdir / f"{output_path.stem}_{batch_id}{output_path.suffix}"
+                    tempdir / f"{output_path.stem}_{batch_id}.gpkg"
                 )
                 batches[batch_id]["tmp_partial_output_path"] = output_tmp_partial_path
 
@@ -560,6 +602,7 @@ def _apply_geooperation_to_layer(
                     rows=rows,
                     explodecollections=explodecollections,
                     gridsize=gridsize,
+                    keep_empty_geoms=keep_empty_geoms,
                     force=force,
                 )
                 future_to_batch_id[future] = batch_id
@@ -588,7 +631,12 @@ def _apply_geooperation_to_layer(
                         # Remark: because force_output_geometrytype for GeoDataFrame
                         # operations is (a lot) more limited than gdal-based, use the
                         # gdal version via _append_to_nolock.
-                        if nb_batches == 1 and force_output_geometrytype is None:
+                        if (
+                            nb_batches == 1
+                            and force_output_geometrytype is None
+                            and tmp_partial_output_path.suffix == tmp_output_path.suffix
+                            and where is None
+                        ):
                             gfo.move(tmp_partial_output_path, tmp_output_path)
                         else:
                             fileops._append_to_nolock(
@@ -597,13 +645,15 @@ def _apply_geooperation_to_layer(
                                 explodecollections=explodecollections,
                                 create_spatial_index=False,
                                 force_output_geometrytype=force_output_geometrytype,
+                                where=where,
                             )
                             gfo.remove(tmp_partial_output_path)
 
-                except Exception:
+                except Exception as ex:
                     batch_id = future_to_batch_id[future]
-                    # calculate_pool.shutdown()
-                    logger.exception(f"Error executing {batches[batch_id]}")
+                    message = f"Error {ex} executing {batches[batch_id]}"
+                    logger.exception(message)
+                    raise RuntimeError(message) from ex
 
                 # Log the progress and prediction speed
                 nb_done += 1
@@ -636,6 +686,7 @@ def _apply_geooperation(
     rows=None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    keep_empty_geoms: bool = True,
     force: bool = False,
 ) -> str:
     # Init
@@ -680,15 +731,18 @@ def _apply_geooperation(
     else:
         raise ValueError(f"operation not supported: {operation}")
 
-    # Remove rows where geom is empty
-    assert isinstance(data_gdf, gpd.GeoDataFrame)
+    # Set empty geometries to null/None
     assert data_gdf.geometry is not None
-    data_gdf = data_gdf[~data_gdf.geometry.is_empty]
-    assert isinstance(data_gdf, gpd.GeoDataFrame)
-    data_gdf = data_gdf[~data_gdf.geometry.isna()]
+    data_gdf.loc[data_gdf.geometry.is_empty, ["geometry"]] = None
+
+    # Remove rows where geom is None/null/empty
+    if not keep_empty_geoms:
+        assert isinstance(data_gdf, gpd.GeoDataFrame)
+        data_gdf = data_gdf[~data_gdf.geometry.isna()]
 
     # If there is an fid column in the dataset, rename it, because the fid column is a
     # "special case" in gdal that should not be written.
+    assert isinstance(data_gdf, gpd.GeoDataFrame)
     columns_lower_lookup = {column.lower(): column for column in data_gdf.columns}
     if "fid" in columns_lower_lookup:
         fid_column = columns_lower_lookup["fid"]
@@ -743,6 +797,7 @@ def dissolve(
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -751,6 +806,10 @@ def dissolve(
     Function that applies a dissolve.
 
     More detailed documentation in module geoops!
+
+    Remark: keep_empty_geoms is not implemented because this is not so easy because
+    (for polygon dissolve) the batches are location based, and null/empty geometries
+    don't have a location. It could be implemented, but as long as nobody needs it...
     """
 
     # Init and validate input parameters
@@ -777,6 +836,11 @@ def dissolve(
                 f"Dissolve to tiles is not supported for {input_layerinfo.geometrytype}"
                 ", so tiles_path should be None and nb_squarish_tiles should be 1)"
             )
+
+    if input_layer is None:
+        input_layer = gfo.get_only_layer(input_path)
+    if output_layer is None:
+        output_layer = gfo.get_default_layer(output_path)
 
     # Check columns in groupby_columns
     if groupby_columns is not None:
@@ -816,7 +880,7 @@ def dissolve(
                     agg_column["column"], list(input_layerinfo.columns) + ["fid"]
                 )
 
-    # Now input parameters are checked, check if we need to calcalate anyway
+    # Now input parameters are checked, check if we need to calculate anyway
     if output_path.exists():
         if force is False:
             result_info[
@@ -851,10 +915,20 @@ def dissolve(
             input_layer=input_layer,
             output_layer=output_layer,
             gridsize=gridsize,
+            keep_empty_geoms=False,
+            where=where,
             force=force,
         )
 
     elif input_layerinfo.geometrytype.to_primitivetype is PrimitiveType.POLYGON:
+        # Prepare where
+        if where is not None:
+            if where == "":
+                where = None
+            else:
+                # Set geometrycolumn to "geom", because temp files are saved as gpkg.
+                where = where.format(geometrycolumn="geom")
+
         # If a tiles_path is specified, read those tiles...
         result_tiles_gdf = None
         if tiles_path is not None:
@@ -865,14 +939,33 @@ def dissolve(
                 logger.debug(f"Nb cpus found: {nb_cpu}, nb_parallel: {nb_parallel}")
         else:
             # Else, create a grid based on the number of tiles wanted as result
-            result_tiles_gdf = grid_util.create_grid2(
-                input_layerinfo.total_bounds, nb_squarish_tiles, input_layerinfo.crs
+            # Use a margin of 1 meter around the bounds
+            margin = 1.0
+            if input_layerinfo.crs is not None and not input_layerinfo.crs.is_projected:
+                # If geographic crs, 1 degree = 111 km or 111000 m
+                margin /= 111000
+            bounds = input_layerinfo.total_bounds
+            bounds = (
+                bounds[0] - margin,
+                bounds[1] - margin,
+                bounds[2] + margin,
+                bounds[3] + margin,
             )
-            if len(result_tiles_gdf) > 1:
-                gfo.to_file(
-                    result_tiles_gdf,
-                    output_path.parent / f"{output_path.stem}_tiles.gpkg",
-                )
+            result_tiles_gdf = grid_util.create_grid2(
+                bounds, nb_squarish_tiles, input_layerinfo.crs
+            )
+
+        # Apply gridsize tolerance on tiles, otherwise the border polygons can't be
+        # unioned properly because gaps appear after rounding coordinates.
+        if gridsize != 0.0:
+            result_tiles_gdf.geometry = shapely2_or_pygeos.set_precision(
+                result_tiles_gdf.geometry.array.data, grid_size=gridsize
+            )
+        if len(result_tiles_gdf) > 1:
+            gfo.to_file(
+                result_tiles_gdf,
+                output_path.parent / f"{output_path.stem}_tiles.gpkg",
+            )
 
         # If a tiled result is asked, add tile_id to group on for the result
         if len(result_tiles_gdf) > 1:
@@ -885,15 +978,16 @@ def dissolve(
         try:
             if output_layer is None:
                 output_layer = gfo.get_default_layer(output_path)
-            output_tmp_path = tempdir / f"{output_path.stem}.gpkg"
+            output_tmp_path = tempdir / "output_tmp.gpkg"
             prev_nb_batches = None
             last_pass = False
             pass_id = 0
             logger.info(f"Start dissolve on file {input_path}")
+            input_pass_layer = input_layer
             while True:
                 # Get info of the current file that needs to be dissolved
-                pass_input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
-                nb_rows_total = pass_input_layerinfo.featurecount
+                input_pass_layerinfo = gfo.get_layerinfo(input_path, input_pass_layer)
+                nb_rows_total = input_pass_layerinfo.featurecount
 
                 # Calculate the best number of parallel processes and batches for
                 # the available resources for the current pass
@@ -925,10 +1019,10 @@ def dissolve(
                     if prev_nb_batches is not None:
                         nb_squarish_tiles_max = max(prev_nb_batches - 1, 1)
                     tiles_gdf = grid_util.create_grid2(
-                        total_bounds=pass_input_layerinfo.total_bounds,
+                        total_bounds=input_pass_layerinfo.total_bounds,
                         nb_squarish_tiles=nb_batches_recommended,
                         nb_squarish_tiles_max=nb_squarish_tiles_max,
-                        crs=pass_input_layerinfo.crs,
+                        crs=input_pass_layerinfo.crs,
                     )
                 else:
                     # If a grid is specified already, add extra columns/rows instead of
@@ -936,9 +1030,14 @@ def dissolve(
                     tiles_gdf = grid_util.split_tiles(
                         result_tiles_gdf, nb_batches_recommended
                     )
-                gfo.to_file(
-                    tiles_gdf, tempdir / f"{output_path.stem}_{pass_id}_tiles.gpkg"
-                )
+
+                # Apply gridsize tolerance on tiles, otherwise the border polygons can't
+                # be unioned properly because gaps appear after rounding coordinates.
+                if gridsize != 0.0:
+                    tiles_gdf.geometry = shapely2_or_pygeos.set_precision(
+                        tiles_gdf.geometry.array.data, grid_size=gridsize
+                    )
+                gfo.to_file(tiles_gdf, tempdir / f"output_{pass_id}_tiles.gpkg")
 
                 # If the number of tiles ends up as 1, it is the last pass anyway...
                 if len(tiles_gdf) == 1:
@@ -949,7 +1048,7 @@ def dissolve(
                 # gfo. The notonborder rows are final immediately
                 if last_pass is not True:
                     output_tmp_onborder_path = (
-                        tempdir / f"{output_path.stem}_{pass_id}_onborder.gpkg"
+                        tempdir / f"output_{pass_id}_onborder.gpkg"
                     )
                 else:
                     output_tmp_onborder_path = output_tmp_path
@@ -964,9 +1063,10 @@ def dissolve(
                     groupby_columns=groupby_columns,
                     agg_columns=agg_columns,
                     tiles_gdf=tiles_gdf,
-                    input_layer=input_layer,
+                    input_layer=input_pass_layer,
                     output_layer=output_layer,
                     gridsize=gridsize,
+                    keep_empty_geoms=False,
                     nb_parallel=nb_parallel,
                 )
 
@@ -975,6 +1075,7 @@ def dissolve(
                 prev_nb_batches = len(tiles_gdf)
                 input_path = output_tmp_onborder_path
                 pass_id += 1
+                input_pass_layer = None
 
                 # If we are ready...
                 if last_pass is True:
@@ -1139,14 +1240,68 @@ def dissolve(
                           ORDER BY geo_data.{orderby_column}
                     """
 
-                # Go!
-                _geoops_sql.select(
-                    input_path=output_tmp_path,
-                    output_path=output_path,
-                    sql_stmt=sql_stmt,
-                    output_layer=output_layer,
-                    explodecollections=explodecollections,
+                # Apply where parameter if needed/possible
+                if where is not None and not not explodecollections:
+                    # explodecollections is not True, so we can add it to sql_stmt.
+                    # If explodecollections would be True, we need to wait to apply the
+                    # where till after explodecollections is applied, so when appending
+                    # the partial results to the output file.
+                    where = where.format(geometrycolumn="geom")
+                    sql_stmt = f"""
+                        SELECT * FROM
+                            ( {sql_stmt}
+                            )
+                        WHERE {where}
+                    """
+                    # Where has been applied already so set to None.
+                    where = None
+
+                logger.info("Postprocess output file")
+                if where is None:
+                    name = f"output_tmp2_final{output_path.suffix}"
+                else:
+                    name = f"output_tmp2_final{output_tmp_path.suffix}"
+                output_tmp2_final_path = tempdir / name
+                sql_stmt = sql_stmt.format(
+                    geometrycolumn="geom", input_layer=output_layer
                 )
+                create_spatial_index = True if where is None else False
+                _ogr_util.vector_translate(
+                    input_path=output_tmp_path,
+                    output_path=output_tmp2_final_path,
+                    output_layer=output_layer,
+                    sql_stmt=sql_stmt,
+                    sql_dialect="SQLITE",
+                    force_output_geometrytype=input_layerinfo.geometrytype,
+                    explodecollections=explodecollections,
+                    options={"LAYER_CREATION.SPATIAL_INDEX": create_spatial_index},
+                )
+
+                # We still need to apply the where filter
+                if where is not None:
+                    name = f"output_tmp3_where{output_path.suffix}"
+                    output_tmp3_where_path = tempdir / name
+                    output_tmp2_info = gfo.get_layerinfo(output_tmp2_final_path)
+                    where = where.format(geometrycolumn=output_tmp2_info.geometrycolumn)
+                    sql_stmt = f"""
+                        SELECT * FROM "{output_layer}"
+                         WHERE {where}
+                    """
+                    tmp_info = gfo.get_layerinfo(output_tmp2_final_path, output_layer)
+                    sql_stmt = sql_stmt.format(geometrycolumn=tmp_info.geometrycolumn)
+                    _ogr_util.vector_translate(
+                        input_path=output_tmp2_final_path,
+                        output_path=output_tmp3_where_path,
+                        output_layer=output_layer,
+                        force_output_geometrytype=input_layerinfo.geometrytype,
+                        sql_stmt=sql_stmt,
+                        sql_dialect="SQLITE",
+                        options={"LAYER_CREATION.SPATIAL_INDEX": True},
+                    )
+                    output_tmp2_final_path = output_tmp3_where_path
+
+                # Now we are ready to move the result to the final spot...
+                gfo.move(output_tmp2_final_path, output_path)
 
         finally:
             shutil.rmtree(tempdir, ignore_errors=True)
@@ -1174,6 +1329,7 @@ def _dissolve_polygons_pass(
     input_layer: Optional[str],
     output_layer: Optional[str],
     gridsize: float,
+    keep_empty_geoms: bool,
     nb_parallel: int,
 ) -> dict:
     # Make sure the input file has a spatial index
@@ -1236,6 +1392,7 @@ def _dissolve_polygons_pass(
                 bbox=tile_row.geometry.bounds,
                 tile_id=tile_id,
                 gridsize=gridsize,
+                keep_empty_geoms=keep_empty_geoms,
             )
             future_to_batch_id[future] = batch_id
 
@@ -1327,6 +1484,7 @@ def _dissolve_polygons(
     bbox: Tuple[float, float, float, float],
     tile_id: Optional[int],
     gridsize: float,
+    keep_empty_geoms: bool,
 ) -> dict:
     # Init
     perfinfo = {}
@@ -1479,9 +1637,14 @@ def _dissolve_polygons(
 
         perfinfo["time_clip"] = (datetime.now() - start_clip).total_seconds()
 
-    # Drop rows with None/empty geometries
-    diss_gdf = diss_gdf[~diss_gdf.geometry.isna()]
-    diss_gdf = diss_gdf[~diss_gdf.geometry.is_empty]
+    # Set empty geometries to null/None
+    assert diss_gdf.geometry is not None
+    diss_gdf.loc[diss_gdf.geometry.is_empty, ["geometry"]] = None
+
+    # Remove rows where geom is None/null/empty
+    if not keep_empty_geoms:
+        assert isinstance(diss_gdf, gpd.GeoDataFrame)
+        diss_gdf = diss_gdf[~diss_gdf.geometry.isna()]
 
     # If there is no result, return
     if len(diss_gdf) == 0:

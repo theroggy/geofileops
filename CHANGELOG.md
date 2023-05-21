@@ -6,6 +6,8 @@
 
 - Add support to read/add/remove embedded layer styles in gpkg (#263)
 - Add `gridsize` parameter to most spatial operations (#261)
+- Add `keep_empty_geoms` and `where` parameters to many single layer spatial operations
+  (#262)
 - Add `where` parameter to `gfo.convert` and `gfo.append_to` (#311)
 - Improve performance of makevalid and isvalid (#258)
 - Improve performance of spatial operations when only one batch is used (#271)
@@ -27,6 +29,9 @@
 
 - `makevalid` parameter `precision` is renamed to `gridsize` as this is the typical
   terminology in other libraries (#273)
+- `keep_empty_geoms` parameters are added with default value `False` for most operations
+  as this was the default behaviour for those operations in the past. This will be
+  changed to `True` in a future version. This is also explained in a futurewarning (#262)
 - removed the long-deprecated functions `get_driver`, `get_driver_for_ext`,
   `to_multi_type` and `to_generaltypeid`  (#276)
 - removed the long-deprecated `vector_util`, `geofileops.geofile` and

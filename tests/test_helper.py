@@ -5,7 +5,7 @@ Helper functions for all tests.
 
 from pathlib import Path
 import tempfile
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import geopandas as gpd
 import geopandas._compat as gpd_compat
@@ -26,6 +26,64 @@ EPSGS = [31370, 4326]
 GRIDSIZE_DEFAULT = 0.0
 SUFFIXES = [".gpkg", ".shp"]
 TESTFILES = ["polygon-parcel", "linestring-row-trees", "point"]
+WHERE_AREA_GT_400 = "ST_Area({geometrycolumn}) > 400"
+WHERE_AREA_GT_5000 = "ST_Area({geometrycolumn}) > 5000"
+WHERE_LENGTH_GT_1000 = "ST_Length({geometrycolumn}) > 1000"
+WHERE_LENGTH_GT_200000 = "ST_Length({geometrycolumn}) > 200000"
+
+
+def prepare_expected_result(
+    gdf: gpd.GeoDataFrame,
+    keep_empty_geoms: bool,
+    gridsize: float = 0.0,
+    where: Optional[str] = None,
+    explodecollections=False,
+    columns: Optional[List[str]] = None,
+) -> gpd.GeoDataFrame:
+    """Prepare expected data"""
+
+    expected_gdf = gdf.copy()
+
+    if gridsize != 0.0:
+        expected_gdf.geometry = shapely2_or_pygeos.set_precision(
+            expected_gdf.geometry.array.data, grid_size=gridsize
+        )
+    if explodecollections:
+        expected_gdf = expected_gdf.explode(ignore_index=True)  # type: ignore
+
+    # Check what filtering is needed
+    filter_area_gt = None
+    if where is None or where == "":
+        pass
+    elif where == "ST_Area({geometrycolumn}) > 400":
+        filter_area_gt = 400
+    elif where == "ST_Area({geometrycolumn}) > 5000":
+        filter_area_gt = 5000
+    else:
+        raise ValueError(f"unsupported where parameter in test: {where}")
+
+    # Apply filtering
+    if keep_empty_geoms is None or not keep_empty_geoms:
+        expected_gdf = expected_gdf[~expected_gdf.geometry.isna()]
+        expected_gdf = expected_gdf[~expected_gdf.geometry.is_empty]
+    if filter_area_gt is not None:
+        expected_gdf = expected_gdf[expected_gdf.geometry.area > filter_area_gt]
+
+    if columns is not None:
+        column_mapper = {}
+        columns_to_drop = []
+        columns_dict = {column.upper(): column for column in columns}
+        for column in expected_gdf.columns:
+            if column.upper() in columns_dict:
+                column_mapper[column] = columns_dict[column.upper()]
+            elif column != "geometry":
+                columns_to_drop.append(column)
+        expected_gdf = expected_gdf.rename(columns=column_mapper)
+        if len(columns_to_drop) > 0:
+            expected_gdf = expected_gdf.drop(columns=columns_to_drop)
+
+    assert isinstance(expected_gdf, gpd.GeoDataFrame)
+    return expected_gdf
 
 
 def prepare_test_file(
@@ -184,8 +242,8 @@ def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path
 
 
 def assert_geodataframe_equal(
-    left,
-    right,
+    left: gpd.GeoDataFrame,
+    right: gpd.GeoDataFrame,
     check_dtype=True,
     check_index_type: Union[bool, str] = "equiv",
     check_column_type: Union[bool, str] = "equiv",
@@ -193,6 +251,7 @@ def assert_geodataframe_equal(
     check_like=False,
     check_less_precise=False,
     check_geom_type=False,
+    check_geom_empty_vs_None=True,
     check_crs=True,
     normalize=False,
     promote_to_multi=False,
@@ -219,6 +278,8 @@ def assert_geodataframe_equal(
         If True, use geom_almost_equals. if False, use geom_equals.
     check_geom_type : bool, default False
         If True, check that all the geom types are equal.
+    check_geom_empty_vs_None : bool, default True
+        If False, ignore differences between empty and None geometries.
     check_crs: bool, default True
         If `check_frame_type` is True, then also check that the
         crs matches.
@@ -242,13 +303,21 @@ def assert_geodataframe_equal(
         left = left[sorted(left.columns)]
         right = right[sorted(right.columns)]
 
+    if not check_geom_empty_vs_None:
+        # Set empty geoms to None for both inputs
+        left = left.copy()
+        left.loc[left.geometry.is_empty, ["geometry"]] = None
+        right = right.copy()
+        right.loc[right.geometry.is_empty, ["geometry"]] = None
+
     if sort_values:
         if normalize:
             left.geometry = gpd.GeoSeries(
-                shapely2_or_pygeos.normalize(left.geometry.array.data)
+                shapely2_or_pygeos.normalize(left.geometry.array.data), index=left.index
             )
             right.geometry = gpd.GeoSeries(
-                shapely2_or_pygeos.normalize(right.geometry.array.data)
+                shapely2_or_pygeos.normalize(right.geometry.array.data),
+                index=right.index,
             )
         if promote_to_multi:
             left.geometry = geoseries_util.harmonize_geometrytypes(
@@ -263,9 +332,9 @@ def assert_geodataframe_equal(
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / "left.geojson"
-        gfo.to_file(left, output_path)
+        gfo.to_file(left, output_path, create_spatial_index=None)
         output_path = output_dir / "right.geojson"
-        gfo.to_file(right, output_path)
+        gfo.to_file(right, output_path, create_spatial_index=None)
 
     gpd_testing.assert_geodataframe_equal(
         left=left,

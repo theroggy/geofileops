@@ -61,6 +61,11 @@ Most spatial operations in geofileops have the same optional parameters:
     * gridsize: the size of the grid the coordinates of the ouput will be rounded to.
       Eg. 0.001 to keep 3 decimals. If eg. a polygon is narrower than the gridsize, it
       will be removed. Value 0.0, the default, doesn't change the precision.
+    * keep_empty_geoms: True to keep rows with empty/null geometries in the output.
+      Default value is different for different functions at the moment.
+    * where: filter to apply to the result of the operation (after explodecollections).
+      It should be in sqlite SQL WHERE syntax and |spatialite_reference_link| functions
+      can also be used. Defaults to None.
     * nb_parallel: specify the number of CPU's to be used. By default all 
       CPU's are used.
     * batchsize: indication of the number of rows to be processed per batch. You can
