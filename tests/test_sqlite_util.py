@@ -55,7 +55,7 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path) is create_spatial_index
     output_info = gfo.get_layerinfo(output_path)
-    assert output_info.featurecount == 6
+    assert output_info.featurecount == 7
 
 
 @pytest.mark.parametrize(
