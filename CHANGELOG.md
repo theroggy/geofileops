@@ -8,6 +8,7 @@
 - Add `gridsize` parameter to most spatial operations (#261)
 - Add `keep_empty_geoms` and `where` parameters to many single layer spatial operations
   (#262)
+- Add `where` parameter to many two layer spatial operations (#312)
 - Add `where` parameter to `gfo.convert` and `gfo.append_to` (#311)
 - Improve performance of makevalid and isvalid (#258)
 - Improve performance of spatial operations when only one batch is used (#271)
@@ -34,6 +35,7 @@
   changed to `True` in a future version. This is also explained in a futurewarning (#262)
 - removed the long-deprecated functions `get_driver`, `get_driver_for_ext`,
   `to_multi_type` and `to_generaltypeid`  (#276)
+- rename and deprecate `convert` to `copy_layer` (#310)
 - removed the long-deprecated `vector_util`, `geofileops.geofile` and
   `geofileops.geofileops` namespaces (#276)
 

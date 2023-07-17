@@ -1130,7 +1130,7 @@ def _read_file_base_fiona(
                 copy(path, tmp_fid_path)
                 add_column(tmp_fid_path, "__TMP_GEOFILEOPS_FID", "INTEGER", "fid")
             else:
-                convert(path, tmp_fid_path)
+                copy_layer(path, tmp_fid_path)
                 # fid in shapefile is 0 based, so fid-1
                 add_column(tmp_fid_path, "__TMP_GEOFILEOPS_FID", "INTEGER", "fid-1")
 
@@ -1985,7 +1985,12 @@ def append_to(
     Raises:
         ValueError: an invalid parameter value was passed.
         RuntimeError: timeout was reached while trying to append data to path.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     # Check/clean input params
     src = Path(src)
     dst = Path(dst)
@@ -2159,6 +2164,46 @@ def convert(
     force: bool = False,
 ):
     """
+    DEPRECATED: please use copy_layer.
+    """
+    warnings.warn("convert is deprecated: use copy_layer.", FutureWarning)
+    return copy_layer(
+        src=src,
+        dst=dst,
+        src_layer=src_layer,
+        dst_layer=dst_layer,
+        src_crs=src_crs,
+        dst_crs=dst_crs,
+        where=where,
+        reproject=reproject,
+        explodecollections=explodecollections,
+        force_output_geometrytype=force_output_geometrytype,
+        create_spatial_index=create_spatial_index,
+        preserve_fid=preserve_fid,
+        options=options,
+        append=append,
+        force=force,
+    )
+
+
+def copy_layer(
+    src: Union[str, "os.PathLike[Any]"],
+    dst: Union[str, "os.PathLike[Any]"],
+    src_layer: Optional[str] = None,
+    dst_layer: Optional[str] = None,
+    src_crs: Union[str, int, None] = None,
+    dst_crs: Union[str, int, None] = None,
+    where: Optional[str] = None,
+    reproject: bool = False,
+    explodecollections: bool = False,
+    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    create_spatial_index: Optional[bool] = True,
+    preserve_fid: Optional[bool] = None,
+    options: dict = {},
+    append: bool = False,
+    force: bool = False,
+):
+    """
     Read a layer from a source file and write it to a new destination file.
 
     Typically used to convert from one fileformat to another or to reproject.
@@ -2218,7 +2263,12 @@ def convert(
             Defaults to False.
         force (bool, optional): overwrite existing output file(s)
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     # Init
     src = Path(src)
     dst = Path(dst)
@@ -2226,7 +2276,7 @@ def convert(
     # If source file doesn't exist, raise error
     if not src.exists():
         raise ValueError(f"src file doesn't exist: {src}")
-    # If dest file exists already, remove it
+    # If dest file exists already and no append
     if not append and dst.exists():
         if force is True:
             remove(dst)

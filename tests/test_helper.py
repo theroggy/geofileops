@@ -111,7 +111,7 @@ def prepare_test_file(
                 if input_path.suffix == suffix:
                     gfo.copy(input_path, input_prepared_path)
                 else:
-                    gfo.convert(input_path, input_prepared_path)
+                    gfo.copy_layer(input_path, input_prepared_path)
             else:
                 test_gdf = gfo.read_file(input_path)
                 test_gdf = test_gdf.to_crs(crs_epsg)
@@ -121,7 +121,7 @@ def prepare_test_file(
         # No crs specified, but different suffix asked, so convert file
         input_prepared_path = tmp_cache_dir / f"{input_path.stem}{suffix}"
         if input_prepared_path.exists() is False:
-            gfo.convert(input_path, input_prepared_path)
+            gfo.copy_layer(input_path, input_prepared_path)
 
     # Now copy the prepared file to the output dir
     output_path = output_dir / input_prepared_path.name
@@ -160,7 +160,7 @@ def get_testfile(
 
     # Convert all layers found
     for layer in layers:
-        gfo.convert(
+        gfo.copy_layer(
             testfile_path,
             prepared_path,
             src_layer=layer,

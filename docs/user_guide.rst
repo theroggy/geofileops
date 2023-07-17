@@ -33,7 +33,7 @@ The typical spatial operations are supported, eg. :meth:`~buffer`,
 :meth:`~simplify`, :meth:`~dissolve`,... 
 
 You can also execute an sqlite sql statement (including  
-|spatialite functions|) on an input file using the :meth:`~select` operation. 
+|spatialite_reference_link|) on an input file using the :meth:`~select` operation. 
 
 A full list of operations can be found in the 
 :ref:`API reference<API-reference-single-layer>`. 
@@ -86,7 +86,7 @@ The standard spatial operations are supported, eg. :meth:`~intersection`,
 More specific features are:
 
     * :meth:`~select_two_layers`: execute a select statement (including  
-      |spatialite functions|) on the input files. 
+      |spatialite_reference_link|) on the input files. 
     * :meth:`~join_nearest`: find the n nearest features from one layer 
       compared the other.
 
@@ -128,7 +128,7 @@ This is an example to get information about the (only) layer in a geo file:
 Remark: some functions might only work on Geopackage files, not on 
 shapefiles.
 
-.. |spatialite functions| raw:: html
+.. |spatialite_reference_link| raw:: html
 
    <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite functions</a>
 

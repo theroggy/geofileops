@@ -36,6 +36,7 @@ def test_clip(tmp_path, testfile, suffix):
         input_path=input_path,
         clip_path=clip_path,
         output_path=output_path,
+        where=None,
         batchsize=batchsize,
     )
 
@@ -53,8 +54,10 @@ def test_clip(tmp_path, testfile, suffix):
 
 @pytest.mark.parametrize("testfile", TESTFILES)
 @pytest.mark.parametrize("suffix", SUFFIXES)
-@pytest.mark.parametrize("gridsize", [0.0, 0.001])
-def test_erase(tmp_path, testfile, suffix, gridsize):
+@pytest.mark.parametrize(
+    "gridsize, where", [(0.0, "ST_Area(geom) > 2000"), (0.001, None)]
+)
+def test_erase(tmp_path, testfile, suffix, gridsize, where):
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
     erase_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
     input_layerinfo = gfo.get_layerinfo(input_path)
@@ -66,6 +69,7 @@ def test_erase(tmp_path, testfile, suffix, gridsize):
         erase_path=erase_path,
         output_path=output_path,
         gridsize=gridsize,
+        where=where,
         batchsize=batchsize,
     )
 
@@ -82,6 +86,9 @@ def test_erase(tmp_path, testfile, suffix, gridsize):
         output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
             output_gpd_gdf.geometry.array.data, grid_size=gridsize
         )
+    if where is not None:
+        output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.area > 2000]
+
     assert_geodataframe_equal(
         output_gdf,
         output_gpd_gdf,
@@ -128,8 +135,11 @@ def test_erase_explodecollections(tmp_path):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
-@pytest.mark.parametrize("gridsize", [0.0, 0.001])
-def test_export_by_location(tmp_path, suffix, gridsize):
+@pytest.mark.parametrize(
+    "gridsize, where, exp_featurecount",
+    [(0.0, "ST_Area(geom) > 2000", 25), (0.001, None, 27)],
+)
+def test_export_by_location(tmp_path, suffix, gridsize, where, exp_featurecount):
     input_to_select_from_path = test_helper.get_testfile(
         "polygon-parcel", suffix=suffix
     )
@@ -144,6 +154,7 @@ def test_export_by_location(tmp_path, suffix, gridsize):
         input_to_compare_with_path=input_to_compare_with_path,
         output_path=output_path,
         gridsize=gridsize,
+        where=where,
         batchsize=batchsize,
     )
 
@@ -153,7 +164,7 @@ def test_export_by_location(tmp_path, suffix, gridsize):
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns) + 1
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
-    assert output_layerinfo.featurecount == 27
+    assert output_layerinfo.featurecount == exp_featurecount
 
     # Check the contents of the result file
     # TODO: this test should be more elaborate...
@@ -434,6 +445,59 @@ def test_intersection_columns_fid(tmp_path, testfile, suffix):
         assert sorted(output_gdf.l2_FiD.unique().tolist()) == [0, 1, 2, 3, 4]
     else:
         assert sorted(output_gdf.l2_FiD.unique().tolist()) == [1, 2, 3, 4, 5]
+
+
+@pytest.mark.parametrize(
+    "suffix, explodecollections, where, exp_featurecount",
+    [
+        (".gpkg", False, None, 30),
+        (".gpkg", True, None, 31),
+        (".gpkg", False, "ST_Area(geom) > 1000", 26),
+        (".shp", False, "ST_Area(geom) > 1000", 26),
+        (".gpkg", True, "ST_Area(geom) > 1000", 27),
+        (".shp", True, "ST_Area(geom) > 1000", 27),
+    ],
+)
+def test_intersection_where(
+    tmp_path, suffix, explodecollections, where, exp_featurecount
+):
+    """Test intersection with where parameter."""
+    # TODO: test data should be changed so explodecollections results in more rows
+    # without where already!!!
+    input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
+
+    # Now run test
+    output_path = (
+        tmp_path / f"{input1_path.stem}_intersection_{input2_path.stem}{suffix}"
+    )
+    batchsize = -1
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+    gfo.intersection(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        explodecollections=explodecollections,
+        where=where,
+        nb_parallel=2,
+        batchsize=batchsize,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    input2_layerinfo = gfo.get_layerinfo(input2_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == (
+        len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
+    )
+    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    assert output_layerinfo.featurecount == exp_featurecount
+
+    # Check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None
 
 
 def test_prepare_spatial_relations_filter():
@@ -1016,10 +1080,16 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, gridsize",
-    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.0)],
+    "suffix, epsg, gridsize, where, explodecollections, exp_featurecount",
+    [
+        (".gpkg", 31370, 0.001, "ST_Area(geom) > 1000", True, 62),
+        (".shp", 31370, 0.0, "ST_Area(geom) > 1000", False, 59),
+        (".gpkg", 4326, 0.0, None, False, 72),
+    ],
 )
-def test_union(tmp_path, suffix, epsg, gridsize):
+def test_union(
+    tmp_path, suffix, epsg, gridsize, where, explodecollections, exp_featurecount
+):
     # Prepare test files
     input1_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix, epsg=epsg
@@ -1041,6 +1111,8 @@ def test_union(tmp_path, suffix, epsg, gridsize):
         input2_path=input2_path,
         output_path=output_path,
         gridsize=gridsize,
+        explodecollections=explodecollections,
+        where=where,
         batchsize=batchsize,
     )
 
@@ -1049,11 +1121,11 @@ def test_union(tmp_path, suffix, epsg, gridsize):
     assert gfo.has_spatial_index(output_path)
     input2_layerinfo = gfo.get_layerinfo(input2_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert output_layerinfo.featurecount == 72
     assert (len(input1_layerinfo.columns) + len(input2_layerinfo.columns)) == len(
         output_layerinfo.columns
     )
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    assert output_layerinfo.featurecount == exp_featurecount
 
     # Check the contents of the result file
     output_gfo_gdf = gfo.read_file(output_path)
@@ -1071,6 +1143,11 @@ def test_union(tmp_path, suffix, epsg, gridsize):
         output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
             output_gpd_gdf.geometry.array.data, grid_size=gridsize
         )
+    if explodecollections:
+        output_gpd_gdf = output_gpd_gdf.explode(ignore_index=True)
+    if where is not None:
+        output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.area > 1000]
+
     assert_geodataframe_equal(
         output_gfo_gdf,
         output_gpd_gdf,

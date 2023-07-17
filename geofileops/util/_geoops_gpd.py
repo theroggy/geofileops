@@ -474,7 +474,12 @@ def _apply_geooperation_to_layer(
           makes it impossible to know the geometry type. Once an output file is created,
           it is also impossible to change the type afterwards (without making a copy).
           If force_output_type is specified, the problem is gone.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     # Init
     start_time_global = datetime.now()
 

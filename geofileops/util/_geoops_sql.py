@@ -769,6 +769,7 @@ def clip(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -851,6 +852,7 @@ def clip(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
+        where=where,
         force_output_geometrytype=force_output_geometrytype,
         output_with_spatial_index=output_with_spatial_index,
         nb_parallel=nb_parallel,
@@ -869,6 +871,7 @@ def erase(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -955,6 +958,7 @@ def erase(
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -973,6 +977,7 @@ def export_by_location(
     input_to_compare_with_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1067,6 +1072,7 @@ def export_by_location(
         explodecollections=False,
         force_output_geometrytype=input_layer_info.geometrytype,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1083,6 +1089,7 @@ def export_by_distance(
     input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1131,6 +1138,7 @@ def export_by_distance(
         explodecollections=False,
         force_output_geometrytype=input_layer_info.geometrytype,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1150,6 +1158,7 @@ def intersection(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1223,6 +1232,7 @@ def intersection(
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1246,6 +1256,7 @@ def join_by_location(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1367,6 +1378,7 @@ def join_by_location(
         explodecollections=explodecollections,
         force_output_geometrytype=input1_layer_info.geometrytype,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1480,7 +1492,7 @@ def join_nearest(
         tempdir = _io_util.create_tempdir("geofileops/join_nearest")
         input1_tmp_path = tempdir / "both_input_layers.sqlite"
         input1_tmp_layer = "input1_layer"
-        gfo.convert(
+        gfo.copy_layer(
             src=input1_path,
             src_layer=input1_layer,
             dst=input1_tmp_path,
@@ -1535,6 +1547,7 @@ def join_nearest(
         force_output_geometrytype=input1_layer_info.geometrytype,
         explodecollections=explodecollections,
         gridsize=gridsize,
+        where=None,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1557,6 +1570,7 @@ def select_two_layers(
     force_output_geometrytype: Optional[GeometryType] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
@@ -1578,6 +1592,7 @@ def select_two_layers(
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1597,6 +1612,7 @@ def split(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
@@ -1700,6 +1716,7 @@ def split(
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1720,6 +1737,7 @@ def symmetric_difference(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1750,6 +1768,7 @@ def symmetric_difference(
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
+            where=where,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -1781,6 +1800,7 @@ def symmetric_difference(
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
+            where=where,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -1800,7 +1820,7 @@ def symmetric_difference(
         if erase1_output_path.suffix != output_path.suffix:
             # Output file should be in diffent format, so convert
             tmp_output_path = tempdir / output_path.name
-            gfo.convert(src=erase1_output_path, dst=tmp_output_path)
+            gfo.copy_layer(src=erase1_output_path, dst=tmp_output_path)
         else:
             # Create spatial index
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
@@ -1827,6 +1847,7 @@ def union(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1859,6 +1880,7 @@ def union(
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
+            where=where,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -1878,6 +1900,7 @@ def union(
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
+            where=where,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -1897,7 +1920,7 @@ def union(
         if split_output_path.suffix != output_path.suffix:
             # Output file should be in different format, so convert
             tmp_output_path = tempdir / output_path.name
-            gfo.convert(src=split_output_path, dst=tmp_output_path)
+            gfo.copy_layer(src=split_output_path, dst=tmp_output_path)
         else:
             # Create spatial index
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
@@ -1929,6 +1952,7 @@ def _two_layer_vector_operation(
     explodecollections: bool,
     force_output_geometrytype: Optional[GeometryType],
     gridsize: float,
+    where: Optional[str],
     nb_parallel: int,
     batchsize: int,
     force: bool,
@@ -1955,6 +1979,9 @@ def _two_layer_vector_operation(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): [description]. Defaults to -1.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
@@ -1970,7 +1997,12 @@ def _two_layer_vector_operation(
 
     Raises:
         ValueError: [description]
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     # Init
     if not input1_path.exists():
         raise ValueError(f"{operation_name}: input1_path doesn't exist: {input1_path}")
@@ -2135,6 +2167,21 @@ def _two_layer_vector_operation(
                     ) sub_gridsize
             """
 
+        # Prepare/apply where parameter
+        if where is not None and not explodecollections:
+            # explodecollections is not True, so we can add where to sql_stmt.
+            # If explodecollections would be True, we need to wait to apply the
+            # where till after explodecollections is applied, so when appending the
+            # partial results to the output file.
+            sql_template = f"""
+                SELECT * FROM
+                    ( {sql_template}
+                    )
+                    WHERE {where}
+            """
+            # Where has been applied already so set to None.
+            where = None
+
         # Calculate
         # ---------
         # Processing in threads is 2x faster for small datasets (on Windows)
@@ -2169,41 +2216,29 @@ def _two_layer_vector_operation(
                 )
                 batches[batch_id]["sqlite_stmt"] = sql_stmt
 
+                # If explodecollections and there is a where to be applied, we need to
+                # apply explodecollections now already to be able to apply the where in
+                # the append of partial files later on even though this involves an
+                # extra copy of the result data under the hood in practice!
+                explodecollections_now = False
+                if explodecollections and where is not None:
+                    explodecollections_now = True
                 # Remark: this temp file doesn't need spatial index
-                if use_ogr is False:
-                    # Use an aggressive speedy sqlite profile
-                    future = calculate_pool.submit(
-                        _sqlite_util.create_table_as_sql,
-                        input1_path=processing_params.batches[batch_id]["path"],
-                        input1_layer=processing_params.batches[batch_id]["layer"],
-                        input2_path=processing_params.input2_path,
-                        output_path=tmp_partial_output_path,
-                        sql_stmt=sql_stmt,
-                        output_layer=output_layer,
-                        output_geometrytype=force_output_geometrytype,
-                        create_spatial_index=False,
-                        profile=_sqlite_util.SqliteProfile.SPEED,
-                    )
-                    future_to_batch_id[future] = batch_id
-                else:
-                    # Use ogr to run the query
-                    #   * input2 path (= using attach) doesn't seem to work
-                    #   * ogr doesn't fill out database names, so do it now
-                    sql_stmt = sql_stmt.format(
-                        input1_databasename=processing_params.input1_databasename,
-                        input2_databasename=processing_params.input2_databasename,
-                    )
-
-                    future = calculate_pool.submit(
-                        _ogr_util.vector_translate,
-                        input_path=processing_params.batches[batch_id]["path"],
-                        output_path=tmp_partial_output_path,
-                        sql_stmt=sql_stmt,
-                        output_layer=output_layer,
-                        explodecollections=explodecollections,
-                        force_output_geometrytype=force_output_geometrytype,
-                        options={"LAYER_CREATION.SPATIAL_INDEX": False},
-                    )
+                future = calculate_pool.submit(
+                    calculate_two_layers,
+                    input1_path=processing_params.batches[batch_id]["path"],
+                    input1_layer=processing_params.batches[batch_id]["layer"],
+                    input2_path=processing_params.input2_path,
+                    output_path=tmp_partial_output_path,
+                    sql_stmt=sql_stmt,
+                    input1_databasename=processing_params.input1_databasename,
+                    input2_databasename=processing_params.input2_databasename,
+                    output_layer=output_layer,
+                    explodecollections=explodecollections_now,
+                    force_output_geometrytype=force_output_geometrytype,
+                    use_ogr=use_ogr,
+                    create_spatial_index=False,
+                )
                 future_to_batch_id[future] = batch_id
 
             # Loop till all parallel processes are ready, but process each one
@@ -2245,6 +2280,7 @@ def _two_layer_vector_operation(
                     nb_batches == 1
                     and not explodecollections
                     and force_output_geometrytype is None
+                    and where is None
                     and tmp_partial_output_path.suffix.lower()
                     == tmp_output_path.suffix.lower()
                 ):
@@ -2261,6 +2297,7 @@ def _two_layer_vector_operation(
                         dst=tmp_output_path,
                         explodecollections=explodecollections,
                         force_output_geometrytype=force_output_geometrytype,
+                        where=where,
                         create_spatial_index=create_spatial_index,
                         preserve_fid=False,
                     )
@@ -2295,6 +2332,70 @@ def _two_layer_vector_operation(
         raise
     finally:
         shutil.rmtree(tempdir, ignore_errors=True)
+
+
+def calculate_two_layers(
+    input1_path: Path,
+    input1_layer: str,
+    input2_path: Path,
+    output_path: Path,
+    sql_stmt: str,
+    input1_databasename: str,
+    input2_databasename: str,
+    output_layer: str,
+    explodecollections: bool,
+    force_output_geometrytype: GeometryType,
+    create_spatial_index: bool,
+    use_ogr: bool,
+):
+    if use_ogr is False:
+        # If explodecollections, write first to tmp file, then apply explodecollections
+        # to the final output file.
+        output_tmp_path = output_path
+        if explodecollections:
+            output_name = f"{output_path.stem}_tmp{output_path.suffix}"
+            output_tmp_path = output_path.parent / output_name
+        _sqlite_util.create_table_as_sql(
+            input1_path=input1_path,
+            input1_layer=input1_layer,
+            input2_path=input2_path,
+            output_path=output_tmp_path,
+            sql_stmt=sql_stmt,
+            output_layer=output_layer,
+            output_geometrytype=force_output_geometrytype,
+            create_spatial_index=create_spatial_index,
+            profile=_sqlite_util.SqliteProfile.SPEED,
+        )
+        if explodecollections:
+            _ogr_util.vector_translate(
+                input_path=output_tmp_path,
+                input_layers=output_layer,
+                output_path=output_path,
+                output_layer=output_layer,
+                explodecollections=explodecollections,
+                force_output_geometrytype=force_output_geometrytype,
+                options={"LAYER_CREATION.SPATIAL_INDEX": create_spatial_index},
+                preserve_fid=False,
+            )
+            gfo.remove(output_tmp_path)
+    else:
+        # Use ogr to run the query
+        #   * input2 path (= using attach) doesn't seem to work
+        #   * ogr doesn't fill out database names, so do it now
+        sql_stmt = sql_stmt.format(
+            input1_databasename=input1_databasename,
+            input2_databasename=input2_databasename,
+        )
+
+        _ogr_util.vector_translate(
+            input_path=input1_path,
+            output_path=output_path,
+            sql_stmt=sql_stmt,
+            output_layer=output_layer,
+            explodecollections=explodecollections,
+            force_output_geometrytype=force_output_geometrytype,
+            options={"LAYER_CREATION.SPATIAL_INDEX": create_spatial_index},
+        )
 
 
 class ProcessingParams:
@@ -2404,7 +2505,7 @@ def _prepare_processing_params(
         else:
             # If not ok, copy the input layer to gpkg
             returnvalue.input1_path = tempdir / f"{input1_path.stem}.gpkg"
-            gfo.convert(
+            gfo.copy_layer(
                 src=input1_path,
                 src_layer=input1_layer,
                 dst=returnvalue.input1_path,
@@ -2424,7 +2525,7 @@ def _prepare_processing_params(
             else:
                 # If not spatialite compatible, copy the input layer to gpkg
                 returnvalue.input2_path = tempdir / f"{input2_path.stem}.gpkg"
-                gfo.convert(
+                gfo.copy_layer(
                     src=input2_path,
                     src_layer=input2_layer,
                     dst=returnvalue.input2_path,

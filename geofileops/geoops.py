@@ -99,7 +99,12 @@ def apply(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(f"Start apply on {input_path}")
     if keep_empty_geoms is None:
         keep_empty_geoms = False
@@ -212,6 +217,10 @@ def buffer(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite</a>  # noqa: E501
+
     **Buffer style options**
 
     Using the different buffer style option parameters you can control how the
@@ -265,8 +274,6 @@ def buffer(
            - |buffer_mitre_25|
            - |buffer_mitre_10|
 
-    .. |spatialite_reference_link| raw:: html
-        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite</a>  # noqa: E501.
     .. |buffer_quadrantsegm_5| image:: ../_static/images/buffer_quadrantsegments_5.png
         :alt: Buffer with quadrantsegments=5
     .. |buffer_quadrantsegm_2| image:: ../_static/images/buffer_quadrantsegments_2.png
@@ -291,7 +298,6 @@ def buffer(
         :alt: Buffer with mitre=2.5
     .. |buffer_mitre_10| image:: ../_static/images/buffer_mitre_10.png
         :alt: Buffer with mitre=1.0
-
     """
     logger.info(
         f"Start buffer on {input_path} "
@@ -445,7 +451,12 @@ def convexhull(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(f"Start convexhull on {input_path}")
     if keep_empty_geoms is None:
         keep_empty_geoms = False
@@ -512,7 +523,12 @@ def delete_duplicate_geometries(
             |spatialite_reference_link| functions can be used. Defaults to None.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(f"Start delete_duplicate_geometries on {input_path}")
     if keep_empty_geoms is None:
         keep_empty_geoms = False
@@ -690,7 +706,12 @@ def dissolve(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     # Init
     if tiles_path is not None:
         tiles_path = Path(tiles_path)
@@ -900,7 +921,12 @@ def makevalid(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
 
     logger.info(f"Start makevalid on {input_path}")
 
@@ -1081,10 +1107,6 @@ def select(
     * When using the (default) "SQLITE" sql dialect, you can also use the spatialite
       functions as documented here: |spatialite_reference_link|.
 
-    .. |spatialite_reference_link| raw:: html
-
-        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>  # noqa: E501
-
     The result is written to the output file specified.
 
     Args:
@@ -1122,7 +1144,12 @@ def select(
             batch of rows instead of in one go on the entire layer.
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s). Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(f"Start select on {input_path}")
 
     # Convert force_output_geometrytype to GeometryType (if necessary)
@@ -1210,7 +1237,12 @@ def simplify(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(f"Start simplify on {input_path} with tolerance {tolerance}")
     if keep_empty_geoms is None:
         keep_empty_geoms = False
@@ -1271,6 +1303,7 @@ def clip(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1318,6 +1351,9 @@ def clip(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1327,11 +1363,15 @@ def clip(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
     .. |clip_input| image:: ../_static/images/clip_input.png
         :alt: Clip input
     .. |clip_result| image:: ../_static/images/clip_result.png
         :alt: Clip result
-    """
+    """  # noqa: E501
 
     logger.info(f"Start clip on {input_path} with {clip_path} to {output_path}")
     return _geoops_sql.clip(
@@ -1344,6 +1384,7 @@ def clip(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1360,6 +1401,7 @@ def erase(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1394,6 +1436,9 @@ def erase(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1402,7 +1447,12 @@ def erase(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
 
     logger.info(f"Start erase on {input_path} with {erase_path} to {output_path}")
     return _geoops_sql.erase(
@@ -1415,6 +1465,7 @@ def erase(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1432,6 +1483,7 @@ def export_by_location(
     input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1465,6 +1517,9 @@ def export_by_location(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1473,7 +1528,12 @@ def export_by_location(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(
         f"Start export_by_location: select from {input_to_select_from_path} "
         f"interacting with {input_to_compare_with_path} to {output_path}"
@@ -1489,6 +1549,7 @@ def export_by_location(
         input_to_compare_with_layer=input2_layer,
         output_layer=output_layer,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1505,6 +1566,7 @@ def export_by_distance(
     input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1531,6 +1593,9 @@ def export_by_distance(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1539,7 +1604,12 @@ def export_by_distance(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(
         f"Start export_by_distance: select from {input_to_select_from_path} within "
         f"max_distance of {max_distance} from {input_to_compare_with_path} "
@@ -1555,6 +1625,7 @@ def export_by_distance(
         input2_layer=input2_layer,
         output_layer=output_layer,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1615,6 +1686,7 @@ def intersection(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1653,6 +1725,9 @@ def intersection(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1661,7 +1736,12 @@ def intersection(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(
         f"Start intersection between {input1_path} and {input2_path} to {output_path}"
     )
@@ -1678,6 +1758,7 @@ def intersection(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1700,6 +1781,7 @@ def join_by_location(
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1764,6 +1846,9 @@ def join_by_location(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -1772,7 +1857,12 @@ def join_by_location(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(
         f"Start join_by_location: select from {input1_path} joined with "
         f"{input2_path} to {output_path}"
@@ -1794,6 +1884,7 @@ def join_by_location(
         output_layer=output_layer,
         explodecollections=False,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1896,6 +1987,7 @@ def select_two_layers(
     explodecollections: bool = False,
     force_output_geometrytype: Optional[GeometryType] = None,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
@@ -2006,6 +2098,9 @@ def select_two_layers(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -2022,10 +2117,6 @@ def select_two_layers(
 
     Additionally, there are some examples listed here that highlight
     other features/possibilities.
-
-    .. |geofileops_sql_link| raw:: html
-
-        <a href="https://github.com/geofileops/geofileops/blob/main/geofileops/util/geofileops_sql.py" target="_blank">geofileops_sql.py</a>
 
     *Join nearest features*
 
@@ -2050,7 +2141,16 @@ def select_two_layers(
                    SELECT MIN(distance) FROM join_with_dist jwd_sub
                     WHERE jwd_sub.l1_join_id = jwd.l1_join_id)
              ORDER BY distance DESC
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    .. |geofileops_sql_link| raw:: html
+
+        <a href="https://github.com/geofileops/geofileops/blob/main/geofileops/util/geofileops_sql.py" target="_blank">geofileops_sql.py</a>
+
+    """  # noqa: E501
     logger.info(
         f"Start select_two_layers: select from {input1_path} and {input2_path} "
         f"to {output_path}"
@@ -2070,6 +2170,7 @@ def select_two_layers(
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -2089,6 +2190,7 @@ def symmetric_difference(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -2127,6 +2229,9 @@ def symmetric_difference(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -2136,7 +2241,12 @@ def symmetric_difference(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(
         f"Start symmetric_difference of {input1_path} and {input2_path} "
         f"to {output_path}"
@@ -2154,6 +2264,7 @@ def symmetric_difference(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -2173,6 +2284,7 @@ def split(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -2214,6 +2326,9 @@ def split(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -2222,7 +2337,12 @@ def split(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(f"Start split between {input1_path} and {input2_path} to {output_path}")
     return _geoops_sql.split(
         input1_path=Path(input1_path),
@@ -2237,6 +2357,7 @@ def split(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -2256,6 +2377,7 @@ def union(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
+    where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -2293,6 +2415,9 @@ def union(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        where (str, optional): filter to apply to the result of the operation (after
+            explodecollections). It should be in sqlite SQL WHERE syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
         batchsize (int, optional): indicative number of rows to process per
@@ -2301,7 +2426,12 @@ def union(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger.info(
         f"Start union: select from {input1_path} and {input2_path} to {output_path}"
     )
@@ -2318,6 +2448,7 @@ def union(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
+        where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,

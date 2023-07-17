@@ -174,7 +174,7 @@ def test_convert(tmp_path, suffix):
 
     # Convert
     dst = tmp_path / f"{src.stem}-output{suffix}"
-    gfo.convert(src, dst)
+    gfo.copy_layer(src, dst)
 
     # Now compare source and dst file
     src_layerinfo = gfo.get_layerinfo(src)
@@ -190,7 +190,7 @@ def test_convert_emptyfile(tmp_path, suffix):
         "polygon-parcel", suffix=suffix, dst_dir=tmp_path, empty=True
     )
     dst = tmp_path / f"{src.stem}-output{suffix}"
-    gfo.convert(src, dst)
+    gfo.copy_layer(src, dst)
 
     # Now compare source and dst file
     assert dst.exists()
@@ -218,7 +218,7 @@ def test_convert_force_output_geometrytype(tmp_path, testfile, force_geometrytyp
     # Convert testfile and force to force_geometrytype
     src = test_helper.get_testfile(testfile)
     dst = tmp_path / f"{src.stem}_to_{force_geometrytype}.gpkg"
-    gfo.convert(src, dst, force_output_geometrytype=force_geometrytype)
+    gfo.copy_layer(src, dst, force_output_geometrytype=force_geometrytype)
     assert gfo.get_layerinfo(dst).geometrytype == force_geometrytype
 
 
@@ -227,7 +227,7 @@ def test_convert_invalid_params(tmp_path):
     src = tmp_path / "nonexisting_file.gpkg"
     dst = tmp_path / "output.gpkg"
     with pytest.raises(ValueError, match="src file doesn't exist: "):
-        gfo.convert(src, dst)
+        gfo.copy_layer(src, dst)
 
 
 @pytest.mark.parametrize(
@@ -252,7 +252,7 @@ def test_convert_preserve_fid(
     # Convert with preserve_fid=None (default)
     # ----------------------------------------
     dst = tmp_path / f"{src.stem}-output_preserve_fid-{preserve_fid}{dst_suffix}"
-    gfo.convert(src, dst, preserve_fid=preserve_fid)
+    gfo.copy_layer(src, dst, preserve_fid=preserve_fid)
 
     # Now compare source and dst file
     src_gdf = gfo.read_file(src, fid_as_index=True)
@@ -272,7 +272,7 @@ def test_convert_reproject(tmp_path, suffix, src_crs):
 
     # Convert with reproject
     dst = tmp_path / f"{src.stem}-output_reproj4326{suffix}"
-    gfo.convert(src, dst, src_crs=src_crs, dst_crs=4326, reproject=True)
+    gfo.copy_layer(src, dst, src_crs=src_crs, dst_crs=4326, reproject=True)
 
     # Now compare source and dst file
     src_layerinfo = gfo.get_layerinfo(src)
@@ -300,7 +300,7 @@ def test_convert_where(tmp_path, suffix):
 
     # Convert with where
     dst = tmp_path / f"{src.stem}-output_where{suffix}"
-    gfo.convert(src, dst, where="ST_Area({geometrycolumn}) > 500")
+    gfo.copy_layer(src, dst, where="ST_Area({geometrycolumn}) > 500")
 
     # Now compare source and dst file
     src_layerinfo = gfo.get_layerinfo(src)
@@ -417,7 +417,7 @@ def test_get_layer_geometrytypes_geometry(tmp_path):
     # Prepare test data + test
     src = test_helper.get_testfile("polygon-parcel", suffix=".gpkg")
     test_path = tmp_path / f"{src.stem}_geometry{src.suffix}"
-    gfo.convert(src, test_path, force_output_geometrytype="GEOMETRY")
+    gfo.copy_layer(src, test_path, force_output_geometrytype="GEOMETRY")
     assert gfo.get_layerinfo(test_path).geometrytypename == "GEOMETRY"
     geometrytypes = gfo.get_layer_geometrytypes(src)
     assert geometrytypes == ["POLYGON", "MULTIPOLYGON"]
