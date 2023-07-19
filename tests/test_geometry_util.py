@@ -237,7 +237,10 @@ def test_remove_inner_rings():
         multipoly_removerings, min_area_to_keep=3, crs=None
     )
     assert isinstance(poly_result, sh_geom.MultiPolygon)
-    assert len(poly_result.geoms[0].interiors) == 1  # type: ignore
+    interiors = poly_result.geoms[
+        0
+    ].interiors  # pyright: ignore[reportOptionalMemberAccess]
+    assert len(interiors) == 1
 
 
 def test_simplify_coords_lang():
@@ -329,7 +332,7 @@ def test_simplify_ext_lang_basic():
     assert isinstance(geom_simplified, sh_geom.MultiLineString)
     assert len(geom_simplified.geoms) == 2
     assert len(geom_simplified.geoms[0].coords) < len(
-        multilinestring.geoms[0].coords  # type: ignore
+        multilinestring.geoms[0].coords  # pyright: ignore[reportOptionalMemberAccess]
     )
     assert len(geom_simplified.geoms[0].coords) == 2
 
@@ -712,7 +715,7 @@ def test_simplify_ext_no_simplification():
         _temp_simplification = sys.modules["simplification"]
     try:
         # Fake that the module is not available
-        sys.modules["simplification"] = None  # type: ignore
+        sys.modules["simplification"] = None
 
         # Using RDP needs simplification module, so should give ImportError
         geometry_util.simplify_ext(
@@ -720,9 +723,9 @@ def test_simplify_ext_no_simplification():
             algorithm=geometry_util.SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER,
             tolerance=1,
         )
-        assert True is False
+        assert False
     except ImportError:
-        assert True is True
+        assert True
     finally:
         if _temp_simplification:
             sys.modules["simplification"] = _temp_simplification

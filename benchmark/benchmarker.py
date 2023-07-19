@@ -8,15 +8,12 @@ import importlib
 import inspect
 import logging
 from pathlib import Path
-import sys
 import tempfile
 from typing import List, Optional
 
 import pandas as pd
 
-# Add path so the benchmark packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import reporter
+from benchmark import reporter
 
 ################################################################################
 # Some init

@@ -21,6 +21,7 @@
   `gfo.select_two_layers` (#283)
 - Improve handling + tests regarding empty input layers/NULL geometries (#320)
 - Many small improvements to logging, documentation, error messages,... (#321,...)
+- Use ruff instead of flake8 for linting (#317)
 
 ### Bugs fixed
 

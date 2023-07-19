@@ -5,6 +5,7 @@
 *.pyc
 *.gpkg-*
 .vscode/
+.ruff_cache
 tests/data/testdata.qgz
 
 build/

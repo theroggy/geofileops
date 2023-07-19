@@ -238,7 +238,7 @@ def get_layer_geometrytypes(
           FROM "{input_layer}" layer
     """
     result_df = read_file(path, sql_stmt=sql_stmt, sql_dialect="SQLITE")
-    return result_df["geom_type"].to_list()  # type: ignore
+    return result_df["geom_type"].to_list()
 
 
 def get_layerinfo(
@@ -317,11 +317,7 @@ def get_layerinfo(
         # For shape files, the difference between the 'MULTI' variant and the
         # single one doesn't exists... so always report MULTI variant by convention.
         if GeofileType(path) == GeofileType.ESRIShapefile:
-            if (
-                geometrytypename.startswith("POLYGON")
-                or geometrytypename.startswith("LINESTRING")
-                or geometrytypename.startswith("POINT")
-            ):
+            if geometrytypename.startswith(("POLYGON", "LINESTRING", "POINT")):
                 geometrytypename = f"MULTI{geometrytypename}"
         if geometrytypename == "UNKNOWN(ANY)":
             geometrytypename = "GEOMETRY"
@@ -1009,7 +1005,7 @@ def read_file(
     )
 
     # No assert to keep backwards compatibility
-    return result_gdf  # type: ignore
+    return result_gdf
 
 
 def read_file_nogeom(
@@ -1181,7 +1177,7 @@ def _read_file_base_fiona(
     # Reorder columns + change casing so they are the same as columns parameter
     if columns_prepared is not None and len(columns_prepared) > 0:
         result_gdf = result_gdf[list(columns_prepared) + ["geometry"]]
-        result_gdf = result_gdf.rename(columns=columns_prepared)  # type: ignore
+        result_gdf = result_gdf.rename(columns=columns_prepared)
 
     # Starting from fiona 1.9, string columns with all None values are read as being
     # float columns. Convert them to object type.
@@ -1194,15 +1190,11 @@ def _read_file_base_fiona(
             for col in float_cols:
                 if col in properties and properties[col].startswith("str"):
                     result_gdf[col] = (
-                        result_gdf[col]  # type: ignore
-                        .astype(object)  # type: ignore
-                        .replace(np.nan, None)
+                        result_gdf[col].astype(object).replace(np.nan, None)
                     )
 
     # assert to evade pyLance warning
-    assert isinstance(result_gdf, pd.DataFrame) or isinstance(
-        result_gdf, gpd.GeoDataFrame
-    )
+    assert isinstance(result_gdf, (gpd.GeoDataFrame, pd.DataFrame))
     return result_gdf
 
 
@@ -1275,12 +1267,9 @@ def _read_file_base_pyogrio(
     # Reorder columns + change casing so they are the same as columns parameter
     if columns_prepared is not None and len(columns_prepared) > 0:
         result_gdf = result_gdf[list(columns_prepared) + ["geometry"]]
-        result_gdf = result_gdf.rename(columns=columns_prepared)  # type: ignore
+        result_gdf = result_gdf.rename(columns=columns_prepared)
 
-    # assert to evade pyLance warning
-    assert isinstance(result_gdf, pd.DataFrame) or isinstance(
-        result_gdf, gpd.GeoDataFrame
-    )
+    assert isinstance(result_gdf, (gpd.GeoDataFrame, pd.DataFrame))
     return result_gdf
 
 
@@ -1512,7 +1501,7 @@ def _to_file_fiona(
     ):
         # No geometry, so prepare to be written as attribute table: add geometry column
         # with None geometry type in schema
-        gdf = gpd.GeoDataFrame(gdf, geometry=[None for i in gdf.index])  # type: ignore
+        gdf = gpd.GeoDataFrame(gdf, geometry=[None for i in gdf.index])
 
         schema = gpd_io_file.infer_schema(gdf)
         schema["geometry"] = "None"
@@ -1576,7 +1565,7 @@ def _to_file_fiona(
             else:
                 gdf_to_write = gdf
             """
-            gdf.to_file(str(path), **kwargs)  # type: ignore
+            gdf.to_file(str(path), **kwargs)
         elif geofiletype == GeofileType.GPKG:
             # Try to harmonize the geometrytype to one (multi)type, as GPKG
             # doesn't like > 1 type in a layer

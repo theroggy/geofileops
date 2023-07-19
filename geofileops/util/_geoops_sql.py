@@ -25,7 +25,7 @@ from . import _general_util
 from . import _io_util
 from . import _ogr_sql_util
 from . import _ogr_util
-from ..helpers import _parameter_helper
+from geofileops.helpers import _parameter_helper
 from . import _processing_util
 from . import _sqlite_util
 
@@ -582,7 +582,8 @@ def _single_layer_vector_operation(
             if force_output_geometrytype is None:
                 warnings.warn(
                     "a gridsize is specified but no force_output_geometrytype, this "
-                    "can result in inconsistent geometries in the output"
+                    "can result in inconsistent geometries in the output",
+                    stacklevel=2,
                 )
             else:
                 primitivetypeid = force_output_geometrytype.to_primitivetype.value
@@ -596,8 +597,7 @@ def _single_layer_vector_operation(
                 batch_filter="",
             )
             cols = _sqlite_util.get_columns(
-                sql_stmt=sql_tmp,
-                input1_path=processing_params.input1_path,  # type: ignore
+                sql_stmt=sql_tmp, input1_path=processing_params.input1_path
             )
             cols = [
                 col for col in cols if col.lower() != input_layerinfo.geometrycolumn
@@ -2188,7 +2188,8 @@ def _two_layer_vector_operation(
             if force_output_geometrytype is None:
                 warnings.warn(
                     "a gridsize is specified but no force_output_geometrytype, this "
-                    "can result in inconsistent geometries in the output"
+                    "can result in inconsistent geometries in the output",
+                    stacklevel=2,
                 )
             else:
                 primitivetypeid = force_output_geometrytype.to_primitivetype.value
@@ -2627,12 +2628,8 @@ def _prepare_processing_params(
         batch_info_df = gfo.read_file(
             path=returnvalue.input1_path, sql_stmt=sql_stmt, sql_dialect="SQLITE"
         )
-        min_rowid = pd.to_numeric(
-            batch_info_df["minmax_rowid"][0]
-        ).item()  # type: ignore
-        max_rowid = pd.to_numeric(
-            batch_info_df["minmax_rowid"][1]
-        ).item()  # type: ignore
+        min_rowid = pd.to_numeric(batch_info_df["minmax_rowid"][0]).item()
+        max_rowid = pd.to_numeric(batch_info_df["minmax_rowid"][1]).item()
 
         # Determine the exact batches to use
         if ((max_rowid - min_rowid) / nb_rows_input_layer) < 1.1:

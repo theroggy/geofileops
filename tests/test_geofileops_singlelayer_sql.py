@@ -27,14 +27,14 @@ from tests.test_helper import assert_geodataframe_equal
 def test_delete_duplicate_geometries(tmp_path, gridsize):
     # Prepare test data
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             test_helper.TestData.polygon_with_island,
             test_helper.TestData.polygon_with_island,
             test_helper.TestData.polygon_no_islands,
             test_helper.TestData.polygon_no_islands,
             test_helper.TestData.polygon_with_island2,
         ],
-        crs=test_helper.TestData.crs_epsg,  # type: ignore
+        crs=test_helper.TestData.crs_epsg,
     )
     expected_gdf = test_gdf.iloc[[0, 2, 4]].reset_index(drop=True)
     suffix = ".gpkg"
@@ -203,9 +203,7 @@ def test_makevalid(tmp_path, suffix, input_empty):
 def test_makevalid_gridsize(tmp_path, descr: str, geometry, expected_geometry):
     # Prepare test data
     # -----------------
-    input_gdf = gpd.GeoDataFrame(
-        {"descr": [descr]}, geometry=[geometry], crs=31370
-    )  # type: ignore
+    input_gdf = gpd.GeoDataFrame({"descr": [descr]}, geometry=[geometry], crs=31370)
     input_path = tmp_path / "test.gpkg"
     gfo.to_file(input_gdf, input_path)
     gridsize = 1
@@ -224,7 +222,7 @@ def test_makevalid_gridsize(tmp_path, descr: str, geometry, expected_geometry):
     # Compare with expected result
     expected_gdf = gpd.GeoDataFrame(
         {"descr": [descr]}, geometry=[expected_geometry], crs=31370
-    )  # type: ignore
+    )
     expected_gdf = expected_gdf[~expected_gdf.geometry.is_empty]
     if len(expected_gdf) == 0:
         assert len(result_gdf) == 0
@@ -441,7 +439,7 @@ def test_select_invalid_sql(tmp_path, suffix):
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
     sql_stmt = 'SELECT {geometrycolumn}, not_existing_column FROM "{input_layer}"'
 
-    with pytest.raises(Exception):
+    with pytest.raises(Exception, match="Error no such column"):
         gfo.select(input_path=input_path, output_path=output_path, sql_stmt=sql_stmt)
 
 

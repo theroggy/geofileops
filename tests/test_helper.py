@@ -49,7 +49,7 @@ def prepare_expected_result(
             expected_gdf.geometry.array.data, grid_size=gridsize
         )
     if explodecollections:
-        expected_gdf = expected_gdf.explode(ignore_index=True)  # type: ignore
+        expected_gdf = expected_gdf.explode(ignore_index=True)
 
     # Check what filtering is needed
     filter_area_gt = None
@@ -341,8 +341,8 @@ def assert_geodataframe_equal(
         left=left,
         right=right,
         check_dtype=check_dtype,
-        check_index_type=check_index_type,  # type: ignore
-        check_column_type=check_column_type,  # type: ignore
+        check_index_type=check_index_type,
+        check_column_type=check_column_type,
         check_frame_type=check_frame_type,
         check_like=check_like,
         check_less_precise=check_less_precise,

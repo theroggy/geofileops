@@ -123,7 +123,7 @@ def test_erase_explodecollections(tmp_path):
     output_gpd_gdf = gpd.overlay(
         input_gdf, erase_gdf, how="difference", keep_geom_type=True
     )
-    output_gpd_gdf = output_gpd_gdf.explode(ignore_index=True)  # type: ignore
+    output_gpd_gdf = output_gpd_gdf.explode(ignore_index=True)
     assert_geodataframe_equal(
         output_gdf,
         output_gpd_gdf,
@@ -264,10 +264,7 @@ def test_intersection(
     expected_gdf = input1_gdf.overlay(
         input2_gdf, how=overlay_operation, keep_geom_type=True
     )
-    renames = {
-        name_gpd: name_gfo
-        for name_gpd, name_gfo in zip(expected_gdf.columns, output_gdf.columns)
-    }
+    renames = dict(zip(expected_gdf.columns, output_gdf.columns))
     expected_gdf = expected_gdf.rename(columns=renames)
     if gridsize != 0.0:
         expected_gdf.geometry = shapely2_or_pygeos.set_precision(
@@ -1007,10 +1004,7 @@ def test_split(tmp_path, suffix, epsg, gridsize):
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
     output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="identity", keep_geom_type=True)
-    renames = {
-        name_gpd: name_gfo
-        for name_gpd, name_gfo in zip(output_gpd_gdf.columns, output_gfo_gdf.columns)
-    }
+    renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     if gridsize != 0.0:
         output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
@@ -1058,10 +1052,7 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
     output_gpd_gdf = input1_gdf.overlay(
         input2_gdf, how="symmetric_difference", keep_geom_type=True
     )
-    renames = {
-        name_gpd: name_gfo
-        for name_gpd, name_gfo in zip(output_gpd_gdf.columns, output_gfo_gdf.columns)
-    }
+    renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     if gridsize != 0.0:
         output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
@@ -1133,10 +1124,7 @@ def test_union(
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
     output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = {
-        name_gpd: name_gfo
-        for name_gpd, name_gfo in zip(output_gpd_gdf.columns, output_gfo_gdf.columns)
-    }
+    renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     output_gpd_gdf["l1_DATUM"] = pd.to_datetime(output_gpd_gdf["l1_DATUM"])
     if gridsize != 0.0:
@@ -1199,10 +1187,7 @@ def test_union_circles(tmp_path, suffix, epsg):
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
     output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = {
-        name_gpd: name_gfo
-        for name_gpd, name_gfo in zip(output_gpd_gdf.columns, output_gdf.columns)
-    }
+    renames = dict(zip(output_gpd_gdf.columns, output_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     assert_geodataframe_equal(
         output_gdf,
@@ -1254,10 +1239,7 @@ def test_union_circles(tmp_path, suffix, epsg):
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
     output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = {
-        name_gpd: name_gfo
-        for name_gpd, name_gfo in zip(output_gpd_gdf.columns, output_gdf.columns)
-    }
+    renames = dict(zip(output_gpd_gdf.columns, output_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     assert_geodataframe_equal(
         output_gdf,

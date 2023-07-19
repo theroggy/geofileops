@@ -10,9 +10,9 @@ if gpd_compat.USE_PYGEOS:
 else:
     os.environ["USE_PYGEOS"] = "0"
 
-from geofileops.fileops import *  # noqa: F403, F401
-from geofileops.geoops import *  # noqa: F403, F401
-from geofileops.helpers.layerstyles import *  # noqa: F403, F401
+from geofileops.fileops import *  # noqa: F403
+from geofileops.geoops import *  # noqa: F403
+from geofileops.helpers.layerstyles import *  # noqa: F403
 
 
 def _get_version():

@@ -48,7 +48,7 @@ def points_gdf():
             for x, y in zip(range(nb_points), range(nb_points))
         ],
         crs="epsg:4326",
-    )  # type: ignore
+    )
     return gdf
 
 
@@ -1120,7 +1120,7 @@ def test_to_file_force_geometrytype_multitype(tmp_path, engine_setter):
 def test_to_file_geomempty(tmp_path, suffix, engine_setter):
     # Test for gdf with an empty polygon + a polygon
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             sh_geom.GeometryCollection(),
             test_helper.TestData.polygon_with_island,
         ]
@@ -1159,7 +1159,7 @@ def test_to_file_geomempty(tmp_path, suffix, engine_setter):
 def test_to_file_geomnone(tmp_path, suffix, engine_setter):
     # Test for gdf with a None geometry + a polygon
     test_gdf = gpd.GeoDataFrame(
-        geometry=[None, test_helper.TestData.polygon_with_island]  # type: ignore
+        geometry=[None, test_helper.TestData.polygon_with_island]
     )
     test_geometrytypes = geoseries_util.get_geometrytypes(test_gdf.geometry)
     assert len(test_geometrytypes) == 1
@@ -1226,7 +1226,7 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
         elif len(index_cols) > 1 and not all(index_cols):
             for level, index_col in enumerate(index_cols):
                 if index_col is None:
-                    index_cols[level] = "level_" + str(level)  # type: ignore
+                    index_cols[level] = "level_" + str(level)
 
         # check GeoDataFrame with default index=None to autodetect
         tempfilename = next(fngen)
@@ -1257,14 +1257,12 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
             expected_cols = other_cols + ["geometry"]
         assert list(df_check.columns) == expected_cols
 
-        return
-
     # Checks where index is not used/saved
     # ------------------------------------
 
     # index is a default RangeIndex
     p_gdf = points_gdf.copy()
-    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)  # type: ignore
+    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
     do_checks(gdf, index_is_used=False)
 
     # index is a RangeIndex, starting from 1
@@ -1273,17 +1271,17 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
 
     # index is a Int64Index regular sequence from 1
     p_gdf.index = list(range(1, len(gdf) + 1))
-    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)  # type: ignore
+    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
     do_checks(gdf, index_is_used=False)
 
     # index was a default RangeIndex, but delete one row to make an Int64Index
     p_gdf = points_gdf.copy()
-    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)  # type: ignore
+    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
     gdf = gdf.drop(5, axis=0)
     do_checks(gdf, index_is_used=False)
 
     # no other columns (except geometry)
-    gdf = gpd.GeoDataFrame(geometry=p_gdf.geometry)  # type: ignore
+    gdf = gpd.GeoDataFrame(geometry=p_gdf.geometry)
     do_checks(gdf, index_is_used=False)
 
     # Checks where index is used/saved
@@ -1291,7 +1289,7 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
 
     # named index
     p_gdf = points_gdf.copy()
-    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)  # type: ignore
+    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
     gdf.index.name = "foo_index"
     do_checks(gdf, index_is_used=True)
 
@@ -1303,20 +1301,20 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
     p_gdf = points_gdf.copy()
     p_gdf["value3"] = p_gdf["value2"] - p_gdf["value1"]
     p_gdf.set_index(["value1", "value2"], inplace=True)
-    gdf = gpd.GeoDataFrame(p_gdf, geometry=p_gdf.geometry)  # type: ignore
+    gdf = gpd.GeoDataFrame(p_gdf, geometry=p_gdf.geometry)
     do_checks(gdf, index_is_used=True)
 
     # partially unnamed MultiIndex
-    gdf.index.names = ["first", None]  # type: ignore
+    gdf.index.names = ["first", None]
     do_checks(gdf, index_is_used=True)
 
     # unnamed MultiIndex
-    gdf.index.names = [None, None]  # type: ignore
+    gdf.index.names = [None, None]
     do_checks(gdf, index_is_used=True)
 
     # unnamed Float64Index
     p_gdf = points_gdf.copy()
-    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)  # type: ignore
+    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
     gdf.index = p_gdf.index.astype(float) / 10
     do_checks(gdf, index_is_used=True)
 
@@ -1326,18 +1324,16 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
 
     # index as string
     p_gdf = points_gdf.copy()
-    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)  # type: ignore
-    gdf.index = pd.TimedeltaIndex(range(len(gdf)), "days")  # type: ignore
+    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
+    gdf.index = pd.TimedeltaIndex(range(len(gdf)), "days")
     # TODO: TimedeltaIndex is an invalid field type
     gdf.index = gdf.index.astype(str)
     do_checks(gdf, index_is_used=True)
 
     # unnamed DatetimeIndex
     p_gdf = points_gdf.copy()
-    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)  # type: ignore
-    gdf.index = pd.TimedeltaIndex(
-        range(len(gdf)), "days"
-    ) + pd.DatetimeIndex(  # type: ignore
+    gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
+    gdf.index = pd.TimedeltaIndex(range(len(gdf)), "days") + pd.DatetimeIndex(
         ["1999-12-27"] * len(gdf)
     )
     if suffix == ".shp":

@@ -8,14 +8,11 @@ import logging
 from pathlib import Path
 import pprint
 import shutil
-import sys
 import tempfile
 from typing import Optional
 import urllib.request
 import zipfile
 
-# Add path so the benchmark packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import geofileops as gfo
 
 ################################################################################

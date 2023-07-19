@@ -246,19 +246,13 @@ def collection_extract(
     # Extract the polygons from the multipolygon, but store them as multipolygons anyway
     if geometry is None:
         return None
-    elif isinstance(geometry, sh_geom.Point) or isinstance(
-        geometry, sh_geom.MultiPoint
-    ):
+    elif isinstance(geometry, (sh_geom.MultiPoint, sh_geom.Point)):
         if primitivetype == PrimitiveType.POINT:
             return geometry
-    elif isinstance(geometry, sh_geom.LineString) or isinstance(
-        geometry, sh_geom.MultiLineString
-    ):
+    elif isinstance(geometry, (sh_geom.LineString, sh_geom.MultiLineString)):
         if primitivetype == PrimitiveType.LINESTRING:
             return geometry
-    elif isinstance(geometry, sh_geom.Polygon) or isinstance(
-        geometry, sh_geom.MultiPolygon
-    ):
+    elif isinstance(geometry, (sh_geom.MultiPolygon, sh_geom.Polygon)):
         if primitivetype == PrimitiveType.POLYGON:
             return geometry
     elif isinstance(geometry, sh_geom.GeometryCollection):
@@ -606,12 +600,6 @@ def simplify_ext(
         if preserve_topology is True and result_poly is None:
             return polygon
 
-        # evade pyLance warning + return
-        assert (
-            result_poly is None
-            or isinstance(result_poly, sh_geom.Polygon)
-            or isinstance(result_poly, sh_geom.MultiPolygon)
-        )
         return result_poly
 
     def simplify_linestring(linestring: sh_geom.LineString) -> sh_geom.LineString:
@@ -655,7 +643,7 @@ def simplify_ext(
         coords_on_border_idx = []
         if keep_points_on is not None:
             coords_gdf = gpd.GeoDataFrame(
-                geometry=list(sh_geom.MultiPoint(coords).geoms)  # type: ignore
+                geometry=list(sh_geom.MultiPoint(coords).geoms)
             )
             coords_on_border_series = coords_gdf.intersects(keep_points_on)
             coords_on_border_idx = np.array(
@@ -739,9 +727,7 @@ def simplify_coords_lang(
     coords_simplified_arr = coords_arr[coords_to_keep_idx]
 
     # If input was np.ndarray, return np.ndarray, otherwise list
-    if isinstance(coords, np.ndarray) or isinstance(
-        coords, sh_coords.CoordinateSequence
-    ):
+    if isinstance(coords, (np.ndarray, sh_coords.CoordinateSequence)):
         return coords_simplified_arr
     else:
         return coords_simplified_arr.tolist()
@@ -758,8 +744,8 @@ def simplify_coords_lang_idx(
 
     Inspiration for the implementation came from:
         * https://github.com/giscan/Generalizer/blob/master/simplify.py
-        * https://github.com/keszegrobert/polyline-simplification/blob/master/6.%20Lang.ipynb  # noqa: E501
-        * https://web.archive.org/web/20171005193700/http://web.cs.sunyit.edu/~poissad/projects/Curve/about_algorithms/lang.php  # noqa: E501
+        * https://github.com/keszegrobert/polyline-simplification/blob/master/6.%20Lang.ipynb
+        * https://web.archive.org/web/20171005193700/http://web.cs.sunyit.edu/~poissad/projects/Curve/about_algorithms/lang.php
 
     Args:
         coords (Union[np.ndarray, list]): list of coordinates to be simplified.

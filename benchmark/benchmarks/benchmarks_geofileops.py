@@ -7,13 +7,10 @@ from datetime import datetime
 import logging
 import multiprocessing
 from pathlib import Path
-import sys
 
 from benchmarker import RunResult
 from benchmarks import testdata
 
-# Add path so the benchmark packages are found
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import geofileops as gfo
 from geofileops.util import _geoops_sql
 from geofileops.util import _geoops_gpd

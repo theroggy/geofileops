@@ -5,9 +5,8 @@ Module exposing all supported operations on geomatries in geofiles.
 
 import logging
 import logging.config
-import os
 from pathlib import Path
-from typing import Any, Callable, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, List, Literal, Optional, Tuple, Union, TYPE_CHECKING
 import warnings
 
 from geofileops.util import _geoops_gpd
@@ -19,6 +18,9 @@ from geofileops.util.geometry_util import (
     SimplifyAlgorithm,
     GeometryType,
 )
+
+if TYPE_CHECKING:
+    import os
 
 ################################################################################
 # Some init
@@ -219,7 +221,7 @@ def buffer(
 
     .. |spatialite_reference_link| raw:: html
 
-        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite</a>  # noqa: E501
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite</a>
 
     **Buffer style options**
 
@@ -298,7 +300,7 @@ def buffer(
         :alt: Buffer with mitre=2.5
     .. |buffer_mitre_10| image:: ../_static/images/buffer_mitre_10.png
         :alt: Buffer with mitre=1.0
-    """
+    """  # noqa: E501
     logger.info(
         f"Start buffer on {input_path} "
         f"(distance: {distance}, quadrantsegments: {quadrantsegments})"
@@ -952,6 +954,7 @@ def makevalid(
             "the precision parameter is deprecated and will be removed in a future "
             "version: please use gridsize",
             FutureWarning,
+            stacklevel=2,
         )
 
     _geoops_sql.makevalid(
@@ -1653,6 +1656,7 @@ def intersect(
         "intersect() is deprecated because it was renamed intersection(). "
         "Will be removed in a future version",
         FutureWarning,
+        stacklevel=2,
     )
     return intersection(
         input1_path=input1_path,

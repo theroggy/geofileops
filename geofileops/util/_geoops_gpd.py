@@ -754,11 +754,9 @@ def _apply_geooperation(
         for fid_number in range(1, 100):
             new_name = f"{fid_column}_{fid_number}"
             if new_name not in columns_lower_lookup:
-                data_gdf = data_gdf.rename(
-                    columns={fid_column: new_name}, copy=False  # type: ignore
-                )
+                data_gdf = data_gdf.rename(columns={fid_column: new_name}, copy=False)
     if explodecollections:
-        data_gdf = data_gdf.explode(ignore_index=True)  # type: ignore
+        data_gdf = data_gdf.explode(ignore_index=True)
 
     if gridsize != 0.0:
         assert isinstance(data_gdf, gpd.GeoDataFrame)
@@ -1616,7 +1614,7 @@ def _dissolve_polygons(
             ]
         )
         bbox_gdf = gpd.GeoDataFrame(
-            data=[1], geometry=[bbox_polygon], crs=input_gdf.crs  # type: ignore
+            data=[1], geometry=[bbox_polygon], crs=input_gdf.crs
         )
 
         # Catch irrelevant pandas future warning
@@ -1690,10 +1688,10 @@ def _dissolve_polygons(
     else:
         # If not, save the polygons on the border seperately
         bbox_lines_gdf = gpd.GeoDataFrame(
-            geometry=geoseries_util.polygons_to_lines(  # type: ignore
+            geometry=geoseries_util.polygons_to_lines(
                 gpd.GeoSeries([sh_geom.box(bbox[0], bbox[1], bbox[2], bbox[3])])
             ),
-            crs=input_gdf.crs,  # type: ignore
+            crs=input_gdf.crs,
         )
         onborder_gdf = gpd.sjoin(diss_gdf, bbox_lines_gdf, predicate="intersects")
         onborder_gdf.drop("index_right", axis=1, inplace=True)
@@ -1827,9 +1825,13 @@ def _dissolve(
     else:
         by_local = by
 
-    groupby_kwargs = dict(
-        by=by_local, level=level, sort=sort, observed=observed, dropna=dropna
-    )
+    groupby_kwargs = {
+        "by": by_local,
+        "level": level,
+        "sort": sort,
+        "observed": observed,
+        "dropna": dropna,
+    }
     """
     if not compat.PANDAS_GE_11:
         groupby_kwargs.pop("dropna")
@@ -1879,7 +1881,7 @@ def _dissolve(
             .to_frame(name="__DISSOLVE_TOJSON")
         )
     else:
-        aggregated_data = data.groupby(**groupby_kwargs).agg(aggfunc)  # type: ignore
+        aggregated_data = data.groupby(**groupby_kwargs).agg(aggfunc)
         # Check if all columns were properly aggregated
         assert by_local is not None
         columns_to_agg = [column for column in data.columns if column not in by_local]
@@ -1904,7 +1906,7 @@ def _dissolve(
 
     # Aggregate
     aggregated_geometry = gpd.GeoDataFrame(
-        data=g, geometry=df.geometry.name, crs=df.crs  # type: ignore
+        data=g, geometry=df.geometry.name, crs=df.crs
     )
     # Recombine
     aggregated = aggregated_geometry.join(aggregated_data)
@@ -1918,7 +1920,7 @@ def _dissolve(
     if by is not None:
         if isinstance(by, str):
             if by in aggregated.columns and df[by].dtype != aggregated[by].dtype:
-                aggregated[by] = aggregated[by].astype(df[by].dtype)  # type: ignore
+                aggregated[by] = aggregated[by].astype(df[by].dtype)
         elif isinstance(by, Iterable):
             for col in by:
                 if col in aggregated.columns and df[col].dtype != aggregated[col].dtype:

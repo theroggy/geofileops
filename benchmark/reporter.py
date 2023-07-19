@@ -181,12 +181,8 @@ def save_chart(
 
     # Show y axes as percentages is asked
     if y_value_formatter is not None:
-        axs.yaxis.set_major_formatter(
-            plt.FuncFormatter(y_value_formatter.format)  # type: ignore
-        )
-        axs.yaxis.set_minor_formatter(
-            plt.FuncFormatter(y_value_formatter.format)  # type: ignore
-        )
+        axs.yaxis.set_major_formatter(plt.FuncFormatter(y_value_formatter.format))
+        axs.yaxis.set_minor_formatter(plt.FuncFormatter(y_value_formatter.format))
 
     # Show grid lines if specified
     if gridlines is not None:
@@ -224,7 +220,7 @@ def save_chart(
                             label_above_line = True
 
                         axs.annotate(
-                            text=text,  # type: ignore
+                            text=text,
                             # s=text,
                             # xy=(row.Index, row_fieldvalue),
                             xy=(index, row_fieldvalue),

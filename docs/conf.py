@@ -35,7 +35,7 @@ author = "Pieter Roggemans"
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
-import geofileops
+import geofileops  # noqa: E402
 
 version = release = geofileops.__version__
 

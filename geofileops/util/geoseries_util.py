@@ -131,7 +131,7 @@ def harmonize_geometrytypes(
 def is_valid_reason(geoseries: gpd.GeoSeries) -> pd.Series:
     # Get result and keep geoseries indexes
     return pd.Series(
-        data=shapely2_or_pygeos.is_valid_reason(geoseries.array.data),  # type: ignore
+        data=shapely2_or_pygeos.is_valid_reason(geoseries.array.data),
         index=geoseries.index,
     )
 
@@ -140,7 +140,7 @@ def _harmonize_to_multitype(
     geoseries: gpd.GeoSeries, dest_geometrytype: GeometryType
 ) -> gpd.GeoSeries:
     # Copy geoseries data to new array
-    geometries_arr = geoseries.array.data.copy()  # type: ignore
+    geometries_arr = geoseries.array.data.copy()
 
     # Set empty geometries to None
     empty_idxs = shapely2_or_pygeos.is_empty(geometries_arr)
@@ -182,7 +182,7 @@ def _harmonize_to_multitype(
     # Prepare result to return
     geoseries_result = gpd.GeoSeries(
         geometries_arr, index=geoseries.index, crs=geoseries.crs
-    )  # type: ignore
+    )
     assert isinstance(geoseries_result, gpd.GeoSeries)
     return geoseries_result
 
@@ -261,7 +261,7 @@ def simplify_topo_ext(
         # For RDP, only overwrite the lines that have a valid result
         for index in range(len(topo.output["arcs"])):
             # If the result of the simplify is a point, keep original
-            topoline_simpl = topolines_simpl.geoms[index].coords  # type: ignore
+            topoline_simpl = topolines_simpl.geoms[index].coords
             if len(topoline_simpl) < 2:
                 continue
             elif (

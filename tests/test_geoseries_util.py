@@ -16,7 +16,7 @@ from tests import test_helper
 
 def test_get_geometrytypes():
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             None,
             sh_geom.Point(),
             sh_geom.LineString(),
@@ -34,7 +34,7 @@ def test_get_geometrytypes():
     assert len(test_geometrytypes) == 5
 
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             None,
             sh_geom.Point(),
             sh_geom.LineString(),
@@ -49,7 +49,7 @@ def test_get_geometrytypes():
 
     # Empty geometries are counted with ignore_empty_geometries=False.
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             None,
             sh_geom.Point(),
             sh_geom.LineString(),
@@ -75,7 +75,7 @@ def test_get_geometrytypes():
 def test_geometry_collection_extract():
     # Test for gdf with all types of geometrytypes, extract!
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             test_helper.TestData.point,
             test_helper.TestData.multipoint,
             test_helper.TestData.polygon_with_island,
@@ -102,7 +102,7 @@ def test_geometry_collection_extract():
 def test_harmonize_geometrytypes():
     # Test for gdf with None + point + multipoint -> all multipoint
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             None,
             sh_geom.Point(),
             test_helper.TestData.point,
@@ -131,7 +131,7 @@ def test_harmonize_geometrytypes():
 
     # Test for gdf with linestring + multilinestring -> all multilinestring
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             None,
             sh_geom.LineString(),
             test_helper.TestData.linestring,
@@ -160,7 +160,7 @@ def test_harmonize_geometrytypes():
 
     # Test for gdf with polygon + multipolygon -> all multipolygon
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             test_helper.TestData.polygon_with_island,
             None,
             sh_geom.Polygon(),
@@ -171,7 +171,7 @@ def test_harmonize_geometrytypes():
     test_gdf_geometrytypes = geoseries_util.get_geometrytypes(test_gdf.geometry)
     assert len(test_gdf_geometrytypes) == 2
     # Filter the gdf a bit to test that the indexes are retained properly in
-    test_gdf = test_gdf.iloc[[1, 2, 3, 4]]  # type: ignore
+    test_gdf = test_gdf.iloc[[1, 2, 3, 4]]
     test_result_gdf = test_gdf.copy()
     assert isinstance(test_result_gdf, gpd.GeoDataFrame)
     test_result_gdf.geometry = geoseries_util.harmonize_geometrytypes(
@@ -190,7 +190,7 @@ def test_harmonize_geometrytypes():
 
     # Test for gdf with all types of geometrytypes -> no harmonization possible
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             None,
             sh_geom.Polygon(),
             test_helper.TestData.point,
@@ -224,7 +224,7 @@ def test_is_valid_reason(tmp_path):
     # Test with valid data + Empty geometry
     # -------------------------------------
     test_gdf = gpd.GeoDataFrame(
-        geometry=[  # type: ignore
+        geometry=[
             sh_geom.Polygon(),
             test_helper.TestData.point,
             test_helper.TestData.multipoint,
@@ -251,7 +251,7 @@ def test_is_valid_reason(tmp_path):
 
     # Test with None
     # --------------
-    test_gdf = gpd.GeoDataFrame(geometry=[None])  # type: ignore
+    test_gdf = gpd.GeoDataFrame(geometry=[None])
     result = geoseries_util.is_valid_reason(test_gdf.geometry)
 
     # is_valid_reason returns None for None geometries

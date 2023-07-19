@@ -34,13 +34,9 @@ def get_layerstyles(
     layer_styles_df = fileops.read_file(path, layer="layer_styles", fid_as_index=True)
     layer_styles_df.index.name = "id"
     if layer is not None:
-        layer_styles_df = layer_styles_df.loc[
-            layer_styles_df["f_table_name"] == layer  # type: ignore
-        ]
+        layer_styles_df = layer_styles_df.loc[layer_styles_df["f_table_name"] == layer]
     if name is not None:
-        layer_styles_df = layer_styles_df.loc[
-            layer_styles_df["styleName"] == name  # type: ignore
-        ]
+        layer_styles_df = layer_styles_df.loc[layer_styles_df["styleName"] == name]
 
     return layer_styles_df
 

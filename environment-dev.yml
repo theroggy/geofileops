@@ -23,8 +23,8 @@ dependencies:
   - pytest-cov
   # linting
   - black
-  - flake8
   - pre-commit
+  - ruff
   # docs
   - pydata-sphinx-theme
   - pip:

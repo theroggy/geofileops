@@ -106,7 +106,7 @@ def vector_translate_by_info(info: VectorTranslateInfo):
         spatial_filter=info.spatial_filter,
         clip_geometry=info.clip_geometry,
         sql_stmt=info.sql_stmt,
-        sql_dialect=info.sql_dialect,  # type: ignore
+        sql_dialect=info.sql_dialect,
         where=info.where,
         transaction_size=info.transaction_size,
         append=info.append,

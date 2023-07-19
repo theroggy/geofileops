@@ -48,7 +48,7 @@ def test_apply(tmp_path, suffix, only_geom_input, gridsize, keep_empty_geoms, wh
             {"uidn": 1, "geometry": test_helper.TestData.polygon_small_island},
             {"uidn": 2, "geometry": test_helper.TestData.polygon_with_island},
         ],
-        crs=31370,  # type: ignore
+        crs=31370,
     )
     input_path = tmp_path / f"polygons_small_holes_{suffix}"
     gfo.to_file(test_gdf, input_path)
@@ -137,7 +137,7 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
             {"id": 2, "geometry": test_helper.TestData.polygon_with_island},
             {"id": 3, "geometry": None},
         ],
-        crs=31370,  # type: ignore
+        crs=31370,
     )
     input_path = tmp_path / f"polygons_small_holes_{suffix}"
     gfo.to_file(test_gdf, input_path)
@@ -211,7 +211,7 @@ def test_apply_geooperation_invalid_operation(tmp_path):
         geoops_gpd._apply_geooperation(
             input_path=test_helper.get_testfile("polygon-parcel"),
             output_path=tmp_path / "output.gpkg",
-            operation="INVALID",  # type: ignore
+            operation="INVALID",
             operation_params={},
         )
 
@@ -589,14 +589,12 @@ def test_dissolve_polygons(
     # Compare result expected values using geopandas
     columns = ["geometry"]
     if groupby_columns is None or len(groupby_columns) == 0:
-        expected_gdf = input_gdf[columns].dissolve()  # type: ignore
+        expected_gdf = input_gdf[columns].dissolve()
     else:
         groupby_columns_upper = {column.upper(): column for column in groupby_columns}
         columns += list(groupby_columns_upper)
         expected_gdf = (
-            input_gdf[columns]
-            .dissolve(by=list(groupby_columns_upper))  # type: ignore
-            .reset_index()
+            input_gdf[columns].dissolve(by=list(groupby_columns_upper)).reset_index()
         ).rename(columns=groupby_columns_upper)
     expected_gdf = test_helper.prepare_expected_result(
         expected_gdf,
@@ -982,9 +980,9 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     assert output_gdf["lbl_conc"][grasland_idx].startswith("Grasland,Grasland,")
     assert output_gdf["lbl_conc_s"][grasland_idx].startswith("Grasland;Grasland;")
     assert output_gdf["lbl_conc_d"][grasland_idx] == "Grasland"
-    assert output_gdf["tlt_mea"][grasland_idx] == 60  # type: ignore
-    assert int(output_gdf["tlt_min"][grasland_idx]) == 60  # type: ignore
-    assert output_gdf["tlt_sum"][grasland_idx] == 1800  # type: ignore
+    assert output_gdf["tlt_mea"][grasland_idx] == 60
+    assert int(output_gdf["tlt_min"][grasland_idx]) == 60
+    assert output_gdf["tlt_sum"][grasland_idx] == 1800
 
     groenten_idx = output_gdf[
         output_gdf["GEWASGROEP"] == "Groenten, kruiden en sierplanten"
