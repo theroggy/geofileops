@@ -98,6 +98,87 @@ def test_set_config_options():
     assert gdal.GetConfigOption(test3_config_envset) == "test3_new_env_value"
 
 
+def test_vector_translate_input_nolayer(tmp_path):
+    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    output_path = tmp_path / f"output{input_path.suffix}"
+    layer = gfo.get_only_layer(input_path)
+    gfo.execute_sql(input_path, sql_stmt=f'DROP TABLE "{layer}"')
+
+    with pytest.raises(
+        Exception, match="Error .* not recognized as a supported file format"
+    ):
+        _ogr_util.vector_translate(str(input_path), output_path)
+
+
+@pytest.mark.parametrize(
+    "input_suffix, output_suffix, geom_null_asc, exp_null_geoms",
+    [
+        (".gpkg", ".gpkg", True, 7),
+        (".gpkg", ".shp", False, 46),
+        (".shp", ".gpkg", False, 46),
+        (".shp", ".shp", True, 7),
+    ],
+)
+def test_vector_translate_geom_null(
+    tmp_path, input_suffix, output_suffix, geom_null_asc, exp_null_geoms
+):
+    """
+    If there the first row of the result has a NULL geometry in the result, all
+    geometries become NULL. Using ORDER BY geom IS NULL controls this.
+       -> https://github.com/geofileops/geofileops/issues/308
+    """
+    input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
+    output_path = tmp_path / f"output{output_suffix}"
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    orderby_direction = "ASC" if geom_null_asc else "DESC"
+    sql_stmt = f"""
+        SELECT * FROM (
+          SELECT ST_Buffer({input_layerinfo.geometrycolumn}, -10) AS geom, oidn, uidn
+            FROM "{input_layerinfo.name}"
+          )
+        ORDER BY geom IS NULL {orderby_direction}
+    """
+    _ogr_util.vector_translate(
+        input_path,
+        output_path,
+        sql_stmt=sql_stmt,
+        sql_dialect="SQLITE",
+        force_output_geometrytype=input_layerinfo.geometrytype,
+    )
+
+    assert output_path.exists()
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert "geom" not in output_layerinfo.columns
+    assert "geometry" not in output_layerinfo.columns
+    assert len(output_layerinfo.columns) == 2
+
+    if output_suffix == ".gpkg":
+        assert output_layerinfo.geometrycolumn == "geom"
+    else:
+        assert output_layerinfo.geometrycolumn == "geometry"
+
+    output_gdf = gfo.read_file(output_path)
+    assert "geometry" in output_gdf.columns
+    assert len(output_gdf.loc[output_gdf.geometry.isna()]) == exp_null_geoms
+
+
+@pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES)
+@pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES)
+def test_vector_translate_input_empty(tmp_path, input_suffix, output_suffix):
+    input_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=input_suffix, empty=True
+    )
+    output_path = tmp_path / f"output{output_suffix}"
+    layer = gfo.get_only_layer(input_path)
+    sql_stmt = f'SELECT * FROM "{layer}"'
+    _ogr_util.vector_translate(input_path, output_path, sql_stmt=sql_stmt)
+
+    assert output_path.exists()
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(input_layerinfo.columns) == len(output_layerinfo.columns)
+
+
 @pytest.mark.parametrize(
     "expected_error, kwargs",
     [
@@ -117,15 +198,3 @@ def test_vector_translate_invalid_params(tmp_path, kwargs, expected_error):
 
     with pytest.raises(Exception, match=expected_error):
         _ogr_util.vector_translate(str(input_path), output_path, **kwargs)
-
-
-def test_vector_translate_input_nolayer(tmp_path):
-    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
-    output_path = tmp_path / f"output{input_path.suffix}"
-    layer = gfo.get_only_layer(input_path)
-    gfo.execute_sql(input_path, sql_stmt=f'DROP TABLE "{layer}"')
-
-    with pytest.raises(
-        Exception, match="Error .* not recognized as a supported file format"
-    ):
-        _ogr_util.vector_translate(str(input_path), output_path)

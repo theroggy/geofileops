@@ -151,8 +151,9 @@ def vector_translate(
     gdal_options = _prepare_gdal_options(options, split_by_option_type=True)
 
     # Input file parameters
+    input_filetype = GeofileType(input_path)
     # Cleanup the input_layers variable.
-    if input_path.suffix.lower() == ".shp":
+    if input_filetype == GeofileType.ESRIShapefile:
         # For shapefiles, having input_layers not None gives issues
         input_layers = None
     elif sql_stmt is not None:
@@ -211,7 +212,10 @@ def vector_translate(
     # Output file parameters
     # Get output format from the filename
     output_filetype = GeofileType(output_path)
-    input_filetype = GeofileType(input_path)
+
+    # Shapefiles only can have one layer, and the layer name == the stem of the file
+    if output_filetype == GeofileType.ESRIShapefile:
+        output_layer = output_path.stem
 
     # SRS
     if output_srs is not None and isinstance(output_srs, int):
@@ -328,6 +332,21 @@ def vector_translate(
                     if spatialref is not None:
                         output_srs = spatialref.ExportToWkt()
 
+            # If the output is a shapefile and the input geometries are NULL, gdal
+            # creates an attribute column "geometry" in the output file. To be able to
+            # detect this case later on, check here if the input file already has an
+            # attribute column "geometry".
+            input_has_geom_attribute = False
+            input_has_geometry_attribute = False
+            input_layer = input_ds.GetLayer()
+            layer_defn = input_layer.GetLayerDefn()
+            for field_idx in range(layer_defn.GetFieldCount()):
+                field_name_lower = layer_defn.GetFieldDefn(field_idx).GetName().lower()
+                if field_name_lower == "geom":
+                    input_has_geom_attribute = True
+                elif field_name_lower == "geometry":
+                    input_has_geometry_attribute = True
+
             # Consolidate all parameters
             # First take copy of args, because gdal.VectorTranslateOptions adds all
             # other parameters to the list passed (by ref)!!!
@@ -384,29 +403,51 @@ def vector_translate(
         if result_ds is None:
             raise GFOError(f"result_ds is None ({cpl_error})")
 
-        # If the output file is an empty shapefile and it was the result of a SQLITE sql
-        # statement, delete the "geom" or "geometry" column if it is present
-        # gdal bug documented in https://github.com/geofileops/geofileops/issues/313
-        if (
-            sql_stmt is not None
-            and sql_dialect == "SQLITE"
-            and output_path.suffix.lower() == ".shp"
-        ):
-            assert isinstance(result_ds, gdal.Dataset)
-            result_layer = result_ds.GetLayerByIndex(0)
-            if result_layer.GetFeatureCount() == 0:
-                layer_defn = result_layer.GetLayerDefn()
-                for field_idx in range(layer_defn.GetFieldCount()):
-                    field_name = layer_defn.GetFieldDefn(field_idx).GetName()
-                    if field_name.lower() in ["geom", "geometry"]:
-                        result_layer.DeleteField(field_idx)
-                        break
-
         # Sometimes an invalid output file is written, so close and try to reopen it.
         result_ds = None
         if output_path.exists():
             try:
-                result_ds = gdal.OpenEx(str(output_path))
+                result_ds = gdal.OpenEx(
+                    str(output_path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_UPDATE
+                )
+
+                # If the (first) output row contains NULL as geom/geometry, gdal will
+                # add an attribute column with the name of the (alias of) the geometry
+                # column: so "geometry" or "geom".
+                # To fix this, delete the "geom" or "geometry" attribute column if
+                # present if the input file didn't have an attribute column with this
+                # name.
+                # Bug documented in https://github.com/geofileops/geofileops/issues/313
+                #
+                # Remark: this check must be done on the reopened output file because
+                # in some cases the "geometrycolumn" is incorrectly listed in the field
+                # list of the Dataset returned by VectorTranslate. E.g. when the input
+                # file is empty.
+                if not input_has_geometry_attribute or not input_has_geom_attribute:
+                    assert isinstance(result_ds, gdal.Dataset)
+                    if output_layer is not None:
+                        result_layer = result_ds.GetLayer(output_layer)
+                    elif result_ds.GetLayerCount() == 1:
+                        result_layer = result_ds.GetLayerByIndex(0)
+                    else:
+                        result_layer = None
+                        logger.warning(
+                            "Unable to determine output layer, so not able to remove "
+                            "possibly incorrect geom and geometry text columns, with "
+                            f"input_path: {input_path}, output_path: {output_path}"
+                        )
+
+                    # Output layer was found, so check it
+                    if result_layer is not None:
+                        layer_defn = result_layer.GetLayerDefn()
+                        for field_idx in range(layer_defn.GetFieldCount()):
+                            name = layer_defn.GetFieldDefn(field_idx).GetName().lower()
+                            if (name == "geom" and not input_has_geom_attribute) or (
+                                name == "geometry" and not input_has_geometry_attribute
+                            ):
+                                result_layer.DeleteField(field_idx)
+                                break
+
             except Exception as ex:
                 logger.info(
                     f"Opening output file gave error, probably the input file was "

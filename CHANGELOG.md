@@ -18,6 +18,7 @@
   (#294)
 - Improve handling of "SELECT * ..." style queries in `gfo.select` and 
   `gfo.select_two_layers` (#283)
+- Improve handling + tests regarding empty input layers/NULL geometries (#320)
 - Many small improvements to logging, documentation, error messages,...
 
 ### Bugs fixed
