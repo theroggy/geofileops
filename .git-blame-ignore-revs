@@ -1,0 +1,3 @@
+# .git-blame-ignore-revs
+# Applied ruff for the first time on entire codebase
+a93d39c67b4ad6513cfa1a2ea0036552a23bca64
