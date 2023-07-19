@@ -423,20 +423,14 @@ def test_get_layer_geometrytypes_geometry(tmp_path):
     assert geometrytypes == ["POLYGON", "MULTIPOLYGON"]
 
 
-@pytest.mark.parametrize(
-    "testfile, suffix, layer",
-    [
-        ("polygon-parcel", ".gpkg", None),
-        ("polygon-parcel", ".shp", None),
-        ("polygon-twolayers", ".gpkg", "parcels"),
-    ],
-)
-def test_get_layerinfo(testfile, suffix, layer):
-    src = test_helper.get_testfile(testfile, suffix=suffix)
+@pytest.mark.parametrize("suffix", [".gpkg", ".shp"])
+def test_get_layerinfo(suffix):
+    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
     # Tests
-    layerinfo = gfo.get_layerinfo(src, layer)
+    layerinfo = gfo.get_layerinfo(src)
     assert str(layerinfo).startswith("<class 'geofileops.fileops.LayerInfo'>")
     assert layerinfo.featurecount == 46
+
     if src.suffix == ".shp":
         assert layerinfo.geometrycolumn == "geometry"
         assert layerinfo.name == src.stem
@@ -445,13 +439,15 @@ def test_get_layerinfo(testfile, suffix, layer):
         assert layerinfo.geometrycolumn == "geom"
         assert layerinfo.name == "parcels"
         assert layerinfo.fid_column == "fid"
+
     assert layerinfo.geometrytypename == gfo.GeometryType.MULTIPOLYGON.name
     assert layerinfo.geometrytype == gfo.GeometryType.MULTIPOLYGON
-    assert len(layerinfo.columns) == 11
-    assert layerinfo.columns["OIDN"].gdal_type == "Integer64"
     assert layerinfo.total_bounds is not None
     assert layerinfo.crs is not None
     assert layerinfo.crs.to_epsg() == 31370
+
+    assert len(layerinfo.columns) == 11
+    assert layerinfo.columns["OIDN"].gdal_type == "Integer64"
 
     # Some tests for exception cases
     # Layer specified that doesn't exist
@@ -463,10 +459,61 @@ def test_get_layerinfo(testfile, suffix, layer):
         not_existing_path = _io_util.with_stem(src, "not_existing_layer")
         layerinfo = gfo.get_layerinfo(not_existing_path)
 
-    # Multiple layers available, but no layer specified
-    if len(gfo.listlayers(src)) > 1:
-        with pytest.raises(ValueError, match="Layer has > 1 layer"):
-            layerinfo = gfo.get_layerinfo(src)
+
+def test_get_layerinfo_nogeom(tmp_path):
+    """
+    Test correct behaviour of get_layerinfo if file doesn't have a geometry column.
+
+    Remark: no use testing shapefile, as it doesn't have a .shp file without geometry
+    column, only a .dbf (and optional .cpg), so get_layerinfo doesn' work anyway!
+    """
+    # Prepare test data
+    src_geom_path = test_helper.get_testfile("polygon-parcel")
+    data_df = gfo.read_file(src_geom_path, ignore_geometry=True)
+    src = tmp_path / f"{src_geom_path.stem}_nogeom{src_geom_path.suffix}"
+    gfo.to_file(data_df, src)
+
+    # Test with raise_on_nogeom=True
+    # ------------------------------
+    with pytest.raises(ValueError, match="Layer doesn't have a geometry column"):
+        layerinfo = gfo.get_layerinfo(src, raise_on_nogeom=True)
+
+    # Test with raise_on_nogeom=False
+    # -------------------------------
+    layerinfo = gfo.get_layerinfo(src, raise_on_nogeom=False)
+    assert str(layerinfo).startswith("<class 'geofileops.fileops.LayerInfo'>")
+    assert layerinfo.featurecount == 46
+
+    assert layerinfo.geometrycolumn is None
+    assert layerinfo.name == src.stem
+    assert layerinfo.fid_column == "fid"
+
+    assert layerinfo.geometrytypename == "NONE"
+    assert layerinfo.geometrytype is None
+    assert layerinfo.total_bounds is None
+    assert layerinfo.crs is None
+
+    assert len(layerinfo.columns) == 11
+
+
+def test_get_layerinfo_twolayers():
+    src = test_helper.get_testfile("polygon-twolayers")
+
+    # Test first layer
+    layerinfo = gfo.get_layerinfo(src, "parcels")
+    assert layerinfo.featurecount == 46
+    assert layerinfo.name == "parcels"
+    assert len(layerinfo.columns) == 11
+
+    # Test second layer
+    layerinfo = gfo.get_layerinfo(src, "zones")
+    assert layerinfo.featurecount == 5
+    assert layerinfo.name == "zones"
+    assert len(layerinfo.columns) == 1
+
+    # Test error if no layer specified
+    with pytest.raises(ValueError, match="Layer has > 1 layer"):
+        layerinfo = gfo.get_layerinfo(src)
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
@@ -1301,6 +1348,45 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
     # named DatetimeIndex
     gdf.index.name = "datetime"
     do_checks(gdf, index_is_used=True)
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES)
+def test_to_file_nogeom(tmp_path, suffix):
+    """
+    Remark: a shapefile doesn't have a .shp file without geometry column, only a .dbf
+    (and optional .cpg)!
+    """
+    # Prepare test data
+    input_geom_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    input_df = gfo.read_file(input_geom_path, ignore_geometry=True)
+    test_path = tmp_path / f"{input_geom_path.stem}_nogeom{suffix}"
+    gfo.to_file(input_df, test_path)
+
+    # Check the file written
+    if suffix == ".gpkg":
+        layerinfo = gfo.get_layerinfo(test_path, raise_on_nogeom=False)
+        assert str(layerinfo).startswith("<class 'geofileops.fileops.LayerInfo'>")
+        assert layerinfo.featurecount == 46
+
+        assert layerinfo.geometrycolumn is None
+        assert layerinfo.name == test_path.stem
+        assert layerinfo.fid_column == "fid"
+
+        assert layerinfo.geometrytypename == "NONE"
+        assert layerinfo.geometrytype is None
+        assert layerinfo.total_bounds is None
+        assert layerinfo.crs is None
+
+        assert len(layerinfo.columns) == 11
+    elif suffix == ".shp":
+        # a shapefile doesn't have a .shp file without geometry column, only a .dbf
+        # (and optional .cpg).
+        assert not test_path.exists()
+        test_df = gfo.read_file(test_path.with_suffix(".dbf"))
+        assert len(test_df) == 46
+        assert len(test_df.columns) == 11
+    else:
+        raise ValueError(f"test not implemented for suffix {suffix}")
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)

@@ -10,6 +10,7 @@
   (#262)
 - Add `where` parameter to many two layer spatial operations (#312)
 - Add `where` parameter to `gfo.convert` and `gfo.append_to` (#311)
+- Support creating geofile without geometry column using `gfo.select` (#322)
 - Improve performance of makevalid and isvalid (#258)
 - Improve performance of spatial operations when only one batch is used (#271)
 - Add checks that `output_path` must not be equal to the/an `input_path` for geo

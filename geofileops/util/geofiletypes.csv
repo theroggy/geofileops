@@ -1,6 +1,6 @@
-geofiletype,   ogrdriver,        suffixes,       is_fid_zerobased, is_spatialite_based, suffixes_extrafiles
-ESRIShapefile, "ESRI Shapefile", "['.shp']",     True,             False,               "['.shp', '.dbf', '.shx', '.prj', '.qix', '.sbn', '.sbx']"
-GeoJSON,       GeoJSON,          "['.geojson']", True,             False,               
-GPKG,          GPKG,             "['.gpkg']",    False,            True,                "['gpkg-journal']"
-SQLite,        SQLite,           "['.sqlite']",  False,            True,                
-FlatGeobuf,    FlatGeobuf,       "['.fgb']",     True,             False,               
+geofiletype,   ogrdriver,        suffixes,              is_fid_zerobased, is_spatialite_based, suffixes_extrafiles
+ESRIShapefile, "ESRI Shapefile", "['.shp', '.dbf']",    True,             False,               "['.shp', '.dbf', '.shx', '.prj', '.qix', '.sbn', '.sbx']"
+GeoJSON,       GeoJSON,          "['.geojson']",        True,             False,               
+GPKG,          GPKG,             "['.gpkg']",           False,            True,                "['gpkg-journal']"
+SQLite,        SQLite,           "['.sqlite']",         False,            True,                
+FlatGeobuf,    FlatGeobuf,       "['.fgb']",            True,             False,               

@@ -242,7 +242,9 @@ def get_layer_geometrytypes(
 
 
 def get_layerinfo(
-    path: Union[str, "os.PathLike[Any]"], layer: Optional[str] = None
+    path: Union[str, "os.PathLike[Any]"],
+    layer: Optional[str] = None,
+    raise_on_nogeom: bool = True,
 ) -> LayerInfo:
     """
     Get information about a layer in the geofile.
@@ -254,6 +256,9 @@ def get_layerinfo(
         path (PathLike): path to the file to get info about
         layer (str, optional): the layer you want info about. Doesn't need to be
             specified if there is only one layer in the geofile.
+        raise_on_nogeom (bool, optional): True to raise if the layer doesn't have a
+            geometry column. If False, the returned LayerInfo.geometrycolumn will be
+            None. Defaults to True.
 
     Returns:
         LayerInfo: the information about the layer.
@@ -367,7 +372,11 @@ def get_layerinfo(
                                 else:
                                     prj_path.unlink()
                                 prj_path.write_text(PRJ_EPSG_31370)
+        elif raise_on_nogeom:
+            errors.append("Layer doesn't have a geometry column!")
 
+        # If there were no errors, everything was OK so we can return.
+        if len(errors) == 0:
             return LayerInfo(
                 name=datasource_layer.GetName(),
                 featurecount=datasource_layer.GetFeatureCount(),
@@ -380,8 +389,6 @@ def get_layerinfo(
                 crs=crs,
                 errors=errors,
             )
-        else:
-            errors.append("Layer doesn't have a geometry column!")
 
     except Exception as ex:
         ex.args = (f"get_layerinfo error for {path}.{layer}:\n  {ex}",)
@@ -1492,6 +1499,12 @@ def _to_file_fiona(
     """
     Writes a pandas dataframe to file using fiona.
     """
+    # Shapefile doesn't support datetime columns, so first cast them to string
+    if GeofileType(path) == GeofileType.ESRIShapefile:
+        gdf = gdf.copy()
+        for column in gdf.select_dtypes(include=["datetime64"]):
+            gdf[column] = gdf[column].astype(str)
+
     # Handle some specific cases where the file schema needs to be manipulated.
     schema = None
     if isinstance(gdf, gpd.GeoDataFrame) is False or (
@@ -2076,8 +2089,7 @@ def _append_to_nolock(
 
     src_layerinfo = None
     if where is not None:
-        if src_layerinfo is None:
-            src_layerinfo = get_layerinfo(src, src_layer)
+        src_layerinfo = get_layerinfo(src, src_layer, raise_on_nogeom=False)
         where = where.format(geometrycolumn=src_layerinfo.geometrycolumn)
 
     # When creating/appending to a shapefile, some extra things need to be done/checked.
@@ -2087,7 +2099,7 @@ def _append_to_nolock(
         # geometrytype "Geometry", raise because type is not supported by shp (and will
         # default to linestring).
         if src_layerinfo is None:
-            src_layerinfo = get_layerinfo(src, src_layer)
+            src_layerinfo = get_layerinfo(src, src_layer, raise_on_nogeom=False)
         if (
             force_output_geometrytype is None
             and src_layerinfo.geometrytype
@@ -2112,9 +2124,11 @@ def _append_to_nolock(
         if where is not None:
             where_clause = f"WHERE {where}"
             where = None
+        geometrycolumn = ""
+        if src_layerinfo.geometrycolumn is not None:
+            geometrycolumn = f"{src_layerinfo.geometrycolumn}, "
         sql_stmt = f"""
-            SELECT {src_layerinfo.geometrycolumn}
-                  ,{", ".join(columns_aliased)}
+            SELECT {geometrycolumn}{", ".join(columns_aliased)}
               FROM "{layer}"
              {where_clause}
         """
@@ -2123,7 +2137,7 @@ def _append_to_nolock(
     # specified, otherwise invalid output.
     if force_output_geometrytype is None and not dst.exists():
         if src_layerinfo is None:
-            src_layerinfo = get_layerinfo(src, src_layer)
+            src_layerinfo = get_layerinfo(src, src_layer, raise_on_nogeom=False)
         force_output_geometrytype = src_layerinfo.geometrytype
 
     # Go!

@@ -88,6 +88,7 @@ def buffer(
         input_path=input_path,
         output_path=output_path,
         sql_template=sql_template,
+        geom_selected=True,
         operation_name="buffer",
         input_layer=input_layer,
         output_layer=output_layer,
@@ -136,6 +137,7 @@ def convexhull(
         input_path=input_path,
         output_path=output_path,
         sql_template=sql_template,
+        geom_selected=True,
         operation_name="convexhull",
         input_layer=input_layer,
         output_layer=output_layer,
@@ -183,6 +185,7 @@ def delete_duplicate_geometries(
         input_path=input_path,
         output_path=output_path,
         sql_template=sql_template,
+        geom_selected=True,
         operation_name="delete_duplicate_geometries",
         input_layer=input_layer,
         output_layer=output_layer,
@@ -226,6 +229,7 @@ def isvalid(
         input_path=input_path,
         output_path=output_path,
         sql_template=sql_template,
+        geom_selected=True,
         operation_name="isvalid",
         input_layer=input_layer,
         output_layer=output_layer,
@@ -328,6 +332,7 @@ def makevalid(
         input_path=input_path,
         output_path=output_path,
         sql_template=sql_template,
+        geom_selected=True,
         operation_name=operation_name,
         input_layer=input_layer,
         output_layer=output_layer,
@@ -376,7 +381,7 @@ def select(
     # If no output geometrytype is specified, use the geometrytype of the input layer
     if force_output_geometrytype is None:
         force_output_geometrytype = gfo.get_layerinfo(
-            input_path, input_layer
+            input_path, input_layer, raise_on_nogeom=False
         ).geometrytype
         logger.info(
             "No force_output_geometrytype specified, so defaults to input layer "
@@ -388,6 +393,7 @@ def select(
         input_path=input_path,
         output_path=output_path,
         sql_template=sql_stmt,
+        geom_selected=None,
         operation_name="select",
         input_layer=input_layer,
         output_layer=output_layer,
@@ -436,6 +442,7 @@ def simplify(
         input_path=input_path,
         output_path=output_path,
         sql_template=sql_template,
+        geom_selected=True,
         operation_name="simplify",
         input_layer=input_layer,
         output_layer=output_layer,
@@ -456,6 +463,7 @@ def _single_layer_vector_operation(
     input_path: Path,
     output_path: Path,
     sql_template: str,
+    geom_selected: Optional[bool],
     operation_name: str,
     input_layer: Optional[str],
     output_layer: Optional[str],
@@ -498,9 +506,11 @@ def _single_layer_vector_operation(
     # Calculate
     tempdir = _io_util.create_tempdir(f"geofileops/{operation_name.replace(' ', '_')}")
     try:
-        # If gridsize != 0.0 we need an sqlite file to be able to determine the columns
-        # later on.
-        convert_to_spatialite_based = False if gridsize == 0.0 else True
+        # If gridsize != 0.0 or if geom_selected is None we need an sqlite file to be
+        # able to determine the columns later on.
+        convert_to_spatialite_based = (
+            True if gridsize != 0.0 or geom_selected is None else False
+        )
         processing_params = _prepare_processing_params(
             input1_path=input_path,
             input1_layer=input_layer,
@@ -516,7 +526,9 @@ def _single_layer_vector_operation(
 
         # Get layer info of the input layer to use
         assert processing_params.input1_path is not None
-        input_layerinfo = gfo.get_layerinfo(processing_params.input1_path, input_layer)
+        input_layerinfo = gfo.get_layerinfo(
+            processing_params.input1_path, input_layer, raise_on_nogeom=False
+        )
 
         # If multiple batches, there should be a batch_filter placeholder sql_template
         nb_batches = len(processing_params.batches)
@@ -537,11 +549,30 @@ def _single_layer_vector_operation(
             fid_column=input_layerinfo.fid_column,
         )
 
+        #  to Check if a geometry column is available + selected
+        if geom_selected is None:
+            if input_layerinfo.geometrycolumn is None:
+                # There is no geometry column in the source file
+                geom_selected = False
+            else:
+                # There is a geometry column in the source file, check if it is selected
+                sql_tmp = sql_template.format(
+                    geometrycolumn=input_layerinfo.geometrycolumn,
+                    columns_to_select_str=column_formatter.prefixed_aliased(),
+                    input_layer=processing_params.input1_layer,
+                    batch_filter="",
+                )
+                cols = _sqlite_util.get_columns(
+                    sql_stmt=sql_tmp,
+                    input1_path=processing_params.input1_path,
+                )
+                geom_selected = input_layerinfo.geometrycolumn in cols
+
         # Fill out/add to the sql_template what is already possible
         # ---------------------------------------------------------
 
         # Add snaptogrid around sql_template if gridsize specified
-        if gridsize != 0.0:
+        if geom_selected and gridsize != 0.0:
             # Apply snaptogrid, but this results in invalid geometries, so also
             # ST_Makevalid. It can also result in collapsed (pieces of)
             # geometries, so also collectionextract.
@@ -580,7 +611,7 @@ def _single_layer_vector_operation(
             """
 
         # If empty/null geometries don't need to be kept, filter them away
-        if not keep_empty_geoms:
+        if geom_selected and not keep_empty_geoms:
             sql_template = f"""
                 SELECT * FROM
                     ( {sql_template}
@@ -606,7 +637,7 @@ def _single_layer_vector_operation(
         # When null geometries are being kept, we need to make sure the geom in the
         # first row is not NULL because of a bug in gdal, so add ORDER BY as last step.
         #   -> https://github.com/geofileops/geofileops/issues/308
-        if keep_empty_geoms:
+        if geom_selected and keep_empty_geoms:
             sql_template = f"""
                 SELECT * FROM
                     ( {sql_template}
@@ -739,11 +770,27 @@ def _single_layer_vector_operation(
         # Round up and clean up
         # Now create spatial index and move to output location
         if tmp_output_path.exists():
-            gfo.create_spatial_index(
-                path=tmp_output_path, layer=output_layer, exist_ok=True
-            )
+            if (
+                gfo.get_layerinfo(
+                    path=tmp_output_path, layer=output_layer, raise_on_nogeom=False
+                ).geometrycolumn
+                is not None
+            ):
+                gfo.create_spatial_index(
+                    path=tmp_output_path, layer=output_layer, exist_ok=True
+                )
             output_path.parent.mkdir(parents=True, exist_ok=True)
             gfo.move(tmp_output_path, output_path)
+        elif (
+            GeofileType(tmp_output_path) == GeofileType.ESRIShapefile
+            and tmp_output_path.with_suffix(".dbf").exists()
+        ):
+            # If the output shapefile doesn't have a geometry column, the .shp file
+            # doesn't exist but the .dbf does
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            gfo.move(
+                tmp_output_path.with_suffix(".dbf"), output_path.with_suffix(".dbf")
+            )
         else:
             logger.debug(f"Result of {operation_name} was empty!")
 
@@ -2433,7 +2480,9 @@ def _prepare_processing_params(
 ) -> Optional[ProcessingParams]:
     # Init
     returnvalue = ProcessingParams(nb_parallel=nb_parallel)
-    input1_layerinfo = gfo.get_layerinfo(input1_path, input1_layer)
+    input1_layerinfo = gfo.get_layerinfo(
+        input1_path, input1_layer, raise_on_nogeom=False
+    )
 
     # Determine the optimal number of parallel processes + batches
     if returnvalue.nb_parallel == -1:
@@ -2499,7 +2548,10 @@ def _prepare_processing_params(
             input2_geofiletype is None or input1_geofiletype == input2_geofiletype
         ):
             returnvalue.input1_path = input1_path
-            if input1_geofiletype == GeofileType.GPKG:
+            if (
+                input1_geofiletype == GeofileType.GPKG
+                and input1_layerinfo.geometrycolumn is not None
+            ):
                 # HasSpatialindex doesn't work for spatialite file
                 gfo.create_spatial_index(input1_path, input1_layer, exist_ok=True)
         else:
@@ -2519,7 +2571,13 @@ def _prepare_processing_params(
                 and input2_geofiletype.is_spatialite_based
             ):
                 returnvalue.input2_path = input2_path
-                if input2_geofiletype == GeofileType.GPKG:
+                input2_layerinfo = gfo.get_layerinfo(
+                    input2_path, input2_layer, raise_on_nogeom=False
+                )
+                if (
+                    input2_geofiletype == GeofileType.GPKG
+                    and input2_layerinfo.geometrycolumn is not None
+                ):
                     # HasSpatialindex doesn't work for spatialite file
                     gfo.create_spatial_index(input2_path, input2_layer, exist_ok=True)
             else:
@@ -2542,7 +2600,9 @@ def _prepare_processing_params(
 
     # Prepare batches to process
     # Get column names and info
-    layer1_info = gfo.get_layerinfo(returnvalue.input1_path, returnvalue.input1_layer)
+    layer1_info = gfo.get_layerinfo(
+        returnvalue.input1_path, returnvalue.input1_layer, raise_on_nogeom=False
+    )
 
     # Check number of batches + appoint nb rows to batches
     nb_rows_input_layer = layer1_info.featurecount

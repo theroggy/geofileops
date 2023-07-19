@@ -445,6 +445,83 @@ def test_select_invalid_sql(tmp_path, suffix):
         gfo.select(input_path=input_path, output_path=output_path, sql_stmt=sql_stmt)
 
 
+@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("gridsize", [0.0, 0.01])
+def test_select_nogeom_in_input(tmp_path, suffix, gridsize):
+    # Prepare test data
+    input_geom_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    data_df = gfo.read_file(input_geom_path, ignore_geometry=True)
+    input_path = tmp_path / f"{input_geom_path.stem}_nogeom{suffix}"
+    gfo.to_file(data_df, input_path)
+
+    # Now run test
+    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
+    sql_stmt = 'SELECT * FROM "{input_layer}"'
+
+    # Column casing seems to behave odd: without gridsize (=subselect) results in upper
+    # casing regardless of quotes or not, with gridsize (=subselect) casing in select is
+    # retained in output.
+    if suffix == ".shp":
+        input_path = input_path.with_suffix(".dbf")
+    gfo.select(
+        input_path=input_path,
+        output_path=output_path,
+        sql_stmt=sql_stmt,
+        gridsize=gridsize,
+    )
+
+    # Now check if the tmp file is correctly created
+    if suffix == ".shp":
+        output_path = output_path.with_suffix(".dbf")
+    layerinfo_output = gfo.get_layerinfo(output_path, raise_on_nogeom=False)
+    layerinfo_input = gfo.get_layerinfo(input_path, raise_on_nogeom=False)
+    assert layerinfo_input.featurecount == layerinfo_output.featurecount
+    columns_output_upper = [col.upper() for col in layerinfo_output.columns]
+    assert "OIDN" in columns_output_upper
+    assert "UIDN" in columns_output_upper
+    assert len(layerinfo_output.columns) == len(layerinfo_input.columns)
+
+    assert layerinfo_output.geometrycolumn is None
+    assert layerinfo_output.geometrytype is None
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("gridsize", [0.0, 0.01])
+def test_select_nogeom_selected(tmp_path, suffix, gridsize):
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+
+    # Now run test
+    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
+    layerinfo_input = gfo.get_layerinfo(input_path)
+    sql_stmt = 'SELECT "oidn", "UIDN" FROM "{input_layer}"'
+
+    # Column casing seems to behave odd: without gridsize (=subselect) results in upper
+    # casing rgardless of quotes or not, with gridsize (=subselect) casing in select is
+    # retained in output.
+    gfo.select(
+        input_path=input_path,
+        output_path=output_path,
+        sql_stmt=sql_stmt,
+        gridsize=gridsize,
+    )
+
+    # Now check if the tmp file is correctly created
+    layerinfo_output = gfo.get_layerinfo(output_path)
+    assert layerinfo_input.featurecount == layerinfo_output.featurecount
+    columns_output_upper = [col.upper() for col in layerinfo_output.columns]
+    assert "OIDN" in columns_output_upper
+    assert "UIDN" in columns_output_upper
+    assert len(layerinfo_output.columns) == 2
+    assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
+
+    # Now check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+
+    # A geometry column is present even though it isn't selected, but values are None
+    assert output_gdf["geometry"][0] is None
+
+
 def test_select_output_exists(tmp_path):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel")
