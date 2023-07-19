@@ -143,6 +143,7 @@ def get_testfile(
         raise ValueError(f"Invalid testfile type: {testfile}")
     if dst_dir is None:
         dst_dir = Path(tempfile.gettempdir()) / "geofileops_test_data"
+    assert isinstance(dst_dir, Path)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
     # Prepare file + return

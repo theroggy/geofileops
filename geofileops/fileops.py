@@ -112,7 +112,9 @@ def listlayers(
     datasource = None
     layers = []
     try:
-        datasource = gdal.OpenEx(str(path))
+        datasource = gdal.OpenEx(
+            str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
+        )
         nb_layers = datasource.GetLayerCount()
         for layer_id in range(nb_layers):
             datasource_layer = datasource.GetLayerByIndex(layer_id)
@@ -245,12 +247,12 @@ def get_layerinfo(
     """
     Get information about a layer in the geofile.
 
-    Raises an exception if the layer definition has errors like invalid column
+    Raises ValueError if the layer definition has errors like invalid column
     names,...
 
     Args:
         path (PathLike): path to the file to get info about
-        layer (str): the layer you want info about. Doesn't need to be
+        layer (str, optional): the layer you want info about. Doesn't need to be
             specified if there is only one layer in the geofile.
 
     Returns:
@@ -389,7 +391,7 @@ def get_layerinfo(
 
     # If we didn't return or raise yet here, there must have been errors
     errors_str = pprint.pformat(errors)
-    raise Exception(
+    raise ValueError(
         f"Errors in layer definition of file {path}, layer {layer}: \n{errors_str}"
     )
 
@@ -1019,6 +1021,7 @@ def read_file_nogeom(
     warnings.warn(
         "read_file_nogeom is deprecated: use read_file with ignore_geometry=True",
         FutureWarning,
+        stacklevel=2,
     )
     result_gdf = _read_file_base(
         path=path,
@@ -1340,6 +1343,7 @@ def read_file_sql(
         'read_file_sql is deprecated: use read_file! Mind: sql_dialect is not "SQLITE" '
         "by default there!",
         FutureWarning,
+        stacklevel=2,
     )
 
     # Run
@@ -1496,6 +1500,7 @@ def _to_file_fiona(
         # No geometry, so prepare to be written as attribute table: add geometry column
         # with None geometry type in schema
         gdf = gpd.GeoDataFrame(gdf, geometry=[None for i in gdf.index])  # type: ignore
+
         schema = gpd_io_file.infer_schema(gdf)
         schema["geometry"] = "None"
     elif (
@@ -1558,20 +1563,17 @@ def _to_file_fiona(
             else:
                 gdf_to_write = gdf
             """
-            gdf_to_write = gdf
-            gdf_to_write.to_file(str(path), **kwargs)  # type: ignore
+            gdf.to_file(str(path), **kwargs)  # type: ignore
         elif geofiletype == GeofileType.GPKG:
             # Try to harmonize the geometrytype to one (multi)type, as GPKG
             # doesn't like > 1 type in a layer
             if schema is None or (len(gdf) > 0 and schema["geometry"] != "None"):
-                gdf_to_write = gdf.copy()
-                gdf_to_write.geometry = geoseries_util.harmonize_geometrytypes(
+                gdf = gdf.copy()
+                gdf.geometry = geoseries_util.harmonize_geometrytypes(
                     gdf.geometry, force_multitype=force_multitype
                 )
-                assert isinstance(gdf_to_write, gpd.GeoDataFrame)
-            else:
-                gdf_to_write = gdf
-            gdf_to_write.to_file(str(path), layer=layer, **kwargs)
+                assert isinstance(gdf, gpd.GeoDataFrame)
+            gdf.to_file(str(path), layer=layer, **kwargs)
         elif geofiletype == GeofileType.SQLite:
             gdf.to_file(str(path), layer=layer, **kwargs)
         elif geofiletype == GeofileType.GeoJSON:
@@ -1707,6 +1709,7 @@ def _to_file_pyogrio(
                 f"{file_cols} vs {gdf_cols}"
             )
 
+    # Prepare kwargs to use in geopandas.to_file
     if create_spatial_index is not None:
         kwargs["SPATIAL_INDEX"] = create_spatial_index
     geofiletype = GeofileType(path)
@@ -2166,7 +2169,7 @@ def convert(
     """
     DEPRECATED: please use copy_layer.
     """
-    warnings.warn("convert is deprecated: use copy_layer.", FutureWarning)
+    warnings.warn("convert is deprecated: use copy_layer.", FutureWarning, stacklevel=2)
     return copy_layer(
         src=src,
         dst=dst,

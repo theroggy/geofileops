@@ -381,6 +381,7 @@ def test_buffer_negative(
     assert output_path.exists()
     assert fileops.has_spatial_index(output_path)
     output_layerinfo = fileops.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
 
     if input_layerinfo.geometrytype in [
         GeometryType.MULTIPOINT,
@@ -398,12 +399,10 @@ def test_buffer_negative(
         else:
             # Everything is filtered away...
             assert output_layerinfo.featurecount == 0
-            assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
 
     else:
         # A Negative buffer of polygons gives a result for large polygons.
         # 7 polygons disappear because of the negative buffer
-        assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
         assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
         # Read result for some more detailed checks

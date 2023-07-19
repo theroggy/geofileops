@@ -644,7 +644,7 @@ def test_dissolve_emptyfile(tmp_path, testfile, suffix, explodecollections):
         groupby_columns = ["type"]
         expected_geometrytype = GeometryType.POINT
     else:
-        raise ValueError(f"unimplimentd testfile: {testfile}")
+        raise ValueError(f"unimplimented testfile: {testfile}")
     if not explodecollections or suffix == ".shp":
         expected_geometrytype = expected_geometrytype.to_multitype
 
