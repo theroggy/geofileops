@@ -166,3 +166,16 @@ def formatbytes(bytes: float):
         return "{0:.2f} GB".format(bytes_float / GB)
     elif TB <= bytes_float:
         return "{0:.2f} TB".format(bytes_float / TB)
+
+
+def prepare_for_serialize(data: dict) -> dict:
+    prepared = {}
+    for key, value in data.items():
+        if isinstance(value, (dict)):
+            prepared[key] = prepare_for_serialize(value)
+        elif isinstance(value, (list, tuple)):
+            prepared[key] = value
+        else:
+            prepared[key] = str(value)
+
+    return prepared

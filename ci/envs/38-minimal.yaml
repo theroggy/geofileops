@@ -8,19 +8,21 @@ dependencies:
   - cloudpickle
   - fiona
   - gdal =3.6.3  # released 2023-03-13
-  - geopandas =0.11  # released 2022-06-10
-  - numpy =1.20  # released 2021-02-23
+  - geopandas =0.12  # released 2022-10-24
+  - numpy =1.21  # released 2021-06-22
   - pandas =1.1  # released 2020-06-28
   - psutil
-  - pygeos
+  #- pygeoops >=0.2,<0.3
+  #- pygeos
   - pyogrio =0.5.1  # released 2023-01-26
   - pyproj =3.4  # released 2022-09-10
-  - shapely <2
+  - shapely >=2,<2.1  # released 2022-12-12
   # optional
   - topojson = 1.5  # released 2022-09-10
   # testing
   - pytest
   - pytest-cov
   - pip:
+    - pygeoops ==0.3.0a0
     # optional
     - simplification

@@ -761,7 +761,7 @@ def _apply_geooperation(
     if gridsize != 0.0:
         assert isinstance(data_gdf, gpd.GeoDataFrame)
         data_gdf.geometry = shapely2_or_pygeos.set_precision(
-            data_gdf.geometry.array.data, grid_size=gridsize
+            data_gdf.geometry, grid_size=gridsize
         )
 
     # If the result is empty, and no output geometrytype specified, use input
@@ -962,7 +962,7 @@ def dissolve(
         # unioned properly because gaps appear after rounding coordinates.
         if gridsize != 0.0:
             result_tiles_gdf.geometry = shapely2_or_pygeos.set_precision(
-                result_tiles_gdf.geometry.array.data, grid_size=gridsize
+                result_tiles_gdf.geometry, grid_size=gridsize
             )
         if len(result_tiles_gdf) > 1:
             gfo.to_file(
@@ -1038,7 +1038,7 @@ def dissolve(
                 # be unioned properly because gaps appear after rounding coordinates.
                 if gridsize != 0.0:
                     tiles_gdf.geometry = shapely2_or_pygeos.set_precision(
-                        tiles_gdf.geometry.array.data, grid_size=gridsize
+                        tiles_gdf.geometry, grid_size=gridsize
                     )
                 gfo.to_file(tiles_gdf, tempdir / f"output_{pass_id}_tiles.gpkg")
 
@@ -1664,7 +1664,7 @@ def _dissolve_polygons(
 
     if gridsize != 0.0:
         diss_gdf.geometry = shapely2_or_pygeos.set_precision(
-            diss_gdf.geometry.array.data, grid_size=gridsize
+            diss_gdf.geometry, grid_size=gridsize
         )
 
     # Save the result to destination file(s)

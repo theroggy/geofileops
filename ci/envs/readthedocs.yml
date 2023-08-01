@@ -12,14 +12,16 @@ dependencies:
   - numpy
   - pandas
   - psutil
+  #- pygeoops >=0.2,<0.3
   - pyogrio
   - pyproj
-  - shapely
+  - shapely >=2,<2.1
   - topojson
   # docs
   # Restrict sphinx version to < 6 to avoid logo error
   - sphinx<6
   - pydata-sphinx-theme
   - pip:
+    - pygeoops ==0.3.0a0
     - sphinx-automodapi ==0.13
     - simplification

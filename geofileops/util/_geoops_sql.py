@@ -5,6 +5,7 @@ Module containing the implementation of Geofile operations using a sql statement
 
 from concurrent import futures
 from datetime import datetime
+import json
 import logging
 import logging.config
 import math
@@ -12,7 +13,7 @@ import multiprocessing
 from pathlib import Path
 import shutil
 import string
-from typing import Iterable, List, Literal, Optional, Union
+from typing import Dict, Iterable, List, Literal, Optional, Union
 import warnings
 
 import pandas as pd
@@ -21,13 +22,13 @@ import geofileops as gfo
 from geofileops import GeofileType, GeometryType, PrimitiveType
 from geofileops import fileops
 from geofileops.fileops import _append_to_nolock
-from . import _general_util
-from . import _io_util
-from . import _ogr_sql_util
-from . import _ogr_util
+from geofileops.util import _general_util
+from geofileops.util import _io_util
+from geofileops.util import _ogr_sql_util
+from geofileops.util import _ogr_util
 from geofileops.helpers import _parameter_helper
-from . import _processing_util
-from . import _sqlite_util
+from geofileops.util import _processing_util
+from geofileops.util import _sqlite_util
 
 ################################################################################
 # Some init
@@ -599,10 +600,10 @@ def _single_layer_vector_operation(
             cols = _sqlite_util.get_columns(
                 sql_stmt=sql_tmp, input1_path=processing_params.input1_path
             )
-            cols = [
+            attributes = [
                 col for col in cols if col.lower() != input_layerinfo.geometrycolumn
             ]
-            columns_to_select = _ogr_sql_util.columns_quoted(cols)
+            columns_to_select = _ogr_sql_util.columns_quoted(attributes)
             sql_template = f"""
                 SELECT {gridsize_op} AS {{geometrycolumn}}
                       {columns_to_select}
@@ -662,7 +663,7 @@ def _single_layer_vector_operation(
             max_workers=processing_params.nb_parallel,
             initializer=_processing_util.initialize_worker(),
         ) as calculate_pool:
-            batches = {}
+            batches: Dict[int, dict] = {}
             future_to_batch_id = {}
             for batch_id in processing_params.batches:
                 batches[batch_id] = {}
@@ -926,9 +927,7 @@ def erase(
     output_with_spatial_index: bool = True,
 ):
     # Init
-    # In the query, important to only extract the geometry types that are expected
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
-    primitivetypeid = input_layer_info.geometrytype.to_primitivetype.value
 
     # If the input type is not point, force the output type to multi,
     # because erase can cause eg. polygons to be split to multipolygons...
@@ -938,17 +937,20 @@ def erase(
 
     # Prepare sql template for this operation
     # Remarks:
-    #   - ST_difference(geometry , NULL) gives NULL as result! -> hence the CASE
-    #   - use of the with instead of an inline view is a lot faster
+    #   - use of the WITH instead of an inline view is a lot faster
     #   - WHERE geom IS NOT NULL to evade rows with a NULL geom, they give issues in
     #     later operations
+    #   - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening
+    #     "geom IS NOT NULL" leads to ST_Difference_Collection calculated double!
+    #   - ST_Intersects and ST_Touches slow down a lot when the data contains huge geoms
+    #   - Not relevant anymore, but ST_difference(geometry , NULL) gives NULL as result
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
     sql_template = f"""
         SELECT * FROM
-          ( WITH layer2_unioned AS (
+          ( WITH layer2_collect AS (
               SELECT layer1.rowid AS layer1_rowid
-                    ,ST_union(layer2.{{input2_geometrycolumn}}) AS geom
+                    ,ST_collect(layer2.{{input2_geometrycolumn}}) AS geom
                 FROM {{input1_databasename}}."{{input1_layer}}" layer1
                 JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
                   ON layer1.fid = layer1tree.id
@@ -961,31 +963,29 @@ def erase(
                  AND layer1tree.maxx >= layer2tree.minx
                  AND layer1tree.miny <= layer2tree.maxy
                  AND layer1tree.maxy >= layer2tree.miny
-                 AND ST_Intersects(
-                        layer1.{{input1_geometrycolumn}},
-                        layer2.{{input2_geometrycolumn}}) = 1
-                 AND ST_Touches(
-                        layer1.{{input1_geometrycolumn}},
-                        layer2.{{input2_geometrycolumn}}) = 0
+                 --AND ST_Intersects(
+                 --       layer1.{{input1_geometrycolumn}},
+                 --       layer2.{{input2_geometrycolumn}}) = 1
+                 --AND ST_Touches(
+                 --       layer1.{{input1_geometrycolumn}},
+                 --       layer2.{{input2_geometrycolumn}}) = 0
                GROUP BY layer1.rowid
             )
-            SELECT CASE WHEN layer2_unioned.geom IS NULL
-                        THEN layer1.{{input1_geometrycolumn}}
-                        ELSE ST_CollectionExtract(
-                                ST_difference(
-                                    layer1.{{input1_geometrycolumn}},
-                                    layer2_unioned.geom),
-                                    {primitivetypeid})
-                   END as geom
+            SELECT IIF(layer2_collect.geom IS NULL,
+                       layer1.{{input1_geometrycolumn}},
+                       ST_GeomFromWKB(
+                            ST_Difference_Collection(
+                                ST_AsBinary(layer1.{{input1_geometrycolumn}}),
+                                ST_AsBinary(layer2_collect.geom),
+                                1))) AS geom
                   {{layer1_columns_prefix_alias_str}}
               FROM {{input1_databasename}}."{{input1_layer}}" layer1
-              LEFT JOIN layer2_unioned ON layer1.rowid = layer2_unioned.layer1_rowid
+              LEFT JOIN layer2_collect ON layer1.rowid = layer2_collect.layer1_rowid
              WHERE 1=1
                {{batch_filter}}
+            LIMIT -1 OFFSET 0
           )
          WHERE geom IS NOT NULL
-           AND ST_NPoints(geom) > 0
-           -- ST_CollectionExtract outputs empty, but not NULL geoms in spatialite 4.3
     """
 
     # Go!
@@ -2061,7 +2061,7 @@ def _two_layer_vector_operation(
         )
     if use_ogr is True and input1_path != input2_path:
         raise ValueError(
-            f"{operation_name}: if use_ogr True, input1_path == input2_path!"
+            f"{operation_name}: if use_ogr True, input1_path should equal input2_path!"
         )
     if output_path.exists():
         if force is False:
@@ -2179,6 +2179,20 @@ def _two_layer_vector_operation(
             batch_filter="{batch_filter}",
         )
 
+        # Determine column names and types based on sql statement
+        column_datatypes = None
+        # Use first batch_filter to improve performance
+        sql_stmt = sql_template.format(
+            input1_databasename="{input1_databasename}",
+            input2_databasename="{input2_databasename}",
+            batch_filter=processing_params.batches[0]["batch_filter"],
+        )
+        column_datatypes = _sqlite_util.get_columns(
+            sql_stmt=sql_stmt,
+            input1_path=processing_params.input1_path,
+            input2_path=processing_params.input2_path,
+        )
+
         # Add snaptogrid around sql_template if gridsize specified
         if gridsize != 0.0:
             # Apply snaptogrid, but this results in invalid geometries, so also
@@ -2195,24 +2209,18 @@ def _two_layer_vector_operation(
                 primitivetypeid = force_output_geometrytype.to_primitivetype.value
                 gridsize_op = f"ST_CollectionExtract({gridsize_op}, {primitivetypeid})"
 
-            # Get all columns of the sql_template
-            sql_tmp = sql_template.format(
-                input1_databasename="{input1_databasename}",
-                input2_databasename="{input2_databasename}",
-                batch_filter="",
-            )
-            cols = _sqlite_util.get_columns(
-                sql_stmt=sql_tmp,
-                input1_path=processing_params.input1_path,
-                input2_path=processing_params.input2_path,
-            )
-            cols = [col for col in cols if col.lower() != "geom"]
+            # All columns need to be specified
+            # Remark:
+            # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening
+            #   "geom IS NOT NULL" leads to ST_Difference_Collection calculated double!
+            cols = [col for col in column_datatypes if col.lower() != "geom"]
             columns_to_select = _ogr_sql_util.columns_quoted(cols)
             sql_template = f"""
                 SELECT {gridsize_op} AS geom
                         {columns_to_select}
-                    FROM ( {sql_template}
-                    ) sub_gridsize
+                  FROM ( {sql_template}
+                  ) sub_gridsize
+                 LIMIT -1 OFFSET 0
             """
 
         # Prepare/apply where parameter
@@ -2225,7 +2233,8 @@ def _two_layer_vector_operation(
                 SELECT * FROM
                     ( {sql_template}
                     )
-                    WHERE {where}
+                 WHERE {where}
+                 LIMIT -1 OFFSET 0
             """
             # Where has been applied already so set to None.
             where = None
@@ -2245,7 +2254,7 @@ def _two_layer_vector_operation(
             initializer=_processing_util.initialize_worker(),
         ) as calculate_pool:
             # Start looping
-            batches = {}
+            batches: Dict[int, dict] = {}
             future_to_batch_id = {}
             for batch_id in processing_params.batches:
                 batches[batch_id] = {}
@@ -2279,13 +2288,12 @@ def _two_layer_vector_operation(
                     input2_path=processing_params.input2_path,
                     output_path=tmp_partial_output_path,
                     sql_stmt=sql_stmt,
-                    input1_databasename=processing_params.input1_databasename,
-                    input2_databasename=processing_params.input2_databasename,
                     output_layer=output_layer,
                     explodecollections=explodecollections_now,
                     force_output_geometrytype=force_output_geometrytype,
                     use_ogr=use_ogr,
                     create_spatial_index=False,
+                    column_datatypes=column_datatypes,
                 )
                 future_to_batch_id[future] = batch_id
 
@@ -2388,12 +2396,11 @@ def calculate_two_layers(
     input2_path: Path,
     output_path: Path,
     sql_stmt: str,
-    input1_databasename: str,
-    input2_databasename: str,
     output_layer: str,
     explodecollections: bool,
-    force_output_geometrytype: GeometryType,
+    force_output_geometrytype: Optional[GeometryType],
     create_spatial_index: bool,
+    column_datatypes: dict,
     use_ogr: bool,
 ):
     if use_ogr is False:
@@ -2413,6 +2420,7 @@ def calculate_two_layers(
             output_geometrytype=force_output_geometrytype,
             create_spatial_index=create_spatial_index,
             profile=_sqlite_util.SqliteProfile.SPEED,
+            column_datatypes=column_datatypes,
         )
         if explodecollections:
             _ogr_util.vector_translate(
@@ -2431,8 +2439,8 @@ def calculate_two_layers(
         #   * input2 path (= using attach) doesn't seem to work
         #   * ogr doesn't fill out database names, so do it now
         sql_stmt = sql_stmt.format(
-            input1_databasename=input1_databasename,
-            input2_databasename=input2_databasename,
+            input1_databasename="main",
+            input2_databasename="main",
         )
 
         _ogr_util.vector_translate(
@@ -2451,21 +2459,22 @@ class ProcessingParams:
         self,
         input1_path: Optional[Path] = None,
         input1_layer: Optional[str] = None,
-        input1_databasename: Optional[str] = None,
         input2_path: Optional[Path] = None,
         input2_layer: Optional[str] = None,
-        input2_databasename: Optional[str] = None,
         nb_parallel: int = -1,
         batches: Optional[dict] = None,
     ):
         self.input1_path = input1_path
         self.input1_layer = input1_layer
-        self.input1_databasename = input1_databasename
         self.input2_path = input2_path
         self.input2_layer = input2_layer
-        self.input2_databasename = input2_databasename
         self.nb_parallel = nb_parallel
         self.batches = batches
+
+    def to_json(self, path: Path):
+        prepared = _general_util.prepare_for_serialize(vars(self))
+        with open(path, "w") as file:
+            file.write(json.dumps(prepared, indent=4, sort_keys=True))
 
 
 def _prepare_processing_params(
@@ -2592,13 +2601,6 @@ def _prepare_processing_params(
                     preserve_fid=True,
                 )
 
-    # Fill out the database names to use in the sql statements
-    returnvalue.input1_databasename = "main"
-    if input2_path is None or input1_path == input2_path:
-        returnvalue.input2_databasename = returnvalue.input1_databasename
-    else:
-        returnvalue.input2_databasename = "input2"
-
     # Prepare batches to process
     # Get column names and info
     layer1_info = gfo.get_layerinfo(
@@ -2610,7 +2612,7 @@ def _prepare_processing_params(
     if nb_batches > int(nb_rows_input_layer / 10):
         nb_batches = max(int(nb_rows_input_layer / 10), 1)
 
-    batches = {}
+    batches: Dict[int, dict] = {}
     if nb_batches == 1:
         # If only one batch, no filtering is needed
         batches[0] = {}
@@ -2658,9 +2660,10 @@ def _prepare_processing_params(
         else:
             # The rowids are not consecutive, so determine the optimal rowid
             # ranges for each batch so each batch has same number of elements
-            # Remark: this might take some seconds for larger datasets!
+            # Remark: - this might take some seconds for larger datasets!
+            #         - (batch_id - 1) AS id to make the id zero-based
             sql_stmt = f"""
-                SELECT batch_id AS id
+                SELECT (batch_id - 1) AS id
                       ,COUNT(*) AS nb_rows
                       ,MIN(rowid) AS start_rowid
                       ,MAX(rowid) AS end_rowid
@@ -2703,6 +2706,7 @@ def _prepare_processing_params(
         returnvalue.nb_parallel = len(batches)
 
     returnvalue.batches = batches
+    returnvalue.to_json(tempdir / "processing_params.json")
     return returnvalue
 
 

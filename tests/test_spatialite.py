@@ -3,8 +3,6 @@
 Tests for functionalities in ogr_util.
 """
 
-import os
-
 import pytest
 
 import geofileops as gfo
@@ -12,8 +10,8 @@ from tests import test_helper
 
 
 @pytest.mark.skipif(
-    "GITHUB_ACTIONS" in os.environ,
-    reason="Don't run on CI: just to followup odd behaviour in spatialite.",
+    not test_helper.RUNS_LOCAL,
+    reason="Don't this run on CI: just to followup odd behaviour in spatialite.",
 )
 def test_st_difference_null(tmp_path):
     """

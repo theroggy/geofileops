@@ -56,7 +56,7 @@ def test_delete_duplicate_geometries(tmp_path, gridsize):
     result_gdf = gfo.read_file(output_path)
     if gridsize != 0.0:
         expected_gdf.geometry = shapely2_or_pygeos.set_precision(
-            expected_gdf.geometry.array.data, grid_size=gridsize
+            expected_gdf.geometry, grid_size=gridsize
         )
     assert_geodataframe_equal(result_gdf, expected_gdf)
 

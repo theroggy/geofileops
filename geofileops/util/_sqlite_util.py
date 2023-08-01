@@ -7,13 +7,18 @@ import datetime
 import enum
 import logging
 from pathlib import Path
+import shutil
 import sqlite3
-from typing import List, Optional, Union
+import tempfile
+from typing import Dict, List, Optional, Union
 
+import pygeoops
+import shapely
+from shapely.geometry.base import BaseMultipartGeometry
 
 import geofileops as gfo
 from geofileops import GeometryType
-from ._general_util import MissingRuntimeDependencyError
+from geofileops.util._general_util import MissingRuntimeDependencyError
 
 #####################################################################
 # First define/init some general variables/constants
@@ -91,17 +96,31 @@ def get_columns(
     sql_stmt: str,
     input1_path: Path,
     input2_path: Optional[Path] = None,
+    empty_output_ok: bool = True,
     use_spatialite: bool = True,
-) -> List[str]:
-    input1_databasename = "main"
-    conn = sqlite3.connect(str(input1_path), uri=True)
+    output_geometrytype: Optional[GeometryType] = None,
+) -> Dict[str, str]:
+    # Create temp output db to be sure the output DB is writable, even though we only
+    # create a temporary table.
+    tmp_dir = Path(tempfile.mkdtemp(prefix="geofileops/get_columns_"))
+    tmp_path = tmp_dir / f"temp{input1_path.suffix}"
+    create_new_spatialdb(path=tmp_path)
+
     sql = None
+    conn = sqlite3.connect(tmp_path, detect_types=sqlite3.PARSE_DECLTYPES)
     try:
-        if use_spatialite is True:
+        # Load spatialite if asked for
+        if use_spatialite:
             load_spatialite(conn)
-            if input1_path.suffix.lower() == ".gpkg":
+            if tmp_path.suffix.lower() == ".gpkg":
                 sql = "SELECT EnableGpkgMode();"
                 conn.execute(sql)
+
+        # Attach to input1
+        input1_databasename = "input1"
+        sql = f"ATTACH DATABASE ? AS {input1_databasename}"
+        dbSpec = (str(input1_path),)
+        conn.execute(sql, dbSpec)
 
         # If input2 isn't the same database input1, attach to it
         input2_databasename = None
@@ -111,25 +130,100 @@ def get_columns(
             else:
                 input2_databasename = "input2"
                 sql = f"ATTACH DATABASE ? AS {input2_databasename}"
-                # dbSpec = (f"file:{input2_path.resolve().as_posix()}?mode=ro",)
                 dbSpec = (str(input2_path),)
                 conn.execute(sql, dbSpec)
-        # Prepare sql statement
+
+        # Prepare sql statement for execute
         sql = sql_stmt.format(
             input1_databasename=input1_databasename,
             input2_databasename=input2_databasename,
+            batch_filter="",
         )
 
-        # Execute sql to be able to get the column names
-        cur = conn.cursor()
-        cur.execute(sql)
-        columns = [desc[0] for desc in cur.description]
-        conn.rollback()
+        # Create temp table to get the column names + general data types
+        # + fetch one row to use it to determine geometrytype.
+        # Remark: specify redundant OFFSET 0 to keep sqlite from flattings the subquery.
+        sql = f"""
+            CREATE TEMPORARY TABLE tmp AS
+            SELECT *
+                FROM (
+                {sql}
+                )
+             LIMIT 1 OFFSET 0;
+        """
+        conn.execute(sql)
+        conn.commit()
+        sql = "PRAGMA TABLE_INFO(tmp)"
+        cur = conn.execute(sql)
+        tmpcolumns = cur.fetchall()
+        cur.close()
+
+        # Fetch one row to try to get more detailed data types if needed
+        sql = "SELECT * FROM tmp"
+        tmpdata = conn.execute(sql).fetchone()
+        if tmpdata is not None and len(tmpdata) == 0:
+            tmpdata = None
+        if not empty_output_ok and tmpdata is None:
+            # If no row was returned, stop
+            raise EmptyResultError(f"Query didn't return any rows: {sql_stmt}")
+
+        # Loop over all columns to determine the data type
+        columns = {}
+        for column_index, column in enumerate(tmpcolumns):
+            columnname = column[1]
+            columntype = column[2]
+
+            if columnname == "geom":
+                # PRAGMA TABLE_INFO gives None as column type for a
+                # geometry column. So if output_geometrytype not specified,
+                # Use ST_GeometryType to get the type
+                # based on the data + apply to_multitype to be sure
+                if output_geometrytype is None:
+                    sql = f"SELECT ST_GeometryType({columnname}) FROM tmp;"
+                    result = conn.execute(sql).fetchall()
+                    if len(result) > 0 and result[0][0] is not None:
+                        output_geometrytype = GeometryType[result[0][0]].to_multitype
+                    else:
+                        output_geometrytype = GeometryType["GEOMETRY"]
+                columns[columnname] = output_geometrytype.name
+            else:
+                # If PRAGMA TABLE_INFO doesn't specify the datatype, determine based
+                # on data.
+                if columntype is None or columntype == "":
+                    sql = f"SELECT typeof({columnname}) FROM tmp;"
+                    result = conn.execute(sql).fetchall()
+                    if len(result) > 0 and result[0][0] is not None:
+                        columns[columnname] = result[0][0]
+                    else:
+                        # If unknown, take the most general types
+                        columns[columnname] = "NUMERIC"
+                elif columntype == "NUM":
+                    # PRAGMA TABLE_INFO sometimes returns 'NUM', but apparently this
+                    # cannot be used in "CREATE TABLE".
+                    if tmpdata is not None and isinstance(
+                        tmpdata[column_index], datetime.date
+                    ):
+                        columns[columnname] = "DATE"
+                    elif tmpdata is not None and isinstance(
+                        tmpdata[column_index], datetime.datetime
+                    ):
+                        columns[columnname] = "DATETIME"
+                    else:
+                        sql = f'SELECT datetime("{columnname}") FROM tmp;'
+                        result = conn.execute(sql).fetchall()
+                        if len(result) > 0 and result[0][0] is not None:
+                            columns[columnname] = "DATETIME"
+                        else:
+                            columns[columnname] = "NUMERIC"
+                else:
+                    columns[columnname] = columntype
+
     except Exception as ex:
         conn.rollback()
-        raise Exception(f"Error {ex} executing {sql}") from ex
+        raise RuntimeError(f"Error {ex} executing {sql}") from ex
     finally:
         conn.close()
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return columns
 
@@ -199,7 +293,7 @@ def create_table_as_sql(
         create_new_spatialdb(path=output_path, crs_epsg=crs_epsg)
 
     sql = None
-    conn = sqlite3.connect(output_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn = sqlite3.connect(output_path, detect_types=sqlite3.PARSE_DECLTYPES, uri=True)
     try:
         with conn:
 
@@ -231,9 +325,12 @@ def create_table_as_sql(
             input1_databasename = "input1"
             sql = f"ATTACH DATABASE ? AS {input1_databasename}"
             dbSpec = (str(input1_path),)
+            # input1_uri = f"file:{input1_path}?immutable=1"
+            # dbSpec = (str(input1_uri),)
             conn.execute(sql, dbSpec)
 
             # If input2 isn't the same database input1, attach to it
+            input2_databasename = None
             if input2_path is not None:
                 if input2_path == input1_path:
                     input2_databasename = input1_databasename
@@ -241,6 +338,8 @@ def create_table_as_sql(
                     input2_databasename = "input2"
                     sql = f"ATTACH DATABASE ? AS {input2_databasename}"
                     dbSpec = (str(input2_path),)
+                    # input2_uri = f"file:{input1_path}?immutable=1"
+                    # dbSpec = (str(input2_uri),)
                     conn.execute(sql, dbSpec)
 
             # Use the sqlite profile specified
@@ -262,91 +361,33 @@ def create_table_as_sql(
                     conn.execute(f"PRAGMA {databasename}.locking_mode=EXCLUSIVE;")
                     conn.execute(f"PRAGMA {databasename}.synchronous=OFF;")
 
+            # Determine columns/datatypes to create the table if not specified
+            column_types = column_datatypes
+            if column_types is None:
+                column_types = get_columns(
+                    sql_stmt=sql_stmt,
+                    input1_path=input1_path,
+                    input2_path=input2_path,
+                    empty_output_ok=empty_output_ok,
+                    use_spatialite=True,
+                    output_geometrytype=output_geometrytype,
+                )
+
+            # If geometry type was not specified, look for it in column_types
+            if output_geometrytype is None:
+                if "geom" in column_types:
+                    output_geometrytype = GeometryType(column_types["geom"])
+                else:
+                    raise ValueError(
+                        "output_geometrytype not specified + determination from "
+                        "sql_stmt failed"
+                    )
+
             # Prepare sql statement
             sql_stmt = sql_stmt.format(
                 input1_databasename=input1_databasename,
                 input2_databasename=input2_databasename,
             )
-
-            # Determine columns/datatypes to create the table
-            # Create temp table to get the column names + general data types
-            # + fetch one row to use it to determine geometrytype.
-            sql = f"""
-                CREATE TEMPORARY TABLE tmp AS
-                  SELECT *
-                    FROM (
-                      {sql_stmt}
-                    )
-                  LIMIT 1;
-            """
-            conn.execute(sql)
-            sql = "PRAGMA TABLE_INFO(tmp)"
-            cur = conn.execute(sql)
-            tmpcolumns = cur.fetchall()
-
-            # Fetch one row to try to get more detailed data types if needed
-            sql = "SELECT * FROM tmp"
-            tmpdata = conn.execute(sql).fetchone()
-            if tmpdata is not None and len(tmpdata) == 0:
-                tmpdata = None
-            if not empty_output_ok and tmpdata is None:
-                # If no row was returned, stop
-                raise EmptyResultError(f"Query didn't return any rows: {sql_stmt}")
-
-            # Loop over all columns to determine the data type
-            column_types = {}
-            for column_index, column in enumerate(tmpcolumns):
-                columnname = column[1]
-                columntype = column[2]
-
-                if column_datatypes is not None and columnname in column_datatypes:
-                    column_types[columnname] = column_datatypes[columnname]
-                elif columnname == "geom":
-                    # PRAGMA TABLE_INFO gives None as column type for a
-                    # geometry column. So if output_geometrytype not specified,
-                    # Use ST_GeometryType to get the type
-                    # based on the data + apply to_multitype to be sure
-                    if output_geometrytype is None:
-                        sql = f"SELECT ST_GeometryType({columnname}) FROM tmp;"
-                        result = conn.execute(sql).fetchall()
-                        if len(result) > 0:
-                            output_geometrytype = GeometryType[
-                                result[0][0]
-                            ].to_multitype
-                        else:
-                            output_geometrytype = GeometryType["GEOMETRY"]
-                    column_types[columnname] = output_geometrytype.name
-                else:
-                    # If PRAGMA TABLE_INFO doesn't specify the datatype, determine based
-                    # on data.
-                    if columntype is None or columntype == "":
-                        sql = f"SELECT typeof({columnname}) FROM tmp;"
-                        result = conn.execute(sql).fetchall()
-                        if len(result) > 0 and result[0][0] is not None:
-                            column_types[columnname] = result[0][0]
-                        else:
-                            # If unknown, take the most general types
-                            column_types[columnname] = "NUMERIC"
-                    elif columntype == "NUM":
-                        # PRAGMA TABLE_INFO sometimes returns 'NUM', but apparently this
-                        # cannot be used in "CREATE TABLE".
-                        if tmpdata is not None and isinstance(
-                            tmpdata[column_index], datetime.date
-                        ):
-                            column_types[columnname] = "DATE"
-                        elif tmpdata is not None and isinstance(
-                            tmpdata[column_index], datetime.datetime
-                        ):
-                            column_types[columnname] = "DATETIME"
-                        else:
-                            sql = f'SELECT datetime("{columnname}") FROM tmp;'
-                            result = conn.execute(sql).fetchall()
-                            if len(result) > 0 and result[0][0] is not None:
-                                column_types[columnname] = "DATETIME"
-                            else:
-                                column_types[columnname] = "NUMERIC"
-                    else:
-                        column_types[columnname] = columntype
 
             # Now we can create the table
             # Create output table using the gpkgAddGeometryColumn() function
@@ -421,12 +462,13 @@ def create_table_as_sql(
 
             # Insert data using the sql statement specified
             try:
-                columns_for_insert = [f'"{column[1]}"' for column in tmpcolumns]
+                columns_for_insert = [f'"{column}"' for column in column_types]
                 sql = (
                     f'INSERT INTO {output_databasename}."{output_layer}" '
                     f'({", ".join(columns_for_insert)})\n{sql_stmt}'
                 )
                 conn.execute(sql)
+
             except Exception as ex:
                 ex_message = str(ex).lower()
                 if ex_message.startswith(
@@ -467,11 +509,10 @@ def create_table_as_sql(
     except EmptyResultError:
         logger.info(f"Query didn't return any rows: {sql_stmt}")
         conn.close()
-        conn = None
         if output_path.exists():
             output_path.unlink()
     except Exception as ex:
-        raise Exception(f"Error {ex} executing {sql}") from ex
+        raise RuntimeError(f"Error {ex} executing {sql}") from ex
     finally:
         if conn is not None:
             conn.close()
@@ -567,3 +608,94 @@ def load_spatialite(conn):
         raise MissingRuntimeDependencyError(
             "Error trying to load mod_spatialite."
         ) from ex
+
+    # Register custom function
+    conn.create_function(
+        "st_difference_collection", 3, st_difference_collection, deterministic=True
+    )
+
+    # Register custom aggregate function
+    # conn.create_aggregate("st_difference_agg", 2, DifferenceAgg)
+
+
+def st_difference_collection(geom1: bytes, geom2: bytes, keep_geom_type: int = 0):
+    # Check/prepare input
+    if geom1 is None:
+        return None
+    if geom2 is None:
+        return geom1
+
+    geom = shapely.from_wkb(geom1)
+    geoms_to_subtract = shapely.from_wkb(geom2)
+    keep_geom_type = False if keep_geom_type == 0 else True
+
+    try:
+        if not isinstance(geoms_to_subtract, BaseMultipartGeometry):
+            result = pygeoops.difference_all_tiled(
+                geom, geoms_to_subtract, keep_geom_type=keep_geom_type
+            )
+        else:
+            result = pygeoops.difference_all_tiled(
+                geom,
+                shapely.get_parts(geoms_to_subtract),
+                keep_geom_type=keep_geom_type,
+            )
+
+        # If an empty result, return None
+        if result is None or result.is_empty:
+            return None
+
+        return shapely.to_wkb(result)
+    except Exception as ex:
+        # ex.with_traceback()
+        print(ex)
+
+
+"""
+class DifferenceAgg:
+    def __init__(self):
+        self.init_todo = True
+        self.tmpdiff = None
+        self.is_split = False
+        self.geom_mbrp = None
+        self.geom_dimension = None
+        self.num_coords_max = 5000
+
+    def step(self, geom, geoms_to_subtract):
+        try:
+            # Init on first call
+            if self.init_todo:
+                self.init_todo = True
+                if geom is None:
+                    self.tmpdiff = shapely.Geometry()
+                geom = shapely.from_wkb(geom)
+                self.geom_mbrp = shapely.box(*geom.bounds)
+                self.geom_dimension = shapely.get_dimensions(geom)
+                self.tmpdiff, self.is_split = difference._split_if_needed(
+                    geom, self.num_coords_max
+                )
+            elif shapely.is_empty(self.tmpdiff).all():
+                return
+
+            # Apply difference
+            geom_to_subtract = shapely.from_wkb(geoms_to_subtract)
+            self.tmpdiff = difference._difference_intersecting(
+                self.tmpdiff, geom_to_subtract, output_dimensions=self.geom_dimension
+            )
+            self.tmpdiff = self.tmpdiff[~shapely.is_empty(self.tmpdiff)]
+
+        except Exception as ex:
+            # ex.with_traceback()
+            print(ex)
+
+    def finalize(self):
+        try:
+            if self.tmpdiff is None or shapely.is_empty(self.tmpdiff).all():
+                return None
+            elif self.is_split:
+                return shapely.to_wkb(shapely.unary_union(self.tmpdiff))
+            else:
+                return shapely.to_wkb(self.tmpdiff[0])
+        except Exception as ex:
+            raise ex
+"""

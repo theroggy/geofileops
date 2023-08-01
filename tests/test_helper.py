@@ -3,6 +3,7 @@
 Helper functions for all tests.
 """
 
+import os
 from pathlib import Path
 import tempfile
 from typing import List, Optional, Union
@@ -31,6 +32,10 @@ WHERE_AREA_GT_5000 = "ST_Area({geometrycolumn}) > 5000"
 WHERE_LENGTH_GT_1000 = "ST_Length({geometrycolumn}) > 1000"
 WHERE_LENGTH_GT_200000 = "ST_Length({geometrycolumn}) > 200000"
 
+RUNS_LOCAL = True
+if "GITHUB_ACTIONS" in os.environ:
+    RUNS_LOCAL = False
+
 
 def prepare_expected_result(
     gdf: gpd.GeoDataFrame,
@@ -46,7 +51,7 @@ def prepare_expected_result(
 
     if gridsize != 0.0:
         expected_gdf.geometry = shapely2_or_pygeos.set_precision(
-            expected_gdf.geometry.array.data, grid_size=gridsize
+            expected_gdf.geometry, grid_size=gridsize
         )
     if explodecollections:
         expected_gdf = expected_gdf.explode(ignore_index=True)
@@ -314,10 +319,10 @@ def assert_geodataframe_equal(
     if sort_values:
         if normalize:
             left.geometry = gpd.GeoSeries(
-                shapely2_or_pygeos.normalize(left.geometry.array.data), index=left.index
+                shapely2_or_pygeos.normalize(left.geometry), index=left.index
             )
             right.geometry = gpd.GeoSeries(
-                shapely2_or_pygeos.normalize(right.geometry.array.data),
+                shapely2_or_pygeos.normalize(right.geometry),
                 index=right.index,
             )
         if promote_to_multi:

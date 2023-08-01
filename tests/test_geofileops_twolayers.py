@@ -52,12 +52,20 @@ def test_clip(tmp_path, testfile, suffix):
     )
 
 
-@pytest.mark.parametrize("testfile", TESTFILES)
 @pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
-    "gridsize, where", [(0.0, "ST_Area(geom) > 2000"), (0.001, None)]
+    "testfile, gridsize, where",
+    [
+        ("linestring-row-trees", 0.0, "ST_Length(geom) > 100"),
+        ("linestring-row-trees", 0.001, None),
+        ("point", 0.0, None),
+        ("point", 0.001, None),
+        ("polygon-parcel", 0.0, None),
+        ("polygon-parcel", 0.0, "ST_Area(geom) > 2000"),
+        ("polygon-parcel", 0.001, None),
+    ],
 )
-def test_erase(tmp_path, testfile, suffix, gridsize, where):
+def test_erase(tmp_path, suffix, testfile, gridsize, where):
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
     erase_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
     input_layerinfo = gfo.get_layerinfo(input_path)
@@ -84,10 +92,19 @@ def test_erase(tmp_path, testfile, suffix, gridsize, where):
     )
     if gridsize != 0.0:
         output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
-            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+            output_gpd_gdf.geometry, grid_size=gridsize
         )
     if where is not None:
-        output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.area > 2000]
+        if where == "ST_Area(geom) > 2000":
+            output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.area > 2000]
+        elif where == "ST_Length(geom) > 100":
+            output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.length > 100]
+        else:
+            raise ValueError(f"where filter not implemented: {where}")
+    output_gpd_path = tmp_path / f"{input_path.stem}-output_gpd{suffix}"
+
+    if test_helper.RUNS_LOCAL:
+        gfo.to_file(output_gpd_gdf, output_gpd_path)
 
     assert_geodataframe_equal(
         output_gdf,
@@ -97,6 +114,9 @@ def test_erase(tmp_path, testfile, suffix, gridsize, where):
         check_less_precise=True,
         normalize=True,
     )
+
+    # Make sure the output still has rows, otherwise the test isn't super useful
+    assert len(output_gdf) > 0
 
 
 def test_erase_explodecollections(tmp_path):
@@ -254,7 +274,7 @@ def test_intersection(
     else:
         assert output_layerinfo.featurecount == 30
 
-    # Check the contents of the result file
+    # Check the contents of the result file by comparing with geopandas
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
 
@@ -268,7 +288,7 @@ def test_intersection(
     expected_gdf = expected_gdf.rename(columns=renames)
     if gridsize != 0.0:
         expected_gdf.geometry = shapely2_or_pygeos.set_precision(
-            expected_gdf.geometry.array.data, grid_size=gridsize
+            expected_gdf.geometry, grid_size=gridsize
         )
     if explodecollections:
         expected_gdf = expected_gdf.explode(ignore_index=True)
@@ -814,7 +834,7 @@ def test_select_two_layers_invalid_sql(tmp_path, suffix):
          WHERE 1=1
            AND ST_Area(layer1.{input1_geometrycolumn}) > 5
     """
-    with pytest.raises(Exception, match='Error <Error near "layer1": syntax error'):
+    with pytest.raises(RuntimeError, match='Error near "layer1": syntax error'):
         gfo.select_two_layers(
             input1_path=input1_path,
             input2_path=input2_path,
@@ -1008,7 +1028,7 @@ def test_split(tmp_path, suffix, epsg, gridsize):
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     if gridsize != 0.0:
         output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
-            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+            output_gpd_gdf.geometry, grid_size=gridsize
         )
     # OIDN is float vs int? -> check_column_type=False
     assert_geodataframe_equal(
@@ -1056,7 +1076,7 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     if gridsize != 0.0:
         output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
-            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+            output_gpd_gdf.geometry, grid_size=gridsize
         )
     assert_geodataframe_equal(
         output_gfo_gdf,
@@ -1129,7 +1149,7 @@ def test_union(
     output_gpd_gdf["l1_DATUM"] = pd.to_datetime(output_gpd_gdf["l1_DATUM"])
     if gridsize != 0.0:
         output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
-            output_gpd_gdf.geometry.array.data, grid_size=gridsize
+            output_gpd_gdf.geometry, grid_size=gridsize
         )
     if explodecollections:
         output_gpd_gdf = output_gpd_gdf.explode(ignore_index=True)

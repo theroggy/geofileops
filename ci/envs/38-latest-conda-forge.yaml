@@ -12,12 +12,14 @@ dependencies:
   - numpy
   - pandas
   - psutil
+  #- pygeoops >=0.2,<0.3
   - pyogrio
   - pyproj
-  - shapely
+  - shapely >=2,<2.1
   - topojson
   # testing
   - pytest
   - pytest-cov
   - pip:
+    - pygeoops ==0.3.0a0
     - simplification

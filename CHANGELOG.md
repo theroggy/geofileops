@@ -13,6 +13,7 @@
 - Support creating geofile without geometry column using `gfo.select` (#322)
 - Improve performance of makevalid and isvalid (#258)
 - Improve performance of spatial operations when only one batch is used (#271)
+- Improve performance of `erase`: files with very large input geometries 100 * faster (#329)
 - Add checks that `output_path` must not be equal to the/an `input_path` for geo
   operations (#246)
 - Follow geopandas behaviour of using shapely2 and/or pygeos instead of forcing pygeos
@@ -31,6 +32,7 @@
 
 ### Deprecations and compatibility notes
 
+- Drop support for shapely1 and pygeos (#329)
 - `makevalid` parameter `precision` is renamed to `gridsize` as this is the typical
   terminology in other libraries (#273)
 - `keep_empty_geoms` parameters are added with default value `False` for most operations
