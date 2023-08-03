@@ -1181,7 +1181,7 @@ def simplify(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     tolerance: float,
-    algorithm: SimplifyAlgorithm = SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER,
+    algorithm: Union[str, SimplifyAlgorithm] = "rdp",
     lookahead: int = 8,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
@@ -1210,8 +1210,8 @@ def simplify(
 
             In projected coordinate systems this tolerance will typically be
             in meter, in geodetic systems this is typically in degrees.
-        algorithm (SimplifyAlgorithm, optional): algorithm to use.
-            Defaults to SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER.
+        algorithm (str, optional): algorithm to use. Defaults to "rdp"
+            (Ramer Douglas Peucker).
         lookahead (int, optional): used for LANG algorithm. Defaults to 8.
         input_layer (str, optional): input layer name. Optional if the input
             file only contains one layer.
@@ -1247,6 +1247,9 @@ def simplify(
 
     """  # noqa: E501
     logger.info(f"Start simplify on {input_path} with tolerance {tolerance}")
+    if isinstance(algorithm, str):
+        algorithm = SimplifyAlgorithm(algorithm)
+
     if keep_empty_geoms is None:
         keep_empty_geoms = False
         warnings.warn(

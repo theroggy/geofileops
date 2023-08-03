@@ -659,3 +659,34 @@ def test_simplify(
     # More detailed checks
     output_gdf = fileops.read_file(output_path)
     assert_geodataframe_equal(output_gdf, expected_gdf, sort_values=True)
+
+
+@pytest.mark.parametrize(
+    "algorithm",
+    [
+        "lang",
+        "rdp",
+        "vw",
+        geoops.SimplifyAlgorithm.LANG,
+        geoops.SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER,
+        geoops.SimplifyAlgorithm.VISVALINGAM_WHYATT,
+    ],
+)
+def test_simplify_algorithms(tmp_path, algorithm):
+    """
+    Rude check on supported algorithms.
+    """
+    input_path = test_helper.get_testfile("polygon-parcel")
+    output_path = tmp_path / f"{input_path.stem}_output.gpkg"
+
+    # Test specifically with geoops
+    set_geoops_module("geofileops.geoops")
+    geoops.simplify(
+        input_path=input_path,
+        output_path=output_path,
+        tolerance=1,
+        algorithm=algorithm,
+        nb_parallel=2,
+    )
+
+    assert output_path.exists()
