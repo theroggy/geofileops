@@ -12,13 +12,10 @@ import sqlite3
 import tempfile
 from typing import Dict, List, Optional, Union
 
-import pygeoops
-import shapely
-from shapely.geometry.base import BaseMultipartGeometry
-
 import geofileops as gfo
 from geofileops import GeometryType
 from geofileops.util._general_util import MissingRuntimeDependencyError
+from geofileops.util import _sqlite_userdefined as sqlite_userdefined
 
 #####################################################################
 # First define/init some general variables/constants
@@ -314,11 +311,14 @@ def create_table_as_sql(
                 sql = "SELECT EnableGpkgMode();"
                 conn.execute(sql)
 
-            # Set nb KB of cache
+            # Set cache size to 128 MB (in kibibytes)
             sql = "PRAGMA cache_size=-128000;"
             conn.execute(sql)
             # Set temp storage to MEMORY
             sql = "PRAGMA temp_store=2;"
+            conn.execute(sql)
+            # Set soft heap limit to 1 GB (in bytes)
+            sql = f"PRAGMA soft_heap_limit={1024*1024*1024};"
             conn.execute(sql)
 
             # If attach to input1
@@ -611,91 +611,11 @@ def load_spatialite(conn):
 
     # Register custom function
     conn.create_function(
-        "st_difference_collection", 3, st_difference_collection, deterministic=True
+        "st_difference_collection",
+        -1,
+        sqlite_userdefined.st_difference_collection,
+        deterministic=True,
     )
 
     # Register custom aggregate function
-    # conn.create_aggregate("st_difference_agg", 2, DifferenceAgg)
-
-
-def st_difference_collection(geom1: bytes, geom2: bytes, keep_geom_type: int = 0):
-    # Check/prepare input
-    if geom1 is None:
-        return None
-    if geom2 is None:
-        return geom1
-
-    geom = shapely.from_wkb(geom1)
-    geoms_to_subtract = shapely.from_wkb(geom2)
-    keep_geom_type = False if keep_geom_type == 0 else True
-
-    try:
-        if not isinstance(geoms_to_subtract, BaseMultipartGeometry):
-            result = pygeoops.difference_all_tiled(
-                geom, geoms_to_subtract, keep_geom_type=keep_geom_type
-            )
-        else:
-            result = pygeoops.difference_all_tiled(
-                geom,
-                shapely.get_parts(geoms_to_subtract),
-                keep_geom_type=keep_geom_type,
-            )
-
-        # If an empty result, return None
-        if result is None or result.is_empty:
-            return None
-
-        return shapely.to_wkb(result)
-    except Exception as ex:
-        # ex.with_traceback()
-        print(ex)
-
-
-"""
-class DifferenceAgg:
-    def __init__(self):
-        self.init_todo = True
-        self.tmpdiff = None
-        self.is_split = False
-        self.geom_mbrp = None
-        self.geom_dimension = None
-        self.num_coords_max = 5000
-
-    def step(self, geom, geoms_to_subtract):
-        try:
-            # Init on first call
-            if self.init_todo:
-                self.init_todo = True
-                if geom is None:
-                    self.tmpdiff = shapely.Geometry()
-                geom = shapely.from_wkb(geom)
-                self.geom_mbrp = shapely.box(*geom.bounds)
-                self.geom_dimension = shapely.get_dimensions(geom)
-                self.tmpdiff, self.is_split = difference._split_if_needed(
-                    geom, self.num_coords_max
-                )
-            elif shapely.is_empty(self.tmpdiff).all():
-                return
-
-            # Apply difference
-            geom_to_subtract = shapely.from_wkb(geoms_to_subtract)
-            self.tmpdiff = difference._difference_intersecting(
-                self.tmpdiff, geom_to_subtract, output_dimensions=self.geom_dimension
-            )
-            self.tmpdiff = self.tmpdiff[~shapely.is_empty(self.tmpdiff)]
-
-        except Exception as ex:
-            # ex.with_traceback()
-            print(ex)
-
-    def finalize(self):
-        try:
-            if self.tmpdiff is None or shapely.is_empty(self.tmpdiff).all():
-                return None
-            elif self.is_split:
-                return shapely.to_wkb(shapely.unary_union(self.tmpdiff))
-            else:
-                return shapely.to_wkb(self.tmpdiff[0])
-        except Exception as ex:
-            raise ex
-"""
+    # conn.create_aggregate("st_difference_agg", 3, userdefined.DifferenceAgg)
