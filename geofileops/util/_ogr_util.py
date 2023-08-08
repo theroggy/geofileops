@@ -13,10 +13,10 @@ from threading import Lock
 from typing import List, Literal, Optional, Tuple, Union
 
 from osgeo import gdal
+from pygeoops import GeometryType
 
 import geofileops as gfo
 from geofileops.util.geofiletype import GeofileType
-from geofileops.util.geometry_util import GeometryType
 
 #####################################################################
 # First define/init some general variables/constants

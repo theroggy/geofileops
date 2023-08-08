@@ -15,7 +15,7 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops.util import geodataframe_util
-from geofileops.util import geoseries_util
+from geofileops.util import _geoseries_util
 
 _data_dir = Path(__file__).parent.resolve() / "data"
 EPSGS = [31370, 4326]
@@ -321,10 +321,10 @@ def assert_geodataframe_equal(
                 index=right.index,
             )
         if promote_to_multi:
-            left.geometry = geoseries_util.harmonize_geometrytypes(
+            left.geometry = _geoseries_util.harmonize_geometrytypes(
                 left.geometry, force_multitype=True
             )
-            right.geometry = geoseries_util.harmonize_geometrytypes(
+            right.geometry = _geoseries_util.harmonize_geometrytypes(
                 right.geometry, force_multitype=True
             )
         left = geodataframe_util.sort_values(left).reset_index(drop=True)

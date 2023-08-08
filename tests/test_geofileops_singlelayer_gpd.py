@@ -8,14 +8,14 @@ from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
+import pygeoops
 import pytest
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops.util import geometry_util
+from geofileops.util import _geometry_util
 from geofileops.util import _geoops_gpd as geoops_gpd
-from geofileops.util import grid_util
 from tests import test_helper
 from tests.test_helper import (
     EPSGS,
@@ -60,7 +60,7 @@ def test_apply(tmp_path, suffix, only_geom_input, gridsize, keep_empty_geoms, wh
         gfo.apply(
             input_path=input_path,
             output_path=output_path,
-            func=lambda geom: geometry_util.remove_inner_rings(
+            func=lambda geom: pygeoops.remove_inner_rings(
                 geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
             ),
             only_geom_input=True,
@@ -73,7 +73,7 @@ def test_apply(tmp_path, suffix, only_geom_input, gridsize, keep_empty_geoms, wh
         gfo.apply(
             input_path=input_path,
             output_path=output_path,
-            func=lambda row: geometry_util.remove_inner_rings(
+            func=lambda row: pygeoops.remove_inner_rings(
                 row.geometry, min_area_to_keep=2, crs=input_layerinfo.crs
             ),
             only_geom_input=False,
@@ -148,7 +148,7 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
         gfo.apply(
             input_path=input_path,
             output_path=output_path,
-            func=lambda geom: geometry_util.remove_inner_rings(
+            func=lambda geom: pygeoops.remove_inner_rings(
                 geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
             ),
             only_geom_input=True,
@@ -159,7 +159,7 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
         gfo.apply(
             input_path=input_path,
             output_path=output_path,
-            func=lambda row: geometry_util.remove_inner_rings(
+            func=lambda row: pygeoops.remove_inner_rings(
                 row.geometry, min_area_to_keep=2, crs=input_layerinfo.crs
             ),
             only_geom_input=False,
@@ -251,8 +251,8 @@ def test_buffer_styles(tmp_path, suffix, epsg):
         input_path=input_path,
         output_path=output_path,
         distance=distance,
-        endcap_style=geometry_util.BufferEndCapStyle.SQUARE,
-        join_style=geometry_util.BufferJoinStyle.MITRE,
+        endcap_style=_geometry_util.BufferEndCapStyle.SQUARE,
+        join_style=_geometry_util.BufferJoinStyle.MITRE,
         batchsize=batchsize,
     )
 
@@ -860,7 +860,9 @@ def test_dissolve_polygons_tiles_empty(tmp_path, suffix):
         bounds[2] + 1 + width,
         bounds[3] + 1,
     )
-    tiles_gdf = grid_util.create_grid2(bounds, nb_squarish_tiles=8, crs=31370)
+    tiles_gdf = gpd.GeoDataFrame(
+        geometry=pygeoops.create_grid2(bounds, nb_squarish_tiles=8), crs=31370
+    )
     gfo.to_file(tiles_gdf, tiles_path)
 
     # Test!
@@ -1076,7 +1078,7 @@ def test_simplify_lang(tmp_path, suffix, epsg, testfile, gridsize):
         input_path=input_path,
         output_path=output_path,
         tolerance=tolerance,
-        algorithm=geometry_util.SimplifyAlgorithm.LANG,
+        algorithm=_geometry_util.SimplifyAlgorithm.LANG,
         lookahead=8,
         gridsize=gridsize,
         batchsize=batchsize,
@@ -1130,7 +1132,7 @@ def test_simplify_vw(tmp_path, suffix, epsg, testfile, gridsize):
         input_path=input_path,
         output_path=output_path,
         tolerance=tolerance,
-        algorithm=geometry_util.SimplifyAlgorithm.VISVALINGAM_WHYATT,
+        algorithm=_geometry_util.SimplifyAlgorithm.VISVALINGAM_WHYATT,
         gridsize=gridsize,
         batchsize=batchsize,
     )

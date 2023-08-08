@@ -8,14 +8,15 @@ from pathlib import Path
 from typing import Any, Callable, List, Literal, Optional, Tuple, Union, TYPE_CHECKING
 import warnings
 
+from pygeoops import GeometryType
+
 from geofileops.util import _geoops_gpd
 from geofileops.util import _geoops_sql
 from geofileops.util import _geoops_ogr
-from geofileops.util.geometry_util import (
+from geofileops.util._geometry_util import (
     BufferEndCapStyle,
     BufferJoinStyle,
     SimplifyAlgorithm,
-    GeometryType,
 )
 
 if TYPE_CHECKING:
@@ -56,11 +57,11 @@ def apply(
 
     Examples for the func parameter:
         * if only_geom_input is True:
-            ``func=lambda geom: geometry_util.remove_inner_rings(``
+            ``func=lambda geom: pygeoops.remove_inner_rings(``
                     ``geom, min_area_to_keep=1)``
 
         * if only_geom_input is False:
-            ``func=lambda row: geometry_util.remove_inner_rings(``
+            ``func=lambda row: pygeoops.remove_inner_rings(``
                     ``row.geometry, min_area_to_keep=1)``
 
     Args:

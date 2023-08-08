@@ -31,8 +31,10 @@ import cloudpickle
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import pygeoops
 import psutil
 
+from pygeoops import GeometryType, PrimitiveType
 import shapely
 import shapely.geometry as sh_geom
 
@@ -44,10 +46,8 @@ from geofileops.util import _io_util
 from geofileops.util import _ogr_util
 from geofileops.helpers import _parameter_helper
 from geofileops.util import _processing_util
-from geofileops.util.geometry_util import GeometryType, PrimitiveType, SimplifyAlgorithm
-from geofileops.util.geometry_util import BufferEndCapStyle, BufferJoinStyle
-from geofileops.util import geoseries_util
-from geofileops.util import grid_util
+from geofileops.util._geometry_util import SimplifyAlgorithm
+from geofileops.util._geometry_util import BufferEndCapStyle, BufferJoinStyle
 
 ################################################################################
 # Some init
@@ -716,9 +716,9 @@ def _apply_geooperation(
     elif operation is GeoOperation.CONVEXHULL:
         data_gdf.geometry = data_gdf.geometry.convex_hull
     elif operation is GeoOperation.SIMPLIFY:
-        data_gdf.geometry = geoseries_util.simplify_ext(
+        data_gdf.geometry = pygeoops.simplify(
             data_gdf.geometry,
-            algorithm=operation_params["algorithm"],
+            algorithm=operation_params["algorithm"].value,
             tolerance=operation_params["tolerance"],
             lookahead=operation_params["step"],
         )
@@ -947,8 +947,9 @@ def dissolve(
                 bounds[2] + margin,
                 bounds[3] + margin,
             )
-            result_tiles_gdf = grid_util.create_grid2(
-                bounds, nb_squarish_tiles, input_layerinfo.crs
+            result_tiles_gdf = gpd.GeoDataFrame(
+                geometry=pygeoops.create_grid2(bounds, nb_squarish_tiles),
+                crs=input_layerinfo.crs,
             )
 
         # Apply gridsize tolerance on tiles, otherwise the border polygons can't be
@@ -1014,16 +1015,18 @@ def dissolve(
                     nb_squarish_tiles_max = None
                     if prev_nb_batches is not None:
                         nb_squarish_tiles_max = max(prev_nb_batches - 1, 1)
-                    tiles_gdf = grid_util.create_grid2(
-                        total_bounds=input_pass_layerinfo.total_bounds,
-                        nb_squarish_tiles=nb_batches_recommended,
-                        nb_squarish_tiles_max=nb_squarish_tiles_max,
+                    tiles_gdf = gpd.GeoDataFrame(
+                        geometry=pygeoops.create_grid2(
+                            total_bounds=input_pass_layerinfo.total_bounds,
+                            nb_squarish_tiles=nb_batches_recommended,
+                            nb_squarish_tiles_max=nb_squarish_tiles_max,
+                        ),
                         crs=input_pass_layerinfo.crs,
                     )
                 else:
                     # If a grid is specified already, add extra columns/rows instead of
                     # creating new one...
-                    tiles_gdf = grid_util.split_tiles(
+                    tiles_gdf = pygeoops.split_tiles(
                         result_tiles_gdf, nb_batches_recommended
                     )
 
@@ -1627,8 +1630,8 @@ def _dissolve_polygons(
 
         # Only keep geometries of the primitive type specified after clip...
         assert isinstance(diss_gdf, gpd.GeoDataFrame)
-        diss_gdf.geometry = geoseries_util.geometry_collection_extract(
-            diss_gdf.geometry, input_geometrytype.to_primitivetype
+        diss_gdf.geometry = pygeoops.collection_extract(
+            diss_gdf.geometry, keep_geom_type=input_geometrytype.to_primitivetype
         )
 
         perfinfo["time_clip"] = (datetime.now() - start_clip).total_seconds()
@@ -1678,12 +1681,10 @@ def _dissolve_polygons(
         )
     else:
         # If not, save the polygons on the border seperately
-        bbox_lines_gdf = gpd.GeoDataFrame(
-            geometry=geoseries_util.polygons_to_lines(
-                gpd.GeoSeries([sh_geom.box(bbox[0], bbox[1], bbox[2], bbox[3])])
-            ),
-            crs=input_gdf.crs,
+        bbox_lines = pygeoops.explode(
+            shapely.boundary(sh_geom.box(bbox[0], bbox[1], bbox[2], bbox[3]))
         )
+        bbox_lines_gdf = gpd.GeoDataFrame(geometry=bbox_lines, crs=input_gdf.crs)
         onborder_gdf = gpd.sjoin(diss_gdf, bbox_lines_gdf, predicate="intersects")
         onborder_gdf.drop("index_right", axis=1, inplace=True)
         if len(onborder_gdf) > 0:

@@ -23,6 +23,6 @@ dependencies:
   - pytest
   - pytest-cov
   - pip:
-    - pygeoops ==0.3.0a0
+    - pygeoops ==0.3.0a1
     # optional
     - simplification

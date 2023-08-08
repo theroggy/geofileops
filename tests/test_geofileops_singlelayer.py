@@ -657,16 +657,20 @@ def test_simplify(
 
     # More detailed checks
     output_gdf = fileops.read_file(output_path)
-    assert_geodataframe_equal(output_gdf, expected_gdf, sort_values=True)
+    assert_geodataframe_equal(
+        output_gdf, expected_gdf, sort_values=True, normalize=True
+    )
 
 
 @pytest.mark.parametrize(
     "algorithm",
     [
         "lang",
+        "lang+",
         "rdp",
         "vw",
         geoops.SimplifyAlgorithm.LANG,
+        geoops.SimplifyAlgorithm.LANGP,
         geoops.SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER,
         geoops.SimplifyAlgorithm.VISVALINGAM_WHYATT,
     ],

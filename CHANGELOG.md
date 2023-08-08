@@ -10,6 +10,7 @@
   (#262)
 - Add `where` parameter to many two layer spatial operations (#312)
 - Add `where` parameter to `gfo.convert` and `gfo.append_to` (#311)
+- Add support for lang+ algorithm in `gfo.simplify` (#334)
 - Support creating geofile without geometry column using `gfo.select` (#322)
 - Improve performance of `makevalid` and `isvalid` (#258)
 - Improvements to `erase`: for files with very large input geometries, 100x faster +
@@ -50,7 +51,11 @@
 - rename and deprecate `convert` to `copy_layer` (#310)
 - removed the long-deprecated `vector_util`, `geofileops.geofile` and
   `geofileops.geofileops` namespaces (#276)
-
+- Remove `geometry_util`, `geoseries_util` and `grid_util` (#339):
+   - Most functions were moved to `pygeoops` because they are generally reusable.
+   - Remaining functions are moved either to `_geometry_util` or `_geoseries_util` to
+     make it clearer they are not public.
+ 
 ## 0.7.0 (2023-03-17)
 
 ### Improvements

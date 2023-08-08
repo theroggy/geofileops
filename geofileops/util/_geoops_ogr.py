@@ -3,11 +3,11 @@ import logging
 from pathlib import Path
 from typing import List, Literal, Optional, Tuple, Union
 
+from pygeoops import GeometryType
 from shapely import wkt
 
 import geofileops as gfo
 from geofileops.util import _ogr_util
-from geofileops.util.geometry_util import GeometryType
 
 ################################################################################
 # Some init

@@ -5,12 +5,7 @@ API Reference
 =============
 
 The API Reference provides an overview of all public objects, functions and 
-methods implemented in GeofileOps. All classes and function exposed in 
-``geofileops.*`` namespace plus those listed in the reference are public.
-
-.. warning::
-   The functionality in the "util" modules is typically relatively stable, but 
-   because it is not "guaranteed", it is not included in the reference.
+methods implemented in GeofileOps.
 
 .. _API-reference-single-layer:
 
