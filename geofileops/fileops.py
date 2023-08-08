@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module with helper functions for geo files.
 """
@@ -2291,7 +2290,7 @@ def copy_layer(
             return
 
     # Convert
-    logger.info(f"Convert {src} to {dst}")
+    logger.info(f"Copy layer from {src} to {dst}")
     _append_to_nolock(
         src,
         dst,

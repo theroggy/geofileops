@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests for functionalities in vector_util, regarding geometry operations.
 """

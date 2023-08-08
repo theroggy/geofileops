@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module containing utilities regarding processes.
 """
@@ -7,7 +6,7 @@ import os
 import psutil
 
 
-class PooledExecutorFactory(object):
+class PooledExecutorFactory:
     """
     Context manager to create an Executor.
 

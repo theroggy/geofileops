@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module with some helpers functions to validate, parse,... parameters with a complex
 structure that are typically reused in different functions in geofileops.

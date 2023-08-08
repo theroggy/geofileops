@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module containing some general utilities.
 """
@@ -157,15 +156,15 @@ def formatbytes(bytes: float):
     TB = float(KB**4)  # 1,099,511,627,776
 
     if bytes_float < KB:
-        return "{0} {1}".format(bytes_float, "Bytes" if bytes_float > 1 else "Byte")
+        return "{} {}".format(bytes_float, "Bytes" if bytes_float > 1 else "Byte")
     elif KB <= bytes_float < MB:
-        return "{0:.2f} KB".format(bytes_float / KB)
+        return f"{bytes_float / KB:.2f} KB"
     elif MB <= bytes_float < GB:
-        return "{0:.2f} MB".format(bytes_float / MB)
+        return f"{bytes_float / MB:.2f} MB"
     elif GB <= bytes_float < TB:
-        return "{0:.2f} GB".format(bytes_float / GB)
+        return f"{bytes_float / GB:.2f} GB"
     elif TB <= bytes_float:
-        return "{0:.2f} TB".format(bytes_float / TB)
+        return f"{bytes_float / TB:.2f} TB"
 
 
 def prepare_for_serialize(data: dict) -> dict:

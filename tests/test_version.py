@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test if backwards compatibility for old API still works.
 """

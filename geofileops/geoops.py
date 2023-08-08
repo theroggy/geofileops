@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module exposing all supported operations on geomatries in geofiles.
 """

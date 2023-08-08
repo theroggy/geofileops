@@ -1,9 +1,9 @@
 import setuptools
 
-with open("README.md", "r") as fh:
+with open("README.md") as fh:
     long_description = fh.read()
 
-with open("geofileops/version.txt", mode="r") as file:
+with open("geofileops/version.txt") as file:
     version = file.readline()
 
 setuptools.setup(
@@ -21,15 +21,15 @@ setuptools.setup(
         "cloudpickle",
         "fiona",
         "gdal",
-        "geopandas>=0.11,<0.14",
+        "geopandas>=0.12,<0.14",
         "numpy",
         "pandas",
         "psutil",
-        "pygeoops>=0.2,<0.3",
+        "pygeoops>=0.3,<0.4",
         "pyogrio",
         "pyproj",
         "shapely>=2,<2.1",
-        "topojson",
+        "topojson<2",
     ],
     extras_require={"full": ["simplification"]},
     classifiers=[

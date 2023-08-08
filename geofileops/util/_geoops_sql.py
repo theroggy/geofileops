@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module containing the implementation of Geofile operations using a sql statement.
 """

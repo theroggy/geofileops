@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests for operations that are executed using a sql statement on two layers.
 """
@@ -6,15 +5,9 @@ Tests for operations that are executed using a sql statement on two layers.
 import math
 
 import geopandas as gpd
-import geopandas._compat as gpd_compat
 import pandas as pd
 import pytest
-
-if gpd_compat.USE_PYGEOS:
-    import pygeos as shapely2_or_pygeos
-else:
-    import shapely as shapely2_or_pygeos
-
+import shapely
 
 import geofileops as gfo
 from geofileops import GeometryType, PrimitiveType
@@ -91,7 +84,7 @@ def test_erase(tmp_path, suffix, testfile, gridsize, where):
         input_gdf, erase_gdf, how="difference", keep_geom_type=True
     )
     if gridsize != 0.0:
-        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+        output_gpd_gdf.geometry = shapely.set_precision(
             output_gpd_gdf.geometry, grid_size=gridsize
         )
     if where is not None:
@@ -287,7 +280,7 @@ def test_intersection(
     renames = dict(zip(expected_gdf.columns, output_gdf.columns))
     expected_gdf = expected_gdf.rename(columns=renames)
     if gridsize != 0.0:
-        expected_gdf.geometry = shapely2_or_pygeos.set_precision(
+        expected_gdf.geometry = shapely.set_precision(
             expected_gdf.geometry, grid_size=gridsize
         )
     if explodecollections:
@@ -1027,7 +1020,7 @@ def test_split(tmp_path, suffix, epsg, gridsize):
     renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     if gridsize != 0.0:
-        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+        output_gpd_gdf.geometry = shapely.set_precision(
             output_gpd_gdf.geometry, grid_size=gridsize
         )
     # OIDN is float vs int? -> check_column_type=False
@@ -1075,7 +1068,7 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
     renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     if gridsize != 0.0:
-        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+        output_gpd_gdf.geometry = shapely.set_precision(
             output_gpd_gdf.geometry, grid_size=gridsize
         )
     assert_geodataframe_equal(
@@ -1148,7 +1141,7 @@ def test_union(
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
     output_gpd_gdf["l1_DATUM"] = pd.to_datetime(output_gpd_gdf["l1_DATUM"])
     if gridsize != 0.0:
-        output_gpd_gdf.geometry = shapely2_or_pygeos.set_precision(
+        output_gpd_gdf.geometry = shapely.set_precision(
             output_gpd_gdf.geometry, grid_size=gridsize
         )
     if explodecollections:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module containing utilities regarding the usage of ogr functionalities.
 """
@@ -539,7 +538,7 @@ def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> 
     return result
 
 
-class set_config_options(object):
+class set_config_options:
     """
     Context manager to set config options.
 

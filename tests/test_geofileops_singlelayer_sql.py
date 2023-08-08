@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests for operations that are executed using a sql statement on one layer.
 """
@@ -6,13 +5,9 @@ Tests for operations that are executed using a sql statement on one layer.
 import math
 
 import geopandas as gpd
-import geopandas._compat as gpd_compat
 import pytest
 
-if gpd_compat.USE_PYGEOS:
-    import pygeos as shapely2_or_pygeos
-else:
-    import shapely as shapely2_or_pygeos
+import shapely
 from shapely.geometry import MultiPolygon, Polygon
 
 import geofileops as gfo
@@ -55,7 +50,7 @@ def test_delete_duplicate_geometries(tmp_path, gridsize):
     assert result_info.featurecount == input_info.featurecount - 2
     result_gdf = gfo.read_file(output_path)
     if gridsize != 0.0:
-        expected_gdf.geometry = shapely2_or_pygeos.set_precision(
+        expected_gdf.geometry = shapely.set_precision(
             expected_gdf.geometry, grid_size=gridsize
         )
     assert_geodataframe_equal(result_gdf, expected_gdf)

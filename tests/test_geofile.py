@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests for functionalities in geofileops.general.
 """
@@ -1187,7 +1186,7 @@ def test_to_file_geomnone(tmp_path, suffix, engine_setter):
 def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
     """Strongly based on similar test in geopandas."""
 
-    class FileNumber(object):
+    class FileNumber:
         def __init__(self, tmpdir, base, ext):
             self.tmpdir = str(tmpdir)
             self.base = base
@@ -1195,7 +1194,7 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
             self.fileno = 0
 
         def __repr__(self):
-            filename = "{0}{1:02d}.{2}".format(self.base, self.fileno, self.ext)
+            filename = f"{self.base}{self.fileno:02d}.{self.ext}"
             return os.path.join(self.tmpdir, filename)
 
         def __next__(self):

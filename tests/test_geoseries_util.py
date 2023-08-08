@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests for functionalities in geoseries_util.
 """
@@ -239,7 +238,7 @@ def test_is_valid_reason(tmp_path):
     assert len(result) == len(test_gdf)
     assert result.unique() == "Valid Geometry"
 
-    # Test if indexas are retained
+    # Test if indexes are retained
     # ----------------------------
     test_filtered_gdf = test_gdf[3:-1]
     assert isinstance(test_filtered_gdf.geometry, gpd.GeoSeries)
@@ -307,13 +306,20 @@ def test_simplify_topo_ext(algorithm):
     # Skip test if simplification is not available
     _ = pytest.importorskip("simplification")
 
+    # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel")
     input_gdf = gfo.read_file(input_path)
+    # Drop some rows to test if series index is retained
+    input_gdf = input_gdf.drop(index=[4, 5])
+
+    # Test
     result_geoseries = geoseries_util.simplify_topo_ext(
         input_gdf.geometry, tolerance=1, algorithm=algorithm
     )
 
+    # Check result
     assert len(result_geoseries) == len(input_gdf.geometry)
+    assert result_geoseries.index.to_list() == input_gdf.index.to_list()
     assert len(result_geoseries[1].geoms[0].exterior.coords) < len(
         input_gdf.geometry[1].geoms[0].exterior.coords
     )

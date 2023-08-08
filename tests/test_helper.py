@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Helper functions for all tests.
 """
@@ -9,13 +8,9 @@ import tempfile
 from typing import List, Optional, Union
 
 import geopandas as gpd
-import geopandas._compat as gpd_compat
 import geopandas.testing as gpd_testing
 
-if gpd_compat.USE_PYGEOS:
-    import pygeos as shapely2_or_pygeos
-else:
-    import shapely as shapely2_or_pygeos
+import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
@@ -50,7 +45,7 @@ def prepare_expected_result(
     expected_gdf = gdf.copy()
 
     if gridsize != 0.0:
-        expected_gdf.geometry = shapely2_or_pygeos.set_precision(
+        expected_gdf.geometry = shapely.set_precision(
             expected_gdf.geometry, grid_size=gridsize
         )
     if explodecollections:
@@ -319,10 +314,10 @@ def assert_geodataframe_equal(
     if sort_values:
         if normalize:
             left.geometry = gpd.GeoSeries(
-                shapely2_or_pygeos.normalize(left.geometry), index=left.index
+                shapely.normalize(left.geometry), index=left.index
             )
             right.geometry = gpd.GeoSeries(
-                shapely2_or_pygeos.normalize(right.geometry),
+                shapely.normalize(right.geometry),
                 index=right.index,
             )
         if promote_to_multi:

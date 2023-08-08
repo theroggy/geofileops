@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests for operations that are executed using a sql statement on one layer.
 """

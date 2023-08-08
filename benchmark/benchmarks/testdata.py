@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module to prepare test data for benchmarking geo operations.
 """

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module containing some utilities regarding io.
 """
@@ -121,7 +120,7 @@ def create_file_atomic(filename) -> bool:
         return True
     except FileExistsError:
         return False
-    except IOError as ex:
+    except OSError as ex:
         if ex.errno == 13:
             return False
         else:

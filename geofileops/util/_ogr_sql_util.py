@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module containing utilities regarding the formatting of sql statements meant for use
 with ogr.

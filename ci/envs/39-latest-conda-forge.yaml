@@ -8,11 +8,11 @@ dependencies:
   - cloudpickle
   - fiona
   - gdal
-  - geopandas >=0.11
+  - geopandas >=0.12
   - numpy
   - pandas
   - psutil
-  #- pygeoops >=0.2,<0.3
+  #- pygeoops >=0.3,<0.4
   - pyogrio
   - pyproj
   - shapely >=2,<2.1

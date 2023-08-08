@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module containing utilities regarding operations on geoseries.
 """
@@ -15,22 +14,14 @@ if gpd_compat.USE_PYGEOS:
     import pygeos as shapely2_or_pygeos
 else:
     import shapely as shapely2_or_pygeos
+import shapely
 from shapely import geometry as sh_geom
 
 from . import geometry_util
 from .geometry_util import GeometryType, PrimitiveType, SimplifyAlgorithm
 
-#####################################################################
-# First define/init some general variables/constants
-#####################################################################
-
 # Get a logger...
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.DEBUG)
-
-#####################################################################
-# GeoDataFrame helpers
-#####################################################################
 
 
 def geometry_collection_extract(
@@ -131,7 +122,7 @@ def harmonize_geometrytypes(
 def is_valid_reason(geoseries: gpd.GeoSeries) -> pd.Series:
     # Get result and keep geoseries indexes
     return pd.Series(
-        data=shapely2_or_pygeos.is_valid_reason(geoseries.array.data),
+        data=shapely.is_valid_reason(geoseries),
         index=geoseries.index,
     )
 
@@ -274,7 +265,7 @@ def simplify_topo_ext(
                 topo.output["arcs"][index] = list(topoline_simpl)
 
     topo_simpl_gdf = topo.to_gdf(crs=geoseries.crs)
-    topo_simpl_gdf.geometry = shapely2_or_pygeos.make_valid(topo_simpl_gdf.geometry)
+    topo_simpl_gdf.geometry = shapely.make_valid(topo_simpl_gdf.geometry)
     geometry_types_orig = geoseries.geom_type.unique()
     geometry_types_simpl = topo_simpl_gdf.geometry.geom_type.unique()
     if len(geometry_types_orig) == 1 and len(geometry_types_simpl) > 1:
