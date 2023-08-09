@@ -1231,6 +1231,11 @@ def intersection(
     force_output_geometrytype = primitivetype_to_extract.to_multitype
 
     # Prepare sql template for this operation
+    #
+    # Remarks:
+    # - ST_Intersects is fine, but ST_Touches slows down. Especially when the data
+    #   contains huge geoms, time doubles or worse. The filter on sub.geom IS NOT NULL
+    #   removes rows without intersection anyway.
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
     sql_template = f"""
@@ -1260,9 +1265,9 @@ def intersection(
                  AND ST_Intersects(
                         layer1.{{input1_geometrycolumn}},
                         layer2.{{input2_geometrycolumn}}) = 1
-                 AND ST_Touches(
-                        layer1.{{input1_geometrycolumn}},
-                        layer2.{{input2_geometrycolumn}}) = 0
+                 --AND ST_Touches(
+                 --       layer1.{{input1_geometrycolumn}},
+                 --       layer2.{{input2_geometrycolumn}}) = 0
             ) sub
          WHERE sub.geom IS NOT NULL
     """
@@ -1684,7 +1689,8 @@ def split(
     #   later operations
     # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening e.g.
     #   "geom IS NOT NULL" leads to ST_Difference_Collection calculated double!
-    # - ST_Intersects and ST_Touches slow down a lot when the data contains huge geoms
+    # - ST_Intersects is fine, but ST_Touches slows down. Especially when the data
+    #   contains huge geoms, time doubles or worse.
     # - Calculate difference in correlated subquery in SELECT clause
     # - Using a WITH with a GROUP BY on layer1.rowid was a few % faster, but this
     #   processed the entire batch in memory so used > 10 * more memory. E.g. for one
