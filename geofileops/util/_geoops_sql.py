@@ -2713,7 +2713,7 @@ def _prepare_processing_params(
             batches[batch_info.id]["path"] = returnvalue.input1_path
 
             # The batch filter
-            if batch_info.id < nb_batches:
+            if batch_info.id < nb_batches - 1:
                 batches[batch_info.id]["batch_filter"] = (
                     f"AND ({layer_alias_d}rowid >= {batch_info.start_rowid} "
                     f"AND {layer_alias_d}rowid <= {batch_info.end_rowid}) "

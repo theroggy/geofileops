@@ -679,7 +679,12 @@ def test_read_file(suffix, engine_setter):
     # Test ignore_geometry, no columns
     read_gdf = gfo.read_file_nogeom(src, columns=[])
     assert isinstance(read_gdf, pd.DataFrame)
-    assert len(read_gdf) == 0
+    if engine_setter == "fiona":
+        # fiona: 0 rows
+        assert len(read_gdf) == 0
+    else:
+        # pyogrio: 0, pyogrio + pyarrow=True: 46 (= the index)
+        assert len(read_gdf) == 0
 
 
 def test_read_file_invalid_params(tmp_path, engine_setter):

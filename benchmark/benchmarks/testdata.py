@@ -131,7 +131,7 @@ def download_samplefile(
                 gfo.move(tmp_path, dst_path)
             else:
                 logger.info(f"Convert tmp file to {dst_path}")
-                gfo.makevalid(tmp_path, dst_path)
+                gfo.makevalid(tmp_path, dst_path, keep_empty_geoms=False)
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 

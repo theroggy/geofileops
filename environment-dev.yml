@@ -2,18 +2,18 @@ name: geofileops-dev
 channels:
   - conda-forge
 dependencies:
-  - python=3.9
+  - python=3.11
   - pip
   # required
   - cloudpickle
   - fiona
-  - gdal >=3.6.3
-  - geopandas >=0.11
+  - gdal >=3.6.4
+  - geopandas >=0.12
   - libspatialite >=5.0
   - numpy
   - pandas
   - psutil
-  #- pygeoops >=0.2,<0.3
+  #- pygeoops >=0.3,<0.4
   - pyogrio
   - pyproj
   - shapely >=2,<2.1
@@ -23,7 +23,7 @@ dependencies:
   - pytest
   - pytest-cov
   # linting
-  - black
+  - black >=23,<24
   - pre-commit
   - ruff
   # docs

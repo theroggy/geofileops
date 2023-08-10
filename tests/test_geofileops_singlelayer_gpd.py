@@ -28,7 +28,7 @@ from tests.test_helper import (
 
 
 def test_get_parallelization_params():
-    parallelization_params = geoops_gpd.get_parallelization_params(500000)
+    parallelization_params = geoops_gpd._get_parallelization_params(500000)
     assert parallelization_params is not None
 
 
@@ -843,7 +843,8 @@ def test_dissolve_polygons_specialcases(tmp_path, suffix):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
-def test_dissolve_polygons_tiles_empty(tmp_path, suffix):
+@pytest.mark.parametrize("nb_parallel", [-1, 2])
+def test_dissolve_polygons_tiles_empty(tmp_path, suffix, nb_parallel):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
     input_layerinfo = gfo.get_layerinfo(input_path)
@@ -871,7 +872,7 @@ def test_dissolve_polygons_tiles_empty(tmp_path, suffix):
         output_path=output_path,
         tiles_path=tiles_path,
         explodecollections=False,
-        nb_parallel=2,
+        nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=True,
     )

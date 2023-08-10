@@ -23,6 +23,7 @@
 - Improvements to `split`: for files with very large input geometries, 2x faster + 10x less
   memory usage. Because `split` is also used in ``  (#331)
 - Improve performance of spatial operations when only one batch is used (#271)
+- Improve performance of some geopandas/shapely based operations (#342)
 - Add checks that `output_path` must not be equal to the/an `input_path` for geo
   operations (#246)
 - Follow geopandas behaviour of using shapely2 and/or pygeos instead of forcing pygeos
