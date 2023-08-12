@@ -73,6 +73,21 @@ def create_new_spatialdb(path: Path, crs_epsg: Optional[int] = None):
                 if crs_epsg is not None and crs_epsg not in [0, -1, 4326]:
                     sql = f"SELECT gpkgInsertEpsgSRID({crs_epsg})"
                     conn.execute(sql)
+
+                # If they are present, remove triggers that were removed from the gpkg
+                # spec because of issues but apparently weren't removed in spatialite.
+                # https://github.com/opengeospatial/geopackage/pull/240
+                sql = "DROP TRIGGER gpkg_metadata_reference_row_id_value_insert;"
+                try:
+                    conn.execute(sql)
+                except Exception:
+                    pass
+                sql = "DROP TRIGGER gpkg_metadata_reference_row_id_value_update;"
+                try:
+                    conn.execute(sql)
+                except Exception:
+                    pass
+
             elif output_suffix_lower == ".sqlite":
                 sql = "SELECT InitSpatialMetaData(1);"
                 conn.execute(sql)

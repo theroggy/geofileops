@@ -56,6 +56,12 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
     output_info = gfo.get_layerinfo(output_path)
     assert output_info.featurecount == 7
 
+    # The gpkg created by spatialite by default include some triggers that have errors
+    # and were removed from the gpkg spec but not removed in spatialite.
+    # These operations give errors if the triggers are still there.
+    gfo.drop_column(output_path, column_name="naam")
+    gfo.rename_layer(output_path, layer=output_path.stem, new_layer="test_layername")
+
 
 @pytest.mark.parametrize(
     "kwargs, expected_error",
