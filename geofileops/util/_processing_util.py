@@ -106,8 +106,8 @@ def setprocessnice(nice_value: int):
             p.nice(process_nice_to_priorityclass(nice_value))
         else:
             p.nice(nice_value)
-    except Exception as ex:
-        raise Exception(
+    except Exception as ex:  # pragma: no cover
+        raise RuntimeError(
             f"Error in setprocessnice with nice_value: {nice_value}"
         ) from ex
 

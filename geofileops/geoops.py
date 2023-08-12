@@ -1655,13 +1655,13 @@ def intersect(
     batchsize: int = -1,
     force: bool = False,
 ):
-    warnings.warn(
+    warnings.warn(  # pragma: no cover
         "intersect() is deprecated because it was renamed intersection(). "
         "Will be removed in a future version",
         FutureWarning,
         stacklevel=2,
     )
-    return intersection(
+    return intersection(  # pragma: no cover
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,

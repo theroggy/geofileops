@@ -2134,13 +2134,27 @@ def _two_layer_vector_operation(
         if processing_params is None or processing_params.batches is None:
             return
 
-        # If multiple batches, there should be a batch_filter placeholder sql_template
+        # Do some checks on the placeholders
+        sql_template_placeholders = [
+            name for _, name, _, _ in string.Formatter().parse(sql_template) if name
+        ]
+
+        # Warn no if "{input*_databasename}". placeholders present
+        if "input1_databasename" not in sql_template_placeholders:
+            logger.warning(
+                'A placeholder "{input1_databasename}". is recommended as prefix for '
+                "the input1 layer/rtree/tables used in sql_stmt."
+            )
+        if "input2_databasename" not in sql_template_placeholders:
+            logger.warning(
+                'A placeholder "{input2_databasename}". is recommended as prefix for '
+                "the input2 layer/rtree/tables used in sql_stmt."
+            )
+
+        # If multiple batches, mandatory "batch_filter" placeholder in sql_template
         nb_batches = len(processing_params.batches)
         if nb_batches > 1:
-            placeholders = [
-                name for _, name, _, _ in string.Formatter().parse(sql_template) if name
-            ]
-            if "batch_filter" not in placeholders:
+            if "batch_filter" not in sql_template_placeholders:
                 raise ValueError(
                     "Number batches > 1 requires a batch_filter placeholder in "
                     f"sql_template {sql_template}"

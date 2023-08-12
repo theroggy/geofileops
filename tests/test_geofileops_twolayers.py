@@ -10,7 +10,7 @@ import pytest
 import shapely
 
 import geofileops as gfo
-from geofileops import GeometryType, PrimitiveType
+from geofileops import GeometryType
 from geofileops.util import _geoops_sql as geoops_sql
 from tests import test_helper
 from tests.test_helper import SUFFIXES, TESTFILES
@@ -684,30 +684,13 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
     output_path = tmp_path / f"{input1_path.stem}-output{suffix}"
 
-    # Prepare query to execute. At the moment this is just the query for the
-    # intersection() operation.
-    input1_layer_info = gfo.get_layerinfo(input1_path)
-    input2_layer_info = gfo.get_layerinfo(input2_path)
-    primitivetype_to_extract = PrimitiveType(
-        min(
-            input1_layer_info.geometrytype.to_primitivetype.value,
-            input2_layer_info.geometrytype.to_primitivetype.value,
-        )
-    )
+    # Prepare query to execute.
     rtree_layer1 = "rtree_{input1_layer}_{input1_geometrycolumn}"
     rtree_layer2 = "rtree_{input2_layer}_{input2_geometrycolumn}"
     sql_stmt = f"""
-        SELECT ST_CollectionExtract(
-                 ST_Intersection(
-                     layer1.{{input1_geometrycolumn}},
-                     layer2.{{input2_geometrycolumn}}),
-              {primitivetype_to_extract.value}) as geom
+        SELECT layer1."{{input1_geometrycolumn}}" AS geom
               {{layer1_columns_prefix_alias_str}}
               {{layer2_columns_prefix_alias_str}}
-              ,CASE
-                 WHEN layer2.naam = 'zone1' THEN 'in_zone1'
-                 ELSE 'niet_in_zone1'
-               END AS category
           FROM {{input1_databasename}}."{{input1_layer}}" layer1
           JOIN {{input1_databasename}}."{rtree_layer1}" layer1tree
             ON layer1.fid = layer1tree.id
@@ -743,7 +726,7 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == 30
     assert len(output_layerinfo.columns) == (
-        len(input1_layerinfo.columns) + len(input2_layerinfo.columns) + 1
+        len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     )
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
@@ -788,8 +771,8 @@ def test_select_two_layers_invalid_paths(
     select_two_layers doesn't get info on input layers up-front, so this is the best
     function to test the lower level checks in _two_layer_vector_operation.
     """
-    # Prepare query to execute. Doesn't really matter what as an error is normally raise
-    # raise before it gets executed.
+    # Prepare query to execute. Doesn't really matter what the error is as it is
+    # raised before it gets executed.
     sql_stmt = """
         SELECT layer1.{input1_geometrycolumn}
               {layer1_columns_prefix_alias_str}
@@ -873,6 +856,62 @@ def test_select_two_layers_batch_filter(
         gfo.select_two_layers(
             input1_path, input2_path, output_path, sql_stmt, nb_parallel=nb_parallel
         )
+
+
+def test_select_two_layers_no_databasename_placeholder(tmp_path):
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"{input1_path.stem}-output.gpkg"
+
+    # Prepare query to execute.
+    rtree_layer1 = "rtree_{input1_layer}_{input1_geometrycolumn}"
+    rtree_layer2 = "rtree_{input2_layer}_{input2_geometrycolumn}"
+    sql_stmt = f"""
+        SELECT layer1."{{input1_geometrycolumn}}" AS geom
+              {{layer1_columns_prefix_alias_str}}
+              {{layer2_columns_prefix_alias_str}}
+          FROM "{{input1_layer}}" layer1
+          JOIN "{rtree_layer1}" layer1tree ON layer1.fid = layer1tree.id
+          JOIN "{{input2_layer}}" layer2
+          JOIN "{rtree_layer2}" layer2tree ON layer2.fid = layer2tree.id
+         WHERE 1=1
+           {{batch_filter}}
+           AND layer1tree.minx <= layer2tree.maxx
+           AND layer1tree.maxx >= layer2tree.minx
+           AND layer1tree.miny <= layer2tree.maxy
+           AND layer1tree.maxy >= layer2tree.miny
+           AND ST_Intersects(
+                  layer1.{{input1_geometrycolumn}},
+                  layer2.{{input2_geometrycolumn}}) = 1
+           AND ST_Touches(
+                  layer1.{{input1_geometrycolumn}},
+                  layer2.{{input2_geometrycolumn}}) = 0
+    """
+    output_layer = "test_output_layer"
+    gfo.select_two_layers(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        output_layer=output_layer,
+        sql_stmt=sql_stmt,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    input2_layerinfo = gfo.get_layerinfo(input2_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert output_layerinfo.featurecount == 30
+    assert len(output_layerinfo.columns) == (
+        len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
+    )
+    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+    # Check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
