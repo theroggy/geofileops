@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import tempfile
 from threading import Lock
-from typing import List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 from osgeo import gdal
 from pygeoops import GeometryType
@@ -502,7 +502,9 @@ def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> 
         "DESTINATION_OPEN",
         "CONFIG",
     ]
-    prepared_options = {option_type: {} for option_type in option_types}
+    prepared_options: Dict[str, dict] = {
+        option_type: {} for option_type in option_types
+    }
 
     # Loop through options specified to add them
     for option, value in options.items():

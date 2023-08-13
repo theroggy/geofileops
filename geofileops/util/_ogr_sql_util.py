@@ -14,7 +14,7 @@ class ColumnFormatter:
     regarding the handling of the special "fid" column.
     """
 
-    _aliases_cache = None
+    _aliases_cache: Optional[List[str]] = None
 
     def __init__(
         self,

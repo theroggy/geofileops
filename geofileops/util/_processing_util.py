@@ -3,6 +3,7 @@ Module containing utilities regarding processes.
 """
 from concurrent import futures
 import os
+from typing import Optional
 import psutil
 
 
@@ -25,7 +26,7 @@ class PooledExecutorFactory:
         else:
             self.max_workers = max_workers
         self.initializer = initializer
-        self.pool = None
+        self.pool: Optional[futures.Executor] = None
 
     def __enter__(self) -> futures.Executor:
         if self.threadpool:

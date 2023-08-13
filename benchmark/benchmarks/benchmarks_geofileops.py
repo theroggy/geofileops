@@ -7,8 +7,8 @@ import logging
 import multiprocessing
 from pathlib import Path
 
-from benchmarker import RunResult
-from benchmarks import testdata
+from benchmark.benchmarker import RunResult
+from benchmark.benchmarks import testdata
 
 import geofileops as gfo
 from geofileops.util import _geoops_sql

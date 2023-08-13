@@ -24,6 +24,7 @@ dependencies:
   - pytest-cov
   # linting
   - black >=23,<24
+  - pandas-stubs
   - pre-commit
   - ruff
   # docs

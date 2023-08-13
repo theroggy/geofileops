@@ -7,9 +7,7 @@ import csv
 from dataclasses import dataclass
 import enum
 from pathlib import Path
-from typing import List, Optional, Union
-
-geofiletypes = {}
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -24,6 +22,9 @@ class GeofileTypeInfo:
     is_fid_zerobased: bool
     is_spatialite_based: bool
     suffixes_extrafiles: Optional[List[str]]
+
+
+geofiletypes: Dict[str, GeofileTypeInfo] = {}
 
 
 def init_geofiletypes():
@@ -68,13 +69,15 @@ class GeofileType(enum.Enum):
     FlatGeobuf = enum.auto()
 
     @classmethod
-    def _missing_(cls, value: Union[str, int, Path]):
+    def _missing_(cls, value):
         """
         Expand options in the GeofileType() constructor.
 
         Args:
-            value (Union[str, int, Driver]):
-                * string: lookup using case insensitive name
+            value (Union[str, int, Driver, Path]):
+                * case insensitive lookup based on suffix
+                * case insensitive lookup based on path
+                * case insensitive lookup based on driver name
                 * GeofileType: create the same GeometryType as the one passed in
 
         Returns:

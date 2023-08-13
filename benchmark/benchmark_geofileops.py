@@ -1,4 +1,4 @@
-import benchmarker
+from benchmark import benchmarker
 
 
 def main():

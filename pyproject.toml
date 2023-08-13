@@ -1,8 +1,16 @@
 [tool.pyright]
+exclude = ["tmp"]
 reportGeneralTypeIssues = false
 
 [tool.black]
 line-length = 88
+
+[tool.mypy]
+exclude = "tmp"
+
+[[tool.mypy.overrides]]
+module = "cloudpickle.*,fiona.*,geopandas.*,matplotlib.*,osgeo.*,pygeos.*,pyogrio.*,psutil.*,setuptools.*,shapely.*"
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 88

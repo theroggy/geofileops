@@ -248,8 +248,7 @@ def get_layerinfo(
     """
     Get information about a layer in the geofile.
 
-    Raises ValueError if the layer definition has errors like invalid column
-    names,...
+    Raises ValueError if the layer definition has errors like invalid column names,...
 
     Args:
         path (PathLike): path to the file to get info about
@@ -375,10 +374,10 @@ def get_layerinfo(
             return LayerInfo(
                 name=datasource_layer.GetName(),
                 featurecount=datasource_layer.GetFeatureCount(),
-                total_bounds=total_bounds,
-                geometrycolumn=geometrycolumn,
+                total_bounds=total_bounds,  # type: ignore[arg-type]
+                geometrycolumn=geometrycolumn,  # type: ignore[arg-type]
                 geometrytypename=geometrytypename,
-                geometrytype=geometrytype,
+                geometrytype=geometrytype,  # type: ignore[arg-type]
                 columns=columns,
                 fid_column=datasource_layer.GetFIDColumn(),
                 crs=crs,
@@ -623,7 +622,8 @@ def remove_spatial_index(
         if geofiletype.is_spatialite_based:
             datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
             result = datasource.ExecuteSQL(
-                f"SELECT DisableSpatialIndex('{layerinfo.name}', '{layerinfo.geometrycolumn}')",  # noqa: E501
+                "SELECT DisableSpatialIndex("
+                f"      '{layerinfo.name}', '{layerinfo.geometrycolumn}')",
                 dialect="SQLITE",
             )
             datasource.ReleaseResultSet(result)
@@ -1316,7 +1316,7 @@ def _fill_out_sql_placeholders(
     ]
     layer_tmp = layer
     layerinfo = None
-    format_kwargs = {}
+    format_kwargs: Dict[str, Any] = {}
     for placeholder in placeholders:
         if layer_tmp is None:
             layer_tmp = get_only_layer(path)
@@ -1586,7 +1586,7 @@ def _to_file_fiona(
         else:
             mode = "w"
 
-        kwargs = {}
+        kwargs: Dict[str, Any] = {}
         kwargs["engine"] = "fiona"
         kwargs["mode"] = mode
         geofiletype = GeofileType(path)
@@ -1738,7 +1738,7 @@ def _to_file_pyogrio(
     Remark: this function only supports writing GeoDataFrames at the moment.
     """
     # Prepare args for write_dataframe
-    kwargs = {}
+    kwargs: Dict[str, Any] = {}
     kwargs["engine"] = "pyogrio"
 
     # Check upfront if append is going to work to give nice error
@@ -1839,24 +1839,22 @@ def cmp(
         bool: True if the files are identical
     """
     # Check input parameters
-    path1_p = Path(path1)
-    path2_p = Path(path2)
+    path1 = Path(path1)
+    path2 = Path(path2)
 
     # For a shapefile, multiple files need to be compared
-    if path1_p.suffix.lower() == ".shp":
-        path2_noext, _ = os.path.splitext(path2_p)
+    if path1.suffix.lower() == ".shp":
         shapefile_base_suffixes = [".shp", ".dbf", ".shx"]
-        path1_noext = path1_p.parent / path1_p.stem
-        path2_noext = path2_p.parent / path2_p.stem
-        for ext in shapefile_base_suffixes:
-            if not filecmp.cmp(f"{str(path1_noext)}{ext}", f"{str(path2_noext)}{ext}"):
+        for suffix in shapefile_base_suffixes:
+            if not filecmp.cmp(path1.with_suffix(suffix), path2.with_suffix(suffix)):
                 logger.info(
-                    f"File {path1_noext}{ext} is different from {path2_noext}{ext}"
+                    f"File {path1.with_suffix(suffix)} is different from "
+                    f"{path2.with_suffix(suffix)}"
                 )
                 return False
         return True
     else:
-        return filecmp.cmp(str(path1_p), str(path2_p))
+        return filecmp.cmp(str(path1), str(path2))
 
 
 def copy(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):

@@ -4,7 +4,7 @@ Module containing some general utilities.
 
 import datetime
 import logging
-from typing import Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +168,7 @@ def formatbytes(bytes: float):
 
 
 def prepare_for_serialize(data: dict) -> dict:
-    prepared = {}
+    prepared: Dict[str, Any] = {}
     for key, value in data.items():
         if isinstance(value, (dict)):
             prepared[key] = prepare_for_serialize(value)

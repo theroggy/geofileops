@@ -40,7 +40,7 @@ def clip_by_geometry(
         operation="clip_by_geometry",
         input_path=input_path,
         output_path=output_path,
-        spatial_filter=spatial_filter,
+        spatial_filter=spatial_filter,  # type: ignore[arg-type]
         clip_geometry=clip_geometry,
         input_layer=input_layer,
         output_layer=output_layer,

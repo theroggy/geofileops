@@ -23,6 +23,7 @@ from typing import (
     List,
     NamedTuple,
     Optional,
+    Set,
     Tuple,
     Union,
 )
@@ -1068,7 +1069,7 @@ def dissolve(
             last_pass = False
             pass_id = 0
             logger.info(f"Start dissolve on file {input_path}")
-            input_pass_layer = input_layer
+            input_pass_layer: Optional[str] = input_layer
             while True:
                 # Get info of the current file that needs to be dissolved
                 input_pass_layerinfo = gfo.get_layerinfo(input_path, input_pass_layer)
@@ -1418,13 +1419,12 @@ def _dissolve_polygons_pass(
     gridsize: float,
     keep_empty_geoms: bool,
     nb_parallel: int,
-) -> dict:
+):
     # Make sure the input file has a spatial index
     gfo.create_spatial_index(input_path, exist_ok=True)
 
     # Start calculation in parallel
     start_time = datetime.now()
-    result_info = {}
     start_time = datetime.now()
     input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
 
@@ -1438,7 +1438,7 @@ def _dissolve_polygons_pass(
         # Prepare output filename
         tempdir = output_onborder_path.parent
 
-        batches = {}
+        batches: Dict[int, dict] = {}
         nb_batches = len(tiles_gdf)
         nb_batches_done = 0
         future_to_batch_id = {}
@@ -1555,8 +1555,6 @@ def _dissolve_polygons_pass(
 
     logger.info(f"Dissolve pass ready, took {datetime.now()-start_time}!")
 
-    return result_info
-
 
 def _dissolve_polygons(
     input_path: Path,
@@ -1574,7 +1572,7 @@ def _dissolve_polygons(
     keep_empty_geoms: bool,
 ) -> dict:
     # Init
-    perfinfo = {}
+    perfinfo: Dict[str, float] = {}
     start_time = datetime.now()
     return_info = {
         "input_path": input_path,
@@ -1594,7 +1592,7 @@ def _dissolve_polygons(
     agg_columns_needed = None
     while True:
         try:
-            columns_to_read = set()
+            columns_to_read: Set[str] = set()
             info = gfo.get_layerinfo(input_path, input_layer)
             if groupby_columns is not None:
                 columns_to_read.update(groupby_columns)
@@ -1653,6 +1651,7 @@ def _dissolve_polygons(
         return return_info
 
     # Now the real processing
+    aggfunc: Union[str, dict, None] = None
     if agg_columns is not None:
         if "__DISSOLVE_TOJSON" not in input_gdf.columns:
             # First pass -> put relevant columns in json field
@@ -1726,12 +1725,14 @@ def _dissolve_polygons(
 
     # Set empty geometries to null/None
     assert diss_gdf.geometry is not None
-    diss_gdf.loc[diss_gdf.geometry.is_empty, ["geometry"]] = None
+    diss_gdf.loc[
+        diss_gdf.geometry.is_empty, ["geometry"]  # type: ignore[union-attr]
+    ] = None
 
     # Remove rows where geom is None/null/empty
     if not keep_empty_geoms:
         assert isinstance(diss_gdf, gpd.GeoDataFrame)
-        diss_gdf = diss_gdf[~diss_gdf.geometry.isna()]
+        diss_gdf = diss_gdf[~diss_gdf.geometry.isna()]  # type: ignore[union-attr]
 
     # If there is no result, return
     if len(diss_gdf) == 0:
@@ -1809,13 +1810,15 @@ def _dissolve_polygons(
     logger.debug(message)
 
     # Collect perfinfo
-    total_perf_time = 0
+    total_perf_time = 0.0
     perfstring = ""
     for perfcode in perfinfo:
         total_perf_time += perfinfo[perfcode]
         perfstring += f"{perfcode}: {perfinfo[perfcode]:.2f}, "
     return_info["total_time"] = (datetime.now() - start_time).total_seconds()
-    perfinfo["unaccounted"] = return_info["total_time"] - total_perf_time
+    perfinfo["unaccounted"] = (
+        return_info["total_time"] - total_perf_time  # type: ignore[operator]
+    )
     perfstring += f"unaccounted: {perfinfo['unaccounted']:.2f}"
 
     # Return
@@ -1925,9 +1928,11 @@ def _dissolve(
 
     if aggfunc is not None and isinstance(aggfunc, dict) and "to_json" in aggfunc:
         agg_columns = list(set(aggfunc["to_json"]))
-        aggregated_data = (
+        agg_data = (
             data.groupby(**groupby_kwargs)
-            .apply(lambda g: g[agg_columns].to_json(orient="records"))
+            .apply(
+                lambda g: g[agg_columns].to_json(orient="records")
+            )  # type: ignore[index]
             .to_frame(name="__DISSOLVE_TOJSON")
         )
     elif isinstance(aggfunc, str) and aggfunc == "merge_json_lists":
@@ -1955,21 +1960,19 @@ def _dissolve(
             # Return as json string
             return json.dumps(json_distinct)
 
-        aggregated_data = (
+        agg_data = (
             data.groupby(**groupby_kwargs)
             .apply(lambda g: group_flatten_json_list(g))
             .to_frame(name="__DISSOLVE_TOJSON")
         )
     else:
-        aggregated_data = data.groupby(**groupby_kwargs).agg(aggfunc)
+        agg_data = data.groupby(**groupby_kwargs).agg(aggfunc)  # type: ignore[arg-type]
         # Check if all columns were properly aggregated
         assert by_local is not None
         columns_to_agg = [column for column in data.columns if column not in by_local]
-        if len(columns_to_agg) != len(aggregated_data.columns):
+        if len(columns_to_agg) != len(agg_data.columns):
             dropped_columns = [
-                column
-                for column in columns_to_agg
-                if column not in aggregated_data.columns
+                column for column in columns_to_agg if column not in agg_data.columns
             ]
             raise Exception(
                 f"Column(s) {dropped_columns} are not supported for aggregation, stop"
@@ -1989,7 +1992,7 @@ def _dissolve(
         data=g, geometry=df.geometry.name, crs=df.crs
     )
     # Recombine
-    aggregated = aggregated_geometry.join(aggregated_data)
+    aggregated = aggregated_geometry.join(agg_data)
 
     # Reset if requested
     if not as_index:

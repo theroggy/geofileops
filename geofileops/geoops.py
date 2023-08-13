@@ -22,15 +22,7 @@ from geofileops.util._geometry_util import (
 if TYPE_CHECKING:
     import os
 
-################################################################################
-# Some init
-################################################################################
-
 logger = logging.getLogger(__name__)
-
-################################################################################
-# Operations on a single layer
-################################################################################
 
 
 def apply(
@@ -581,7 +573,9 @@ def dissolve(
     Data in other columns can be retained in the output by specifying the
     ``agg_columns`` parameter.
 
-    Rows with null or empty geometries are ignored.
+    Because the input layer is tiled using a grid to speed up, extra collinear points
+    will typically be present in the output geometries. Rows with null or empty
+    geometries are ignored.
 
     This is an example of how data in the columns that isn't grouped on can be
     aggregated to be added to the output file:

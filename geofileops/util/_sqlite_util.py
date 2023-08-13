@@ -296,8 +296,10 @@ def create_table_as_sql(
     # Use crs epsg from input1_layer, if it has one
     input1_layerinfo = gfo.get_layerinfo(input1_path, input1_layer)
     crs_epsg = -1
-    if input1_layerinfo.crs is not None and input1_layerinfo.crs.to_epsg() is not None:
-        crs_epsg = input1_layerinfo.crs.to_epsg()
+    if input1_layerinfo.crs is not None:
+        epsg = input1_layerinfo.crs.to_epsg()
+        if epsg is not None:
+            crs_epsg = epsg
 
     # If output file doesn't exist yet, create and init it
     if not output_path.exists():
