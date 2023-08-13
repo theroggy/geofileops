@@ -1719,7 +1719,7 @@ def _dissolve_polygons(
         # Only keep geometries of the primitive type specified after clip...
         assert isinstance(diss_gdf, gpd.GeoDataFrame)
         diss_gdf.geometry = pygeoops.collection_extract(
-            diss_gdf.geometry, keep_geom_type=input_geometrytype.to_primitivetype
+            diss_gdf.geometry, primitivetype=input_geometrytype.to_primitivetype
         )
 
         perfinfo["time_clip"] = (datetime.now() - start_clip).total_seconds()
