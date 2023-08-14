@@ -24,8 +24,7 @@ class MissingRuntimeDependencyError(Exception):
 
 def align_casing(string_to_align: str, strings_to_align_to: Iterable) -> str:
     """
-    Align the casing of a string to the strings in strings_to_align_to so they
-    have the same casing.
+    Search a string case-insentive in a list of string to align its casing.
 
     If the string is not found in strings_to_align_to, a ValueError is thrown.
 
@@ -46,8 +45,7 @@ def align_casing_list(
     strings_to_align: List[str], strings_to_align_to: Iterable
 ) -> List[str]:
     """
-    Align the strings in strings_to_align to the strings in strings_to_align_to so they
-    have the same casing.
+    Search the string caseintensitive in a list of strings.
 
     If a string is not found in strings_to_align_to, a ValueError is thrown.
 
@@ -146,9 +144,8 @@ def format_progress(
 
 def formatbytes(bytes: float):
     """
-    Return the given bytes as a human friendly KB, MB, GB, or TB string
+    Return the given bytes as a human friendly KB, MB, GB, or TB string.
     """
-
     bytes_float = float(bytes)
     KB = float(1024)
     MB = float(KB**2)  # 1,048,576

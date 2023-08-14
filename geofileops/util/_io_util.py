@@ -15,7 +15,6 @@ def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path
     Remark: the temp dir won't be cleaned up automatically!
 
     Examples:
-
         - base_dirname="foo" -> /tmp/foo_000001
         - base_dirname="foo/bar" -> /tmp/foo/bar_000001
 
@@ -33,7 +32,6 @@ def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path
     Returns:
         Path: the path to the temp dir created.
     """
-
     if parent_dir is None:
         parent_dir = Path(tempfile.gettempdir())
 
@@ -58,8 +56,9 @@ def get_tempfile_locked(
     tempdir: Optional[Path] = None,
 ) -> Tuple[Path, Path]:
     """
-    Formats a temp file path, and creates a corresponding lock file so you can
-    treat it immediately as being locked.
+    Formats a temp file path, and creates a corresponding lock file.
+
+    This way you can treat it immediately as being locked.
 
     Args:
         base_filename (str): The base filename to use. A numeric suffix will be

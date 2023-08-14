@@ -256,6 +256,7 @@ def create_table_as_sql(
 ):
     """
     Execute sql statement and save the result in the output file.
+
     Args:
         input1_path (Path): the path to the 1st input file.
         input1_layer (str): the layer/table to select from in het 1st input file
@@ -280,6 +281,7 @@ def create_table_as_sql(
             uses settings optimized for speed, but will be less save regarding
             transaction safety,...
             Defaults to SqliteProfile.DEFAULT.
+
     Raises:
         ValueError: invalid (combinations of) parameters passed.
         EmptyResultError: the sql_stmt didn't return any rows.

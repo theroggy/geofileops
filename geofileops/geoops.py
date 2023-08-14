@@ -796,8 +796,9 @@ def isvalid(
     force: bool = False,
 ) -> bool:
     """
-    Checks for all geometries in the geofile if they are valid, and writes the
-    results to the output file
+    Checks for all geometries in the geofile if they are valid.
+
+    The results are written to the output file.
 
     Args:
         input_path (PathLike): The input file.
@@ -830,7 +831,6 @@ def isvalid(
     Returns:
         bool: True if all geometries were valid.
     """
-
     # Check parameters
     if output_path is not None:
         output_path = Path(output_path)
@@ -874,8 +874,9 @@ def makevalid(
     force: bool = False,
 ):
     """
-    Makes all geometries in the input file valid and writes the result to the
-    output path.
+    Makes all geometries in the input file valid.
+
+    Writes the result to the output path.
 
     Alternative names:
         - QGIS: fix geometries
@@ -900,6 +901,7 @@ def makevalid(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
+        precision (float, optional): deprecated. Use gridsize.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
@@ -923,7 +925,6 @@ def makevalid(
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
 
     """  # noqa: E501
-
     logger.info(f"Start makevalid on {input_path}")
 
     if keep_empty_geoms is None:
@@ -1012,7 +1013,6 @@ def warp(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
     """
-
     logger.info(f"Start warp on {input_path}")
     _geoops_ogr.warp(
         input_path=Path(input_path),
@@ -1372,7 +1372,6 @@ def clip(
     .. |clip_result| image:: ../_static/images/clip_result.png
         :alt: Clip result
     """  # noqa: E501
-
     logger.info(f"Start clip on {input_path} with {clip_path} to {output_path}")
     return _geoops_sql.clip(
         input_path=Path(input_path),
@@ -1453,7 +1452,6 @@ def erase(
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
 
     """  # noqa: E501
-
     logger.info(f"Start erase on {input_path} with {erase_path} to {output_path}")
     return _geoops_sql.erase(
         input_path=Path(input_path),
@@ -1489,8 +1487,10 @@ def export_by_location(
     force: bool = False,
 ):
     """
-    Exports all features in input_to_select_from_path that intersect with any
-    features in input_to_compare_with_path.
+    Exports all intersecting features.
+
+    All features in input_to_select_from_path that intersect with any features in
+    input_to_compare_with_path are exported.
 
     Alternative names:
         - QGIS: extract by location
@@ -1572,8 +1572,10 @@ def export_by_distance(
     force: bool = False,
 ):
     """
-    Exports all features in input_to_select_from_path that are within the
-    distance specified of any features in input_to_compare_with_path.
+    Exports all features within the distance specified.
+
+    Features in input_to_select_from_path that are within the distance specified of any
+    features in input_to_compare_with_path.
 
     Args:
         input_to_select_from_path (PathLike): the 1st input file
@@ -1649,6 +1651,9 @@ def intersect(
     batchsize: int = -1,
     force: bool = False,
 ):
+    """
+    DEPRECATED: please use intersection.
+    """
     warnings.warn(  # pragma: no cover
         "intersect() is deprecated because it was renamed intersection(). "
         "Will be removed in a future version",
@@ -1693,8 +1698,7 @@ def intersection(
     force: bool = False,
 ):
     """
-    Calculate the pairwise intersection of alle features in input1 with all
-    features in input2.
+    Calculate the pairwise intersection of alle features.
 
     Alternative names:
         - GeoPandas: overlay(how="intersection")
@@ -1910,12 +1914,11 @@ def join_nearest(
     force: bool = False,
 ):
     """
-    Joins features in input1 with the nb_nearest features that are closest to
-    them in input2.
+    Joins features with the nb_nearest features that are closest.
 
     Args:
-        input1_path (PathLike): the 1st input file
-        input2_path (PathLike): the 2nd input file
+        input1_path (PathLike): the input file to join to nb_nearest features.
+        input2_path (PathLike): the file where nb_nearest features are looked for.
         output_path (PathLike): the file to write the result to
         nb_nearest (int): the number of nearest features from input 2 to join
             to input1.
@@ -2068,9 +2071,10 @@ def select_two_layers(
     The result is written to the output file specified.
 
     Args:
-        input1_path (PathLike): the 1st input file
-        input2_path (PathLike): the 2nd input file
-        output_path (PathLike): the file to write the result to
+        input1_path (PathLike): the 1st input file.
+        input2_path (PathLike): the 2nd input file.
+        output_path (PathLike): the file to write the result to.
+        sql_stmt (str): the SELECT sql statement to be executed.
         input1_layer (str, optional): input layer name. Optional if the
             file only contains one layer. Defaults to None.
         input1_columns (List[str], optional): list of columns to retain if one of the

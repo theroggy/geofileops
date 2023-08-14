@@ -1,3 +1,7 @@
+"""
+Library to make spatial operations on large geo files fast(er) and easy.
+"""
+
 from pathlib import Path
 import os
 

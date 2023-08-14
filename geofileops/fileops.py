@@ -149,12 +149,22 @@ class ColumnInfo:
         width: Optional[int],
         precision: Optional[int],
     ):
+        """
+        Constructor of ColumnInfo.
+
+        Args:
+            name (str): the column name.
+            gdal_type (str): the gdal type of the column.
+            width (Optional[int]): the width of the column, if applicable.
+            precision (Optional[int]): the precision of the column, if applicable.
+        """
         self.name = name
         self.gdal_type = gdal_type
         self.width = width
         self.precision = precision
 
     def __repr__(self):
+        """Overrides the representation property of ColumnInfo."""
         return f"{self.__class__}({self.__dict__})"
 
 
@@ -195,6 +205,21 @@ class LayerInfo:
         crs: Optional[pyproj.CRS],
         errors: List[str],
     ):
+        """
+        Constructor of Layerinfo.
+
+        Args:
+            name (str): name of the layer.
+            featurecount (int): number of features in the layer.
+            total_bounds (Tuple[float, float, float, float]): the bounds of the layer.
+            geometrycolumn (str): the name of the geometry column.
+            geometrytypename (str): the name of the geometry column type.
+            geometrytype (GeometryType): the type of the geometry column.
+            columns (Dict[str, ColumnInfo]): the attribute columns of the layer.
+            fid_column (str): the name of the fid column.
+            crs (Optional[pyproj.CRS]): the crs of the layer.
+            errors (List[str]): errors encountered reading the layer info.
+        """
         self.name = name
         self.featurecount = featurecount
         self.total_bounds = total_bounds
@@ -207,6 +232,7 @@ class LayerInfo:
         self.errors = errors
 
     def __repr__(self):
+        """Overrides the representation property of LayerInfo."""
         return f"{self.__class__}({self.__dict__})"
 
 
@@ -890,13 +916,12 @@ def update_column(
             the value.
         layer (str, optional): The layer name. If None and the geofile
             has only one layer, that layer is used. Defaults to None.
-        layer (str, optional): SQL where clause to restrict the rows that will
+        where (str, optional): SQL where clause to restrict the rows that will
             be updated. Defaults to None.
 
     Raises:
         ValueError: an invalid parameter value was passed.
     """
-
     # Init
     path = Path(path)
     if layer is None:
@@ -1777,7 +1802,7 @@ def _to_file_pyogrio(
 
 def get_crs(path: Union[str, "os.PathLike[Any]"]) -> pyproj.CRS:
     """
-    Get the CRS (projection) of the file
+    Get the CRS (projection) of the file.
 
     Args:
         path (PathLike): Path to the file.
@@ -1859,8 +1884,10 @@ def cmp(
 
 def copy(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
     """
-    Copies the geofile from src to dst. Is the source file is a geofile containing
-    of multiple files (eg. .shp) all files are copied.
+    Copies the geofile from src to dst.
+
+    If the source file is a geofile containing of multiple files (eg. .shp) all files
+    are copied.
 
     Args:
         src (PathLike): the file to copy.
@@ -1892,8 +1919,10 @@ def copy(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"
 
 def move(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
     """
-    Moves the geofile from src to dst. If the source file is a geofile containing
-    of multiple files (eg. .shp) all files are moved.
+    Moves the geofile from src to dst.
+
+    If the source file is a geofile containing of multiple files (eg. .shp) all files
+    are moved.
 
     Args:
         src (PathLike): the file to move
@@ -1925,12 +1954,15 @@ def move(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"
 
 def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False):
     """
-    Removes the geofile. Is it is a geofile composed of multiple files
-    (eg. .shp) all files are removed.
+    Removes the geofile.
+
+    Is it is a geofile composed of multiple files (eg. .shp) all files are removed.
     If .lock files are present, they are removed as well.
 
     Args:
         path (PathLike): the file to remove
+        missing_ok (bool, optional): True not to give an error if the file to be removed
+            doesn't exist. Defaults to False.
     """
     # Check input parameters
     path = Path(path)

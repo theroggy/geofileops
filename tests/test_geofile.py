@@ -105,7 +105,7 @@ def test_add_column(tmp_path):
         assert f"column_{type}" in info.columns
 
     # Adding an already existing column doesn't give an error
-    existing_column = list(info.columns)[0]
+    existing_column = next(iter(info.columns))
     gfo.add_column(test_path, name=existing_column, type="TEXT")
 
     # Force update on an existing column

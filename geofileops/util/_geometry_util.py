@@ -11,8 +11,9 @@ logger = logging.getLogger(__name__)
 
 class BufferJoinStyle(enum.Enum):
     """
-    Enumeration of the available buffer styles for the intermediate points of
-    a line or polygon geometry.
+    Enumeration of the available buffer styles for intermediate points.
+
+    Relevant for the end points of a line or polygon geometry.
     """
 
     ROUND = 1
@@ -22,8 +23,9 @@ class BufferJoinStyle(enum.Enum):
 
 class BufferEndCapStyle(enum.Enum):
     """
-    Enumeration of the available buffer styles for the end points of
-    a line or point geometry.
+    Enumeration of the possible end point buffer styles.
+
+    Relevant for the end points of a line or point geometry.
     """
 
     ROUND = 1

@@ -1,3 +1,7 @@
+"""
+Module to save layer styles in Geopackage files.
+"""
+
 from pathlib import Path
 import sqlite3
 from typing import Optional

@@ -1,6 +1,8 @@
 """
-Module with some helpers functions to validate, parse,... parameters with a complex
-structure that are typically reused in different functions in geofileops.
+Module with some helpers functions to validate, parse,... parameters.
+
+Mainly used for parameters with a complex structure that are typically reused in
+different functions in geofileops.
 """
 
 
@@ -93,6 +95,6 @@ def validate_agg_columns(agg_columns: dict):
                 )
     else:
         message = (
-            f"agg_columns has invalid top-level key: {list(agg_columns.keys())[0]}"
+            f"agg_columns has invalid top-level key: {next(iter(agg_columns.keys()))}"
         )
         raise ValueError(f"{message}: {base_message}")

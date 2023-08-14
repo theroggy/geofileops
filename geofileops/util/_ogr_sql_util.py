@@ -1,6 +1,5 @@
 """
-Module containing utilities regarding the formatting of sql statements meant for use
-with ogr.
+Module with utilities to format sql statements meant for use with ogr.
 """
 
 from typing import Iterable, List, Optional
@@ -89,7 +88,9 @@ class ColumnFormatter:
 
     def _fix_fid_columns(self, columns: List[str]) -> List[str]:
         """
-        The "fid" special column needs some extra treatment:
+        Fix the fid columns.
+
+        Useful if the "fid" special column needs some extra treatment:
             - if the fid_column name as reported by gdal is "", this means that the file
               format doesn't actually save the fid (eg. shapefile) but uses a row number
               in the file. When using sql in sql_dialect "SQLITE", "rowid" is the

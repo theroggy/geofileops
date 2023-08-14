@@ -104,6 +104,8 @@ def _get_parallelization_params(
             If -1, tries to use all resources available. Defaults to -1.
         nb_batches_previous_pass (int, optional): If applicable, the number of batches
             used in a previous pass of the calculation. Defaults to None.
+        parallelization_config (ParallelizationConfig, optional): Configuration
+            parameters to use to suggest parallelisation parameters.
 
     Returns:
         parallelizationParams: The recommended parameters.
@@ -896,7 +898,6 @@ def dissolve(
     (for polygon dissolve) the batches are location based, and null/empty geometries
     don't have a location. It could be implemented, but as long as nobody needs it...
     """
-
     # Init and validate input parameters
     # ----------------------------------
     start_time = datetime.now()
@@ -1840,6 +1841,7 @@ def _dissolve(
 ) -> gpd.GeoDataFrame:
     """
     Dissolve geometries within `groupby` into single observation.
+
     This is accomplished by applying the `unary_union` method
     to all geometries within a groupself.
     Observations associated with each `groupby` group will be aggregated
@@ -1876,10 +1878,12 @@ def _dissolve(
         A warning will be emitted for earlier pandas versions
         if a non-default value is given for this parameter.
         .. versionadded:: 0.9.0
-    Returns
+
+    Returns:
     -------
     GeoDataFrame
-    Examples
+
+    Examples:
     --------
     >>> from shapely.geometry import Point
     >>> d = {
@@ -1898,11 +1902,11 @@ def _dissolve(
     col1
     name1  MULTIPOINT (0.00000 1.00000, 1.00000 2.00000)
     name2                        POINT (2.00000 1.00000)
-    See also
+
+    See Also:
     --------
     GeoDataFrame.explode : explode multi-part geometries into single geometries
     """
-
     if by is None and level is None:
         by_local = np.zeros(len(df), dtype="int64")
     else:

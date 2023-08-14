@@ -20,6 +20,17 @@ logger = logging.getLogger(__name__)
 
 
 def sort_values(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """
+    Sort the values in the GeoDataFrame by the values in all columns.
+
+    For the geometry column, it is first converted to it's WKT.
+
+    Args:
+        gdf (gpd.GeoDataFrame): the input GeoDataFrame.
+
+    Returns:
+        gpd.GeoDataFrame: the result with sorted values.
+    """
     result_gdf = gdf.copy()
     result_gdf["tmp_sort_geometry_wkt"] = result_gdf.geometry.to_wkt()
     columns_no_geom = [

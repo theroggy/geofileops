@@ -27,7 +27,7 @@ class GeofileTypeInfo:
 geofiletypes: Dict[str, GeofileTypeInfo] = {}
 
 
-def init_geofiletypes():
+def _init_geofiletypes():
     geofiletypes_path = Path(__file__).resolve().parent / "geofiletypes.csv"
     with open(geofiletypes_path) as file:
         # Set skipinitialspace to True so the csv can be formatted for readability
@@ -120,22 +120,27 @@ class GeofileType(enum.Enum):
 
     @property
     def is_fid_zerobased(self) -> bool:
+        """Returns True if the fid is zero based for this GeofileType."""
         return geofiletypes[self.name].is_fid_zerobased
 
     @property
     def is_spatialite_based(self) -> bool:
+        """Returns True if this GeofileType is based on spatialite."""
         return geofiletypes[self.name].is_spatialite_based
 
     @property
-    def ogrdriver(self):
+    def ogrdriver(self) -> str:
+        """Returns the ogr driver for this GeofileType."""
         return geofiletypes[self.name].ogrdriver
 
     @property
-    def suffixes_extrafiles(self):
+    def suffixes_extrafiles(self) -> List[str]:
+        """Returns a list of suffixes for the extra files for this GeofileType."""
         return geofiletypes[self.name].suffixes_extrafiles
 
     @property
-    def is_singlelayer(self):
+    def is_singlelayer(self) -> bool:
+        """Returns True if a file of this GeofileType can only have one layer."""
         if self.is_spatialite_based:
             return False
         else:
@@ -143,4 +148,4 @@ class GeofileType(enum.Enum):
 
 
 # Init!
-init_geofiletypes()
+_init_geofiletypes()

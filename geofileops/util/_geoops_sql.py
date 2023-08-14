@@ -2035,13 +2035,23 @@ def _two_layer_vector_operation(
         input1_path (str): the file to export features from
         input2_path (str): the file to check intersections with
         output_path (str): output file
-        input1_layer (str, optional): [description]. Defaults to None.
-        input1_columns
-        input1_columns_prefix
-        input2_layer (str, optional): [description]. Defaults to None.
-        input2_columns
-        input2_columns_prefix
-        output_layer (str, optional): [description]. Defaults to None.
+                input1_layer (str, optional): input layer name. Optional if the
+            file only contains one layer. Defaults to None.
+        operation_name (str): name of the operation to be used in logging.
+        sql_template (str): the SELECT sql statement to be executed.
+        input1_layer (str): input1 layer name.
+        input1_columns (List[str]): list of columns to retain. If None, all
+            standard columns are retained. In addition to standard columns, it is also
+            possible to specify "fid", a unique index available in all input files. Note
+            that the "fid" will be aliased even if input1_columns_prefix is "", eg. to
+            "fid_1".
+        input1_columns_prefix (str): prefix to use in the column aliases.
+        input2_layer (str): input2 layer name.
+        input2_columns (List[str]): columns to select. If None is specified,
+            all columns are selected. As explained for input1_columns, it is also
+            possible to specify "fid".
+        input2_columns_prefix (str): prefix to use in the column aliases.
+        output_layer (str): [description]. Defaults to None.
         explodecollections (bool, optional): Explode collecions in output.
             Defaults to False.
         force_output_geometrytype (GeometryType, optional): Defaults to None.
