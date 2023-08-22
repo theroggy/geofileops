@@ -7,9 +7,6 @@ import math
 import geopandas as gpd
 import pytest
 
-import shapely
-from shapely.geometry import MultiPolygon, Polygon
-
 import geofileops as gfo
 from geofileops import GeometryType
 from geofileops.util import _geoops_sql as geoops_sql
@@ -18,8 +15,7 @@ from tests.test_helper import EPSGS, SUFFIXES
 from tests.test_helper import assert_geodataframe_equal
 
 
-@pytest.mark.parametrize("gridsize", [0.0, 0.1])
-def test_delete_duplicate_geometries(tmp_path, gridsize):
+def test_delete_duplicate_geometries(tmp_path):
     # Prepare test data
     test_gdf = gpd.GeoDataFrame(
         geometry=[
@@ -41,18 +37,12 @@ def test_delete_duplicate_geometries(tmp_path, gridsize):
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
     print(f"Run test for suffix {suffix}")
     # delete_duplicate_geometries isn't multiprocess, so no batchsize needed
-    gfo.delete_duplicate_geometries(
-        input_path=input_path, output_path=output_path, gridsize=gridsize
-    )
+    gfo.delete_duplicate_geometries(input_path=input_path, output_path=output_path)
 
     # Check result, 2 duplicates should be removed
     result_info = gfo.get_layerinfo(output_path)
     assert result_info.featurecount == input_info.featurecount - 2
     result_gdf = gfo.read_file(output_path)
-    if gridsize != 0.0:
-        expected_gdf.geometry = shapely.set_precision(
-            expected_gdf.geometry, grid_size=gridsize
-        )
     assert_geodataframe_equal(result_gdf, expected_gdf)
 
 
@@ -121,121 +111,6 @@ def test_isvalid(tmp_path, suffix, epsg):
     output_auto_gdf = gfo.read_file(output_auto_path)
     assert output_auto_gdf["geometry"][0] is not None
     assert output_auto_gdf["isvalid"][0] == 0
-
-
-@pytest.mark.parametrize("suffix", SUFFIXES)
-@pytest.mark.parametrize("input_empty", [True, False])
-def test_makevalid(tmp_path, suffix, input_empty):
-    # Prepare test data
-    input_path = test_helper.get_testfile(
-        "polygon-invalid", suffix=suffix, empty=input_empty
-    )
-
-    # If the input file is not empty, it should have invalid geoms
-    if not input_empty:
-        input_isvalid_path = tmp_path / f"{input_path.stem}_is-valid{suffix}"
-        isvalid = gfo.isvalid(input_path=input_path, output_path=input_isvalid_path)
-        assert isvalid is False, "Input file should contain invalid features"
-
-    # Make sure the input file is not valid
-    if not input_empty:
-        output_isvalid_path = (
-            tmp_path / f"{input_path.stem}_is-valid{input_path.suffix}"
-        )
-        isvalid = gfo.isvalid(input_path=input_path, output_path=output_isvalid_path)
-        assert isvalid is False, "Input file should contain invalid features"
-
-    # Do operation
-    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
-    gfo.makevalid(
-        input_path=input_path,
-        output_path=output_path,
-        nb_parallel=2,
-        force_output_geometrytype=gfo.GeometryType.MULTIPOLYGON,
-        validate_attribute_data=True,
-    )
-
-    # Now check if the output file is correctly created
-    assert output_path.exists()
-    layerinfo_orig = gfo.get_layerinfo(input_path)
-    layerinfo_output = gfo.get_layerinfo(output_path)
-    assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
-    assert layerinfo_output.geometrytype in [
-        GeometryType.POLYGON,
-        GeometryType.MULTIPOLYGON,
-    ]
-
-    if not input_empty:
-        assert layerinfo_orig.featurecount == layerinfo_output.featurecount
-
-    # Check if the result file is valid
-    output_new_isvalid_path = (
-        tmp_path / f"{output_path.stem}_new_is-valid{output_path.suffix}"
-    )
-    isvalid = gfo.isvalid(input_path=output_path, output_path=output_new_isvalid_path)
-    assert isvalid is True, "Output file shouldn't contain invalid features"
-
-    # Run makevalid with existing output file and force=False (=default)
-    gfo.makevalid(input_path=input_path, output_path=output_path)
-
-
-@pytest.mark.parametrize(
-    "descr, geometry, expected_geometry",
-    [
-        ("sliver", Polygon([(0, 0), (10, 0), (10, 0.5), (0, 0)]), Polygon()),
-        (
-            "poly + sliver",
-            MultiPolygon(
-                [
-                    Polygon([(0, 5), (5, 5), (5, 10), (0, 10), (0, 5)]),
-                    Polygon([(0, 0), (10, 0), (10, 0.5), (0, 0)]),
-                ]
-            ),
-            Polygon([(0, 5), (5, 5), (5, 10), (0, 10), (0, 5)]),
-        ),
-    ],
-)
-def test_makevalid_gridsize(tmp_path, descr: str, geometry, expected_geometry):
-    # Prepare test data
-    # -----------------
-    input_gdf = gpd.GeoDataFrame({"descr": [descr]}, geometry=[geometry], crs=31370)
-    input_path = tmp_path / "test.gpkg"
-    gfo.to_file(input_gdf, input_path)
-    gridsize = 1
-
-    # Now we are ready to test
-    # ------------------------
-    result_path = tmp_path / "test_makevalid.gpkg"
-    gfo.makevalid(
-        input_path=input_path,
-        output_path=result_path,
-        gridsize=gridsize,
-        force=True,
-    )
-    result_gdf = gfo.read_file(result_path)
-
-    # Compare with expected result
-    expected_gdf = gpd.GeoDataFrame(
-        {"descr": [descr]}, geometry=[expected_geometry], crs=31370
-    )
-    expected_gdf = expected_gdf[~expected_gdf.geometry.is_empty]
-    if len(expected_gdf) == 0:
-        assert len(result_gdf) == 0
-    else:
-        assert_geodataframe_equal(result_gdf, expected_gdf)
-
-
-def test_makevalid_invalidparams():
-    expected_error = (
-        "the precision parameter is deprecated and cannot be combined with gridsize"
-    )
-    with pytest.raises(ValueError, match=expected_error):
-        gfo.makevalid(
-            input_path="abc",
-            output_path="def",
-            gridsize=1,
-            precision=1,
-        )
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)

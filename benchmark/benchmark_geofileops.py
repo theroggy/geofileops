@@ -7,7 +7,9 @@ def main():
     # return
 
     # Only run specific benchmark function(s)
-    benchmarker.run_benchmarks(["benchmarks_geofileops"], ["buffer_gpd"])
+    benchmarker.run_benchmarks(
+        ["benchmarks_geofileops"], ["makevalid_gpd", "makevalid_gridsize_gpd"]
+    )
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 import pytest
 import shapely
+from shapely import MultiPolygon, Point, Polygon
+from shapely.testing import assert_geometries_equal
 
 from geofileops.util import _sqlite_userdefined as sqlite_userdefined
 
@@ -51,7 +53,7 @@ def test_gfo_difference_collection_empty_geoms(
         assert result == exp_result, f"Issue with test {test_id}"
 
 
-def test__difference_collection_invalid_params():
+def test_difference_collection_invalid_params():
     # geom_to_subtract is not a wkb
     with pytest.raises(TypeError, match="Expected bytes or string, got Point"):
         sqlite_userdefined.gfo_difference_collection(
@@ -71,4 +73,42 @@ def test__difference_collection_invalid_params():
     with pytest.raises(ValueError, match="keep_geom_type has invalid value"):
         sqlite_userdefined.gfo_difference_collection(
             shapely.Point(1, 1).wkb, shapely.Point(1, 1).wkb, keep_geom_type=5
+        )
+
+
+@pytest.mark.parametrize(
+    "test_descr, geom, exp_result",
+    [
+        ("None", None, None),
+        ("empty", Point(), Point()),
+        ("point", Point(1, 1), Point(1, 1)),
+        ("sliver", Polygon([(0, 0), (10, 0), (10, 0.5), (0, 0)]), None),
+        (
+            "poly + sliver",
+            MultiPolygon(
+                [
+                    Polygon([(0, 5), (5, 5), (5, 10), (0, 10), (0, 5)]),
+                    Polygon([(0, 0), (10, 0), (10, 0.5), (0, 0)]),
+                ]
+            ),
+            Polygon([(0, 5), (5, 5), (5, 10), (0, 10), (0, 5)]),
+        ),
+    ],
+)
+def test_gfo_reduceprecision(test_descr, geom, exp_result):
+    geom_wkb = None if geom is None else geom.wkb
+
+    result = sqlite_userdefined.gfo_reduceprecision(geom_wkb, gridsize=1)
+
+    result = shapely.from_wkb(result)
+    if exp_result is None:
+        assert result is None, f"Issue with test {test_descr}"
+    else:
+        # Depending on the version of geos, sometimes result is a multipolygon...
+        if isinstance(exp_result, Polygon):
+            exp_result = MultiPolygon([exp_result])
+        if isinstance(result, Polygon):
+            result = MultiPolygon([result])
+        assert_geometries_equal(
+            result, exp_result, normalize=True, err_msg=f"Issue with test {test_descr}"
         )

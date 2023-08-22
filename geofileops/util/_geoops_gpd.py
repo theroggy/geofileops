@@ -314,6 +314,7 @@ def apply(
     input_path: Path,
     output_path: Path,
     func: Callable[[Any], Any],
+    operation_name: str = None,
     only_geom_input: bool = True,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
@@ -332,6 +333,8 @@ def apply(
         "only_geom_input": only_geom_input,
         "pickled_func": cloudpickle.dumps(func),
     }
+    if operation_name is not None:
+        operation_params["operation_name"] = operation_name
 
     # Go!
     return _apply_geooperation_to_layer(
@@ -585,9 +588,11 @@ def _apply_geooperation_to_layer(
     """  # noqa: E501
     # Init
     start_time_global = datetime.now()
+    operation_name = operation_params.get("operation_name")
+    if operation_name is None:
+        operation_name = operation.name.lower()
 
     # Check input parameters...
-    operation_name = operation.name.lower()
     if not input_path.exists():
         raise ValueError(f"{operation_name}: input_path doesn't exist: {input_path}")
     if input_path == output_path:
@@ -826,11 +831,6 @@ def _apply_geooperation(
     assert data_gdf.geometry is not None
     data_gdf.loc[data_gdf.geometry.is_empty, ["geometry"]] = None
 
-    # Remove rows where geom is None/null/empty
-    if not keep_empty_geoms:
-        assert isinstance(data_gdf, gpd.GeoDataFrame)
-        data_gdf = data_gdf[~data_gdf.geometry.isna()]
-
     # If there is an fid column in the dataset, rename it, because the fid column is a
     # "special case" in gdal that should not be written.
     assert isinstance(data_gdf, gpd.GeoDataFrame)
@@ -847,6 +847,12 @@ def _apply_geooperation(
     if gridsize != 0.0:
         assert isinstance(data_gdf, gpd.GeoDataFrame)
         data_gdf.geometry = shapely.set_precision(data_gdf.geometry, grid_size=gridsize)
+
+    # Remove rows where geom is None/null/empty
+    if not keep_empty_geoms:
+        assert isinstance(data_gdf, gpd.GeoDataFrame)
+        data_gdf = data_gdf[~data_gdf.geometry.isna()]
+        data_gdf = data_gdf[~data_gdf.geometry.is_empty]
 
     # If the result is empty, and no output geometrytype specified, use input
     # geometrytype

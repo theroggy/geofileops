@@ -628,10 +628,10 @@ def test_join_by_location(
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, gridsize",
-    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.001)],
+    "suffix, epsg",
+    [(".gpkg", 31370), (".gpkg", 4326), (".shp", 31370)],
 )
-def test_join_nearest(tmp_path, suffix, epsg, gridsize):
+def test_join_nearest(tmp_path, suffix, epsg):
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
@@ -648,7 +648,6 @@ def test_join_nearest(tmp_path, suffix, epsg, gridsize):
         input2_path=input2_path,
         output_path=output_path,
         nb_nearest=nb_nearest,
-        gridsize=gridsize,
         batchsize=batchsize,
         force=True,
     )

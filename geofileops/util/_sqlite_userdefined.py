@@ -73,7 +73,67 @@ def gfo_difference_collection(
             return None
 
         return shapely.to_wkb(result)
-    except Exception as ex:
+    except Exception as ex:  # pragma: no cover
+        # ex.with_traceback()
+        print(ex)
+        return None
+
+
+def gfo_reduceprecision(
+    geom_wkb: bytes,
+    gridsize: int,
+    makevalid_first: int = 0,
+) -> Optional[bytes]:
+    """
+    Reduces the precision of the geometry to the gridsize specified.
+
+    By default, geometries use double precision coordinates (grid_size = 0). Coordinates
+    will be rounded if a precision grid is less precise than the input geometry.
+    Duplicated vertices will be dropped from lines and polygons for grid sizes greater
+    than 0. Line and polygon geometries may collapse to empty geometries if all vertices
+    are closer together than grid_size. Z values, if present, will not be modified.
+
+    Note: unless parameter makevalid_first=1 is used, input geometries should be
+    geometrically valid. Unexpected results may occur if input geometries are not.
+
+    Args:
+        geom_wkb (bytes): geometry to reduce precision from in wkb format.
+        gridsize (int): the size of the grid the coordinates of the ouput will be
+            rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change the
+            precision.
+        makevalid_first (int): if 1, the input is first made valid before reducing the
+            precision.
+
+    Returns:
+        Optional[bytes]: return the geometry with the precision reduced.
+    """
+    # Check/prepare input
+    if geom_wkb is None:
+        return None
+
+    # Extract wkb's, and return if empty
+    geom = shapely.from_wkb(geom_wkb)
+    if geom.is_empty:
+        return geom_wkb
+    del geom_wkb
+
+    try:
+        # If needed, apply makevalid first
+        result = geom
+        if makevalid_first:
+            result = shapely.make_valid(result)
+
+        # Apply set_precision
+        result = shapely.set_precision(result, grid_size=gridsize)
+
+        # If an empty result, return None
+        # Remark: apparently ST_IsEmpty of spatialite doesn't work (in combination with
+        # gpkg and/or wkb?).
+        if result is None or result.is_empty:
+            return None
+
+        return shapely.to_wkb(result)
+    except Exception as ex:  # pragma: no cover
         # ex.with_traceback()
         print(ex)
         return None

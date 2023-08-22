@@ -7,11 +7,14 @@ import logging
 import math
 from typing import List
 
+import geopandas as gpd
 import pytest
+from shapely import MultiPolygon, Polygon
 
 from geofileops import geoops
 from geofileops import fileops
 from geofileops import GeometryType
+from geofileops.util import _geoops_sql
 from geofileops.util import _io_util as io_util
 from tests import test_helper
 from tests.test_helper import (
@@ -587,6 +590,140 @@ def test_convexhull(
     output_gdf = fileops.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
     assert_geodataframe_equal(output_gdf, expected_gdf, sort_values=True)
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("input_empty", [True, False])
+@pytest.mark.parametrize(
+    "geoops_module", ["geofileops.geoops", "geofileops.util._geoops_sql"]
+)
+def test_makevalid(tmp_path, suffix, input_empty, geoops_module):
+    # Prepare test data
+    input_path = test_helper.get_testfile(
+        "polygon-invalid", suffix=suffix, empty=input_empty
+    )
+    set_geoops_module(geoops_module)
+
+    # If the input file is not empty, it should have invalid geoms
+    if not input_empty:
+        input_isvalid_path = tmp_path / f"{input_path.stem}_is-valid{suffix}"
+        isvalid = _geoops_sql.isvalid(
+            input_path=input_path, output_path=input_isvalid_path
+        )
+        assert isvalid is False, "Input file should contain invalid features"
+
+    # Make sure the input file is not valid
+    if not input_empty:
+        output_isvalid_path = (
+            tmp_path / f"{input_path.stem}_is-valid{input_path.suffix}"
+        )
+        isvalid = _geoops_sql.isvalid(
+            input_path=input_path, output_path=output_isvalid_path
+        )
+        assert isvalid is False, "Input file should contain invalid features"
+
+    # Do operation
+    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
+    geoops.makevalid(
+        input_path=input_path,
+        output_path=output_path,
+        nb_parallel=2,
+        force_output_geometrytype=fileops.GeometryType.MULTIPOLYGON,
+        validate_attribute_data=True,
+    )
+
+    # Now check if the output file is correctly created
+    assert output_path.exists()
+    layerinfo_orig = fileops.get_layerinfo(input_path)
+    layerinfo_output = fileops.get_layerinfo(output_path)
+    assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
+    assert layerinfo_output.geometrytype in [
+        GeometryType.POLYGON,
+        GeometryType.MULTIPOLYGON,
+    ]
+
+    if not input_empty:
+        assert layerinfo_orig.featurecount == layerinfo_output.featurecount
+
+    # Check if the result file is valid
+    output_new_isvalid_path = (
+        tmp_path / f"{output_path.stem}_new_is-valid{output_path.suffix}"
+    )
+    isvalid = _geoops_sql.isvalid(
+        input_path=output_path, output_path=output_new_isvalid_path
+    )
+    assert isvalid is True, "Output file shouldn't contain invalid features"
+
+    # Run makevalid with existing output file and force=False (=default)
+    geoops.makevalid(input_path=input_path, output_path=output_path)
+
+
+@pytest.mark.parametrize(
+    "descr, geometry, expected_geometry",
+    [
+        ("sliver", Polygon([(0, 0), (10, 0), (10, 0.5), (0, 0)]), Polygon()),
+        (
+            "poly + sliver",
+            MultiPolygon(
+                [
+                    Polygon([(0, 5), (5, 5), (5, 10), (0, 10), (0, 5)]),
+                    Polygon([(0, 0), (10, 0), (10, 0.5), (0, 0)]),
+                ]
+            ),
+            Polygon([(0, 5), (5, 5), (5, 10), (0, 10), (0, 5)]),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "geoops_module", ["geofileops.geoops", "geofileops.util._geoops_sql"]
+)
+def test_makevalid_gridsize(
+    tmp_path, descr: str, geometry, geoops_module, expected_geometry
+):
+    # Prepare test data
+    # -----------------
+    set_geoops_module(geoops_module)
+    input_gdf = gpd.GeoDataFrame({"descr": [descr]}, geometry=[geometry], crs=31370)
+    input_path = tmp_path / "test.gpkg"
+    fileops.to_file(input_gdf, input_path)
+    gridsize = 1
+
+    # Now we are ready to test
+    # ------------------------
+    result_path = tmp_path / "test_makevalid.gpkg"
+    geoops.makevalid(
+        input_path=input_path,
+        output_path=result_path,
+        gridsize=gridsize,
+        keep_empty_geoms=False,
+        force=True,
+    )
+    result_gdf = fileops.read_file(result_path)
+
+    # Compare with expected result
+    expected_gdf = gpd.GeoDataFrame(
+        {"descr": [descr]}, geometry=[expected_geometry], crs=31370
+    )
+    expected_gdf = expected_gdf[~expected_gdf.geometry.is_empty]
+    if len(expected_gdf) == 0:
+        assert len(result_gdf) == 0
+    else:
+        assert_geodataframe_equal(result_gdf, expected_gdf)
+
+
+def test_makevalid_invalidparams():
+    # Only test on geoops, as the invalid params only exist there.
+    set_geoops_module("geofileops.geoops")
+    expected_error = (
+        "the precision parameter is deprecated and cannot be combined with gridsize"
+    )
+    with pytest.raises(ValueError, match=expected_error):
+        geoops.makevalid(
+            input_path="abc",
+            output_path="def",
+            gridsize=1,
+            precision=1,
+        )
 
 
 @pytest.mark.parametrize(

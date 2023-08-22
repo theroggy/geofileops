@@ -5,6 +5,7 @@ Module to benchmark geofileops operations.
 from datetime import datetime
 import logging
 import multiprocessing
+import inspect
 from pathlib import Path
 
 from benchmark.benchmarker import RunResult
@@ -254,7 +255,7 @@ def intersection(tmp_dir: Path) -> RunResult:
     return result
 
 
-def _intersection_gridsize(tmp_dir: Path) -> RunResult:
+def intersection_gridsize(tmp_dir: Path) -> RunResult:
     # Init
     input1_path = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
     input2_path = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
@@ -266,7 +267,7 @@ def _intersection_gridsize(tmp_dir: Path) -> RunResult:
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,
-        gridsize=0.1,
+        gridsize=0.001,
         nb_parallel=nb_parallel,
         force=True,
     )
@@ -276,8 +277,8 @@ def _intersection_gridsize(tmp_dir: Path) -> RunResult:
         operation="intersection_gridsize",
         secs_taken=(datetime.now() - start_time).total_seconds(),
         operation_descr=(
-            "intersection with gridsize 0.1 between 2 agri parcel layers BEFL "
-            "(2*~500.000 polygons)"
+            "intersection with gridsize 0.001 between 2 agri parcel layers BEFL "
+            "(2*~500k polygons)"
         ),
         run_details={"nb_cpu": nb_parallel},
     )
@@ -333,6 +334,102 @@ def join_by_location_intersects(tmp_dir: Path) -> RunResult:
 
     # Cleanup and return
     logger.info(f"nb features in result: {gfo.get_layerinfo(output_path).featurecount}")
+    output_path.unlink()
+    return result
+
+
+def makevalid_gridsize_gpd(tmp_dir: Path) -> RunResult:
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+    input_path = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+
+    # Go!
+    start_time = datetime.now()
+    output_path = tmp_dir / f"{input_path.stem}_{function_name}.gpkg"
+    gfo.makevalid(
+        input_path, output_path, gridsize=0.001, nb_parallel=nb_parallel, force=True
+    )
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation=function_name,
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=f"{function_name} on agri parcel layer BEFL (~500k polygons)",
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    output_path.unlink()
+    return result
+
+
+def makevalid_gridsize_spatialite(tmp_dir: Path) -> RunResult:
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+    input_path = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+
+    # Go!
+    start_time = datetime.now()
+    output_path = tmp_dir / f"{input_path.stem}_{function_name}.gpkg"
+    _geoops_sql.makevalid(
+        input_path, output_path, gridsize=0.001, nb_parallel=nb_parallel, force=True
+    )
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation=function_name,
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=f"{function_name} on agri parcel layer BEFL (~500k polygons)",
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    output_path.unlink()
+    return result
+
+
+def makevalid_gpd(tmp_dir: Path) -> RunResult:
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+    input_path = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+
+    # Go!
+    start_time = datetime.now()
+    output_path = tmp_dir / f"{input_path.stem}_{function_name}.gpkg"
+    gfo.makevalid(input_path, output_path, nb_parallel=nb_parallel, force=True)
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation=function_name,
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=f"{function_name} on agri parcel layer BEFL (~500k polygons)",
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    output_path.unlink()
+    return result
+
+
+def makevalid_spatialite(tmp_dir: Path) -> RunResult:
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+    input_path = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+
+    # Go!
+    start_time = datetime.now()
+    output_path = tmp_dir / f"{input_path.stem}_{function_name}.gpkg"
+    _geoops_sql.makevalid(input_path, output_path, nb_parallel=nb_parallel, force=True)
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation=function_name,
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=f"{function_name} on agri parcel layer BEFL (~500k polygons)",
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
     output_path.unlink()
     return result
 

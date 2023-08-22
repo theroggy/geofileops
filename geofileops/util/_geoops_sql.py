@@ -161,7 +161,6 @@ def delete_duplicate_geometries(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
-    gridsize: float = 0.0,
     keep_empty_geoms: bool = True,
     where: Optional[str] = None,
     force: bool = False,
@@ -192,7 +191,7 @@ def delete_duplicate_geometries(
         columns=columns,
         explodecollections=explodecollections,
         force_output_geometrytype=input_layer_info.geometrytype,
-        gridsize=gridsize,
+        gridsize=0.0,
         keep_empty_geoms=keep_empty_geoms,
         where=where,
         sql_dialect="SQLITE",
@@ -1227,7 +1226,7 @@ def intersection(
     )
 
     # For the output file, if output is going to be polygon or linestring, force
-    # MULTI variant to evade ugly warnings
+    # MULTI variant to avoid ugly warnings
     force_output_geometrytype = primitivetype_to_extract.to_multitype
 
     # Prepare sql template for this operation
@@ -1247,7 +1246,7 @@ def intersection(
                        ST_Intersection(
                             layer1.{{input1_geometrycolumn}},
                             layer2.{{input2_geometrycolumn}}),
-                            {primitivetype_to_extract.value}) as geom
+                            {primitivetype_to_extract.value}) AS geom
                     {{layer1_columns_prefix_alias_str}}
                     {{layer2_columns_prefix_alias_str}}
                 FROM {{input1_databasename}}."{{input1_layer}}" layer1
@@ -1519,7 +1518,6 @@ def join_nearest(
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
-    gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1603,7 +1601,7 @@ def join_nearest(
         output_layer=output_layer,
         force_output_geometrytype=input1_layer_info.geometrytype,
         explodecollections=explodecollections,
-        gridsize=gridsize,
+        gridsize=0.0,
         where=None,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
@@ -2254,6 +2252,11 @@ def _two_layer_vector_operation(
             else:
                 primitivetypeid = force_output_geometrytype.to_primitivetype.value
                 gridsize_op = f"ST_CollectionExtract({gridsize_op}, {primitivetypeid})"
+
+            gridsize_op = (
+                "ST_GeomFromWKB(GFO_ReducePrecision("
+                f"ST_AsBinary(sub_gridsize.geom), {gridsize}))"
+            )
 
             # All columns need to be specified
             # Remark:

@@ -627,11 +627,18 @@ def load_spatialite(conn):
             "Error trying to load mod_spatialite."
         ) from ex
 
-    # Register custom function
+    # Register custom functions
     conn.create_function(
         "GFO_Difference_Collection",
         -1,
         sqlite_userdefined.gfo_difference_collection,
+        deterministic=True,
+    )
+
+    conn.create_function(
+        "GFO_ReducePrecision",
+        -1,
+        sqlite_userdefined.gfo_reduceprecision,
         deterministic=True,
     )
 
