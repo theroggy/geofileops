@@ -629,11 +629,11 @@ def load_spatialite(conn):
 
     # Register custom function
     conn.create_function(
-        "st_difference_collection",
+        "GFO_Difference_Collection",
         -1,
-        sqlite_userdefined.st_difference_collection,
+        sqlite_userdefined.gfo_difference_collection,
         deterministic=True,
     )
 
     # Register custom aggregate function
-    # conn.create_aggregate("st_difference_agg", 3, userdefined.DifferenceAgg)
+    # conn.create_aggregate("GFO_Difference_Agg", 3, userdefined.DifferenceAgg)

@@ -938,17 +938,17 @@ def erase(
     # - WHERE geom IS NOT NULL to avoid rows with a NULL geom, they give issues in
     #   later operations
     # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening e.g.
-    #   "geom IS NOT NULL" leads to ST_Difference_Collection calculated double!
+    #   "geom IS NOT NULL" leads to GFO_Difference_Collection calculated double!
     # - ST_Intersects and ST_Touches slow down a lot when the data contains huge geoms
     # - Calculate difference in correlated subquery in SELECT clause
     # - Using a WITH with a GROUP BY on layer1.rowid was a few % faster, but this
     #   processed the entire batch in memory so used > 10 * more memory. E.g. for one
     #   test file 4-7 GB per process versus 70-700 MB). For another: crash.
-    # - Check if the result of ST_Difference_Collection is empty (NULL) using IFNULL,
+    # - Check if the result of GFO_Difference_Collection is empty (NULL) using IFNULL,
     #   and if this ois the case set to 'DIFF_EMPTY'. This way we can make the
     #   distinction whether the subquery is finding a row (no match with spatial index)
     #   or if the difference results in an empty/NULL geometry.
-    #   Tried to return EMPTY GEOMETRY from ST_Difference_Collection, but it didn't
+    #   Tried to return EMPTY GEOMETRY from GFO_Difference_Collection, but it didn't
     #   work to use spatialite's ST_IsEmpty(geom) = 0 to filter on this for an unclear
     #   reason.
     # - Not relevant anymore, but ST_difference(geometry , NULL) gives NULL as result
@@ -959,7 +959,7 @@ def erase(
         SELECT * FROM (
           SELECT IFNULL(
                    ( SELECT IFNULL(
-                                ST_GeomFromWKB(ST_Difference_Collection(
+                                ST_GeomFromWKB(GFO_Difference_Collection(
                                     ST_AsBinary(layer1_sub.{{input1_geometrycolumn}}),
                                     ST_AsBinary(ST_Collect(
                                         layer2_sub.{{input2_geometrycolumn}})),
@@ -1688,18 +1688,18 @@ def split(
     # - WHERE geom IS NOT NULL to avoid rows with a NULL geom, they give issues in
     #   later operations
     # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening e.g.
-    #   "geom IS NOT NULL" leads to ST_Difference_Collection calculated double!
+    #   "geom IS NOT NULL" leads to GFO_Difference_Collection calculated double!
     # - ST_Intersects is fine, but ST_Touches slows down. Especially when the data
     #   contains huge geoms, time doubles or worse.
     # - Calculate difference in correlated subquery in SELECT clause
     # - Using a WITH with a GROUP BY on layer1.rowid was a few % faster, but this
     #   processed the entire batch in memory so used > 10 * more memory. E.g. for one
     #   test file 4-7 GB per process versus 70-700 MB). For another: crash.
-    # - Check if the result of ST_Difference_Collection is empty (NULL) using IFNULL,
+    # - Check if the result of GFO_Difference_Collection is empty (NULL) using IFNULL,
     #   and if this ois the case set to 'DIFF_EMPTY'. This way we can make the
     #   distinction whether the subquery is finding a row (no match with spatial index)
     #   or if the difference results in an empty/NULL geometry.
-    #   Tried to return EMPTY GEOMETRY from ST_Difference_Collection, but it didn't
+    #   Tried to return EMPTY GEOMETRY from GFO_Difference_Collection, but it didn't
     #   work to use spatialite's ST_IsEmpty(geom) = 0 to filter on this for an unclear
     #   reason.
     # - Not relevant anymore, but ST_difference(geometry , NULL) gives NULL as result
@@ -1733,7 +1733,7 @@ def split(
             UNION ALL
             SELECT IFNULL(
                      ( SELECT IFNULL(
-                                  ST_GeomFromWKB(ST_Difference_Collection(
+                                  ST_GeomFromWKB(GFO_Difference_Collection(
                                       ST_AsBinary(layer1_sub.{{input1_geometrycolumn}}),
                                       ST_AsBinary(ST_Collect(
                                           layer2_sub.{{input2_geometrycolumn}})),
@@ -2258,15 +2258,15 @@ def _two_layer_vector_operation(
             # All columns need to be specified
             # Remark:
             # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening
-            #   "geom IS NOT NULL" leads to ST_Difference_Collection calculated double!
+            #   "geom IS NOT NULL" leads to GFO_Difference_Collection calculated double!
             cols = [col for col in column_datatypes if col.lower() != "geom"]
             columns_to_select = _ogr_sql_util.columns_quoted(cols)
             sql_template = f"""
                 SELECT {gridsize_op} AS geom
                         {columns_to_select}
                   FROM ( {sql_template}
+                         LIMIT -1 OFFSET 0
                   ) sub_gridsize
-                 LIMIT -1 OFFSET 0
             """
 
         # Prepare/apply where parameter
@@ -2278,9 +2278,9 @@ def _two_layer_vector_operation(
             sql_template = f"""
                 SELECT * FROM
                     ( {sql_template}
+                      LIMIT -1 OFFSET 0
                     )
                  WHERE {where}
-                 LIMIT -1 OFFSET 0
             """
             # Where has been applied already so set to None.
             where = None

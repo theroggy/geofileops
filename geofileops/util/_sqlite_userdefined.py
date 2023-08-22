@@ -8,7 +8,7 @@ import pygeoops
 # from pygeoops import _paramvalidation as paramvalidation
 
 
-def st_difference_collection(
+def gfo_difference_collection(
     geom_wkb: bytes,
     geom_to_subtract_wkb: bytes,
     keep_geom_type: int = 0,
