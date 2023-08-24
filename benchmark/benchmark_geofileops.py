@@ -4,9 +4,10 @@ from benchmark import benchmarker
 def main():
     # Run the benchmark function(s)
     functions_to_run = [
-        # "intersection",
+        # "clip",
+        "intersection",
         # "intersection_gridsize",
-        "symmetric_difference_complexpoly_agri",
+        # "symmetric_difference_complexpoly_agri",
     ]
     # Run all bechmark functions
     # functions_to_run = None

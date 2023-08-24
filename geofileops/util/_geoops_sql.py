@@ -835,10 +835,12 @@ def clip(
 
     # Prepare sql template for this operation
     # Remarks:
-    #   - ST_intersection(geometry , NULL) gives NULL as result! -> hence the CASE
-    #   - use of the with instead of an inline view is a lot faster
-    #   - WHERE geom IS NOT NULL to evade rows with a NULL geom, they give issues in
-    #     later operations
+    # - ST_intersection(geometry , NULL) gives NULL as result! -> hence the CASE
+    # - use of the with instead of an inline view is a lot faster
+    # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening e.g.
+    #   "geom IS NOT NULL" leads to geom operation to be calculated twice!
+    # - WHERE geom IS NOT NULL to evade rows with a NULL geom, they give issues in
+    #   later operations.
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
     sql_template = f"""
@@ -865,6 +867,7 @@ def clip(
                         layer1.{{input1_geometrycolumn}},
                         layer2.{{input2_geometrycolumn}}) = 0
                GROUP BY layer1.rowid
+               LIMIT -1 OFFSET 0
             )
             SELECT CASE WHEN layer2_unioned.geom IS NULL THEN NULL
                         ELSE ST_CollectionExtract(
@@ -876,10 +879,9 @@ def clip(
               JOIN layer2_unioned ON layer1.rowid = layer2_unioned.layer1_rowid
              WHERE 1=1
                {{batch_filter}}
+             LIMIT -1 OFFSET 0
           )
          WHERE geom IS NOT NULL
-           AND ST_NPoints(geom) > 0
-           -- ST_CollectionExtract outputs empty, but not NULL geoms in spatialite 4.3
     """
 
     # Go!
@@ -1252,6 +1254,8 @@ def intersection(
     # - ST_Intersects is fine, but ST_Touches slows down. Especially when the data
     #   contains huge geoms, time doubles or worse. The filter on sub.geom IS NOT NULL
     #   removes rows without intersection anyway.
+    # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening e.g.
+    #   "geom IS NOT NULL" leads to geom operation to be calculated twice!
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
     sql_template = f"""
@@ -1284,6 +1288,7 @@ def intersection(
                  --AND ST_Touches(
                  --       layer1.{{input1_geometrycolumn}},
                  --       layer2.{{input2_geometrycolumn}}) = 0
+               LIMIT -1 OFFSET 0
             ) sub
          WHERE sub.geom IS NOT NULL
     """

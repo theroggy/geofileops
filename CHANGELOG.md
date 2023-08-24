@@ -13,7 +13,9 @@
 - Add support for lang+ algorithm in `gfo.simplify` (#334)
 - Support creating geofile without geometry column using `gfo.select` (#322)
 - Improve performance of `makevalid` and `isvalid` (#258)
-- Improve performance of `intersection` for large input geometries: 2x faster (#340)
+- Improve performance of `intersection`, 30% faster for typical data, up to 4x faster
+  for large input geometries (#340, #358)
+- Improve performance of `clip`: 3x faster for typical data (#358)
 - Support on-the-fly subdividing of complex geometries to speed up processing in
   `erase`, `split`, `symmetric difference` and `union` (#329, #330, #331, #357).
   The new parameter `subdivide_coords` can be used to control the feature.
