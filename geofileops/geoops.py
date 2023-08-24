@@ -1400,6 +1400,7 @@ def erase(
     where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    subdivide_coords: int = 1000,
     force: bool = False,
 ):
     """
@@ -1441,6 +1442,11 @@ def erase(
             batch. A smaller batch size, possibly in combination with a
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about subdivide_coords coordinates during processing which can
+            offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If < 0,
+            no subdividing is applied. Defaults to 1000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -1463,6 +1469,7 @@ def erase(
         where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
         force=force,
     )
 
@@ -2190,6 +2197,7 @@ def symmetric_difference(
     where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    subdivide_coords: int = 1000,
     force: bool = False,
 ):
     """
@@ -2236,6 +2244,11 @@ def symmetric_difference(
             smaller nb_parallel, will reduc
             e the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about subdivide_coords coordinates during processing which can
+            offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If < 0,
+            no subdividing is applied. Defaults to 1000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -2264,6 +2277,7 @@ def symmetric_difference(
         where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
         force=force,
     )
 
@@ -2284,6 +2298,7 @@ def split(
     where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    subdivide_coords: int = 1000,
     force: bool = False,
 ):
     """
@@ -2332,6 +2347,11 @@ def split(
             batch. A smaller batch size, possibly in combination with a
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about subdivide_coords coordinates during processing which can
+            offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If < 0,
+            no subdividing is applied. Defaults to 1000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -2357,6 +2377,7 @@ def split(
         where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
         force=force,
     )
 
@@ -2377,6 +2398,7 @@ def union(
     where: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    subdivide_coords: int = 1000,
     force: bool = False,
 ):
     """
@@ -2421,6 +2443,11 @@ def union(
             batch. A smaller batch size, possibly in combination with a
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about subdivide_coords coordinates during processing which can
+            offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If < 0,
+            no subdividing is applied. Defaults to 1000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -2448,5 +2475,6 @@ def union(
         where=where,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
         force=force,
     )

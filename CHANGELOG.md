@@ -14,14 +14,10 @@
 - Support creating geofile without geometry column using `gfo.select` (#322)
 - Improve performance of `makevalid` and `isvalid` (#258)
 - Improve performance of `intersection` for large input geometries: 2x faster (#340)
-- Improvements to `erase`: for files with very large input geometries, 100x faster +
-  10x less memory usage. (#329, #330)
-- Several operations are based on `erase` and/or `split` and get benefits from the
-  improvements above:
-  - `symmetric difference`: is fully based on `erase`, so gets the same improvement.
-  - `union`: is based and `erase` and `split`.
-- Improvements to `split`: for files with very large input geometries, 2x faster + 10x less
-  memory usage. Because `split` is also used in ``  (#331)
+- Support on-the-fly subdividing of complex geometries to speed up processing in
+  `erase`, `split`, `symmetric difference` and `union` (#329, #330, #331, #357).
+  The new parameter `subdivide_coords` can be used to control the feature.
+  For files with very large input geometries, up to 100x faster + 10x less memory usage.
 - Improve performance of spatial operations when only one batch is used (#271)
 - Improve performance of some geopandas/shapely based operations (#342)
 - Add checks that `output_path` must not be equal to the/an `input_path` for geo

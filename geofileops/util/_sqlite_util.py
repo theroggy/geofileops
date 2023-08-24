@@ -642,5 +642,12 @@ def load_spatialite(conn):
         deterministic=True,
     )
 
+    conn.create_function(
+        "GFO_Subdivide",
+        -1,
+        sqlite_userdefined.gfo_subdivide,
+        deterministic=True,
+    )
+
     # Register custom aggregate function
     # conn.create_aggregate("GFO_Difference_Agg", 3, userdefined.DifferenceAgg)

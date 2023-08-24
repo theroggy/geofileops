@@ -2,14 +2,15 @@ from benchmark import benchmarker
 
 
 def main():
-    # benchmarker.run_benchmarks(["benchmarks_geofileops"])
-
-    # return
-
-    # Only run specific benchmark function(s)
-    benchmarker.run_benchmarks(
-        ["benchmarks_geofileops"], ["makevalid_gpd", "makevalid_gridsize_gpd"]
-    )
+    # Run the benchmark function(s)
+    functions_to_run = [
+        # "intersection",
+        # "intersection_gridsize",
+        "symmetric_difference_complexpoly_agri",
+    ]
+    # Run all bechmark functions
+    # functions_to_run = None
+    benchmarker.run_benchmarks(["benchmarks_geofileops"], functions_to_run)
 
 
 if __name__ == "__main__":

@@ -6,12 +6,15 @@ import ast
 import math
 import os
 from pathlib import Path
+import shutil
+import tempfile
 from typing import Literal, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pandas.api
+from PIL import Image
 
 A4_LONG_SIDE = 11.69
 A4_SHORT_SIDE = 8.27
@@ -240,8 +243,20 @@ def save_chart(
     plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
 
-    # Save and open if wanted
-    fig.savefig(str(output_path))
+    # Save the file if it doesn't exist yet
+    if not output_path.exists():
+        fig.savefig(str(output_path))
+    else:
+        # If it exists already, only save it if it has changed
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_output_path = Path(tmp_dir) / output_path.name
+            fig.savefig(tmp_output_path)
+            img_new = np.asarray(Image.open(tmp_output_path))
+            img_old = np.asarray(Image.open(output_path))
+            if not np.array_equal(img_new, img_old):
+                shutil.move(tmp_output_path, output_path)
+
+    # Open if wanted
     if open_output_file is True:
         os.startfile(output_path)
 

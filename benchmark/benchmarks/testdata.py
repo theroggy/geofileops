@@ -9,6 +9,8 @@ import pprint
 import shutil
 import tempfile
 from typing import Optional
+
+import shapely
 import urllib.request
 import zipfile
 
@@ -57,6 +59,42 @@ class TestFile(enum.Enum):
         )
 
         return testfile_path
+
+
+def create_complex_poly(
+    xmin: float,
+    ymin: float,
+    width: int,
+    height: int,
+    line_distance: int,
+    max_segment_length: int,
+) -> shapely.Polygon:
+    """Create complex polygon of a ~grid-shape the size specified."""
+    lines = []
+
+    # Vertical lines
+    for x_offset in range(0, 0 + width, line_distance):
+        lines.append(
+            shapely.LineString(
+                [(xmin + x_offset, ymin), (xmin + x_offset, ymin + height)]
+            )
+        )
+
+    # Horizontal lines
+    for y_offset in range(0, 0 + height, line_distance):
+        lines.append(
+            shapely.LineString(
+                [(xmin, ymin + y_offset), (xmin + width, ymin + y_offset)]
+            )
+        )
+
+    poly_complex = shapely.unary_union(shapely.MultiLineString(lines).buffer(2))
+    poly_complex = shapely.segmentize(
+        poly_complex, max_segment_length=max_segment_length
+    )
+    assert len(shapely.get_parts(poly_complex)) == 1
+
+    return poly_complex
 
 
 def download_samplefile(

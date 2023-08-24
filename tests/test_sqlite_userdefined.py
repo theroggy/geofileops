@@ -96,11 +96,16 @@ def test_difference_collection_invalid_params():
     ],
 )
 def test_gfo_reduceprecision(test_descr, geom, exp_result):
+    # Prepare test data
     geom_wkb = None if geom is None else geom.wkb
 
-    result = sqlite_userdefined.gfo_reduceprecision(geom_wkb, gridsize=1)
+    # Run test
+    result_wkb = sqlite_userdefined.gfo_reduceprecision(
+        geom_wkb, gridsize=1, makevalid_first=True
+    )
 
-    result = shapely.from_wkb(result)
+    # Check result
+    result = shapely.from_wkb(result_wkb)
     if exp_result is None:
         assert result is None, f"Issue with test {test_descr}"
     else:
@@ -112,3 +117,46 @@ def test_gfo_reduceprecision(test_descr, geom, exp_result):
         assert_geometries_equal(
             result, exp_result, normalize=True, err_msg=f"Issue with test {test_descr}"
         )
+
+
+@pytest.mark.parametrize(
+    "test_descr, geom, subdivide_coords, exp_result",
+    [
+        ("None", None, 3, None),
+        ("empty", Point(), 3, Point()),
+        ("point", Point(1, 1), 3, Point(1, 1)),
+        (
+            "poly",
+            Polygon([(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)]),
+            3,
+            shapely.GeometryCollection(
+                [
+                    Polygon([(0, 0), (0, 10), (5, 10), (5, 0), (0, 0)]),
+                    Polygon([(5, 0), (5, 10), (10, 10), (10, 0), (5, 0)]),
+                ]
+            ),
+        ),
+        (
+            "poly_nodivide",
+            Polygon([(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)]),
+            0,
+            Polygon([(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)]),
+        ),
+    ],
+)
+def test_gfo_subdivide(test_descr, geom, subdivide_coords, exp_result):
+    # Prepare test data
+    geom_wkb = None if geom is None else geom.wkb
+
+    # Test
+    result_wkb = sqlite_userdefined.gfo_subdivide(geom_wkb, coords=subdivide_coords)
+
+    # Check result
+    result = shapely.from_wkb(result_wkb)
+    if exp_result is None:
+        assert result is None, f"test {test_descr} failed"
+        return
+
+    assert_geometries_equal(
+        result, exp_result, normalize=True, err_msg=f"test {test_descr} failed"
+    )
