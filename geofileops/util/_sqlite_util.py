@@ -6,6 +6,7 @@ import datetime
 import enum
 import logging
 from pathlib import Path
+import pprint
 import shutil
 import sqlite3
 import tempfile
@@ -145,11 +146,24 @@ def get_columns(
                 conn.execute(sql, dbSpec)
 
         # Prepare sql statement for execute
-        sql = sql_stmt.format(
+        sql_stmt_prepared = sql_stmt.format(
             input1_databasename=input1_databasename,
             input2_databasename=input2_databasename,
             batch_filter="",
         )
+
+        # Log explain plan if debug logging enabled.
+        if logger.isEnabledFor(logging.DEBUG):
+            sql = f"""
+                EXPLAIN QUERY PLAN
+                SELECT * FROM (
+                  {sql_stmt_prepared}
+                );
+            """
+            cur = conn.execute(sql)
+            plan = cur.fetchall()
+            cur.close()
+            logger.debug(pprint.pformat(plan))
 
         # Create temp table to get the column names + general data types
         # + fetch one row to use it to determine geometrytype.
@@ -157,9 +171,9 @@ def get_columns(
         sql = f"""
             CREATE TEMPORARY TABLE tmp AS
             SELECT *
-                FROM (
-                {sql}
-                )
+              FROM (
+                {sql_stmt_prepared}
+              )
              LIMIT 1 OFFSET 0;
         """
         conn.execute(sql)

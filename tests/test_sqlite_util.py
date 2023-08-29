@@ -2,6 +2,7 @@
 Tests for functionalities in ogr_util.
 """
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -121,3 +122,29 @@ def test_execute_sql(tmp_path):
     nb_deleted += 2
     info = gfo.get_layerinfo(test_path)
     assert info.featurecount == info_input.featurecount - nb_deleted
+
+
+def test_get_columns():
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
+
+    input1_info = gfo.get_layerinfo(input1_path)
+    input2_info = gfo.get_layerinfo(input2_path)
+    sql_stmt = f"""
+        SELECT layer1.OIDN, layer1.UIDN, layer1.datum, layer2.naam
+          FROM {{input1_databasename}}."{input1_info.name}" layer1
+          CROSS JOIN {{input2_databasename}}."{input2_info.name}" layer2
+         WHERE 1=1
+    """
+
+    # Set logging level to DEBUG so the explain plan logging code path is touched.
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+
+    # Run test
+    columns = sqlite_util.get_columns(
+        sql_stmt=sql_stmt, input1_path=input1_path, input2_path=input2_path
+    )
+
+    assert len(columns) == 4

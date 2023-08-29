@@ -5,7 +5,8 @@ def main():
     # Run the benchmark function(s)
     functions_to_run = [
         # "clip",
-        "intersection",
+        # "intersection",
+        "intersection_complexpoly_agri",
         # "intersection_gridsize",
         # "symmetric_difference_complexpoly_agri",
     ]

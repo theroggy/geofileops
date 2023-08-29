@@ -257,6 +257,51 @@ def intersection(tmp_dir: Path) -> RunResult:
     return result
 
 
+def intersection_complexpoly_agri(tmp_dir: Path) -> RunResult:
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+    # Prepare a complex polygon to test with
+    poly_complex = testdata.create_complex_poly(
+        xmin=30000.123,
+        ymin=170000.123,
+        width=20000,
+        height=20000,
+        line_distance=500,
+        max_segment_length=100,
+    )
+    print(f"num_coordinates: {shapely.get_num_coordinates(poly_complex)}")
+    input1_path = tmp_dir / "complex.gpkg"
+    complex_gdf = gpd.GeoDataFrame(geometry=[poly_complex], crs="epsg:31370")
+    complex_gdf.to_file(input1_path, engine="pyogrio")
+    input2_path = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+
+    # Go!
+    start_time = datetime.now()
+    output_path = tmp_dir / f"{input1_path.stem}_inters_{input2_path.stem}.gpkg"
+    gfo.intersection(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        nb_parallel=nb_parallel,
+        force=True,
+    )
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation=function_name,
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=(
+            f"{function_name} between 1 complex poly and the agriparcels BEFL "
+            "(~500k poly)"
+        ),
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    output_path.unlink()
+    return result
+
+
 def intersection_gridsize(tmp_dir: Path) -> RunResult:
     # Init
     input1_path = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)

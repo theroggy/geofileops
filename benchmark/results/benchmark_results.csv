@@ -51,3 +51,4 @@ run_datetime,package,package_version,operation,operation_descr,secs_taken,run_de
 2023-08-22 15:02:04.994284,geofileops,0.8.0a10,makevalid_gpd,makevalid_gpd on agri parcel layer BEFL (~500k polygons),17.116651,{'nb_cpu': 12}
 2023-08-22 15:02:24.313938,geofileops,0.8.0a10,makevalid_gridsize_gpd,makevalid_gridsize_gpd on agri parcel layer BEFL (~500k polygons),19.257703,{'nb_cpu': 12}
 2023-08-24 20:35:39.216442,geofileops,0.8.0a11,symmetric_difference_complexpoly_agri,symmetric_difference_complexpoly_agri between 1 complex poly (36098 points) and the agriparcels BEFL (~500k poly),60.031343,{'nb_cpu': 12}
+2023-08-29 18:27:37.615915,geofileops,0.8.0a11,intersection_complexpoly_agri,intersection_complexpoly_agri between 1 complex poly and the agriparcels BEFL (~500k poly),44.359832,{'nb_cpu': 12}
