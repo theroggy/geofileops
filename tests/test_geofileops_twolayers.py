@@ -3,6 +3,8 @@ Tests for operations that are executed using a sql statement on two layers.
 """
 
 import math
+from pathlib import Path
+from typing import Optional
 
 import geopandas as gpd
 import pandas as pd
@@ -1122,15 +1124,22 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, gridsize, where, explodecollections, exp_featurecount",
+    "suffix, epsg, gridsize, where, explodecollections, keep_fid, exp_featurecount",
     [
-        (".gpkg", 31370, 0.001, "ST_Area(geom) > 1000", True, 62),
-        (".shp", 31370, 0.0, "ST_Area(geom) > 1000", False, 59),
-        (".gpkg", 4326, 0.0, None, False, 72),
+        (".gpkg", 31370, 0.001, "ST_Area(geom) > 1000", True, True, 62),
+        (".shp", 31370, 0.0, "ST_Area(geom) > 1000", False, True, 59),
+        (".gpkg", 4326, 0.0, None, False, False, 72),
     ],
 )
 def test_union(
-    tmp_path, suffix, epsg, gridsize, where, explodecollections, exp_featurecount
+    tmp_path: Path,
+    suffix: str,
+    epsg: int,
+    gridsize: float,
+    where: Optional[str],
+    explodecollections: bool,
+    keep_fid: bool,
+    exp_featurecount: int,
 ):
     # Prepare test files
     input1_path = test_helper.get_testfile(
@@ -1147,11 +1156,20 @@ def test_union(
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
     output_path = tmp_path / f"{input1_path.stem}_union_{input2_path.stem}{suffix}"
 
+    input1_columns = None
+    input2_columns = None
+    input2_layerinfo = gfo.get_layerinfo(input2_path)
+    if keep_fid:
+        input1_columns = list(input1_layerinfo.columns) + ["fid"]
+        input2_columns = list(input2_layerinfo.columns) + ["fid"]
+
     # Test
     gfo.union(
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,
+        input1_columns=input1_columns,
+        input2_columns=input2_columns,
         gridsize=gridsize,
         explodecollections=explodecollections,
         where=where,
@@ -1161,19 +1179,24 @@ def test_union(
     # Check if the tmp file is correctly created
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
-    input2_layerinfo = gfo.get_layerinfo(input2_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert (len(input1_layerinfo.columns) + len(input2_layerinfo.columns)) == len(
-        output_layerinfo.columns
-    )
+    exp_columns = len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
+    if keep_fid:
+        exp_columns += 2
+    assert len(output_layerinfo.columns) == exp_columns
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
     assert output_layerinfo.featurecount == exp_featurecount
 
     # Check the contents of the result file
     output_gfo_gdf = gfo.read_file(output_path)
     assert output_gfo_gdf["geometry"][0] is not None
-    input1_gdf = gfo.read_file(input1_path)
-    input2_gdf = gfo.read_file(input2_path)
+
+    # Prepare expected result
+    input1_gdf = gfo.read_file(input1_path, fid_as_index=keep_fid)
+    input2_gdf = gfo.read_file(input2_path, fid_as_index=keep_fid)
+    if keep_fid:
+        input1_gdf["l1_fid"] = input1_gdf.index
+        input2_gdf["l2_fid"] = input2_gdf.index
     output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
     renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
@@ -1187,6 +1210,7 @@ def test_union(
     if where is not None:
         output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.area > 1000]
 
+    # Compare result with expected result
     assert_geodataframe_equal(
         output_gfo_gdf,
         output_gpd_gdf,

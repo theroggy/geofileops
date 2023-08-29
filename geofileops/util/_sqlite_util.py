@@ -225,21 +225,21 @@ def get_columns(
                 elif columntype == "NUM":
                     # PRAGMA TABLE_INFO sometimes returns 'NUM', but apparently this
                     # cannot be used in "CREATE TABLE".
-                    if tmpdata is not None and isinstance(
-                        tmpdata[column_index], datetime.date
-                    ):
+                    if tmpdata is None:
+                        columns[columnname] = "NUMERIC"
+                    elif isinstance(tmpdata[column_index], datetime.date):
                         columns[columnname] = "DATE"
-                    elif tmpdata is not None and isinstance(
-                        tmpdata[column_index], datetime.datetime
-                    ):
+                    elif isinstance(tmpdata[column_index], datetime.datetime):
                         columns[columnname] = "DATETIME"
-                    else:
+                    elif isinstance(tmpdata[column_index], str):
                         sql = f'SELECT datetime("{columnname}") FROM tmp;'
                         result = conn.execute(sql).fetchall()
                         if len(result) > 0 and result[0][0] is not None:
                             columns[columnname] = "DATETIME"
                         else:
                             columns[columnname] = "NUMERIC"
+                    else:
+                        columns[columnname] = "NUMERIC"
                 else:
                     columns[columnname] = columntype
 

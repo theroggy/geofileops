@@ -35,6 +35,7 @@
 ### Bugs fixed
 
 - Fix parameter `index` in `to_file` being ~ ignored (#285)
+- Fix `fid` column in output having only null values in e.g. `union` (#362)
 - Fix "json" aggregate column handling in dissolve on line and point input files gives
   wrong results (#257)
 
