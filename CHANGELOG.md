@@ -6,9 +6,9 @@
 
 - Add support to read/add/remove embedded layer styles in gpkg (#263)
 - Add `gridsize` parameter to most spatial operations (#261)
-- Add `keep_empty_geoms` and `where` parameters to many single layer spatial operations
+- Add `keep_empty_geoms` and `where_post` parameters to many single layer spatial operations
   (#262)
-- Add `where` parameter to many two layer spatial operations (#312)
+- Add `where_post` parameter to many two layer spatial operations (#312)
 - Add `where` parameter to `gfo.convert` and `gfo.append_to` (#311)
 - Add support for lang+ algorithm in `gfo.simplify` (#334)
 - Support creating geofile without geometry column using `gfo.select` (#322)

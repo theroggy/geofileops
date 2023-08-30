@@ -36,7 +36,7 @@ def prepare_expected_result(
     gdf: gpd.GeoDataFrame,
     keep_empty_geoms: bool,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     explodecollections=False,
     columns: Optional[List[str]] = None,
 ) -> gpd.GeoDataFrame:
@@ -53,14 +53,14 @@ def prepare_expected_result(
 
     # Check what filtering is needed
     filter_area_gt = None
-    if where is None or where == "":
+    if where_post is None or where_post == "":
         pass
-    elif where == "ST_Area({geometrycolumn}) > 400":
+    elif where_post == "ST_Area({geometrycolumn}) > 400":
         filter_area_gt = 400
-    elif where == "ST_Area({geometrycolumn}) > 5000":
+    elif where_post == "ST_Area({geometrycolumn}) > 5000":
         filter_area_gt = 5000
     else:
-        raise ValueError(f"unsupported where parameter in test: {where}")
+        raise ValueError(f"unsupported where_post parameter in test: {where_post}")
 
     # Apply filtering
     if keep_empty_geoms is None or not keep_empty_geoms:

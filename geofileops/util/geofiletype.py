@@ -136,7 +136,10 @@ class GeofileType(enum.Enum):
     @property
     def suffixes_extrafiles(self) -> List[str]:
         """Returns a list of suffixes for the extra files for this GeofileType."""
-        return geofiletypes[self.name].suffixes_extrafiles
+        suffixes = geofiletypes[self.name].suffixes_extrafiles
+        if suffixes is None:
+            return []
+        return suffixes
 
     @property
     def is_singlelayer(self) -> bool:

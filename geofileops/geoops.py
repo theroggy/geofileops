@@ -38,7 +38,7 @@ def apply(
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     gridsize: float = 0.0,
     keep_empty_geoms: Optional[bool] = None,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -83,8 +83,8 @@ def apply(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -123,7 +123,7 @@ def apply(
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
         keep_empty_geoms=keep_empty_geoms,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -145,7 +145,7 @@ def buffer(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: Optional[bool] = None,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -200,8 +200,8 @@ def buffer(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -325,7 +325,7 @@ def buffer(
             explodecollections=explodecollections,
             gridsize=gridsize,
             keep_empty_geoms=keep_empty_geoms,
-            where=where,
+            where_post=where_post,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -347,7 +347,7 @@ def buffer(
             explodecollections=explodecollections,
             gridsize=gridsize,
             keep_empty_geoms=keep_empty_geoms,
-            where=where,
+            where_post=where_post,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -406,7 +406,7 @@ def convexhull(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: Optional[bool] = None,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -435,8 +435,8 @@ def convexhull(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -472,7 +472,7 @@ def convexhull(
         explodecollections=explodecollections,
         gridsize=gridsize,
         keep_empty_geoms=keep_empty_geoms,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -487,7 +487,7 @@ def delete_duplicate_geometries(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     keep_empty_geoms: Optional[bool] = None,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     force: bool = False,
 ):
     """
@@ -509,8 +509,8 @@ def delete_duplicate_geometries(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
@@ -539,7 +539,7 @@ def delete_duplicate_geometries(
         columns=columns,
         explodecollections=explodecollections,
         keep_empty_geoms=keep_empty_geoms,
-        where=where,
+        where_post=where_post,
         force=force,
     )
 
@@ -555,7 +555,7 @@ def dissolve(
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -687,8 +687,8 @@ def dissolve(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -729,7 +729,7 @@ def dissolve(
         input_layer=input_layer,
         output_layer=output_layer,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -862,7 +862,7 @@ def makevalid(
     force_output_geometrytype: Optional[GeometryType] = None,
     gridsize: float = 0.0,
     keep_empty_geoms: Optional[bool] = None,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     precision: Optional[float] = None,
     validate_attribute_data: bool = False,
     nb_parallel: int = -1,
@@ -901,7 +901,7 @@ def makevalid(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where (str, optional): filter to apply to the result of the operation (after
+        where_post (str, optional): filter to apply to the result of the operation (after
             explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         validate_attribute_data (bool, optional): True to validate if all attribute data
@@ -960,7 +960,7 @@ def makevalid(
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
         keep_empty_geoms=keep_empty_geoms,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1180,7 +1180,7 @@ def simplify(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: Optional[bool] = None,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1220,8 +1220,8 @@ def simplify(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1261,7 +1261,7 @@ def simplify(
             columns=columns,
             explodecollections=explodecollections,
             gridsize=gridsize,
-            where=where,
+            where_post=where_post,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -1278,7 +1278,7 @@ def simplify(
             columns=columns,
             explodecollections=explodecollections,
             gridsize=gridsize,
-            where=where,
+            where_post=where_post,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             force=force,
@@ -1300,7 +1300,7 @@ def clip(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1348,8 +1348,8 @@ def clip(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1380,7 +1380,7 @@ def clip(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1397,7 +1397,7 @@ def erase(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 1000,
@@ -1433,8 +1433,8 @@ def erase(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1466,7 +1466,7 @@ def erase(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         subdivide_coords=subdivide_coords,
@@ -1485,7 +1485,7 @@ def export_by_location(
     input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1521,8 +1521,8 @@ def export_by_location(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1553,7 +1553,7 @@ def export_by_location(
         input_to_compare_with_layer=input2_layer,
         output_layer=output_layer,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1570,7 +1570,7 @@ def export_by_distance(
     input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1599,7 +1599,7 @@ def export_by_distance(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
+        where_post (str, optional): filter to apply to the result of the operation (after
             explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
@@ -1631,7 +1631,7 @@ def export_by_distance(
         input2_layer=input2_layer,
         output_layer=output_layer,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1696,7 +1696,7 @@ def intersection(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1734,7 +1734,7 @@ def intersection(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
+        where_post (str, optional): filter to apply to the result of the operation (after
             explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
@@ -1767,7 +1767,7 @@ def intersection(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1790,7 +1790,7 @@ def join_by_location(
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1855,8 +1855,8 @@ def join_by_location(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1893,7 +1893,7 @@ def join_by_location(
         output_layer=output_layer,
         explodecollections=False,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -1990,7 +1990,7 @@ def select_two_layers(
     explodecollections: bool = False,
     force_output_geometrytype: Optional[GeometryType] = None,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
@@ -2102,8 +2102,8 @@ def select_two_layers(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -2174,7 +2174,7 @@ def select_two_layers(
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
@@ -2194,7 +2194,7 @@ def symmetric_difference(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 1000,
@@ -2234,8 +2234,8 @@ def symmetric_difference(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -2274,7 +2274,7 @@ def symmetric_difference(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         subdivide_coords=subdivide_coords,
@@ -2295,7 +2295,7 @@ def split(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 1000,
@@ -2338,8 +2338,8 @@ def split(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -2374,7 +2374,7 @@ def split(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         subdivide_coords=subdivide_coords,
@@ -2395,7 +2395,7 @@ def union(
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where: Optional[str] = None,
+    where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 1000,
@@ -2434,8 +2434,8 @@ def union(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): filter to apply to the result of the operation
+            (after explodecollections). It should be in sqlite SQL WHERE syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -2472,7 +2472,7 @@ def union(
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         subdivide_coords=subdivide_coords,

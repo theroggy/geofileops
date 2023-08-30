@@ -31,7 +31,7 @@ def test_clip(tmp_path, testfile, suffix):
         input_path=input_path,
         clip_path=clip_path,
         output_path=output_path,
-        where=None,
+        where_post=None,
         batchsize=batchsize,
     )
 
@@ -49,7 +49,7 @@ def test_clip(tmp_path, testfile, suffix):
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
-    "testfile, gridsize, where",
+    "testfile, gridsize, where_post",
     [
         ("linestring-row-trees", 0.0, "ST_Length(geom) > 100"),
         ("linestring-row-trees", 0.001, None),
@@ -60,7 +60,7 @@ def test_clip(tmp_path, testfile, suffix):
         ("polygon-parcel", 0.001, None),
     ],
 )
-def test_erase(tmp_path, suffix, testfile, gridsize, where):
+def test_erase(tmp_path, suffix, testfile, gridsize, where_post):
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
     erase_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
     input_layerinfo = gfo.get_layerinfo(input_path)
@@ -72,7 +72,7 @@ def test_erase(tmp_path, suffix, testfile, gridsize, where):
         erase_path=erase_path,
         output_path=output_path,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         batchsize=batchsize,
     )
 
@@ -89,13 +89,13 @@ def test_erase(tmp_path, suffix, testfile, gridsize, where):
         output_gpd_gdf.geometry = shapely.set_precision(
             output_gpd_gdf.geometry, grid_size=gridsize
         )
-    if where is not None:
-        if where == "ST_Area(geom) > 2000":
+    if where_post is not None:
+        if where_post == "ST_Area(geom) > 2000":
             output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.area > 2000]
-        elif where == "ST_Length(geom) > 100":
+        elif where_post == "ST_Length(geom) > 100":
             output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.length > 100]
         else:
-            raise ValueError(f"where filter not implemented: {where}")
+            raise ValueError(f"where_post filter not implemented: {where_post}")
     output_gpd_path = tmp_path / f"{input_path.stem}-output_gpd{suffix}"
 
     if test_helper.RUNS_LOCAL:
@@ -151,10 +151,10 @@ def test_erase_explodecollections(tmp_path):
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
-    "gridsize, where, exp_featurecount",
+    "gridsize, where_post, exp_featurecount",
     [(0.0, "ST_Area(geom) > 2000", 25), (0.001, None, 27)],
 )
-def test_export_by_location(tmp_path, suffix, gridsize, where, exp_featurecount):
+def test_export_by_location(tmp_path, suffix, gridsize, where_post, exp_featurecount):
     input_to_select_from_path = test_helper.get_testfile(
         "polygon-parcel", suffix=suffix
     )
@@ -169,7 +169,7 @@ def test_export_by_location(tmp_path, suffix, gridsize, where, exp_featurecount)
         input_to_compare_with_path=input_to_compare_with_path,
         output_path=output_path,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         batchsize=batchsize,
     )
 
@@ -460,7 +460,7 @@ def test_intersection_columns_fid(tmp_path, testfile, suffix):
 
 
 @pytest.mark.parametrize(
-    "suffix, explodecollections, where, exp_featurecount",
+    "suffix, explodecollections, where_post, exp_featurecount",
     [
         (".gpkg", False, None, 30),
         (".gpkg", True, None, 31),
@@ -470,12 +470,12 @@ def test_intersection_columns_fid(tmp_path, testfile, suffix):
         (".shp", True, "ST_Area(geom) > 1000", 27),
     ],
 )
-def test_intersection_where(
-    tmp_path, suffix, explodecollections, where, exp_featurecount
+def test_intersection_where_post(
+    tmp_path, suffix, explodecollections, where_post, exp_featurecount
 ):
-    """Test intersection with where parameter."""
+    """Test intersection with where_post parameter."""
     # TODO: test data should be changed so explodecollections results in more rows
-    # without where already!!!
+    # without where_post already!!!
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
 
@@ -491,7 +491,7 @@ def test_intersection_where(
         input2_path=input2_path,
         output_path=output_path,
         explodecollections=explodecollections,
-        where=where,
+        where_post=where_post,
         nb_parallel=2,
         batchsize=batchsize,
     )
@@ -1124,7 +1124,8 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, gridsize, where, explodecollections, keep_fid, exp_featurecount",
+    "suffix, epsg, gridsize, where_post, explodecollections, keep_fid, "
+    "exp_featurecount",
     [
         (".gpkg", 31370, 0.001, "ST_Area(geom) > 1000", True, True, 62),
         (".shp", 31370, 0.0, "ST_Area(geom) > 1000", False, True, 59),
@@ -1136,7 +1137,7 @@ def test_union(
     suffix: str,
     epsg: int,
     gridsize: float,
-    where: Optional[str],
+    where_post: Optional[str],
     explodecollections: bool,
     keep_fid: bool,
     exp_featurecount: int,
@@ -1172,7 +1173,7 @@ def test_union(
         input2_columns=input2_columns,
         gridsize=gridsize,
         explodecollections=explodecollections,
-        where=where,
+        where_post=where_post,
         batchsize=batchsize,
     )
 
@@ -1207,7 +1208,7 @@ def test_union(
         )
     if explodecollections:
         output_gpd_gdf = output_gpd_gdf.explode(ignore_index=True)
-    if where is not None:
+    if where_post is not None:
         output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.area > 1000]
 
     # Compare result with expected result

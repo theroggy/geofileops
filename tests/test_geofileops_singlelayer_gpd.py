@@ -34,13 +34,15 @@ def test_get_parallelization_params():
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
-    "only_geom_input, gridsize, keep_empty_geoms, where",
+    "only_geom_input, gridsize, keep_empty_geoms, where_post",
     [
         (False, 0.0, True, "ST_Area({geometrycolumn}) > 70"),
         (True, 0.01, False, None),
     ],
 )
-def test_apply(tmp_path, suffix, only_geom_input, gridsize, keep_empty_geoms, where):
+def test_apply(
+    tmp_path, suffix, only_geom_input, gridsize, keep_empty_geoms, where_post
+):
     # Prepare test data
     test_gdf = gpd.GeoDataFrame(
         data=[
@@ -66,7 +68,7 @@ def test_apply(tmp_path, suffix, only_geom_input, gridsize, keep_empty_geoms, wh
             only_geom_input=True,
             gridsize=gridsize,
             keep_empty_geoms=keep_empty_geoms,
-            where=where,
+            where_post=where_post,
             batchsize=batchsize,
         )
     else:
@@ -79,7 +81,7 @@ def test_apply(tmp_path, suffix, only_geom_input, gridsize, keep_empty_geoms, wh
             only_geom_input=False,
             gridsize=gridsize,
             keep_empty_geoms=keep_empty_geoms,
-            where=where,
+            where_post=where_post,
             batchsize=batchsize,
         )
 
@@ -94,13 +96,13 @@ def test_apply(tmp_path, suffix, only_geom_input, gridsize, keep_empty_geoms, wh
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
-    # Number of rows depends on keep_empty_geoms and where
-    if where == "ST_Area({geometrycolumn}) > 70" and keep_empty_geoms:
+    # Number of rows depends on keep_empty_geoms and where_post
+    if where_post == "ST_Area({geometrycolumn}) > 70" and keep_empty_geoms:
         assert output_layerinfo.featurecount == input_layerinfo.featurecount - 1
-    elif where is None and not keep_empty_geoms:
+    elif where_post is None and not keep_empty_geoms:
         assert output_layerinfo.featurecount == input_layerinfo.featurecount
     else:
-        raise ValueError(f"unsupported where in test: {where}")
+        raise ValueError(f"unsupported where_post in test: {where_post}")
 
     for row in output_gdf.itertuples():
         cur_geometry = row.geometry
@@ -272,7 +274,7 @@ def test_buffer_styles(tmp_path, suffix, epsg):
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
-    "epsg, gridsize, explodecollections, where",
+    "epsg, gridsize, explodecollections, where_post",
     [
         (31370, 0.001, True, WHERE_LENGTH_GT_1000),
         (31370, 0.001, False, WHERE_LENGTH_GT_200000),
@@ -281,7 +283,7 @@ def test_buffer_styles(tmp_path, suffix, epsg):
     ],
 )
 def test_dissolve_linestrings(
-    tmp_path, suffix, epsg, gridsize, explodecollections, where
+    tmp_path, suffix, epsg, gridsize, explodecollections, where_post
 ):
     # Prepare test data
     input_path = test_helper.get_testfile(
@@ -300,7 +302,7 @@ def test_dissolve_linestrings(
         output_path=output_path,
         explodecollections=explodecollections,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         batchsize=batchsize,
     )
 
@@ -315,21 +317,21 @@ def test_dissolve_linestrings(
     assert len(output_layerinfo.columns) >= 0
 
     if explodecollections:
-        if where is None or where == "":
+        if where_post is None or where_post == "":
             assert output_layerinfo.featurecount == 83
-        elif where == WHERE_LENGTH_GT_1000:
+        elif where_post == WHERE_LENGTH_GT_1000:
             assert output_layerinfo.featurecount == 13
         else:
-            raise ValueError(f"check for where {where} not implemented")
+            raise ValueError(f"check for where_post {where_post} not implemented")
     else:
-        if where is None or where == "":
+        if where_post is None or where_post == "":
             assert output_layerinfo.featurecount == 1
-        elif where == WHERE_LENGTH_GT_200000:
+        elif where_post == WHERE_LENGTH_GT_200000:
             assert output_layerinfo.featurecount == 0
             # Output empty, so nothing more to check
             return
         else:
-            raise ValueError(f"check for where {where} not implemented")
+            raise ValueError(f"check for where_post {where_post} not implemented")
 
     # Check the contents of the result file
     input_gdf = gfo.read_file(input_path)
@@ -518,7 +520,8 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, groupby_columns, explode, gridsize, where, expected_featurecount",
+    "suffix, epsg, groupby_columns, explode, gridsize, where_post, "
+    "expected_featurecount",
     [
         (".gpkg", 31370, ["GEWASGROEP"], True, 0.0, "", 25),
         (".gpkg", 31370, ["GEWASGROEP"], False, 0.0, "", 6),
@@ -538,7 +541,7 @@ def test_dissolve_polygons(
     groupby_columns,
     explode,
     gridsize,
-    where,
+    where_post,
     expected_featurecount,
 ):
     # Prepare test data
@@ -557,7 +560,7 @@ def test_dissolve_polygons(
         groupby_columns=groupby_columns,
         explodecollections=explode,
         gridsize=gridsize,
-        where=where,
+        where_post=where_post,
         nb_parallel=2,
         batchsize=batchsize,
     )
@@ -600,7 +603,7 @@ def test_dissolve_polygons(
         explodecollections=explode,
         gridsize=gridsize,
         keep_empty_geoms=False,
-        where=where,
+        where_post=where_post,
     )
     expected_path = tmp_path / f"{input_path.stem}_gpd-output{suffix}"
     gfo.to_file(expected_gdf, expected_path)
