@@ -15,4 +15,4 @@ docs/_build
 docs/api
 geofileops.egg-info/
 htmlcov/
-tmp/
+local_ignore/

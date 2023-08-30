@@ -29,7 +29,7 @@
 - Improve handling of "SELECT * ..." style queries in `gfo.select` and 
   `gfo.select_two_layers` (#283)
 - Improve handling + tests regarding empty input layers/NULL geometries (#320)
-- Many small improvements to logging, documentation, error messages,... (#321,...)
+- Many small improvements to logging, documentation, error messages,... (#321, #366,...)
 - Use ruff instead of flake8 for linting (#317)
 
 ### Bugs fixed

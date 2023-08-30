@@ -27,6 +27,7 @@ dependencies:
   - pandas-stubs
   - pre-commit
   - ruff
+  - types-pillow
   # docs
   - pydata-sphinx-theme
   - pip:
