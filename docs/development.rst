@@ -1,4 +1,5 @@
 
+===========
 Development
 ===========
 
@@ -10,18 +11,34 @@ be as well.
 Create development environment
 ------------------------------
 
-The first step would be to fork the |geofileOps git repository|, to be able to run/debug 
-the code.
+The first step would be to fork and clone the |geofileOps git repository|, to be able to
+run/debug the code.
 
-If you don't have the conda package manager installed yet, here is a link to the 
-`miniforge installer`_
+The easiest way to install the dependencies of geofileops and run it is to use the
+conda package manager. If you don't have it installed yet, here is a link to the 
+`miniforge installer`_.
 
-
-Then you'll need to create a new conda environment with the necessary 
-dependencies. ::
+Start the conda prompt and create a new conda environment with the following
+commands: ::
 
     conda env create -f environment-dev.yml
     conda activate geofileops-dev
+
+
+If you use e.g. anaconda or miniconda instead of a miniforge installation, also run
+following commands to specify that all depencencies should be installed from the
+conda-forge channel. Mixing packages from multiple channels is bound to give problems
+sooner or later: ::
+
+    conda config --env --add channels conda-forge
+    conda config --env --set channel_priority strict
+
+
+It is recommended to install the pre-commit hook that will take care of the automatic
+checks and formatting, so you don't run into linting errors when you create a pull
+request: ::
+
+    pre-commit install
 
 
 .. _miniforge installer : https://github.com/conda-forge/miniforge#miniforge3

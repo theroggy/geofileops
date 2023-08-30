@@ -613,7 +613,7 @@ def test_data_integrity(path: Path, use_spatialite: bool = True):
             sql = f'SELECT * FROM "{layer}"'
             cursor = conn.execute(sql)
 
-            # Fetch the data in chunks to evade excessive memory usage
+            # Fetch the data in chunks to avoid excessive memory usage
             while True:
                 result = cursor.fetchmany(10000)
                 if not result:

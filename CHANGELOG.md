@@ -9,9 +9,9 @@
 - Add `keep_empty_geoms` and `where_post` parameters to many single layer spatial operations
   (#262)
 - Add `where_post` parameter to many two layer spatial operations (#312)
-- Add `where` parameter to `gfo.convert` and `gfo.append_to` (#311)
-- Add support for lang+ algorithm in `gfo.simplify` (#334)
-- Support creating geofile without geometry column using `gfo.select` (#322)
+- Add `where` parameter to `copy_layer` and `append_to` (#311)
+- Add support for lang+ algorithm in `simplify` (#334)
+- Support creating geofile without geometry column using `select` (#322)
 - Improve performance of `makevalid` and `isvalid` (#258)
 - Improve performance of `intersection`, 30% faster for typical data, up to 4x faster
   for large input geometries (#340, #358)
@@ -26,8 +26,8 @@
   operations (#246)
 - Follow geopandas behaviour of using shapely2 and/or pygeos instead of forcing pygeos
   (#294)
-- Improve handling of "SELECT * ..." style queries in `gfo.select` and 
-  `gfo.select_two_layers` (#283)
+- Improve handling of "SELECT * ..." style queries in `select` and 
+  `select_two_layers` (#283)
 - Improve handling + tests regarding empty input layers/NULL geometries (#320)
 - Many small improvements to logging, documentation, error messages,... (#321, #366,...)
 - Use ruff instead of flake8 for linting (#317)

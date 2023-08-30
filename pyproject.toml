@@ -6,7 +6,7 @@ reportGeneralTypeIssues = false
 line-length = 88
 
 [tool.mypy]
-exclude = "local_ignore"
+exclude = ["local_ignore"]
 
 [[tool.mypy.overrides]]
 module = "cloudpickle.*,fiona.*,geopandas.*,matplotlib.*,osgeo.*,pygeos.*,pyogrio.*,psutil.*,setuptools.*,shapely.*,topojson.*"

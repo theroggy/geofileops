@@ -83,8 +83,8 @@ def apply(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -200,8 +200,8 @@ def buffer(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -435,8 +435,8 @@ def convexhull(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -509,8 +509,8 @@ def delete_duplicate_geometries(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
@@ -669,7 +669,7 @@ def dissolve(
         tiles_path (PathLike, optional): a path to a geofile containing tiles.
             If specified, the output will be dissolved/unioned only within the
             tiles provided.
-            Can be used to evade huge geometries being created if the input
+            Can be used to avoid huge geometries being created if the input
             geometries are very interconnected.
             Defaults to None (= the output is not tiled).
         nb_squarish_tiles (int, optional): the approximate number of tiles the
@@ -677,7 +677,7 @@ def dissolve(
             automatically created based on the total bounds of the input file.
             The input geometries will be dissolved/unioned only within the
             tiles generated.
-            Can be used to evade huge geometries being created if the input
+            Can be used to avoid huge geometries being created if the input
             geometries are very interconnected.
             Defaults to 1 (= the output is not tiled).
         input_layer (str, optional): input layer name. Optional if the
@@ -687,8 +687,8 @@ def dissolve(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -901,8 +901,8 @@ def makevalid(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where_post (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         validate_attribute_data (bool, optional): True to validate if all attribute data
             can be read. Raises an exception if an error is found, as this type of error
@@ -1220,8 +1220,8 @@ def simplify(
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to False now, but default becomes True in a future
             version.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1348,8 +1348,8 @@ def clip(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1433,8 +1433,8 @@ def erase(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1521,8 +1521,8 @@ def export_by_location(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1599,8 +1599,8 @@ def export_by_distance(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1734,8 +1734,8 @@ def intersection(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -1855,8 +1855,8 @@ def join_by_location(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -2102,8 +2102,8 @@ def select_two_layers(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -2234,8 +2234,8 @@ def symmetric_difference(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -2338,8 +2338,8 @@ def split(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.
@@ -2434,8 +2434,8 @@ def union(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available processors.

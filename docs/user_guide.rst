@@ -1,5 +1,6 @@
 .. currentmodule:: geofileops
 
+==========
 User guide
 ==========
 
@@ -63,9 +64,9 @@ Most spatial operations in geofileops have the same optional parameters:
       will be removed. Value 0.0, the default, doesn't change the precision.
     * keep_empty_geoms: True to keep rows with empty/null geometries in the output.
       Default value is different for different functions at the moment.
-    * where_post: filter to apply to the result of the operation (after
-      explodecollections). It should be in sqlite SQL WHERE syntax and
-      |spatialite_reference_link| functions can also be used. Defaults to None.
+    * where_post (str, optional): sql filter to apply after all other processing,
+      including e.g. explodecollections. It should be in sqlite syntax and
+      |spatialite_reference_link| functions can be used. Defaults to None.
     * nb_parallel: specify the number of CPU's to be used. By default all 
       CPU's are used.
     * batchsize: indication of the number of rows to be processed per batch. You can
@@ -125,8 +126,7 @@ This is an example to get information about the (only) layer in a geo file:
     layerinfo = gfo.get_layerinfo(path='...')
     print(f"Layer {layerinfo.name} contains {layerinfo.featurecount} features")
 
-Remark: some functions might only work on Geopackage files, not on 
-shapefiles.
+Remark: some functions might only work on Geopackage files, not on shapefiles.
 
 .. |spatialite_reference_link| raw:: html
 

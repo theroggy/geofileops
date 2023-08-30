@@ -564,8 +564,8 @@ def _apply_geooperation_to_layer(
             the precision. Defaults to 0.0.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to True.
-        where_post (str, optional): filter to apply to the result of the operation (after
-            explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): [description]. Defaults to -1.
         batchsize (int, optional): indicative number of rows to process per
@@ -861,9 +861,7 @@ def _apply_geooperation(
         input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
         force_output_geometrytype = input_layerinfo.geometrytype.to_multitype.name
 
-    # assert to evade pyLance warning
-    assert isinstance(data_gdf, gpd.GeoDataFrame)
-    # Use force_multitype, to evade warnings when some batches contain
+    # Use force_multitype, to avoid warnings when some batches contain
     # singletype and some contain multitype geometries
     gfo.to_file(
         gdf=data_gdf,
@@ -1271,7 +1269,7 @@ def dissolve(
                                 f'{extra_param_str}) AS "{agg_column["as"]}"'
                             )
 
-                # Add a column to order the result by to evade having all
+                # Add a column to order the result by to avoid having all
                 # complex geometries together in the output file.
                 orderby_column = "temp_ordercolumn_geohash"
                 _add_orderby_column(
@@ -1682,8 +1680,6 @@ def _dissolve_polygons(
         GeometryType.POLYGON,
         GeometryType.MULTIPOLYGON,
     ]:
-        # assert to evade pyLance warning
-        assert isinstance(diss_gdf, gpd.GeoDataFrame)
         diss_gdf = diss_gdf.explode(ignore_index=True)
 
     # Clip the result on the borders of the bbox not to have overlaps
@@ -1765,9 +1761,9 @@ def _dissolve_polygons(
     # If the tiles don't need to be merged afterwards, we can just save the result as
     # it is.
     if str(output_notonborder_path) == str(output_onborder_path):
-        # assert to evade pyLance warning
+        # assert to avoid pyLance warning
         assert isinstance(diss_gdf, gpd.GeoDataFrame)
-        # Use force_multitype, to evade warnings when some batches contain
+        # Use force_multitype, to avoid warnings when some batches contain
         # singletype and some contain multitype geometries
         gfo.to_file(
             diss_gdf,
@@ -1786,9 +1782,7 @@ def _dissolve_polygons(
         onborder_gdf = gpd.sjoin(diss_gdf, bbox_lines_gdf, predicate="intersects")
         onborder_gdf.drop("index_right", axis=1, inplace=True)
         if len(onborder_gdf) > 0:
-            # assert to evade pyLance warning
-            assert isinstance(onborder_gdf, gpd.GeoDataFrame)
-            # Use force_multitype, to evade warnings when some batches contain
+            # Use force_multitype, to avoid warnings when some batches contain
             # singletype and some contain multitype geometries
             gfo.to_file(
                 onborder_gdf,
@@ -1800,9 +1794,7 @@ def _dissolve_polygons(
 
         notonborder_gdf = diss_gdf[~diss_gdf.index.isin(onborder_gdf.index)]
         if len(notonborder_gdf) > 0:
-            # assert to evade pyLance warning
-            assert isinstance(notonborder_gdf, gpd.GeoDataFrame)
-            # Use force_multitype, to evade warnings when some batches contain
+            # Use force_multitype, to avoid warnings when some batches contain
             # singletype and some contain multitype geometries
             gfo.to_file(
                 notonborder_gdf,

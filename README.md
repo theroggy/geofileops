@@ -13,8 +13,8 @@ typical GIS operations are available: e.g.
 [buffer](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.buffer), 
 [dissolve](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.dissolve),
 [erase](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.erase)/difference, 
-[intersection](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.intersection),...
-[union](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.union),
+[intersection](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.intersection), 
+[union](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.union),... 
 Check out the [API reference](https://geofileops.readthedocs.io/en/stable/reference.html)
 for a full list.
 
@@ -23,13 +23,13 @@ is recommended as it will give better performance for most operations.
 
 The aim is that there is no size limit on the files that can be processed on standard
 hardware. To make processing faster, the operations can use all available CPU's. In
-some cases (complex) geometries will be cut in smaller tiles to speed up processing
+some cases (complex) geometries can be cut in smaller tiles to speed up processing
 further. For operations like buffer this won't make a big difference as it doesn't need
 a lot of CPU power, but calculating the intersection between two large files, dissolving
 large files,... will be a lot faster.
 
 The following chart gives an impression of the speed improvement that can be expected
-when processing larger files (including I/O!) with 10 CPU's available. More information
+when processing larger files (including I/O) with 10 CPU's available. More information
 about this benchmark can be found [here](https://github.com/geofileops/geobenchmark).
 
 ![Geo benchmark](https://github.com/geofileops/geobenchmark/blob/main/results_vector_ops/GeoBenchmark.png)

@@ -5,6 +5,7 @@
 
 .. currentmodule:: geofileops
 
+====================
 GeofileOps |version|
 ====================
 
@@ -12,15 +13,17 @@ This python library aims to make spatial operations on large geo files faster
 and easier. 
 
 It provides an easy to use API that can accomplish a lot with few lines of 
-code. To make processing faster, geofileops can use all available CPU's for 
-spatial operations.
-For operations like buffer this won't make a big difference as it doesn't need 
-a lot of CPU power, but calculating the intersection between two large files, 
-dissolving large files,... will be a lot faster.
-The aim is that there is no size limit on the files that can be processed. 
+code.
 
-Most typical operations are available: :meth:`~buffer`, :meth:`~simplify`,
-:meth:`~dissolve`, :meth:`~union`, :meth:`~erase`, :meth:`~intersection`,... 
+To make processing faster, geofileops can use all available CPU's for 
+spatial operations. For operations like buffer this won't make a huge difference as it
+doesn't need a lot of CPU power, but calculating the intersection between two large
+files, dissolving large files,... will be a lot faster. The aim is that there is no
+size limit on the files that can be processed on standard hardware.
+
+Most typical GIS operations are available: e.g. :meth:`~buffer`, :meth:`~simplify`,
+:meth:`~dissolve`, :meth:`~intersection`,... You can also run custom logic by using
+:meth:`~apply`, :meth:`~select` or :meth:`~select_two_layers`.
 
 Geofileops is tested on geopackage and shapefile input files. However, geopackage
 is recommended as it will give better performance for most operations.

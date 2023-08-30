@@ -370,7 +370,7 @@ def select(
     batchsize: int = -1,
     force: bool = False,
 ):
-    # Check if output exists already here, to evade to much logging to be written
+    # Check if output exists already here, to avoid to much logging to be written
     if output_path.exists():
         if force is False:
             logger.info(f"Stop select: output exists already {output_path}")
@@ -841,7 +841,7 @@ def clip(
     # - use of the with instead of an inline view is a lot faster
     # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening e.g.
     #   "geom IS NOT NULL" leads to geom operation to be calculated twice!
-    # - WHERE geom IS NOT NULL to evade rows with a NULL geom, they give issues in
+    # - WHERE geom IS NOT NULL to avoid rows with a NULL geom, they give issues in
     #   later operations.
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
@@ -1367,7 +1367,7 @@ def join_by_location(
     # Prepare spatial relations filter
     if spatial_relations_query != "intersects is True":
         # joining should only be possible on features that at least have an
-        # interaction! So, add "intersects is True" to query to evade errors!
+        # interaction! So, add "intersects is True" to query to avoid errors!
         spatial_relations_query = f"({spatial_relations_query}) and intersects is True"
     spatial_relations_filter = _prepare_spatial_relations_filter(
         spatial_relations_query
@@ -1375,7 +1375,7 @@ def join_by_location(
 
     # Prepare sql template
     #
-    # Remark: use "LIMIT -1 OFFSET 0" to evade that the sqlite query optimizer
+    # Remark: use "LIMIT -1 OFFSET 0" to avoid that the sqlite query optimizer
     #     "flattens" the subquery, as that makes checking the spatial
     #     relations (using ST_RelateMatch) very slow!
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
@@ -1704,7 +1704,7 @@ def split(
     input1_layer_info = gfo.get_layerinfo(input1_path, input1_layer)
     primitivetype_to_extract = input1_layer_info.geometrytype.to_primitivetype
 
-    # For the output file, force MULTI variant to evade ugly warnings
+    # For the output file, force MULTI variant to avoid ugly warnings
     force_output_geometrytype = primitivetype_to_extract.to_multitype
 
     # Prepare sql template for this operation
@@ -2103,8 +2103,8 @@ def _two_layer_vector_operation(
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
-        where_post (str, optional): filter to apply to the result of the operation
-            (after explodecollections). It should be in sqlite SQL WHERE syntax and
+        where_post (str, optional): sql filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
         nb_parallel (int, optional): [description]. Defaults to -1.
         batchsize (int, optional): indicative number of rows to process per
