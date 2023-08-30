@@ -23,11 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
       - uses: pre-commit/action@v3.0.0
 
   Test:
     needs: Linting
-    name: ${{ matrix.os }}, ${{ matrix.env }}
+    name: ${{ matrix.os }} - ${{ matrix.env }} (python ${{ matrix.python }})
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     defaults:
@@ -39,17 +41,17 @@ jobs:
         os: [ubuntu-latest]
         dev: [false]
         python: ["3.8", "3.9", "3.10", "3.11"]
-        env: ["ci/envs/latest.yml"]
+        env: ["latest"]
         include:
-          - env: ci/envs/minimal.yaml
+          - env: minimal
             os: ubuntu-latest
             dev: false
             python: "3.8"
-          - env: ci/envs/latest.yaml
+          - env: latest
             os: macos-latest
             dev: false
             python: "3.11"
-          - env: ci/envs/latest.yaml
+          - env: latest
             os: windows-latest
             dev: false
             python: "3.11"
@@ -61,8 +63,12 @@ jobs:
         uses: mamba-org/setup-micromamba@v1
         with:
           micromamba-version: '1.3.1-0'
-          environment-file: ${{ matrix.env }}
-
+          environment-file: ci/envs/${{ matrix.env }}.yml
+          cache-environment: true
+          create-args: >-
+            python=${{ matrix.python }}
+            ${{ matrix.extra }}
+        
       - name: Test
         run: |
           pytest --color=yes --cov=geofileops --cov-append --cov-report term-missing --cov-report xml tests/
