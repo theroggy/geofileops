@@ -1479,7 +1479,7 @@ def export_by_location(
     input_to_compare_with_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     min_area_intersect: Optional[float] = None,
-    area_inters_column_name: Optional[str] = "area_inters",
+    area_inters_column_name: Optional[str] = None,
     input1_layer: Optional[str] = None,
     input1_columns: Optional[List[str]] = None,
     input2_layer: Optional[str] = None,
@@ -1506,7 +1506,7 @@ def export_by_location(
         min_area_intersect (float, optional): minimum area of the intersection.
             Defaults to None.
         area_inters_column_name (str, optional): column name of the intersect
-            area. Defaults to 'area_inters'. In None, no area column is added.
+            area. If None, no area column is added. Defaults to None.
         input1_layer (str, optional): input layer name. Optional if the
             file only contains one layer.
         input1_columns (List[str], optional): list of columns to retain. If None, all

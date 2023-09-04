@@ -151,10 +151,12 @@ def test_erase_explodecollections(tmp_path):
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
-    "gridsize, where_post, exp_featurecount",
-    [(0.0, "ST_Area(geom) > 2000", 25), (0.001, None, 27)],
+    "area_inters_column_name, gridsize, where_post, exp_featurecount",
+    [("area_inters", 0.0, "ST_Area(geom) > 2000", 25), (None, 0.001, None, 27)],
 )
-def test_export_by_location(tmp_path, suffix, gridsize, where_post, exp_featurecount):
+def test_export_by_location(
+    tmp_path, suffix, area_inters_column_name, gridsize, where_post, exp_featurecount
+):
     input_to_select_from_path = test_helper.get_testfile(
         "polygon-parcel", suffix=suffix
     )
@@ -168,6 +170,7 @@ def test_export_by_location(tmp_path, suffix, gridsize, where_post, exp_featurec
         input_to_select_from_path=input_to_select_from_path,
         input_to_compare_with_path=input_to_compare_with_path,
         output_path=output_path,
+        area_inters_column_name=area_inters_column_name,
         gridsize=gridsize,
         where_post=where_post,
         batchsize=batchsize,
@@ -177,7 +180,10 @@ def test_export_by_location(tmp_path, suffix, gridsize, where_post, exp_featurec
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert len(output_layerinfo.columns) == len(input_layerinfo.columns) + 1
+    exp_columns = len(input_layerinfo.columns)
+    if area_inters_column_name:
+        exp_columns += 1
+    assert len(output_layerinfo.columns) == exp_columns
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
     assert output_layerinfo.featurecount == exp_featurecount
 

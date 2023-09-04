@@ -1043,7 +1043,7 @@ def export_by_location(
     input_to_compare_with_path: Path,
     output_path: Path,
     min_area_intersect: Optional[float] = None,
-    area_inters_column_name: Optional[str] = "area_inters",
+    area_inters_column_name: Optional[str] = None,
     input_layer: Optional[str] = None,
     input_columns: Optional[List[str]] = None,
     input_to_compare_with_layer: Optional[str] = None,
@@ -1058,73 +1058,75 @@ def export_by_location(
     # TODO: test performance difference between the following two queries
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
-    sql_template = f"""
-        SELECT layer1.{{input1_geometrycolumn}} AS geom
-              {{layer1_columns_prefix_alias_str}}
-          FROM {{input1_databasename}}."{{input1_layer}}" layer1
-          JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-            ON layer1.fid = layer1tree.id
-         WHERE 1=1
-           {{batch_filter}}
-           AND EXISTS (
-              SELECT 1
-                FROM {{input2_databasename}}."{{input2_layer}}" layer2
-                JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                  ON layer2.fid = layer2tree.id
-               WHERE layer1tree.minx <= layer2tree.maxx
-                 AND layer1tree.maxx >= layer2tree.minx
-                 AND layer1tree.miny <= layer2tree.maxy
-                 AND layer1tree.maxy >= layer2tree.miny
-                 AND ST_intersects(layer1.{{input1_geometrycolumn}},
-                                   layer2.{{input2_geometrycolumn}}) = 1
-                 AND ST_touches(layer1.{{input1_geometrycolumn}},
-                                layer2.{{input2_geometrycolumn}}) = 0)
-    """
 
-    # Calculate intersect area if necessary
-    area_inters_column_expression = ""
-    if area_inters_column_name is not None or min_area_intersect is not None:
+    # If intersect area needs to be calculated, other query needed
+    if area_inters_column_name is None and min_area_intersect is None:
+        sql_template = f"""
+            SELECT layer1.{{input1_geometrycolumn}} AS geom
+                  {{layer1_columns_prefix_alias_str}}
+              FROM {{input1_databasename}}."{{input1_layer}}" layer1
+              JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
+                ON layer1.fid = layer1tree.id
+             WHERE 1=1
+               {{batch_filter}}
+               AND EXISTS (
+                  SELECT 1
+                    FROM {{input2_databasename}}."{{input2_layer}}" layer2
+                    JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                      ON layer2.fid = layer2tree.id
+                   WHERE layer1tree.minx <= layer2tree.maxx
+                     AND layer1tree.maxx >= layer2tree.minx
+                     AND layer1tree.miny <= layer2tree.maxy
+                     AND layer1tree.maxy >= layer2tree.miny
+                     AND ST_intersects(layer1.{{input1_geometrycolumn}},
+                                       layer2.{{input2_geometrycolumn}}) = 1
+                     AND ST_touches(layer1.{{input1_geometrycolumn}},
+                                    layer2.{{input2_geometrycolumn}}) = 0)
+            """
+    else:
+        # Intersect area needs to be calculated
         if area_inters_column_name is None:
             area_inters_column_name = "area_inters"
         area_inters_column_expression = f"""
             ,ST_area(ST_intersection(
-                 ST_union(layer1.{{input1_geometrycolumn}}),
-                 ST_union(layer2.{{input2_geometrycolumn}})
-             )) AS {area_inters_column_name}
+                    ST_union(layer1.{{input1_geometrycolumn}}),
+                    ST_union(layer2.{{input2_geometrycolumn}})
+                )) AS {area_inters_column_name}
         """
 
-    # Prepare sql template for this operation
-    sql_template = f"""
-        SELECT ST_union(layer1.{{input1_geometrycolumn}}) as geom
-              {{layer1_columns_prefix_str}}
-              {area_inters_column_expression}
-          FROM {{input1_databasename}}."{{input1_layer}}" layer1
-          JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-            ON layer1.fid = layer1tree.id
-          JOIN {{input2_databasename}}."{{input2_layer}}" layer2
-          JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-            ON layer2.fid = layer2tree.id
-         WHERE 1=1
-           {{batch_filter}}
-           AND layer1tree.minx <= layer2tree.maxx
-           AND layer1tree.maxx >= layer2tree.minx
-           AND layer1tree.miny <= layer2tree.maxy
-           AND layer1tree.maxy >= layer2tree.miny
-           AND ST_Intersects(layer1.{{input1_geometrycolumn}},
-                             layer2.{{input2_geometrycolumn}}) = 1
-           AND ST_Touches(layer1.{{input1_geometrycolumn}},
-                          layer2.{{input2_geometrycolumn}}) = 0
-         GROUP BY layer1.rowid {{layer1_columns_prefix_str}}
-    """
-
-    # Filter on intersect area if necessary
-    if min_area_intersect is not None:
+        # Prepare sql template with intersect area calculation
         sql_template = f"""
-            SELECT sub.* FROM
-              ( {sql_template}
-              ) sub
-             WHERE sub.{area_inters_column_name} >= {min_area_intersect}
+            SELECT ST_union(layer1.{{input1_geometrycolumn}}) as geom
+                  {{layer1_columns_prefix_str}}
+                  {area_inters_column_expression}
+              FROM {{input1_databasename}}."{{input1_layer}}" layer1
+              JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
+                ON layer1.fid = layer1tree.id
+              JOIN {{input2_databasename}}."{{input2_layer}}" layer2
+              JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                ON layer2.fid = layer2tree.id
+             WHERE 1=1
+               {{batch_filter}}
+               AND layer1tree.minx <= layer2tree.maxx
+               AND layer1tree.maxx >= layer2tree.minx
+               AND layer1tree.miny <= layer2tree.maxy
+               AND layer1tree.maxy >= layer2tree.miny
+               AND ST_Intersects(layer1.{{input1_geometrycolumn}},
+                                 layer2.{{input2_geometrycolumn}}) = 1
+               AND ST_Touches(layer1.{{input1_geometrycolumn}},
+                              layer2.{{input2_geometrycolumn}}) = 0
+             GROUP BY layer1.rowid {{layer1_columns_prefix_str}}
         """
+
+        # Filter on intersect area if necessary
+        if min_area_intersect is not None:
+            sql_template = f"""
+                SELECT sub.* FROM
+                  ( {sql_template}
+                     LIMIT -1 OFFSET 0
+                  ) sub
+                WHERE sub.{area_inters_column_name} >= {min_area_intersect}
+            """
 
     # Go!
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)

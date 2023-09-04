@@ -1,4 +1,4 @@
-# Include the test.gpkg as it is needed by ogr_util.py
+# Include test.gpkg as it is needed by ogr_util.py
 include geofileops/util/test.gpkg
 include geofileops/util/geofiletypes.csv
 
@@ -7,6 +7,3 @@ include geofileops/version.txt
 
 # Include the py.types so e.g. mypy knows geofileops is typed
 include geofileops/py.typed
-
-# Include all tests so they can be run when packaging the conda package
-graft tests
