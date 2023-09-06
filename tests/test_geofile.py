@@ -1086,6 +1086,52 @@ def test_to_file_emptyfile(tmp_path, suffix):
     assert input_layerinfo.geometrytype == output_layerinfo.geometrytype
 
 
+def test_to_file_fid_append_to(tmp_path, engine_setter):
+    """Write 2 gpkg files with fid, then use append_to to merge them."""
+    # Prepare test data
+    suffix = ".gpkg"
+    test1_gdf = gpd.GeoDataFrame(
+        [
+            {"geometry": sh_geom.Point(0, 1), "fid": 2},
+            {"geometry": sh_geom.Point(0, 1), "fid": 3},
+        ],
+        crs="epsg:31370",
+    )
+    test2_gdf = gpd.GeoDataFrame(
+        [
+            {"geometry": sh_geom.Point(0, 1), "fid": 5},
+            {"geometry": sh_geom.Point(0, 1), "fid": 6},
+        ],
+        crs="epsg:31370",
+    )
+    output1_path = tmp_path / f"output1{suffix}"
+    output2_path = tmp_path / f"output2{suffix}"
+    output_path = tmp_path / f"output{suffix}"
+
+    # Write the two geodataframes each to a file
+    gfo.to_file(test1_gdf, output1_path)
+    gfo.to_file(test2_gdf, output2_path)
+
+    # Check if the files were written properly
+    output1_gdf = gfo.read_file(output1_path, fid_as_index=True)
+    assert_geodataframe_equal(output1_gdf, test1_gdf.set_index("fid"))
+    output2_gdf = gfo.read_file(output2_path, fid_as_index=True)
+    assert_geodataframe_equal(output2_gdf, test2_gdf.set_index("fid"))
+
+    # Now merge them, but start with the high fid numbers
+    gfo.copy(output2_path, output_path)
+    gfo.rename_layer(output_path, output_path.stem)
+    gfo.append_to(
+        output1_path, output_path, dst_layer=output_path.stem, preserve_fid=True
+    )
+
+    # Prepare expected result
+    expected_gdf = pd.concat([test1_gdf, test2_gdf]).set_index("fid")
+    # Now check result
+    written_gdf = gfo.read_file(output_path, fid_as_index=True)
+    assert_geodataframe_equal(written_gdf, expected_gdf)
+
+
 def test_to_file_force_geometrytype_multitype(tmp_path, engine_setter):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel")

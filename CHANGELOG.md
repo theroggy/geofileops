@@ -74,8 +74,7 @@
 - Add function `get_layer_geometrytypes` to get a list of all geometry types that
   are actually in a layer (#230)
 - Add `fid_as_index` parameter to `read_file` (#215)
-- Add `force_output_geometrytype` parameter to `apply` (#233)
-- Add `fid_as_index` parameter to `read_file` (#215)
+- Preserve `fid` values in single layer operations when possible (#)
 - Add `force_output_geometrytype` parameter to `apply` (#233)
 - Optimize performance of operations when only one batch is used (#19)
 - Optimize number batches for single layer sql operations (#214)

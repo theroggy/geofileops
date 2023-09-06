@@ -1218,6 +1218,7 @@ def _read_file_base_fiona(
     # Set the index to the backed-up fid
     if fid_as_index:
         result_gdf = result_gdf.set_index("__TMP_GEOFILEOPS_FID")
+        result_gdf.index.name = "fid"
 
     # Reorder columns + change casing so they are the same as columns parameter
     if columns_prepared is not None and len(columns_prepared) > 0:

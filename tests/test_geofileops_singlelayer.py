@@ -532,6 +532,53 @@ def test_buffer_negative_where_explode(
 
 
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
+def test_buffer_preserve_fid_gpkg(tmp_path, geoops_module):
+    """
+    Buffer test to check if fid is properly preserved.
+
+    Only relevant for e.g. Geopackage as it saves the fid as a value. For e.g.
+    shapefiles the fid is not retained, but always a sequence from 0 in the file.
+    """
+    # Prepare test data: remove 2 fid's from file to check if the fid's are preserved
+    input_full_path = test_helper.get_testfile("polygon-parcel")
+    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    input_layer = fileops.get_only_layer(input_path)
+    sql_stmt = f'DELETE FROM "{input_layer}" WHERE fid IN (5, 6)'
+    fileops.execute_sql(input_path, sql_stmt=sql_stmt)
+
+    # Now run test
+    output_path = tmp_path / f"{input_path.stem}-{geoops_module}.gpkg"
+    set_geoops_module(geoops_module)
+    input_layerinfo = fileops.get_layerinfo(input_path)
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    # Test positive buffer
+    geoops.buffer(
+        input_path=input_path,
+        output_path=output_path,
+        distance=1,
+        keep_empty_geoms=False,
+        nb_parallel=2,
+        batchsize=batchsize,
+    )
+
+    # Prepare expected result to compare with
+    expected_gdf = fileops.read_file(input_full_path, fid_as_index=True)
+    expected_gdf = expected_gdf[~expected_gdf.index.isin([5, 6])]
+
+    # Check if the output file with the expected result
+    assert output_path.exists()
+    assert fileops.has_spatial_index(output_path)
+    output_gdf = fileops.read_file(output_path, fid_as_index=True)
+    assert len(output_gdf) == len(expected_gdf)
+    assert output_gdf["geometry"].iloc[0] is not None
+    assert (
+        output_gdf.index.sort_values().tolist()
+        == expected_gdf.index.sort_values().tolist()
+    )
+
+
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
 @pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize(
     "empty_input, gridsize, keep_empty_geoms, where_post",

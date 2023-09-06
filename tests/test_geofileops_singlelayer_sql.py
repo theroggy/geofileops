@@ -18,6 +18,7 @@ from tests.test_helper import assert_geodataframe_equal
 def test_delete_duplicate_geometries(tmp_path):
     # Prepare test data
     test_gdf = gpd.GeoDataFrame(
+        {"fid": [1, 2, 3, 4, 5]},
         geometry=[
             test_helper.TestData.polygon_with_island,
             test_helper.TestData.polygon_with_island,
@@ -27,7 +28,7 @@ def test_delete_duplicate_geometries(tmp_path):
         ],
         crs=test_helper.TestData.crs_epsg,
     )
-    expected_gdf = test_gdf.iloc[[0, 2, 4]].reset_index(drop=True)
+    expected_gdf = test_gdf.iloc[[0, 2, 4]].set_index(keys="fid")
     suffix = ".gpkg"
     input_path = tmp_path / f"input_test_data{suffix}"
     gfo.to_file(test_gdf, input_path)
@@ -42,7 +43,7 @@ def test_delete_duplicate_geometries(tmp_path):
     # Check result, 2 duplicates should be removed
     result_info = gfo.get_layerinfo(output_path)
     assert result_info.featurecount == input_info.featurecount - 2
-    result_gdf = gfo.read_file(output_path)
+    result_gdf = gfo.read_file(output_path, fid_as_index=True)
     assert_geodataframe_equal(result_gdf, expected_gdf)
 
 
@@ -78,6 +79,14 @@ def test_isvalid(tmp_path, suffix, epsg):
         "polygon-invalid", dst_dir=tmp_path, suffix=suffix, epsg=epsg
     )
 
+    # For Geopackage, also test if fid is properly preserved
+    preserve_fid = True if suffix == ".gpkg" else False
+    # Delete 2nd row, so we can check properly if fid is retained for Geopackage
+    # WHERE rowid = 2, because fid is not known for .shp file with sql_dialect="SQLITE"
+    input_layer = gfo.get_only_layer(input_path)
+    sql_stmt = f'DELETE FROM "{input_layer}" WHERE rowid = 2'
+    gfo.execute_sql(input_path, sql_stmt=sql_stmt, sql_dialect="SQLITE")
+
     # Now run test
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
     input_layerinfo = gfo.get_layerinfo(input_path)
@@ -90,9 +99,11 @@ def test_isvalid(tmp_path, suffix, epsg):
     assert input_layerinfo.featurecount == result_layerinfo.featurecount
     assert len(input_layerinfo.columns) == len(result_layerinfo.columns) - 2
 
-    output_gdf = gfo.read_file(output_path)
-    assert output_gdf["geometry"][0] is not None
-    assert output_gdf["isvalid"][0] == 0
+    output_gdf = gfo.read_file(output_path, fid_as_index=preserve_fid)
+    assert output_gdf["geometry"].iloc[0] is not None
+    assert output_gdf["isvalid"].iloc[0] == 0
+    if preserve_fid:
+        assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 3]
 
     # Do operation, without specifying output path
     gfo.isvalid(

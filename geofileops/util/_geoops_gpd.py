@@ -41,7 +41,7 @@ import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
-from geofileops import fileops
+from geofileops import fileops, GeofileType
 from geofileops.util import _general_util
 from geofileops.util import _geoops_sql
 from geofileops.util import _io_util
@@ -612,6 +612,11 @@ def _apply_geooperation_to_layer(
     if isinstance(force_output_geometrytype, GeometryType):
         force_output_geometrytype = force_output_geometrytype.name
 
+    # Check if we want to preserve the fid in the output
+    preserve_fid = False
+    if not explodecollections and GeofileType(output_path) == GeofileType.GPKG:
+        preserve_fid = True
+
     # Prepare where_to_apply and filter_null_geoms
     if where_post is not None:
         if where_post == "":
@@ -693,6 +698,7 @@ def _apply_geooperation_to_layer(
                     explodecollections=explodecollections,
                     gridsize=gridsize,
                     keep_empty_geoms=keep_empty_geoms,
+                    preserve_fid=preserve_fid,
                     force=force,
                 )
                 future_to_batch_id[future] = batch_id
@@ -741,6 +747,7 @@ def _apply_geooperation_to_layer(
                                 create_spatial_index=False,
                                 force_output_geometrytype=force_output_geometrytype,
                                 where=where_post,
+                                preserve_fid=preserve_fid,
                             )
                             gfo.remove(tmp_partial_output_path)
 
@@ -782,6 +789,7 @@ def _apply_geooperation(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = True,
+    preserve_fid: bool = False,
     force: bool = False,
 ) -> str:
     # Init
@@ -795,7 +803,11 @@ def _apply_geooperation(
     # Now go!
     start_time = datetime.now()
     data_gdf = gfo.read_file(
-        path=input_path, layer=input_layer, columns=columns, where=where
+        path=input_path,
+        layer=input_layer,
+        columns=columns,
+        where=where,
+        fid_as_index=preserve_fid,
     )
 
     # Run operation if data read
@@ -860,6 +872,10 @@ def _apply_geooperation(
     if len(data_gdf) == 0:
         input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
         force_output_geometrytype = input_layerinfo.geometrytype.to_multitype.name
+
+    # If the index is still unique, save it to fid column so to_file can save it
+    if preserve_fid:
+        data_gdf["fid"] = data_gdf.index
 
     # Use force_multitype, to avoid warnings when some batches contain
     # singletype and some contain multitype geometries

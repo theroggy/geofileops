@@ -15,6 +15,9 @@ def test_clip_by_geometry(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
+    # For Geopackage, also test if fid is properly preserved
+    preserve_fid = True if suffix == ".gpkg" else False
+
     # Do operation
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
     clip_wkt = (
@@ -35,14 +38,21 @@ def test_clip_by_geometry(tmp_path, suffix):
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
     # Now check the contents of the result file
-    output_gdf = gfo.read_file(output_path)
-    assert output_gdf["geometry"][0] is not None
+    output_gdf = gfo.read_file(output_path, fid_as_index=preserve_fid)
+    assert output_gdf["geometry"].iloc[0] is not None
+
+    # Check if the fid was properly retained if relevant
+    if preserve_fid:
+        assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 10]
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
 def test_export_by_bounds(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+
+    # For Geopackage, also test if fid is properly preserved
+    preserve_fid = True if suffix == ".gpkg" else False
 
     # Do operation
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
@@ -59,8 +69,12 @@ def test_export_by_bounds(tmp_path, suffix):
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
     # Now check the contents of the result file
-    output_gdf = gfo.read_file(output_path)
-    assert output_gdf["geometry"][0] is not None
+    output_gdf = gfo.read_file(output_path, fid_as_index=preserve_fid)
+    assert output_gdf["geometry"].iloc[0] is not None
+
+    # Check if the fid was properly retained if relevant
+    if preserve_fid:
+        assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 8]
 
 
 def test_warp(tmp_path):

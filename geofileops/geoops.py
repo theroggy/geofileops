@@ -57,6 +57,9 @@ def apply(
             ``func=lambda row: pygeoops.remove_inner_rings(``
                     ``row.geometry, min_area_to_keep=1)``
 
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
+
     Args:
         input_path (PathLike): the input file
         output_path (PathLike): the file to write the result to
@@ -154,6 +157,9 @@ def buffer(
     Applies a buffer operation on geometry column of the input file.
 
     The result is written to the output file specified.
+
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
 
     Args:
         input_path (PathLike): the input file
@@ -367,6 +373,9 @@ def clip_by_geometry(
     """
     Clip all geometries in the imput file by the geometry provided.
 
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
+
     Args:
         input_path (PathLike): the input file
         output_path (PathLike): the file to write the result to
@@ -415,6 +424,9 @@ def convexhull(
     Applies a convexhull operation on the input file.
 
     The result is written to the output file specified.
+
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
 
     Args:
         input_path (PathLike): the input file
@@ -492,6 +504,9 @@ def delete_duplicate_geometries(
 ):
     """
     Copy all rows to the output file, except for duplicate geometries.
+
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
 
     Args:
         input_path (PathLike): the input file
@@ -749,6 +764,9 @@ def export_by_bounds(
     """
     Export the rows that intersect with the bounds specified.
 
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
+
     Args:
         input_path (PathLike): the input file
         output_path (PathLike): the file to write the result to
@@ -795,6 +813,9 @@ def isvalid(
     Checks for all geometries in the geofile if they are valid.
 
     The results are written to the output file.
+
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
 
     Args:
         input_path (PathLike): The input file.
@@ -877,6 +898,9 @@ def makevalid(
     Alternative names:
         - QGIS: fix geometries
         - shapely: make_valid
+
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
 
     Args:
         input_path (PathLike): The input file.
@@ -1189,6 +1213,9 @@ def simplify(
     Applies a simplify operation on geometry column of the input file.
 
     The result is written to the output file specified.
+
+    If ``explodecollections`` is False and the output file is a GeoPackage, the fid
+    will be preserved. In other cases this will typically not be the case.
 
     Args:
         input_path (PathLike): the input file
