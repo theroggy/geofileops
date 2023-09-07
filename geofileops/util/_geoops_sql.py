@@ -616,7 +616,9 @@ def _single_layer_vector_operation(
             sql_template = f"""
                 SELECT {gridsize_op} AS {input_layerinfo.geometrycolumn}
                       {columns_to_select}
-                  FROM ( {sql_template}
+                  FROM
+                    ( {sql_template}
+                       LIMIT -1 OFFSET 0
                     ) sub_gridsize
             """
 
@@ -625,6 +627,7 @@ def _single_layer_vector_operation(
             sql_template = f"""
                 SELECT * FROM
                     ( {sql_template}
+                       LIMIT -1 OFFSET 0
                     )
                  WHERE {input_layerinfo.geometrycolumn} IS NOT NULL
             """
@@ -638,6 +641,7 @@ def _single_layer_vector_operation(
             sql_template = f"""
                 SELECT * FROM
                     ( {sql_template}
+                       LIMIT -1 OFFSET 0
                     )
                     WHERE {where_post}
             """
@@ -651,6 +655,7 @@ def _single_layer_vector_operation(
             sql_template = f"""
                 SELECT * FROM
                     ( {sql_template}
+                       LIMIT -1 OFFSET 0
                     )
                  ORDER BY {input_layerinfo.geometrycolumn} IS NULL
             """
