@@ -2750,13 +2750,12 @@ def _prepare_processing_params(
             # fast distribution in batches
             batch_info_list = []
             nb_rows_per_batch = round(nb_rows_input_layer / nb_batches)
-            offset = 0
+            start_rowid = min_rowid
             offset_per_batch = round((max_rowid - min_rowid) / nb_batches)
             for batch_id in range(nb_batches):
-                start_rowid = offset
                 if batch_id < (nb_batches - 1):
                     # End rowid for this batch is the next start_rowid - 1
-                    end_rowid = offset + offset_per_batch - 1
+                    end_rowid = start_rowid + offset_per_batch - 1
                 else:
                     # For the last batch, take the max_rowid so no rowid's are
                     # 'lost' due to rounding errors
@@ -2764,7 +2763,7 @@ def _prepare_processing_params(
                 batch_info_list.append(
                     (batch_id, nb_rows_per_batch, start_rowid, end_rowid)
                 )
-                offset += offset_per_batch
+                start_rowid += offset_per_batch
             batch_info_df = pd.DataFrame(
                 batch_info_list, columns=["id", "nb_rows", "start_rowid", "end_rowid"]
             )

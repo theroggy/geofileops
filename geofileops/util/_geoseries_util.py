@@ -112,7 +112,10 @@ def _harmonize_to_multitype(
     geoseries: gpd.GeoSeries, dest_geometrytype: GeometryType
 ) -> gpd.GeoSeries:
     # Copy geoseries data to new array
-    geometries_arr = geoseries.array.data.copy()
+    if gpd_compat.USE_PYGEOS:
+        geometries_arr = geoseries.array.data.copy()
+    else:
+        geometries_arr = geoseries.copy()
 
     # Set empty geometries to None
     empty_idxs = shapely2_or_pygeos.is_empty(geometries_arr)

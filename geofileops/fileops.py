@@ -1001,8 +1001,13 @@ def read_file(
         rows (slice, optional): return only the rows specified. For many file formats
             (e.g. Geopackage) this is slow, so using e.g. a where filter instead is
             recommended. Defaults to None, then all rows are returned.
-        where (str, optional): only return the rows that comply to the filter specified.
-            Filter should be in |OGRSQL_WHERE| sql format. Defaults to None.
+        where (str, optional): where clause to filter features in layer by attribute
+            values. If the datasource natively supports sql, its specific sql dialect
+            should be used (eg. SQLite and GeoPackage: `SQLITE`_, PostgreSQL). If it
+            doesn't, the `OGRSQL WHERE`_ syntax should be used. Note that it is not
+            possible to overrule the sql dialect, this is only possible when you use the
+            sql parameter. Examples: ``"ISO_A3 = 'CAN'"``,
+            ``"POP_EST > 10000000 AND POP_EST < 100000000"``. Defaults to None.
         sql_stmt (str): sql statement to use. Only supported with "pyogrio" engine.
         sql_dialect (str, optional): Sql dialect used. Options are None, "SQLITE" or
             "OGRSQL". If None, for data sources with explicit SQL support the statement
@@ -1022,7 +1027,7 @@ def read_file(
     Returns:
         gpd.GeoDataFrame: the data read.
 
-    .. |OGRSQL_WHERE| raw:: html
+    .. |OGRSQL WHERE| raw:: html
 
         <a href="https://gdal.org/user/ogr_sql_dialect.html#where" target="_blank">OGRSQL WHERE</a>
 
@@ -2147,6 +2152,7 @@ def _append_to_nolock(
     ):
         options["LAYER_CREATION.SPATIAL_INDEX"] = create_spatial_index
 
+    src_layer = src_layer if src_layer is not None else get_only_layer(src)
     src_layerinfo = None
     if where is not None:
         src_layerinfo = get_layerinfo(src, src_layer, raise_on_nogeom=False)
@@ -2178,7 +2184,6 @@ def _append_to_nolock(
         columns_aliased = [
             f'"{column}" AS "{laundered}"' for column, laundered in columns_laundered
         ]
-        layer = src_layer if src_layer is not None else get_only_layer(src)
         # If there is a where specified, integrate it...
         where_clause = ""
         if where is not None:
@@ -2189,7 +2194,7 @@ def _append_to_nolock(
             geometrycolumn = f"{src_layerinfo.geometrycolumn}, "
         sql_stmt = f"""
             SELECT {geometrycolumn}{", ".join(columns_aliased)}
-              FROM "{layer}"
+              FROM "{src_layer}"
              {where_clause}
         """
 
