@@ -10,6 +10,7 @@ import geopandas as gpd
 import pandas as pd
 import pytest
 import shapely
+import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
@@ -135,6 +136,69 @@ def test_erase_explodecollections(tmp_path):
     output_gdf = gfo.read_file(output_path)
     input_gdf = gfo.read_file(input_path)
     erase_gdf = gfo.read_file(erase_path)
+    output_gpd_gdf = gpd.overlay(
+        input_gdf, erase_gdf, how="difference", keep_geom_type=True
+    )
+    output_gpd_gdf = output_gpd_gdf.explode(ignore_index=True)
+    assert_geodataframe_equal(
+        output_gdf,
+        output_gpd_gdf,
+        promote_to_multi=True,
+        sort_values=True,
+        check_less_precise=True,
+        normalize=True,
+    )
+
+
+def test_erase_subdivide_multipolygons(tmp_path):
+    """
+    Test if erase with subdivide also works if the erase layer contains multipolygons.
+
+    It seems spatialite function ST_AsBinary, ST_GeomFromWKB and/or ST_Collect have
+    issues processing nested multi-types (e.g. a GeometryCollection containing e.g.
+    MultiPolygons).
+    """
+    # Prepare test data
+    input_path = test_helper.get_testfile("point")
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    # Prepare erase test data: should be multipolygons
+    zone_path = test_helper.get_testfile("polygon-zone")
+    zones_gdf = gfo.read_file(zone_path)
+
+    erase_geometries = [
+        {"desc": "erase1", "geometry": zones_gdf.geometry[4]},
+        {
+            "desc": "erase2",
+            "geometry": sh_geom.MultiPolygon(
+                [
+                    zones_gdf.geometry[0],
+                    zones_gdf.geometry[1],
+                    zones_gdf.geometry[2],
+                    zones_gdf.geometry[3],
+                ]
+            ),
+        },
+    ]
+    erase_gdf = gpd.GeoDataFrame(erase_geometries, crs=31370)
+    erase_path = tmp_path / f"{zone_path.stem}_multi.gpkg"
+    gfo.to_file(erase_gdf, erase_path)
+
+    output_path = tmp_path / f"{input_path.stem}-output_exploded{input_path.suffix}"
+    gfo.erase(
+        input_path=input_path,
+        erase_path=erase_path,
+        output_path=output_path,
+        batchsize=batchsize,
+        subdivide_coords=10,
+    )
+
+    # Compare result with geopandas
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_gdf = gfo.read_file(output_path)
+    input_gdf = gfo.read_file(input_path)
     output_gpd_gdf = gpd.overlay(
         input_gdf, erase_gdf, how="difference", keep_geom_type=True
     )
