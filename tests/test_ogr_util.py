@@ -110,6 +110,43 @@ def test_vector_translate_input_nolayer(tmp_path):
 
 
 @pytest.mark.parametrize(
+    "expected_error, kwargs",
+    [
+        (
+            "it is not supported to specify both sql_stmt and where",
+            {"where": "abc", "sql_stmt": "def"},
+        ),
+        (
+            "Error input_layers .* not found in",
+            {"input_layers": "unexisting"},
+        ),
+    ],
+)
+def test_vector_translate_invalid_params(tmp_path, kwargs, expected_error):
+    input_path = test_helper.get_testfile("polygon-parcel")
+    output_path = tmp_path / f"output{input_path.suffix}"
+
+    with pytest.raises(Exception, match=expected_error):
+        _ogr_util.vector_translate(str(input_path), output_path, **kwargs)
+
+
+@pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES)
+@pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES)
+def test_vector_translate_sql(tmp_path, input_suffix, output_suffix):
+    input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
+    output_path = tmp_path / f"output{output_suffix}"
+    layer = gfo.get_only_layer(input_path)
+    sql_stmt = f'SELECT * FROM "{layer}"'
+    _ogr_util.vector_translate(input_path, output_path, sql_stmt=sql_stmt)
+
+    assert output_path.exists()
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(input_layerinfo.columns) == len(output_layerinfo.columns)
+    assert input_layerinfo.featurecount == input_layerinfo.featurecount
+
+
+@pytest.mark.parametrize(
     "input_suffix, output_suffix, geom_null_asc, exp_null_geoms",
     [
         (".gpkg", ".gpkg", True, 7),
@@ -118,7 +155,7 @@ def test_vector_translate_input_nolayer(tmp_path):
         (".shp", ".shp", True, 7),
     ],
 )
-def test_vector_translate_geom_null(
+def test_vector_translate_sql_geom_null(
     tmp_path, input_suffix, output_suffix, geom_null_asc, exp_null_geoms
 ):
     """
@@ -163,7 +200,7 @@ def test_vector_translate_geom_null(
 
 @pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES)
 @pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES)
-def test_vector_translate_input_empty(tmp_path, input_suffix, output_suffix):
+def test_vector_translate_sql_input_empty(tmp_path, input_suffix, output_suffix):
     input_path = test_helper.get_testfile(
         "polygon-parcel", suffix=input_suffix, empty=True
     )
@@ -176,24 +213,3 @@ def test_vector_translate_input_empty(tmp_path, input_suffix, output_suffix):
     input_layerinfo = gfo.get_layerinfo(input_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert len(input_layerinfo.columns) == len(output_layerinfo.columns)
-
-
-@pytest.mark.parametrize(
-    "expected_error, kwargs",
-    [
-        (
-            "it is not supported to specify both sql_stmt and where",
-            {"where": "abc", "sql_stmt": "def"},
-        ),
-        (
-            "Error input_layers .* not found in",
-            {"input_layers": "unexisting"},
-        ),
-    ],
-)
-def test_vector_translate_invalid_params(tmp_path, kwargs, expected_error):
-    input_path = test_helper.get_testfile("polygon-parcel")
-    output_path = tmp_path / f"output{input_path.suffix}"
-
-    with pytest.raises(Exception, match=expected_error):
-        _ogr_util.vector_translate(str(input_path), output_path, **kwargs)

@@ -248,7 +248,8 @@ def vector_translate(
             output_geometrytypes.append(force_output_geometrytype.name)
         else:
             output_geometrytypes.append(force_output_geometrytype)
-    output_geometrytypes.append("PROMOTE_TO_MULTI")
+    else:
+        output_geometrytypes.append("PROMOTE_TO_MULTI")
     if transaction_size is not None:
         args.extend(["-gt", str(transaction_size)])
     if preserve_fid is not None:

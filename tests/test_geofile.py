@@ -153,6 +153,39 @@ def test_append_different_columns(tmp_path, suffix):
     assert len(src_info.columns) == len(res_info.columns) + 1
 
 
+def test_append_shp_laundered_columns(tmp_path):
+    # GDAL doesn't seem to handle appending to a shapefile where column laundering is
+    # needed very well: all laundered columns get NULL values instead of the actual
+    # values.
+    # gfo.append_to bypasses this by laundering the columns beforehand via an sql
+    # statement so gdal doesn't need to do laundering.
+    # Start from a gpkg test file, because that can have long column names that need
+    # laundering.
+    src_path = test_helper.get_testfile(
+        "polygon-parcel", dst_dir=tmp_path, suffix=".gpkg"
+    )
+    gfo.add_column(
+        src_path, name="extra_long_columnname", type="TEXT", expression="'TEST VALUE'"
+    )
+    dst_path = tmp_path / "dst.shp"
+    gfo.append_to(src_path, dst_path)
+    gfo.append_to(src_path, dst_path)
+
+    src_info = gfo.get_layerinfo(src_path)
+    dst_info = gfo.get_layerinfo(dst_path)
+
+    # All rows are appended tot the dst layer, and long column name should be laundered
+    assert (src_info.featurecount * 2) == dst_info.featurecount
+    assert len(src_info.columns) == len(dst_info.columns)
+    assert "extra_long" in dst_info.columns
+    assert "extra_long_columnname" not in dst_info.columns
+
+    # Check content
+    dst_gdf = gfo.read_file(dst_path)
+    assert dst_gdf is not None
+    assert dst_gdf["extra_long"].to_list() == ["TEST VALUE"] * len(dst_gdf)
+
+
 @pytest.mark.parametrize("suffix", SUFFIXES)
 def test_cmp(tmp_path, suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
