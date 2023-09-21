@@ -991,7 +991,7 @@ def test_spatial_index(tmp_path, suffix):
     assert has_spatial_index is True
 
     # Spatial index if it exists already by default gives error
-    with pytest.raises(Exception, match="Error adding spatial index to"):
+    with pytest.raises(Exception, match="create_spatial_index error for"):
         gfo.create_spatial_index(path=test_path, layer=layer)
     gfo.create_spatial_index(path=test_path, layer=layer, exist_ok=True)
 

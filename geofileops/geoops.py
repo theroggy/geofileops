@@ -1124,6 +1124,10 @@ def select(
       you use the {batch_filter} placeholder this is even mandatory.
     * When using the (default) "SQLITE" sql dialect, you can also use the spatialite
       functions as documented here: |spatialite_reference_link|.
+    * It is supported to use an attribute table (= table without geometry column) as
+      input layer and/or not to include the geometry column in the selected columns.
+      Note though that if the {columns_to_select_str} placeholder is used, it will
+      start with a "," and if no column precedes it the SQL statement will be invalid.
 
     The result is written to the output file specified.
 
@@ -2077,7 +2081,7 @@ def select_two_layers(
 
     Some important remarks:
 
-    * Because some sql statement won't give the same result when parallellized
+    * Because some sql statement won't give the same result when parallelized
       (eg. when using a group by statement), nb_parallel is 1 by default.
       If you do want to use parallel processing, specify nb_parallel + make
       sure to include the placeholder {batch_filter} in your sql_stmt.
@@ -2089,10 +2093,16 @@ def select_two_layers(
       select from the appropriate table aliases (layer1, layer2).
     * Besides the standard sqlite sql syntacs, you can use the spatialite
       functions as documented here: |sqlite_reference_link|
+    * It is supported to use attribute tables (= table without geometry column) as
+      input layers and/or not to include the geometry column in the selected columns.
+      Note though that if the column placeholders are used (e.g.
+      {layer1_columns_prefix_str}), they will start with a "," and if no column precedes
+      it the SQL statement will be invalid.
+
 
     .. |sqlite_reference_link| raw:: html
 
-        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>  # noqa: E501
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
 
     The result is written to the output file specified.
 

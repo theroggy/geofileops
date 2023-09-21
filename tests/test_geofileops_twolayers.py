@@ -806,6 +806,105 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
     assert output_gdf["geometry"][0] is not None
 
 
+@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("input_nogeom", ["input1", "input2", "both"])
+def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
+    # Prepare test file with geom
+    input_geom_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+
+    # Prepare test file without geometry
+    if suffix == ".shp":
+        # For shapefiles, if there is no geometry only the .dbf file is written
+        input_nogeom_path = tmp_path / "input_nogeom.dbf"
+    else:
+        input_nogeom_path = tmp_path / f"input_nogeom{suffix}"
+
+    input_nogeom_df = pd.DataFrame(
+        {
+            "GEWASGROEP": ["Landbouwinfrastructuur", "Grasland"],
+            "JOINFIELD": ["Landbouwinfrastructuur_joined", "Grasland_joined"],
+        }
+    )
+    gfo.to_file(input_nogeom_df, input_nogeom_path)
+
+    if input_nogeom == "input1":
+        input1_path = input_nogeom_path
+        input2_path = input_geom_path
+        geom_column = '"{input2_geometrycolumn}" AS geom'
+        layer1 = "input_nogeom layer1"
+        layer2 = '"{input2_layer}" layer2'
+        exp_output_geom = True
+        exp_featurecount = 35
+    elif input_nogeom == "input2":
+        input1_path = input_geom_path
+        input2_path = input_nogeom_path
+        geom_column = '"{input1_geometrycolumn}" AS geom'
+        layer1 = '"{input1_layer}" layer1'
+        layer2 = "input_nogeom layer2"
+        exp_output_geom = True
+        exp_featurecount = 35
+    elif input_nogeom == "both":
+        input1_path = input_nogeom_path
+        input2_path = input_nogeom_path
+        geom_column = "NULL AS test"
+        layer1 = "input_nogeom layer1"
+        layer2 = "input_nogeom layer2"
+        exp_output_geom = False
+        exp_featurecount = 2
+
+    if suffix == ".shp" and not exp_output_geom:
+        # For shapefiles, if there is no geometry only the .dbf file is written
+        output_path = tmp_path / f"{input1_path.stem}-output.dbf"
+    else:
+        output_path = tmp_path / f"{input1_path.stem}-output{suffix}"
+
+    # Prepare query to execute.
+    sql_stmt = f"""
+        SELECT {geom_column}
+              {{layer1_columns_prefix_alias_str}}
+              {{layer2_columns_prefix_alias_str}}
+          FROM {{input1_databasename}}.{layer1}
+          JOIN {{input2_databasename}}.{layer2}
+            ON layer2.gewasgroep = layer1.gewasgroep
+         WHERE 1=1
+           {{batch_filter}}
+    """
+    gfo.select_two_layers(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        sql_stmt=sql_stmt,
+        batchsize=exp_featurecount / 2,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    if exp_output_geom:
+        assert gfo.has_spatial_index(output_path)
+
+    input1_layerinfo = gfo.get_layerinfo(input1_path, raise_on_nogeom=False)
+    input2_layerinfo = gfo.get_layerinfo(input2_path, raise_on_nogeom=False)
+    output_layerinfo = gfo.get_layerinfo(output_path, raise_on_nogeom=exp_output_geom)
+
+    exp_columns = len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
+    if input_nogeom == "both":
+        assert output_layerinfo.featurecount == exp_featurecount
+        assert len(output_layerinfo.columns) == exp_columns + 1
+        assert output_layerinfo.geometrycolumn is None
+        assert output_layerinfo.geometrytype is None
+        assert output_layerinfo.crs is None
+    else:
+        assert output_layerinfo.featurecount == exp_featurecount
+        assert len(output_layerinfo.columns) == exp_columns
+        assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+        assert output_layerinfo.crs.to_epsg() == 31370
+
+    # Check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+    if exp_output_geom:
+        assert output_gdf["geometry"][0] is not None
+
+
 @pytest.mark.parametrize(
     "expected_error, input1_path, input2_path, output_path",
     [

@@ -165,7 +165,7 @@ def delete_duplicate_geometries(
     where_post: Optional[str] = None,
     force: bool = False,
 ):
-    # The query as written doesn't give correct results when parallellized,
+    # The query as written doesn't give correct results when parallelized,
     # but it isn't useful to do it for this operation.
     sql_template = """
         SELECT {geometrycolumn} AS {geometrycolumn}
@@ -477,6 +477,36 @@ def _single_layer_vector_operation(
     batchsize: int,
     force: bool,
 ):
+    """
+    Execute a sql query template on the input layer.
+
+    Args:
+        input_path (Path): _description_
+        output_path (Path): _description_
+        sql_template (str): _description_
+        geom_selected (Optional[bool]): True if a geometry column is selected in the
+            sql_template. False if no geometry column is selected. None if it is
+            unclear.
+        operation_name (str): _description_
+        input_layer (Optional[str]): _description_
+        output_layer (Optional[str]): _description_
+        columns (Optional[List[str]]): _description_
+        explodecollections (bool): _description_
+        force_output_geometrytype (Optional[GeometryType]): _description_
+        gridsize (float): _description_
+        keep_empty_geoms (bool): _description_
+        where_post (Optional[str]): _description_
+        sql_dialect (Optional[Literal["SQLITE", "OGRSQL"]]): _description_
+        nb_parallel (int): _description_
+        batchsize (int): _description_
+        force (bool): _description_
+
+    Raises:
+        ValueError: _description_
+        ValueError: _description_
+        ValueError: _description_
+        Exception: _description_
+    """
     # Init
     start_time = datetime.now()
 
@@ -700,7 +730,7 @@ def _single_layer_vector_operation(
                 if nb_batches == 1:
                     create_spatial_index = True
                 translate_info = _ogr_util.VectorTranslateInfo(
-                    input_path=processing_params.batches[batch_id]["path"],
+                    input_path=processing_params.batches[batch_id]["input1_path"],
                     output_path=tmp_partial_output_path,
                     output_layer=output_layer,
                     sql_stmt=sql_stmt,
@@ -2147,7 +2177,7 @@ def _two_layer_vector_operation(
         raise ValueError(f"{operation_name}: input1_path doesn't exist: {input1_path}")
     if not input2_path.exists():
         raise ValueError(f"{operation_name}: input2_path doesn't exist: {input2_path}")
-    if input1_path == output_path or input2_path == output_path:
+    if output_path in (input1_path, input2_path):
         raise ValueError(
             f"{operation_name}: output_path must not equal one of input paths"
         )
@@ -2174,10 +2204,6 @@ def _two_layer_vector_operation(
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
     tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-
-    # Use get_layerinfo to check if the input files are valid
-    gfo.get_layerinfo(input1_path, input1_layer)
-    gfo.get_layerinfo(input2_path, input2_layer)
 
     # Prepare output filename
     tmp_output_path = tempdir / output_path.name
@@ -2235,7 +2261,9 @@ def _two_layer_vector_operation(
         # Format column strings for use in select
         assert processing_params.input1_path is not None
         input1_tmp_layerinfo = gfo.get_layerinfo(
-            processing_params.input1_path, processing_params.input1_layer
+            processing_params.input1_path,
+            processing_params.input1_layer,
+            raise_on_nogeom=False,
         )
         input1_col_strs = _ogr_sql_util.ColumnFormatter(
             columns_asked=input1_columns,
@@ -2246,7 +2274,9 @@ def _two_layer_vector_operation(
         )
         assert processing_params.input2_path is not None
         input2_tmp_layerinfo = gfo.get_layerinfo(
-            processing_params.input2_path, processing_params.input2_layer
+            processing_params.input2_path,
+            processing_params.input2_layer,
+            raise_on_nogeom=False,
         )
         input2_col_strs = _ogr_sql_util.ColumnFormatter(
             columns_asked=input2_columns,
@@ -2394,9 +2424,10 @@ def _two_layer_vector_operation(
                 # Remark: this temp file doesn't need spatial index
                 future = calculate_pool.submit(
                     calculate_two_layers,
-                    input1_path=processing_params.batches[batch_id]["path"],
-                    input1_layer=processing_params.batches[batch_id]["layer"],
-                    input2_path=processing_params.input2_path,
+                    input1_path=processing_params.batches[batch_id]["input1_path"],
+                    input1_layer=processing_params.batches[batch_id]["input1_layer"],
+                    input2_path=processing_params.batches[batch_id]["input2_path"],
+                    input2_layer=processing_params.batches[batch_id]["input2_layer"],
                     output_path=tmp_partial_output_path,
                     sql_stmt=sql_stmt,
                     output_layer=output_layer,
@@ -2484,7 +2515,10 @@ def _two_layer_vector_operation(
         if tmp_output_path.exists():
             if output_with_spatial_index:
                 gfo.create_spatial_index(
-                    path=tmp_output_path, layer=output_layer, exist_ok=True
+                    path=tmp_output_path,
+                    layer=output_layer,
+                    exist_ok=True,
+                    no_geom_ok=True,
                 )
             if tmp_output_path != output_path:
                 output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2505,6 +2539,7 @@ def calculate_two_layers(
     input1_path: Path,
     input1_layer: str,
     input2_path: Path,
+    input2_layer: str,
     output_path: Path,
     sql_stmt: str,
     output_layer: str,
@@ -2525,6 +2560,7 @@ def calculate_two_layers(
             input1_path=input1_path,
             input1_layer=input1_layer,
             input2_path=input2_path,
+            input2_layer=input2_layer,
             output_path=output_tmp_path,
             sql_stmt=sql_stmt,
             output_layer=output_layer,
@@ -2568,12 +2604,12 @@ def calculate_two_layers(
 class ProcessingParams:
     def __init__(
         self,
-        input1_path: Optional[Path] = None,
-        input1_layer: Optional[str] = None,
-        input2_path: Optional[Path] = None,
-        input2_layer: Optional[str] = None,
-        nb_parallel: int = -1,
-        batches: Optional[dict] = None,
+        input1_path: Path,
+        input1_layer: str,
+        input2_path: Optional[Path],
+        input2_layer: Optional[str],
+        nb_parallel: int,
+        batches: dict,
     ):
         self.input1_path = input1_path
         self.input1_layer = input1_layer
@@ -2600,13 +2636,12 @@ def _prepare_processing_params(
     input2_layer: Optional[str] = None,
 ) -> Optional[ProcessingParams]:
     # Init
-    returnvalue = ProcessingParams(nb_parallel=nb_parallel)
     input1_layerinfo = gfo.get_layerinfo(
         input1_path, input1_layer, raise_on_nogeom=False
     )
 
     # Determine the optimal number of parallel processes + batches
-    if returnvalue.nb_parallel == -1:
+    if nb_parallel == -1:
         # If no batch size specified, put at least 100 rows in a batch
         if batchsize <= 0:
             min_rows_per_batch = 100
@@ -2615,15 +2650,15 @@ def _prepare_processing_params(
             min_rows_per_batch = batchsize
 
         max_parallel = max(int(input1_layerinfo.featurecount / min_rows_per_batch), 1)
-        returnvalue.nb_parallel = min(multiprocessing.cpu_count(), max_parallel)
+        nb_parallel = min(multiprocessing.cpu_count(), max_parallel)
 
     # Determine optimal number of batches
     # Remark: especially for 'select' operation, if nb_parallel is 1
     #         nb_batches should be 1 (select might give wrong results)
-    if returnvalue.nb_parallel > 1:
+    if nb_parallel > 1:
         # Limit number of rows processed in parallel to limit memory use
         if batchsize > 0:
-            max_rows_parallel = batchsize * returnvalue.nb_parallel
+            max_rows_parallel = batchsize * nb_parallel
         else:
             max_rows_parallel = 1000000
             if input2_path is not None:
@@ -2633,18 +2668,17 @@ def _prepare_processing_params(
         if input1_layerinfo.featurecount > max_rows_parallel:
             # If more rows than can be handled simultanously in parallel
             nb_batches = int(
-                input1_layerinfo.featurecount
-                / (max_rows_parallel / returnvalue.nb_parallel)
+                input1_layerinfo.featurecount / (max_rows_parallel / nb_parallel)
             )
         elif batchsize > 0:
             # If a batchsize is specified, try to honer it
-            nb_batches = returnvalue.nb_parallel
+            nb_batches = nb_parallel
         else:
             # If no batchsize specified and 2 layer processing, add some batches to
             # reduce impact of possible unbalanced batches on total processing time.
-            nb_batches = returnvalue.nb_parallel
+            nb_batches = nb_parallel
             if input2_path is not None:
-                nb_batches = returnvalue.nb_parallel * 2
+                nb_batches = nb_parallel * 2
 
     elif batchsize > 0:
         nb_batches = math.ceil(input1_layerinfo.featurecount / batchsize)
@@ -2652,13 +2686,7 @@ def _prepare_processing_params(
         nb_batches = 1
 
     # Prepare input files for the calculation
-    returnvalue.input1_layer = input1_layer
-    returnvalue.input2_layer = input2_layer
-
-    if convert_to_spatialite_based is False:
-        returnvalue.input1_path = input1_path
-        returnvalue.input2_path = input2_path
-    else:
+    if convert_to_spatialite_based:
         # Check if the input files are of the correct geofiletype
         input1_geofiletype = GeofileType(input1_path)
         input2_geofiletype = None if input2_path is None else GeofileType(input2_path)
@@ -2668,7 +2696,6 @@ def _prepare_processing_params(
         if input1_geofiletype.is_spatialite_based and (
             input2_geofiletype is None or input1_geofiletype == input2_geofiletype
         ):
-            returnvalue.input1_path = input1_path
             if (
                 input1_geofiletype == GeofileType.GPKG
                 and input1_layerinfo.geometrycolumn is not None
@@ -2677,21 +2704,21 @@ def _prepare_processing_params(
                 gfo.create_spatial_index(input1_path, input1_layer, exist_ok=True)
         else:
             # If not ok, copy the input layer to gpkg
-            returnvalue.input1_path = tempdir / f"{input1_path.stem}.gpkg"
+            input1_tmp_path = tempdir / f"{input1_path.stem}.gpkg"
             gfo.copy_layer(
                 src=input1_path,
                 src_layer=input1_layer,
-                dst=returnvalue.input1_path,
-                dst_layer=returnvalue.input1_layer,
+                dst=input1_tmp_path,
+                dst_layer=input1_layer,
                 preserve_fid=True,
             )
+            input1_path = input1_tmp_path
 
         if input2_path is not None and input2_geofiletype is not None:
             if (
                 input2_geofiletype == input1_geofiletype
                 and input2_geofiletype.is_spatialite_based
             ):
-                returnvalue.input2_path = input2_path
                 input2_layerinfo = gfo.get_layerinfo(
                     input2_path, input2_layer, raise_on_nogeom=False
                 )
@@ -2703,20 +2730,19 @@ def _prepare_processing_params(
                     gfo.create_spatial_index(input2_path, input2_layer, exist_ok=True)
             else:
                 # If not spatialite compatible, copy the input layer to gpkg
-                returnvalue.input2_path = tempdir / f"{input2_path.stem}.gpkg"
+                input2_tmp_path = tempdir / f"{input2_path.stem}.gpkg"
                 gfo.copy_layer(
                     src=input2_path,
                     src_layer=input2_layer,
-                    dst=returnvalue.input2_path,
-                    dst_layer=returnvalue.input2_layer,
+                    dst=input2_tmp_path,
+                    dst_layer=input2_layer,
                     preserve_fid=True,
                 )
+                input2_path = input2_tmp_path
 
     # Prepare batches to process
     # Get column names and info
-    layer1_info = gfo.get_layerinfo(
-        returnvalue.input1_path, returnvalue.input1_layer, raise_on_nogeom=False
-    )
+    layer1_info = gfo.get_layerinfo(input1_path, input1_layer, raise_on_nogeom=False)
 
     # Check number of batches + appoint nb rows to batches
     nb_rows_input_layer = layer1_info.featurecount
@@ -2727,8 +2753,10 @@ def _prepare_processing_params(
     if nb_batches == 1:
         # If only one batch, no filtering is needed
         batches[0] = {}
-        batches[0]["layer"] = returnvalue.input1_layer
-        batches[0]["path"] = returnvalue.input1_path
+        batches[0]["input1_path"] = input1_path
+        batches[0]["input1_layer"] = input1_layer
+        batches[0]["input2_path"] = input2_path
+        batches[0]["input2_layer"] = input2_layer
         batches[0]["batch_filter"] = ""
     else:
         # Determine the min_rowid and max_rowid
@@ -2739,7 +2767,7 @@ def _prepare_processing_params(
             SELECT MAX(rowid) minmax_rowid FROM "{layer1_info.name}"
         """
         batch_info_df = gfo.read_file(
-            path=returnvalue.input1_path, sql_stmt=sql_stmt, sql_dialect="SQLITE"
+            path=input1_path, sql_stmt=sql_stmt, sql_dialect="SQLITE"
         )
         min_rowid = pd.to_numeric(batch_info_df["minmax_rowid"][0]).item()
         max_rowid = pd.to_numeric(batch_info_df["minmax_rowid"][1]).item()
@@ -2784,9 +2812,7 @@ def _prepare_processing_params(
                     )
                  GROUP BY batch_id;
             """
-            batch_info_df = gfo.read_file(
-                path=returnvalue.input1_path, sql_stmt=sql_stmt
-            )
+            batch_info_df = gfo.read_file(path=input1_path, sql_stmt=sql_stmt)
 
         # Prepare the layer alias to use in the batch filter
         layer_alias_d = ""
@@ -2797,8 +2823,10 @@ def _prepare_processing_params(
         for batch_info in batch_info_df.itertuples():
             # Fill out the batch properties
             batches[batch_info.id] = {}
-            batches[batch_info.id]["layer"] = returnvalue.input1_layer
-            batches[batch_info.id]["path"] = returnvalue.input1_path
+            batches[batch_info.id]["input1_path"] = input1_path
+            batches[batch_info.id]["input1_layer"] = input1_layer
+            batches[batch_info.id]["input2_path"] = input2_path
+            batches[batch_info.id]["input2_layer"] = input2_layer
 
             # The batch filter
             if batch_info.id < nb_batches - 1:
@@ -2812,10 +2840,17 @@ def _prepare_processing_params(
                 ] = f"AND {layer_alias_d}rowid >= {batch_info.start_rowid} "
 
     # No use starting more processes than the number of batches...
-    if len(batches) < returnvalue.nb_parallel:
-        returnvalue.nb_parallel = len(batches)
+    if len(batches) < nb_parallel:
+        nb_parallel = len(batches)
 
-    returnvalue.batches = batches
+    returnvalue = ProcessingParams(
+        input1_path=input1_path,
+        input1_layer=input1_layer,
+        input2_path=input2_path,
+        input2_layer=input2_layer,
+        nb_parallel=nb_parallel,
+        batches=batches,
+    )
     returnvalue.to_json(tempdir / "processing_params.json")
     return returnvalue
 

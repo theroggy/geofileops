@@ -43,11 +43,10 @@ def test_st_difference_null(tmp_path):
 @pytest.mark.parametrize("ogr_type", ["WKB", "WKT"])
 def test_nested_collections(ogr_type):
     """
-    ST_difference returns NULL when 2nd argument is NULL.
+    A multi-geometry in a GeometryCollection is "flattened" by spatialite, which should
+    not happen. For wkb's in some cases the result is even
 
-    This is the normal treatment of NULL values: `SELECT (1-NULL)` also results in NULL.
-
-    In several spatial operations IIF statements are used to handle this situation.
+    Bug report: https://groups.google.com/g/spatialite-users/c/GW-Ed0SL81Y
     """
     # Prepare test data
     input_path = test_helper.get_testfile(testfile="polygon-parcel")
@@ -56,10 +55,15 @@ def test_nested_collections(ogr_type):
     )
 
     # Test
-    if ogr_type == "WKB":
+    if ogr_type == "WKT":
         sql_stmt = f"SELECT ST_GeomFromText('{collection.wkt}')"
-    elif ogr_type == "WKT":
+    elif ogr_type == "WKB":
         sql_stmt = f"SELECT ST_GeomFromWKB(x'{collection.wkb_hex}')"
 
     test_gdf = gfo.read_file(input_path, sql_stmt=sql_stmt)
-    assert test_gdf.geometry[0].wkt == collection.wkt
+    if ogr_type == "WKT":
+        # Due to a bug in spatialite this isn't equal even though it should be equal...
+        assert test_gdf.geometry[0].wkt != collection.wkt
+    elif ogr_type == "WKB":
+        # Due to a worse bug in spatialite the wkb version is parsed to a POINT.
+        assert test_gdf.geometry[0].wkt == "GEOMETRYCOLLECTION (POINT (0 0))"

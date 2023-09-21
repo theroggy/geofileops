@@ -11,17 +11,19 @@
 - Add `where_post` parameter to many two layer spatial operations (#312)
 - Add `where` parameter to `copy_layer` and `append_to` (#311)
 - Add support for lang+ algorithm in `simplify` (#334)
-- Support creating geofile without geometry column using `select` (#322)
+- Add support to use `select` and `select_two_layers` on attribute tables (= tables
+  without geometry column) and/or have an attribute table as result (#322, #379)
 - Improve performance of `makevalid` and `isvalid` (#258)
 - Improve performance of `intersection`, 30% faster for typical data, up to 4x faster
   for large input geometries (#340, #358)
 - Improve performance of `clip`: 3x faster for typical data (#358)
 - Improve performance of `export_by_location`, especially when `area_inters_column_name`
   and `min_area_intersect` are `None`: a lot faster + 10x less memory usage (#370)
-- Support on-the-fly subdividing of complex geometries to speed up processing in
-  `erase`, `split`, `symmetric difference` and `union` (#329, #330, #331, #357).
-  The new parameter `subdivide_coords` can be used to control the feature.
-  For files with very large input geometries, up to 100x faster + 10x less memory usage.
+- Improve performance of `erase`, `split`, `symmetric difference` and `union` by
+  applying on-the-fly subdividing of complex geometries to speed up processing. The new
+  parameter `subdivide_coords` can be used to control the feature. For files with very
+  large input geometries, up to 100x faster + 10x less memory usage.
+  (#329, #330, #331, #357)
 - Improve performance of spatial operations when only one batch is used (#271)
 - Improve performance of single layer operations (#375)
 - Improve performance of some geopandas/shapely based operations (#342)
@@ -29,8 +31,8 @@
   operations (#246)
 - Follow geopandas behaviour of using shapely2 and/or pygeos instead of forcing pygeos
   (#294)
-- Improve handling of "SELECT * ..." style queries in `select` and 
-  `select_two_layers` (#283)
+- Improve handling of "SELECT * ..." style queries in `select` and `select_two_layers`
+  (#283)
 - Improve handling + tests regarding empty input layers/NULL geometries (#320)
 - Many small improvements to logging, documentation, error messages,... (#321, #366,...)
 - Use smaller footprint conda packages for tests (use `geopandas-base`, `nomkl`) (#377)

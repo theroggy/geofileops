@@ -44,6 +44,7 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
         input1_path=input1_path,
         input1_layer="parcels",
         input2_path=input2_path,
+        input2_layer="zones",
         output_path=output_path,
         output_layer=output_path.stem,
         output_geometrytype=gfo.GeometryType.MULTIPOLYGON,
@@ -91,6 +92,8 @@ def test_create_table_as_sql_invalidparams(kwargs, expected_error):
         kwargs["input1_layer"] = "input1_layer"
     if "input2_path" not in kwargs:
         kwargs["input2_path"] = Path("input2.gpkg")
+    if "input2_layer" not in kwargs:
+        kwargs["input2_layer"] = "input2_layer"
     if "output_path" not in kwargs:
         kwargs["output_path"] = Path("output.gpkg")
     if "output_layer" not in kwargs:

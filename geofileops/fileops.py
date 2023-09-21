@@ -519,6 +519,7 @@ def create_spatial_index(
     cache_size_mb: Optional[int] = 128,
     exist_ok: bool = False,
     force_rebuild: bool = False,
+    no_geom_ok: bool = False,
 ):
     """
     Create a spatial index on the layer specified.
@@ -530,34 +531,38 @@ def create_spatial_index(
         cache_size_mb (int, optional): cache memory in MB that can be used while
             creating spatial index for spatialite files (.gpkg or .sqlite). If None,
             the default cache_size from sqlite is used. Defaults to 128.
-        exist_ok (bool, options): If True and the index exists already, don't
-            throw an error.
+        exist_ok (bool, optional): If True and the index exists already, don't
+            throw an error. Defaults to False.
         force_rebuild (bool, options): True to force rebuild even if index
             exists already. Defaults to False.
+        no_geom_ok (bool, options): If True and the file doesn't have a geometry column,
+            don't throw an error. Defaults to False.
     """
     # Init
     path = Path(path)
     if layer is None:
         layer = get_only_layer(path)
 
-    # If index already exists, remove index or return
-    if has_spatial_index(path, layer):
-        if force_rebuild:
-            remove_spatial_index(path, layer)
-        elif exist_ok:
-            return
-        else:
-            raise Exception(
-                f"Error adding spatial index to {path}.{layer}, it exists already"
-            )
-
-    # Now really add index
+    # Add index
     datasource = None
     try:
         geofiletype = GeofileType(path)
+
+        layerinfo = get_layerinfo(path, layer, raise_on_nogeom=not no_geom_ok)
+        if no_geom_ok and layerinfo.geometrycolumn is None:
+            return
+
+        # If index already exists, remove index or return
+        if has_spatial_index(path, layer):
+            if force_rebuild:
+                remove_spatial_index(path, layer)
+            elif exist_ok:
+                return
+            else:
+                raise RuntimeError(f"Spatial index exists already on {path}.{layer}")
+
         if geofiletype.is_spatialite_based:
             # The config options need to be set before opening the file!
-            layerinfo = get_layerinfo(path, layer)
             with _ogr_util.set_config_options({"OGR_SQLITE_CACHE": cache_size_mb}):
                 datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
                 geometrycolumn = layerinfo.geometrycolumn
@@ -580,7 +585,9 @@ def create_spatial_index(
 
 
 def has_spatial_index(
-    path: Union[str, "os.PathLike[Any]"], layer: Optional[str] = None
+    path: Union[str, "os.PathLike[Any]"],
+    layer: Optional[str] = None,
+    no_geom_ok: bool = False,
 ) -> bool:
     """
     Check if the layer/column has a spatial index.
@@ -588,12 +595,14 @@ def has_spatial_index(
     Args:
         path (PathLike): The file path.
         layer (str, optional): The layer. Defaults to None.
+        no_geom_ok (bool, options): If True and the file doesn't have a geometry column,
+            don't throw an error. Defaults to False.
 
     Raises:
         ValueError: an invalid parameter value was passed.
 
     Returns:
-        bool: True if the spatial column exists.
+        bool: True if a spatial index exists, False if it doesn't exist.
     """
     # Init
     path = Path(path)
@@ -603,7 +612,9 @@ def has_spatial_index(
     geofiletype = GeofileType(path)
     try:
         if geofiletype.is_spatialite_based:
-            layerinfo = get_layerinfo(path, layer)
+            layerinfo = get_layerinfo(path, layer, raise_on_nogeom=not no_geom_ok)
+            if no_geom_ok and layerinfo.geometrycolumn is None:
+                return False
             datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_READONLY)
             sql = f"""
                 SELECT HasSpatialIndex('{layerinfo.name}',

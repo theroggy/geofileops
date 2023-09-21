@@ -257,6 +257,7 @@ def create_table_as_sql(
     input1_path: Path,
     input1_layer: str,
     input2_path: Path,
+    input2_layer: str,
     output_path: Path,
     sql_stmt: str,
     output_layer: str,
@@ -275,6 +276,7 @@ def create_table_as_sql(
         input1_path (Path): the path to the 1st input file.
         input1_layer (str): the layer/table to select from in het 1st input file
         input2_path (Path): the path to the 2nd input file.
+        input2_layer (str): the layer/table to select from in het 2nd input file
         output_path (Path): the path where the output file needs to be created/appended.
         sql_stmt (str): SELECT statement to run on the input files.
         output_layer (str): layer/table name to use.
@@ -309,13 +311,24 @@ def create_table_as_sql(
     if input2_path is not None and output_suffix_lower != input2_path.suffix.lower():
         raise ValueError("output_path and both input paths must have the same suffix!")
 
-    # Use crs epsg from input1_layer, if it has one
-    input1_layerinfo = gfo.get_layerinfo(input1_path, input1_layer)
+    # Check if crs are the same in the input layers + use it (if there is one)
+    input1_info = gfo.get_layerinfo(input1_path, input1_layer, raise_on_nogeom=False)
+    input2_info = gfo.get_layerinfo(input2_path, input2_layer, raise_on_nogeom=False)
     crs_epsg = -1
-    if input1_layerinfo.crs is not None:
-        epsg = input1_layerinfo.crs.to_epsg()
-        if epsg is not None:
-            crs_epsg = epsg
+    if input1_info.crs is not None:
+        crs_epsg1 = input1_info.crs.to_epsg()
+        if crs_epsg1 is not None:
+            crs_epsg = crs_epsg1
+        # If input 2 also has a crs, check if it is the same.
+        if input2_info.crs is not None and crs_epsg1 != input2_info.crs.to_epsg():
+            logger.warning(
+                "input1 layer doesn't have the same crs as input2 layer: "
+                f"{input1_info.crs} vs {input2_info.crs}"
+            )
+    elif input2_info.crs is not None:
+        crs_epsg2 = input2_info.crs.to_epsg()
+        if crs_epsg2 is not None:
+            crs_epsg = crs_epsg2
 
     # If output file doesn't exist yet, create and init it
     if not output_path.exists():
@@ -406,14 +419,8 @@ def create_table_as_sql(
                 )
 
             # If geometry type was not specified, look for it in column_types
-            if output_geometrytype is None:
-                if "geom" in column_types:
-                    output_geometrytype = GeometryType(column_types["geom"])
-                else:
-                    raise ValueError(
-                        "output_geometrytype not specified + determination from "
-                        "sql_stmt failed"
-                    )
+            if output_geometrytype is None and "geom" in column_types:
+                output_geometrytype = GeometryType(column_types["geom"])
 
             # Prepare sql statement
             sql_stmt = sql_stmt.format(
@@ -460,37 +467,42 @@ def create_table_as_sql(
             conn.execute(sql)
 
             # Add metadata
-            assert output_geometrytype is not None
             if output_suffix_lower == ".gpkg":
+                data_type = "features" if "geom" in column_types else "attributes"
+
                 # ~ mimic behaviour of gpkgAddGeometryColumn()
                 sql = f"""
                     INSERT INTO {output_databasename}.gpkg_contents (
                         table_name, data_type, identifier, description, last_change,
                         min_x, min_y, max_x, max_y, srs_id)
-                    VALUES ('{output_layer}', 'features', NULL, '', DATETIME(),
+                    VALUES ('{output_layer}', '{data_type}', NULL, '', DATETIME(),
                         NULL, NULL, NULL, NULL, {to_string_for_sql(crs_epsg)});
                 """
                 conn.execute(sql)
-                sql = f"""
-                    INSERT INTO {output_databasename}.gpkg_geometry_columns (
-                        table_name, column_name, geometry_type_name, srs_id, z, m)
-                    VALUES ('{output_layer}', 'geom', '{output_geometrytype.name}',
-                        {to_string_for_sql(crs_epsg)}, 0, 0);
-                """
-                conn.execute(sql)
 
-                # Now add geom triggers
-                # Remark: this only works on the main database!
-                sql = f"SELECT gpkgAddGeometryTriggers('{output_layer}', 'geom');"
-                conn.execute(sql)
+                # If there is a geometry column, register it
+                if "geom" in column_types:
+                    sql = f"""
+                        INSERT INTO {output_databasename}.gpkg_geometry_columns (
+                            table_name, column_name, geometry_type_name, srs_id, z, m)
+                        VALUES ('{output_layer}', 'geom', '{output_geometrytype.name}',
+                            {to_string_for_sql(crs_epsg)}, 0, 0);
+                    """
+                    conn.execute(sql)
+
+                    # Now add geom triggers
+                    # Remark: this only works on the main database!
+                    sql = f"SELECT gpkgAddGeometryTriggers('{output_layer}', 'geom');"
+                    conn.execute(sql)
             elif output_suffix_lower == ".sqlite":
-                # Create metadata for the geometry column
-                sql = f"""
-                    SELECT RecoverGeometryColumn(
-                        '{output_layer}', 'geom',
-                        {to_string_for_sql(crs_epsg)}, '{output_geometrytype.name}');
-                """
-                conn.execute(sql)
+                # Create geom metadata if there is one
+                if "geom" in column_types:
+                    sql = f"""
+                        SELECT RecoverGeometryColumn(
+                          '{output_layer}', 'geom',
+                          {to_string_for_sql(crs_epsg)}, '{output_geometrytype.name}');
+                    """
+                    conn.execute(sql)
 
             # Insert data using the sql statement specified
             try:
@@ -513,7 +525,7 @@ def create_table_as_sql(
                 raise
 
             # Create spatial index if needed
-            if create_spatial_index is True:
+            if "geom" in column_types and create_spatial_index is True:
                 sql = f"SELECT UpdateLayerStatistics('{output_layer}', 'geom');"
                 conn.execute(sql)
                 if output_suffix_lower == ".gpkg":
