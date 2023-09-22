@@ -1,0 +1,12 @@
+name: geofileops-installed-latest
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pip
+  # required
+  - geofileops
+  # testing
+  - pytest
+  - pip:
+    - simplification
