@@ -12,7 +12,7 @@ import multiprocessing
 from pathlib import Path
 import shutil
 import string
-from typing import Dict, Iterable, List, Literal, Optional, Union
+from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union
 import warnings
 
 import pandas as pd
@@ -2640,51 +2640,6 @@ def _prepare_processing_params(
         input1_path, input1_layer, raise_on_nogeom=False
     )
 
-    # Determine the optimal number of parallel processes + batches
-    if nb_parallel == -1:
-        # If no batch size specified, put at least 100 rows in a batch
-        if batchsize <= 0:
-            min_rows_per_batch = 100
-        else:
-            # If batchsize is specified, use the batch size
-            min_rows_per_batch = batchsize
-
-        max_parallel = max(int(input1_layerinfo.featurecount / min_rows_per_batch), 1)
-        nb_parallel = min(multiprocessing.cpu_count(), max_parallel)
-
-    # Determine optimal number of batches
-    # Remark: especially for 'select' operation, if nb_parallel is 1
-    #         nb_batches should be 1 (select might give wrong results)
-    if nb_parallel > 1:
-        # Limit number of rows processed in parallel to limit memory use
-        if batchsize > 0:
-            max_rows_parallel = batchsize * nb_parallel
-        else:
-            max_rows_parallel = 1000000
-            if input2_path is not None:
-                max_rows_parallel = 200000
-
-        # Adapt number of batches to max_rows_parallel
-        if input1_layerinfo.featurecount > max_rows_parallel:
-            # If more rows than can be handled simultanously in parallel
-            nb_batches = int(
-                input1_layerinfo.featurecount / (max_rows_parallel / nb_parallel)
-            )
-        elif batchsize > 0:
-            # If a batchsize is specified, try to honer it
-            nb_batches = nb_parallel
-        else:
-            # If no batchsize specified and 2 layer processing, add some batches to
-            # reduce impact of possible unbalanced batches on total processing time.
-            nb_batches = nb_parallel
-            if input2_path is not None:
-                nb_batches = nb_parallel * 2
-
-    elif batchsize > 0:
-        nb_batches = math.ceil(input1_layerinfo.featurecount / batchsize)
-    else:
-        nb_batches = 1
-
     # Prepare input files for the calculation
     if convert_to_spatialite_based:
         # Check if the input files are of the correct geofiletype
@@ -2741,14 +2696,18 @@ def _prepare_processing_params(
                 input2_path = input2_tmp_path
 
     # Prepare batches to process
-    # Get column names and info
     layer1_info = gfo.get_layerinfo(input1_path, input1_layer, raise_on_nogeom=False)
+    nb_rows_input_layer = layer1_info.featurecount
+
+    # Determine optimal number of batches
+    nb_parallel, nb_batches = _determine_nb_batches(
+        nb_rows_input_layer=nb_rows_input_layer,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        is_twolayer_operation=input2_path is not None,
+    )
 
     # Check number of batches + appoint nb rows to batches
-    nb_rows_input_layer = layer1_info.featurecount
-    if nb_batches > int(nb_rows_input_layer / 10):
-        nb_batches = max(int(nb_rows_input_layer / 10), 1)
-
     batches: Dict[int, dict] = {}
     if nb_batches == 1:
         # If only one batch, no filtering is needed
@@ -2853,6 +2812,94 @@ def _prepare_processing_params(
     )
     returnvalue.to_json(tempdir / "processing_params.json")
     return returnvalue
+
+
+def _determine_nb_batches(
+    nb_rows_input_layer: int,
+    nb_parallel: int,
+    batchsize: int,
+    is_twolayer_operation: bool,
+    cpu_count: Optional[int] = None,
+) -> Tuple[int, int]:
+    """
+    Determine an optimal number of batches and parallel workers.
+
+    Args:
+        nb_rows_input_layer (int): number of input rows
+        nb_parallel (int): recommended number of workers
+        batchsize (int): recommended number of rows per batch
+        is_twolayer_operation (bool): True if optimization for a two layer operation,
+            False if it involves a single layer operation.
+        cpu_count (int, optional): the number of CPU's available. If None, this is
+            determined automatically if needed.
+
+    Returns:
+        Tuple[int, int]: Tuple of (nb_parallel, nb_batches)
+    """
+    # If no or 1 input rows or if 1 parallel worker is asked
+    # Remark: especially for 'select' operation, if nb_parallel is 1 nb_batches should
+    # be 1 (select might give wrong results)
+    if nb_rows_input_layer <= 1 or nb_parallel == 1:
+        return (1, 1)
+
+    if cpu_count is None:
+        cpu_count = multiprocessing.cpu_count()
+
+    # Determine the optimal number of parallel workers
+    if nb_parallel == -1:
+        # If no batch size specified, put at least 100 rows in a batch
+        if batchsize <= 0:
+            min_rows_per_batch = 100
+        else:
+            # If batchsize is specified, use the batch size
+            min_rows_per_batch = batchsize
+
+        max_parallel = max(int(nb_rows_input_layer / min_rows_per_batch), 1)
+        nb_parallel = min(cpu_count, max_parallel)
+
+    # Determine optimal number of batches
+    if nb_parallel > 1:
+        # Limit number of rows processed in parallel to limit memory use
+        if batchsize > 0:
+            max_rows_parallel = batchsize * nb_parallel
+        else:
+            max_rows_parallel = 1000000
+            if is_twolayer_operation:
+                max_rows_parallel = 200000
+
+        # Adapt number of batches to max_rows_parallel
+        if nb_rows_input_layer > max_rows_parallel:
+            # If more rows than can be handled simultanously in parallel
+            nb_batches = math.ceil(
+                nb_rows_input_layer / (max_rows_parallel / nb_parallel)
+            )
+            # Round up to the nearest multiple of nb_parallel
+            nb_batches = math.ceil(nb_batches / nb_parallel) * nb_parallel
+        elif batchsize > 0:
+            # If a batchsize is specified, try to honer it
+            nb_batches = nb_parallel
+        else:
+            nb_batches = nb_parallel
+
+            # If no batchsize specified and 2 layer processing, add some batches to
+            # reduce impact of possible unbalanced batches on total processing time.
+            if is_twolayer_operation:
+                nb_batches *= 2
+
+    elif batchsize > 0:
+        nb_batches = math.ceil(nb_rows_input_layer / batchsize)
+
+    else:
+        nb_batches = 1
+
+    # If more batches than rows, limit nb batches
+    if nb_batches > nb_rows_input_layer:
+        nb_batches = nb_rows_input_layer
+    # If more parallel than number of batches, nimit nb_parallel
+    if nb_parallel > nb_batches:
+        nb_parallel = nb_batches
+
+    return (nb_parallel, nb_batches)
 
 
 def dissolve_singlethread(

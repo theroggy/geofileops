@@ -4,8 +4,8 @@
 name: TestsOnInstalled
 
 on:
-  # pull_request:
-  #   branches: [ main, v0.** ]
+  #pull_request:
+  #  branches: [ main, v0.** ]
   schedule:
     - cron: "0 0 * * *"
 
@@ -15,38 +15,41 @@ concurrency:
 
 jobs:
   TestsOnInstalled:    
-    name: ${{ matrix.ref }}|python ${{ matrix.python }}|${{ matrix.os }}
+    name: ${{ matrix.checkout_ref }} - python ${{ matrix.python }} - ${{ matrix.os }}
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: "ubuntu-latest"
     defaults:
       run:
         shell: bash -l {0}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: ["ubuntu-latest"]
         dev: [false]
         python: ["3.11"]
-        ref: ["v0.7.x"]
         env: ["installed"]
-        # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
-        extra: ["nomkl"]
+        include:
+          - checkout_ref: "v0.7.x"
+            # nomkl: openblas instead of mkl saves 600 MB. Linux OK, but 50% slower on Windows and OSX!
+            install_extra_args: >-
+              nomkl
+              geofileops=0.7.1
 
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ matrix.ref }}
+          ref: ${{ matrix.checkout_ref }}
           sparse-checkout: |
             ci
             tests
       - name: Install Conda environment with Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
-          micromamba-version: '1.5.1-0'
+          micromamba-version: "1.5.1-0"
           environment-file: ci/envs/${{ matrix.env }}.yml
           create-args: >-
             python=${{ matrix.python }}
-            ${{ matrix.extra }}
+            ${{ matrix.install_extra_args }}
 
       - name: Test
         run: |
