@@ -1209,7 +1209,7 @@ def _read_file_base_fiona(
     # make sure the column names specified have the same casing.
     columns_prepared = None
     if columns is not None:
-        layerinfo = get_layerinfo(path, layer=layer)
+        layerinfo = get_layerinfo(path, layer=layer, raise_on_nogeom=False)
         columns_upper_lookup = {column.upper(): column for column in columns}
         columns_prepared = {
             column: columns_upper_lookup[column.upper()]
@@ -1238,7 +1238,10 @@ def _read_file_base_fiona(
 
     # Reorder columns + change casing so they are the same as columns parameter
     if columns_prepared is not None and len(columns_prepared) > 0:
-        result_gdf = result_gdf[list(columns_prepared) + ["geometry"]]
+        columns_to_keep = list(columns_prepared)
+        if layerinfo.geometrycolumn is not None and not ignore_geometry:
+            columns_to_keep += ["geometry"]
+        result_gdf = result_gdf[columns_to_keep]
         result_gdf = result_gdf.rename(columns=columns_prepared)
 
     # Starting from fiona 1.9, string columns with all None values are read as being
@@ -1298,7 +1301,7 @@ def _read_file_base_pyogrio(
         # Checking if column names should be read is case sensitive in pyogrio, so
         # make sure the column names specified have the same casing.
         if columns is not None:
-            layerinfo = get_layerinfo(path, layer=layer)
+            layerinfo = get_layerinfo(path, layer=layer, raise_on_nogeom=False)
             columns_upper_lookup = {column.upper(): column for column in columns}
             columns_prepared = {
                 column: columns_upper_lookup[column.upper()]
@@ -1331,7 +1334,10 @@ def _read_file_base_pyogrio(
 
     # Reorder columns + change casing so they are the same as columns parameter
     if columns_prepared is not None and len(columns_prepared) > 0:
-        result_gdf = result_gdf[list(columns_prepared) + ["geometry"]]
+        columns_to_keep = list(columns_prepared)
+        if layerinfo.geometrycolumn is not None and not ignore_geometry:
+            columns_to_keep += ["geometry"]
+        result_gdf = result_gdf[columns_to_keep]
         result_gdf = result_gdf.rename(columns=columns_prepared)
 
     # Cast columns that are of object type, but contain datetime.date or datetime.date
@@ -1511,6 +1517,7 @@ def to_file(
         isinstance(gdf, gpd.GeoDataFrame) and "geometry" not in gdf.columns
     ):
         engine = "fiona"
+        create_spatial_index = False
     else:
         engine = _get_engine()
 
