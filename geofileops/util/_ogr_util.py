@@ -300,7 +300,11 @@ def vector_translate(
         output_geometrytypes.append("PROMOTE_TO_MULTI")
     if transaction_size is not None:
         args.extend(["-gt", str(transaction_size)])
-    if preserve_fid is not None:
+    if preserve_fid is None:
+        if explodecollections:
+            # If explodecollections is specified, explicitly disable fid to avoid errors
+            args.append("-unsetFid")
+    else:
         if preserve_fid:
             args.append("-preserve_fid")
         else:

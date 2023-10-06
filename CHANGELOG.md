@@ -46,6 +46,7 @@
 - Fix "json" aggregate column handling in dissolve on line and point input files gives
   wrong results (#257)
 - Fix error in `read_file` when `read_geometry=False` and `columns` specified (#393)
+- Fix error in `copy_layer` with `explodecollections` on some input files (#395)
 
 ### Deprecations and compatibility notes
 

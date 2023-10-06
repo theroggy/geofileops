@@ -201,7 +201,7 @@ def test_cmp(tmp_path, suffix):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
-def test_convert(tmp_path, suffix):
+def test_copy_layer(tmp_path, suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
     # Convert
@@ -216,7 +216,7 @@ def test_convert(tmp_path, suffix):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
-def test_convert_emptyfile(tmp_path, suffix):
+def test_copy_layer_emptyfile(tmp_path, suffix):
     # Convert
     src = test_helper.get_testfile(
         "polygon-parcel", suffix=suffix, dst_dir=tmp_path, empty=True
@@ -232,6 +232,16 @@ def test_convert_emptyfile(tmp_path, suffix):
     assert len(src_layerinfo.columns) == len(dst_layerinfo.columns)
 
 
+def test_copy_layer_explodecollections(tmp_path):
+    src = test_helper.get_testfile("polygon-parcel")
+    dst = tmp_path / f"{src.stem}.gpkg"
+
+    # copy_layer, with explodecollections. Default behaviour of gdal was to try to
+    # preserve the fids, but this didn't work with explodecolledtions, this was
+    # overruled in #395
+    gfo.copy_layer(src, dst, explodecollections=True)
+
+
 @pytest.mark.parametrize(
     "testfile, force_geometrytype",
     [
@@ -243,18 +253,18 @@ def test_convert_emptyfile(tmp_path, suffix):
         ("polygon-parcel", GeometryType.MULTIPOINT),
     ],
 )
-def test_convert_force_output_geometrytype(tmp_path, testfile, force_geometrytype):
+def test_copy_layer_force_output_geometrytype(tmp_path, testfile, force_geometrytype):
     # The conversion is done by ogr, and the "test" is rather written to
     # explore the behaviour of this ogr functionality
 
-    # Convert testfile and force to force_geometrytype
+    # copy_layer on testfile and force to force_geometrytype
     src = test_helper.get_testfile(testfile)
     dst = tmp_path / f"{src.stem}_to_{force_geometrytype}.gpkg"
     gfo.copy_layer(src, dst, force_output_geometrytype=force_geometrytype)
     assert gfo.get_layerinfo(dst).geometrytype == force_geometrytype
 
 
-def test_convert_invalid_params(tmp_path):
+def test_copy_layer_invalid_params(tmp_path):
     # Convert
     src = tmp_path / "nonexisting_file.gpkg"
     dst = tmp_path / "output.gpkg"
@@ -272,7 +282,7 @@ def test_convert_invalid_params(tmp_path):
         (".shp", ".sqlite", False, False),
     ],
 )
-def test_convert_preserve_fid(
+def test_copy_layer_preserve_fid(
     tmp_path,
     src_suffix: str,
     dst_suffix: str,
@@ -281,8 +291,7 @@ def test_convert_preserve_fid(
 ):
     src = test_helper.get_testfile("polygon-parcel", suffix=src_suffix)
 
-    # Convert with preserve_fid=None (default)
-    # ----------------------------------------
+    # copy_layer
     dst = tmp_path / f"{src.stem}-output_preserve_fid-{preserve_fid}{dst_suffix}"
     gfo.copy_layer(src, dst, preserve_fid=preserve_fid)
 
@@ -299,10 +308,10 @@ def test_convert_preserve_fid(
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
 @pytest.mark.parametrize("src_crs", [None, 31370])
-def test_convert_reproject(tmp_path, suffix, src_crs):
+def test_copy_layer_reproject(tmp_path, suffix, src_crs):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
-    # Convert with reproject
+    # copy_layer with reproject
     dst = tmp_path / f"{src.stem}-output_reproj4326{suffix}"
     gfo.copy_layer(src, dst, src_crs=src_crs, dst_crs=4326, reproject=True)
 
@@ -327,10 +336,10 @@ def test_convert_reproject(tmp_path, suffix, src_crs):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES)
-def test_convert_where(tmp_path, suffix):
+def test_copy_layer_where(tmp_path, suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
-    # Convert with where
+    # copy_layer with where
     dst = tmp_path / f"{src.stem}-output_where{suffix}"
     gfo.copy_layer(src, dst, where="ST_Area({geometrycolumn}) > 500")
 
