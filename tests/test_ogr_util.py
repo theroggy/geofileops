@@ -12,6 +12,34 @@ from geofileops.util import _ogr_util
 from tests import test_helper
 
 
+@pytest.mark.parametrize(
+    "log_details, error_details",
+    [
+        ([], []),
+        (["Logline1", "Logline2", "ERROR1", "ERROR2"], ["ERROR1", "ERROR2"]),
+    ],
+)
+def test_GDALError(log_details, error_details):
+    ex = _ogr_util.GDALError(
+        "Error", log_details=log_details, error_details=error_details
+    )
+
+    ex_str = str(ex)
+    if len(log_details) > 0:
+        # The line with only "\n" is dropped
+        assert len(ex.log_details) == len(log_details)
+        assert len(ex.error_details) == 2
+        assert "GDAL CPL_LOG ERRORS" in ex_str
+        assert "GDAL CPL_LOG ALL" in ex_str
+        for line in log_details:
+            assert line in ex_str
+        for line in error_details:
+            assert line in ex_str
+    else:
+        assert ex.error_details == []
+        assert ex.log_details == []
+
+
 def test_get_drivers():
     drivers = _ogr_util.get_drivers()
     assert len(drivers) > 0
@@ -51,6 +79,28 @@ def test_prepare_gdal_options():
         except Exception:
             error_raised = True
         assert error_raised is True, f"Error should have been raised for {option}"
+
+
+def test_read_cpl_log(tmp_path):
+    # Prepare test data
+    cpl_log_path = tmp_path / "cpl_log.log"
+    test_log_lines = [
+        "logging line 1\n",
+        "ERROR1\n",
+        "\nERROR2\n",
+        "\0\n",
+        "\n",
+        "logging line 3\n",
+    ]
+    with open(cpl_log_path, mode="w") as file:
+        file.writelines(test_log_lines)
+
+    # Test
+    log_lines, error_lines = _ogr_util.read_cpl_log(cpl_log_path)
+
+    assert len(error_lines) == 2
+    # There are two lines with no usefull data, thay will be ignored
+    assert len(log_lines) == len(test_log_lines) - 2
 
 
 def test_set_config_options():
@@ -95,6 +145,29 @@ def test_set_config_options():
     # If option via env is changed, it changes here as well
     os.environ[test3_config_envset] = "test3_new_env_value"
     assert gdal.GetConfigOption(test3_config_envset) == "test3_new_env_value"
+
+
+def test_vector_translate_gdal_error(tmp_path):
+    input_path = test_helper.get_testfile("polygon-parcel")
+    output_path = tmp_path / "output.gpkg"
+    try:
+        _ogr_util.vector_translate(
+            input_path, output_path, explodecollections=True, preserve_fid=True
+        )
+    except _ogr_util.GDALError as ex:
+        assert ex.error_details == []
+
+        # Locally, the test works fine, but when running the CI on github it doesn't:
+        # the CPL_LOG file stays empty there?
+        if test_helper.RUNS_LOCAL:
+            assert len(ex.log_details) > 0
+        else:
+            assert len(ex.log_details) == 0
+
+        # Test succesful: GDALError was raised correctly
+        return
+
+    assert False, "A GDALError should have been raised but wasn't"
 
 
 def test_vector_translate_input_nolayer(tmp_path):

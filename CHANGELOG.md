@@ -34,7 +34,8 @@
 - Improve handling of "SELECT * ..." style queries in `select` and `select_two_layers`
   (#283)
 - Improve handling + tests regarding empty input layers/NULL geometries (#320)
-- Many small improvements to logging, documentation, error messages,... (#321, #366,...)
+- Many small improvements to logging, documentation, (gdal)error messages,...
+  (#321, #366, #394,...)
 - Use smaller footprint conda packages for tests (use `geopandas-base`, `nomkl`) (#377)
 - Use ruff instead of flake8 for linting (#317)
 
