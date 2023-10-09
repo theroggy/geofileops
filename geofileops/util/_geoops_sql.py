@@ -1721,7 +1721,7 @@ def select_two_layers(
     )
 
 
-def split(
+def identity(
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
@@ -1853,7 +1853,7 @@ def split(
         input2_path=input2_path,
         output_path=output_path,
         sql_template=sql_template,
-        operation_name="split",
+        operation_name="identity",
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2004,10 +2004,10 @@ def union(
     subdivide_coords: int = 1000,
     force: bool = False,
 ):
-    # A union can be simulated by doing a "split" of input1 and input2 and
+    # A union can be simulated by doing an "identity" of input1 and input2 and
     # then append the result of an erase of input2 with input1...
 
-    # Because the calculations in split and erase will be towards temp files,
+    # Because the calculations in identity and erase will be towards temp files,
     # we need to do some additional init + checks here...
     if force is False and output_path.exists():
         return
@@ -2017,12 +2017,12 @@ def union(
     start_time = datetime.now()
     tempdir = _io_util.create_tempdir("geofileops/union")
     try:
-        # First split input1 with input2 to a temporary output gfo...
-        split_output_path = tempdir / "split_output.gpkg"
-        split(
+        # First apply identity of input1 with input2 to a temporary output file...
+        identity_output_path = tempdir / "identity_output.gpkg"
+        identity(
             input1_path=input1_path,
             input2_path=input2_path,
-            output_path=split_output_path,
+            output_path=identity_output_path,
             input1_layer=input1_layer,
             input1_columns=input1_columns,
             input1_columns_prefix=input1_columns_prefix,
@@ -2064,17 +2064,17 @@ def union(
         # Now append
         _append_to_nolock(
             src=erase_output_path,
-            dst=split_output_path,
+            dst=identity_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
         )
 
         # Convert or add spatial index
-        tmp_output_path = split_output_path
-        if split_output_path.suffix != output_path.suffix:
+        tmp_output_path = identity_output_path
+        if identity_output_path.suffix != output_path.suffix:
             # Output file should be in different format, so convert
             tmp_output_path = tempdir / output_path.name
-            gfo.copy_layer(src=split_output_path, dst=tmp_output_path)
+            gfo.copy_layer(src=identity_output_path, dst=tmp_output_path)
         else:
             # Create spatial index
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)

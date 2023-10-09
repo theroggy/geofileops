@@ -44,7 +44,7 @@ Spatial operations on two layers
    join_by_location
    join_nearest
    select_two_layers
-   split
+   identity
    symmetric_difference
    union
 

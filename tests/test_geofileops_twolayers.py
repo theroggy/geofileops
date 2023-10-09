@@ -289,6 +289,62 @@ def test_export_by_distance(tmp_path, testfile, suffix):
     assert output_gdf["geometry"][0] is not None
 
 
+@pytest.mark.parametrize(
+    "suffix, epsg, gridsize",
+    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.001)],
+)
+def test_identity(tmp_path, suffix, epsg, gridsize):
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
+    input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+    output_path = tmp_path / f"{input1_path.stem}-output{suffix}"
+
+    # Test
+    gfo.identity(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        gridsize=gridsize,
+        batchsize=batchsize,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    input2_layerinfo = gfo.get_layerinfo(input2_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert output_layerinfo.featurecount == 67
+    assert (len(input1_layerinfo.columns) + len(input2_layerinfo.columns)) == len(
+        output_layerinfo.columns
+    )
+    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+    # Check the contents of the result file
+    output_gfo_gdf = gfo.read_file(output_path)
+    assert output_gfo_gdf["geometry"][0] is not None
+    input1_gdf = gfo.read_file(input1_path)
+    input2_gdf = gfo.read_file(input2_path)
+    output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="identity", keep_geom_type=True)
+    renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
+    output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
+    if gridsize != 0.0:
+        output_gpd_gdf.geometry = shapely.set_precision(
+            output_gpd_gdf.geometry, grid_size=gridsize
+        )
+    # OIDN is float vs int? -> check_column_type=False
+    assert_geodataframe_equal(
+        output_gfo_gdf,
+        output_gpd_gdf,
+        promote_to_multi=True,
+        sort_values=True,
+        check_less_precise=True,
+        normalize=True,
+        check_dtype=False,
+    )
+
+
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
 @pytest.mark.parametrize(
     "suffix, epsg, gridsize, explodecollections, nb_parallel",
@@ -1187,24 +1243,20 @@ def test_select_two_layers_select_star_fids_unique(tmp_path, suffix):
     assert len(output_layerinfo.columns) == exp_nb_columns
 
 
-@pytest.mark.parametrize(
-    "suffix, epsg, gridsize",
-    [(".gpkg", 31370, 0.001), (".gpkg", 4326, 0.0), (".shp", 31370, 0.001)],
-)
-def test_split(tmp_path, suffix, epsg, gridsize):
+def test_split(tmp_path):
+    """Is deprecated, but keep minimal test."""
     # Prepare test data
-    input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
-    input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
-    output_path = tmp_path / f"{input1_path.stem}-output{suffix}"
+    output_path = tmp_path / f"{input1_path.stem}-output.gpkg"
 
     # Test
     gfo.split(
         input1_path=input1_path,
         input2_path=input2_path,
         output_path=output_path,
-        gridsize=gridsize,
         batchsize=batchsize,
     )
 
@@ -1227,10 +1279,7 @@ def test_split(tmp_path, suffix, epsg, gridsize):
     output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="identity", keep_geom_type=True)
     renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
     output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
-    if gridsize != 0.0:
-        output_gpd_gdf.geometry = shapely.set_precision(
-            output_gpd_gdf.geometry, grid_size=gridsize
-        )
+
     # OIDN is float vs int? -> check_column_type=False
     assert_geodataframe_equal(
         output_gfo_gdf,
