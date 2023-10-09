@@ -1009,30 +1009,27 @@ def erase(
         SELECT * FROM (
           SELECT IFNULL(
                    ( SELECT IFNULL(
-                                ST_GeomFromWKB(GFO_Difference_Collection(
-                                    ST_AsBinary(layer1_sub.{{input1_geometrycolumn}}),
-                                    ST_AsBinary(ST_Collect(layer2_sub.geom_divided)),
-                                    1,
-                                    {subdivide_coords}
-                                )),
-                                'DIFF_EMPTY'
+                               ST_GeomFromWKB(GFO_Difference_Collection(
+                                  ST_AsBinary(layer1_sub.{{input1_geometrycolumn}}),
+                                  ST_AsBinary(ST_Collect(
+                                     IIF(
+                                        ST_NPoints(layer2_sub.{{input2_geometrycolumn}})
+                                           < {subdivide_coords},
+                                        layer2_sub.{{input2_geometrycolumn}},
+                                        ST_GeomFromWKB(GFO_Subdivide(
+                                           ST_AsBinary(
+                                              layer2_sub.{{input2_geometrycolumn}}),
+                                           {subdivide_coords}))
+                                     ))),
+                                     1,
+                                     {subdivide_coords}
+                               )),
+                               'DIFF_EMPTY'
                             ) AS diff_geom
                        FROM {{input1_databasename}}."{{input1_layer}}" layer1_sub
                        JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
                          ON layer1_sub.rowid = layer1tree.id
-                       JOIN (SELECT layer2_sub2.rowid
-                                   ,IIF(
-                                      ST_NPoints(layer2_sub2.{{input2_geometrycolumn}})
-                                          < {subdivide_coords},
-                                      layer2_sub2.{{input2_geometrycolumn}},
-                                      ST_GeomFromWKB(GFO_Subdivide(
-                                          ST_AsBinary(
-                                              layer2_sub2.{{input2_geometrycolumn}}),
-                                          {subdivide_coords}))
-                                    ) AS geom_divided
-                             FROM {{input2_databasename}}."{{input2_layer}}" layer2_sub2
-                             LIMIT -1 OFFSET 0
-                         ) layer2_sub
+                       JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
                        JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
                          ON layer2_sub.rowid = layer2tree.id
                       WHERE 1=1
@@ -1047,6 +1044,7 @@ def erase(
                    layer1.{{input1_geometrycolumn}}
                  ) AS geom
                 {{layer1_columns_prefix_alias_str}}
+                {{layer2_columns_prefix_alias_null_str}}
             FROM {{input1_databasename}}."{{input1_layer}}" layer1
            WHERE 1=1
              {{batch_filter}}
@@ -1804,30 +1802,27 @@ def split(
           UNION ALL
           SELECT IFNULL(
                    ( SELECT IFNULL(
-                                ST_GeomFromWKB(GFO_Difference_Collection(
-                                    ST_AsBinary(layer1_sub.{{input1_geometrycolumn}}),
-                                    ST_AsBinary(ST_Collect(layer2_sub.geom_divided)),
-                                    1,
-                                    {subdivide_coords}
-                                )),
-                                'DIFF_EMPTY'
+                               ST_GeomFromWKB(GFO_Difference_Collection(
+                                  ST_AsBinary(layer1_sub.{{input1_geometrycolumn}}),
+                                  ST_AsBinary(ST_Collect(
+                                     IIF(
+                                        ST_NPoints(layer2_sub.{{input2_geometrycolumn}})
+                                           < {subdivide_coords},
+                                        layer2_sub.{{input2_geometrycolumn}},
+                                        ST_GeomFromWKB(GFO_Subdivide(
+                                           ST_AsBinary(
+                                              layer2_sub.{{input2_geometrycolumn}}),
+                                           {subdivide_coords}))
+                                     ))),
+                                     1,
+                                     {subdivide_coords}
+                               )),
+                               'DIFF_EMPTY'
                             ) AS diff_geom
                        FROM {{input1_databasename}}."{{input1_layer}}" layer1_sub
                        JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
                          ON layer1_sub.rowid = layer1tree.id
-                       JOIN (SELECT layer2_sub2.rowid
-                                   ,IIF(
-                                      ST_NPoints(layer2_sub2.{{input2_geometrycolumn}})
-                                          < {subdivide_coords},
-                                      layer2_sub2.{{input2_geometrycolumn}},
-                                      ST_GeomFromWKB(GFO_Subdivide(
-                                          ST_AsBinary(
-                                              layer2_sub2.{{input2_geometrycolumn}}),
-                                          {subdivide_coords}))
-                                    ) AS geom_divided
-                             FROM {{input2_databasename}}."{{input2_layer}}" layer2_sub2
-                             LIMIT -1 OFFSET 0
-                         ) layer2_sub
+                       JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
                        JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
                          ON layer2_sub.rowid = layer2tree.id
                       WHERE 1=1

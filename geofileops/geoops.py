@@ -84,8 +84,7 @@ def apply(
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
-            in the output. Defaults to False now, but default becomes True in a future
-            version.
+            in the output. Defaults to False.
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
@@ -104,15 +103,6 @@ def apply(
 
     """  # noqa: E501
     logger.info(f"Start apply on {input_path}")
-    if keep_empty_geoms is None:
-        keep_empty_geoms = False
-        warnings.warn(
-            "keep_empty_geoms defaults to False now for backwards compatibility, but "
-            "this will change to True in a future version. If keep_empty_geoms is "
-            "specified, this warning isn't shown anymore",
-            FutureWarning,
-            stacklevel=2,
-        )
 
     return _geoops_gpd.apply(
         input_path=Path(input_path),
@@ -204,8 +194,7 @@ def buffer(
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
-            in the output. Defaults to False now, but default becomes True in a future
-            version.
+            in the output. Defaults to False.
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
@@ -304,15 +293,6 @@ def buffer(
         f"Start buffer on {input_path} "
         f"(distance: {distance}, quadrantsegments: {quadrantsegments})"
     )
-    if keep_empty_geoms is None:
-        keep_empty_geoms = False
-        warnings.warn(
-            "keep_empty_geoms defaults to False now for backwards compatibility, but "
-            "this will change to True in a future version. If keep_empty_geoms is "
-            "specified, this warning isn't shown anymore",
-            FutureWarning,
-            stacklevel=2,
-        )
 
     if (
         endcap_style == BufferEndCapStyle.ROUND
@@ -445,8 +425,7 @@ def convexhull(
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
-            in the output. Defaults to False now, but default becomes True in a future
-            version.
+            in the output. Defaults to False.
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
@@ -465,15 +444,6 @@ def convexhull(
 
     """  # noqa: E501
     logger.info(f"Start convexhull on {input_path}")
-    if keep_empty_geoms is None:
-        keep_empty_geoms = False
-        warnings.warn(
-            "keep_empty_geoms defaults to False now for backwards compatibility, but "
-            "this will change to True in a future version. If keep_empty_geoms is "
-            "specified, this warning isn't shown anymore",
-            FutureWarning,
-            stacklevel=2,
-        )
 
     return _geoops_sql.convexhull(
         input_path=Path(input_path),
@@ -522,8 +492,7 @@ def delete_duplicate_geometries(
         explodecollections (bool, optional): True to output only simple geometries.
             Defaults to False.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
-            in the output. Defaults to False now, but default becomes True in a future
-            version.
+            in the output. Defaults to False.
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
@@ -536,15 +505,6 @@ def delete_duplicate_geometries(
 
     """  # noqa: E501
     logger.info(f"Start delete_duplicate_geometries on {input_path}")
-    if keep_empty_geoms is None:
-        keep_empty_geoms = False
-        warnings.warn(
-            "keep_empty_geoms defaults to False now for backwards compatibility, but "
-            "this will change to True in a future version. If keep_empty_geoms is "
-            "specified, this warning isn't shown anymore",
-            FutureWarning,
-            stacklevel=2,
-        )
 
     return _geoops_sql.delete_duplicate_geometries(
         input_path=Path(input_path),
@@ -923,8 +883,7 @@ def makevalid(
             the precision. Defaults to 0.0.
         precision (float, optional): deprecated. Use gridsize.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
-            in the output. Defaults to False now, but default becomes True in a future
-            version.
+            in the output. Defaults to False.
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
@@ -946,16 +905,6 @@ def makevalid(
 
     """  # noqa: E501
     logger.info(f"Start makevalid on {input_path}")
-
-    if keep_empty_geoms is None:
-        keep_empty_geoms = False
-        warnings.warn(
-            "keep_empty_geoms defaults to False now for backwards compatibility, but "
-            "this will change to True in a future version. If keep_empty_geoms is "
-            "specified, this warning isn't shown anymore",
-            FutureWarning,
-            stacklevel=2,
-        )
 
     if gridsize is None:
         gridsize = 0.0
@@ -1249,8 +1198,7 @@ def simplify(
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
-            in the output. Defaults to False now, but default becomes True in a future
-            version.
+            in the output. Defaults to False.
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
@@ -1271,16 +1219,6 @@ def simplify(
     logger.info(f"Start simplify on {input_path} with tolerance {tolerance}")
     if isinstance(algorithm, str):
         algorithm = SimplifyAlgorithm(algorithm)
-
-    if keep_empty_geoms is None:
-        keep_empty_geoms = False
-        warnings.warn(
-            "keep_empty_geoms defaults to False now for backwards compatibility, but "
-            "this will change to True in a future version. If keep_empty_geoms is "
-            "specified, this warning isn't shown anymore",
-            FutureWarning,
-            stacklevel=2,
-        )
 
     if algorithm == SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER:
         return _geoops_sql.simplify(

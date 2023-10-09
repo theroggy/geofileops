@@ -1220,7 +1220,6 @@ def test_split(tmp_path, suffix, epsg, gridsize):
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
     # Check the contents of the result file
-    # TODO: this test should be more elaborate...
     output_gfo_gdf = gfo.read_file(output_path)
     assert output_gfo_gdf["geometry"][0] is not None
     input1_gdf = gfo.read_file(input1_path)

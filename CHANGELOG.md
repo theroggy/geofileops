@@ -7,7 +7,7 @@
 - Add support to read/add/remove embedded layer styles in gpkg (#263)
 - Add `gridsize` parameter to most spatial operations (#261)
 - Add `keep_empty_geoms` and `where_post` parameters to many single layer spatial operations
-  (#262)
+  (#262, #398)
 - Add `where_post` parameter to many two layer spatial operations (#312)
 - Add `where` parameter to `copy_layer` and `append_to` (#311)
 - Add support for lang+ algorithm in `simplify` (#334)
@@ -23,7 +23,7 @@
   applying on-the-fly subdividing of complex geometries to speed up processing. The new
   parameter `subdivide_coords` can be used to control the feature. For files with very
   large input geometries, up to 100x faster + 10x less memory usage.
-  (#329, #330, #331, #357)
+  (#329, #330, #331, #357, #396)
 - Improve performance of spatial operations when only one batch is used (#271)
 - Improve performance of single layer operations (#375)
 - Improve performance of some geopandas/shapely based operations (#342)
@@ -55,9 +55,6 @@
   terminology in other libraries (#273)
 - parameter `area_inters_column_name` in `export_by_location` now defaults to `None`
   instead of "area_inters" (#370)
-- `keep_empty_geoms` parameters are added with default value `False` for most operations
-  as this was the default behaviour for those operations in the past. This will be
-  changed to `True` in a future version. This is also explained in a futurewarning (#262)
 - removed the long-deprecated functions `get_driver`, `get_driver_for_ext`,
   `to_multi_type` and `to_generaltypeid`  (#276)
 - rename and deprecate `convert` to `copy_layer` (#310)
