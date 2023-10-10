@@ -6,13 +6,13 @@ dependencies:
   - pip
   # required
   - cloudpickle
-  - fiona
+  - fiona >=1.8.21  # release 2022-01-07, pinning this specific version is not compatible with gdal version
   - gdal =3.6.3  # released 2023-03-13
   - geopandas-base =0.12  # released 2022-10-24
   - libspatialite =5.0  #  knn index replaced by knn2 in 5.1
   - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
-  - numpy =1.21  # released 2021-06-22
-  - pandas =1.1  # released 2020-06-28
+  - numpy =1.22  # released 2021-12-31
+  - pandas =1.4  # released 2022-01-28
   - psutil
   - pygeoops =0.3  # released 2023-09-08
   - pygeos
@@ -20,7 +20,7 @@ dependencies:
   - pyproj =3.4  # released 2022-09-10
   - shapely >=2,<2.1  # released 2022-12-12
   # optional
-  - topojson = 1.5  # released 2022-09-10
+  - topojson =1.5  # released 2022-09-10
   # testing
   - pytest
   - pytest-cov
