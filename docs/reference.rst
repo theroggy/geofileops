@@ -88,8 +88,7 @@ General file operations
 
    cmp
    copy
-   is_geofile
-   is_geofile_ext
+   get_driver
    listlayers
    move
    remove
@@ -103,8 +102,6 @@ Classes
    BufferEndCapStyle
    BufferJoinStyle
    DataType
-   GeofileType
-   GeometryType
    LayerInfo
    PrimitiveType
    SimplifyAlgorithm

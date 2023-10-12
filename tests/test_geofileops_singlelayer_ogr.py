@@ -7,10 +7,10 @@ import pytest
 import geofileops as gfo
 from geofileops import GeometryType
 from tests import test_helper
-from tests.test_helper import SUFFIXES
+from tests.test_helper import SUFFIXES_GEOOPS
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_clip_by_geometry(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -46,7 +46,7 @@ def test_clip_by_geometry(tmp_path, suffix):
         assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 10]
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_export_by_bounds(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)

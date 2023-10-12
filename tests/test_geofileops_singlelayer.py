@@ -11,16 +11,17 @@ import geopandas as gpd
 import pytest
 from shapely import MultiPolygon, Polygon
 
-from geofileops import geoops
 from geofileops import fileops
 from geofileops import GeometryType
+from geofileops import geoops
+from geofileops.util import _geofileinfo
 from geofileops.util import _geoops_sql
 from geofileops.util import _io_util as io_util
 from tests import test_helper
 from tests.test_helper import (
     EPSGS,
     GRIDSIZE_DEFAULT,
-    SUFFIXES,
+    SUFFIXES_GEOOPS,
     TESTFILES,
     WHERE_AREA_GT_400,
 )
@@ -48,7 +49,7 @@ def basic_combinations_to_test(
     geoops_modules: List[str] = GEOOPS_MODULES,
     testfiles: List[str] = TESTFILES,
     epsgs: List[int] = EPSGS,
-    suffixes: List[str] = SUFFIXES,
+    suffixes: List[str] = SUFFIXES_GEOOPS,
 ) -> list:
     """
     Return sensible combinations of parameters to be used in tests for following params:
@@ -213,7 +214,7 @@ def test_buffer(
     )
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
 def test_buffer_columns_fid(tmp_path, suffix, geoops_module, testfile):
@@ -241,7 +242,7 @@ def test_buffer_columns_fid(tmp_path, suffix, geoops_module, testfile):
 
     # Read input file and extract some info
     input_gdf = fileops.read_file(input_path, fid_as_index=True)
-    if fileops.GeofileType(input_path).is_fid_zerobased:
+    if _geofileinfo.get_geofileinfo(input_path).is_fid_zerobased:
         assert input_gdf.index[0] == 0
     else:
         assert input_gdf.index[0] == 1
@@ -476,7 +477,7 @@ def test_buffer_negative_explode(tmp_path, geoops_module):
 
 
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
     "keep_empty_geoms, where_post", [(False, None), (False, WHERE_AREA_GT_400)]
 )
@@ -579,7 +580,7 @@ def test_buffer_preserve_fid_gpkg(tmp_path, geoops_module):
 
 
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
     "empty_input, gridsize, keep_empty_geoms, where_post",
     [(True, 0.0, True, None), (False, 0.001, None, WHERE_AREA_GT_400)],
@@ -642,7 +643,7 @@ def test_convexhull(
     assert_geodataframe_equal(output_gdf, expected_gdf, sort_values=True)
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("input_empty", [True, False])
 @pytest.mark.parametrize(
     "geoops_module", ["geofileops.geoops", "geofileops.util._geoops_sql"]

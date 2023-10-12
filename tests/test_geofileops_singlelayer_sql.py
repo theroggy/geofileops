@@ -11,7 +11,7 @@ import geofileops as gfo
 from geofileops import GeometryType
 from geofileops.util import _geoops_sql as geoops_sql
 from tests import test_helper
-from tests.test_helper import EPSGS, SUFFIXES
+from tests.test_helper import EPSGS, SUFFIXES_GEOOPS
 from tests.test_helper import assert_geodataframe_equal
 
 
@@ -71,7 +71,7 @@ def test_dissolve_singlethread_output_exists(tmp_path):
     assert output_path.stat().st_size != 0
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("epsg", EPSGS)
 def test_isvalid(tmp_path, suffix, epsg):
     # Prepare test data
@@ -124,7 +124,7 @@ def test_isvalid(tmp_path, suffix, epsg):
     assert output_auto_gdf["isvalid"][0] == 0
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("gridsize", [0.0, 0.01])
 def test_select(tmp_path, suffix, gridsize):
     # Prepare test data
@@ -158,7 +158,7 @@ def test_select(tmp_path, suffix, gridsize):
     assert output_gdf["geometry"][0] is not None
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_select_column_casing(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", tmp_path, suffix)
@@ -188,8 +188,8 @@ def test_select_column_casing(tmp_path, suffix):
     assert output_gdf["geometry"][0] is not None
 
 
-@pytest.mark.parametrize("input_suffix", SUFFIXES)
-@pytest.mark.parametrize("output_suffix", SUFFIXES)
+@pytest.mark.parametrize("input_suffix", SUFFIXES_GEOOPS)
+@pytest.mark.parametrize("output_suffix", SUFFIXES_GEOOPS)
 def test_select_emptyinput(tmp_path, input_suffix, output_suffix):
     # Prepare test data
     input_path = test_helper.get_testfile(
@@ -252,7 +252,7 @@ def test_select_emptyinput_operation(tmp_path, input_suffix, output_suffix):
     assert output_layerinfo.featurecount == 0
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_select_emptyresult(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -278,8 +278,8 @@ def test_select_emptyresult(tmp_path, suffix):
         'SELECT {geometrycolumn}, "oidn", "UIDN" FROM "{input_layer}"',
     ],
 )
-@pytest.mark.parametrize("input_suffix", SUFFIXES)
-@pytest.mark.parametrize("output_suffix", SUFFIXES)
+@pytest.mark.parametrize("input_suffix", SUFFIXES_GEOOPS)
+@pytest.mark.parametrize("output_suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("gridsize", [0.0])
 def test_select_geom_aliases(tmp_path, input_suffix, output_suffix, sql_stmt, gridsize):
     # Prepare test data
@@ -311,7 +311,7 @@ def test_select_geom_aliases(tmp_path, input_suffix, output_suffix, sql_stmt, gr
     assert output_gdf["geometry"][0] is not None
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_select_invalid_sql(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -324,7 +324,7 @@ def test_select_invalid_sql(tmp_path, suffix):
         gfo.select(input_path=input_path, output_path=output_path, sql_stmt=sql_stmt)
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("gridsize", [0.0, 0.01])
 def test_select_nogeom_in_input(tmp_path, suffix, gridsize):
     # Prepare test data
@@ -364,7 +364,7 @@ def test_select_nogeom_in_input(tmp_path, suffix, gridsize):
     assert layerinfo_output.geometrytype is None
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("gridsize", [0.0, 0.01])
 def test_select_nogeom_selected(tmp_path, suffix, gridsize):
     # Prepare test data
@@ -413,7 +413,7 @@ def test_select_output_exists(tmp_path):
     assert output_path.stat().st_size == 0
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
     "nb_parallel, has_batch_filter, exp_raise",
     [(1, False, False), (2, True, False), (2, False, True)],
@@ -445,7 +445,7 @@ def test_select_batch_filter(
         gfo.select(input_path, output_path, sql_stmt, nb_parallel=nb_parallel)
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("explodecollections", [True, False])
 def test_select_star(tmp_path, suffix, explodecollections):
     # Prepare test data

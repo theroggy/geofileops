@@ -203,8 +203,8 @@ def test_vector_translate_invalid_params(tmp_path, kwargs, expected_error):
         _ogr_util.vector_translate(str(input_path), output_path, **kwargs)
 
 
-@pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES)
-@pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES)
+@pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)
+@pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES_GEOOPS)
 def test_vector_translate_sql(tmp_path, input_suffix, output_suffix):
     input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
     output_path = tmp_path / f"output{output_suffix}"
@@ -271,8 +271,8 @@ def test_vector_translate_sql_geom_null(
     assert len(output_gdf.loc[output_gdf.geometry.isna()]) == exp_null_geoms
 
 
-@pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES)
-@pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES)
+@pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)
+@pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES_GEOOPS)
 def test_vector_translate_sql_input_empty(tmp_path, input_suffix, output_suffix):
     input_path = test_helper.get_testfile(
         "polygon-parcel", suffix=input_suffix, empty=True

@@ -18,16 +18,19 @@ import warnings
 import pandas as pd
 
 import geofileops as gfo
-from geofileops import GeofileType, GeometryType, PrimitiveType
+from geofileops import GeometryType, PrimitiveType
 from geofileops import fileops
+
 from geofileops.fileops import _append_to_nolock
 from geofileops.util import _general_util
+from geofileops.util import _geofileinfo
 from geofileops.util import _io_util
 from geofileops.util import _ogr_sql_util
 from geofileops.util import _ogr_util
 from geofileops.helpers import _parameter_helper
 from geofileops.util import _processing_util
 from geofileops.util import _sqlite_util
+
 
 ################################################################################
 # Some init
@@ -255,8 +258,8 @@ def isvalid(
     # If output is sqlite based, check if all data can be read
     if validate_attribute_data:
         try:
-            input_geofiletype = GeofileType(input_path)
-            if input_geofiletype.is_spatialite_based:
+            input_info = _geofileinfo.get_geofileinfo(input_path)
+            if input_info.is_spatialite_based:
                 _sqlite_util.test_data_integrity(path=input_path)
                 logger.debug("test_data_integrity was succesfull")
         except Exception:
@@ -349,8 +352,8 @@ def makevalid(
 
     # If asked and output is spatialite based, check if all data can be read
     if validate_attribute_data:
-        output_geofiletype = GeofileType(input_path)
-        if output_geofiletype.is_spatialite_based:
+        output_geofileinfo = _geofileinfo.get_geofileinfo(input_path)
+        if output_geofileinfo.is_spatialite_based:
             _sqlite_util.test_data_integrity(path=input_path)
 
 
@@ -534,7 +537,7 @@ def _single_layer_vector_operation(
 
     # Determine if fid can be preserved
     preserve_fid = False
-    if not explodecollections and GeofileType(output_path) == GeofileType.GPKG:
+    if not explodecollections and gfo.get_driver(output_path) == "GPKG":
         preserve_fid = True
 
     # Calculate
@@ -826,7 +829,7 @@ def _single_layer_vector_operation(
             output_path.parent.mkdir(parents=True, exist_ok=True)
             gfo.move(tmp_output_path, output_path)
         elif (
-            GeofileType(tmp_output_path) == GeofileType.ESRIShapefile
+            gfo.get_driver(tmp_output_path) == "ESRI Shapefile"
             and tmp_output_path.with_suffix(".dbf").exists()
         ):
             # If the output shapefile doesn't have a geometry column, the .shp file
@@ -1603,7 +1606,7 @@ def join_nearest(
     # Prepare input files
     # To use knn index, the input layers need to be in sqlite file format
     # (not a .gpkg!), so prepare this
-    if input1_path == input2_path and GeofileType(input1_path) == GeofileType.SQLite:
+    if input1_path == input2_path and gfo.get_driver(input1_path) == "SQLite":
         # Input files already ok...
         input1_tmp_path = input1_path
         input1_tmp_layer = input1_layer
@@ -2638,16 +2641,18 @@ def _prepare_processing_params(
     # Prepare input files for the calculation
     if convert_to_spatialite_based:
         # Check if the input files are of the correct geofiletype
-        input1_geofiletype = GeofileType(input1_path)
-        input2_geofiletype = None if input2_path is None else GeofileType(input2_path)
+        input1_info = _geofileinfo.get_geofileinfo(input1_path)
+        input2_info = (
+            None if input2_path is None else _geofileinfo.get_geofileinfo(input2_path)
+        )
 
         # If input files are of the same format + are spatialite compatible,
         # just use them
-        if input1_geofiletype.is_spatialite_based and (
-            input2_geofiletype is None or input1_geofiletype == input2_geofiletype
+        if input1_info.is_spatialite_based and (
+            input2_info is None or input1_info.driver == input2_info.driver
         ):
             if (
-                input1_geofiletype == GeofileType.GPKG
+                input1_info.driver == "GPKG"
                 and input1_layerinfo.geometrycolumn is not None
             ):
                 # HasSpatialindex doesn't work for spatialite file
@@ -2664,16 +2669,16 @@ def _prepare_processing_params(
             )
             input1_path = input1_tmp_path
 
-        if input2_path is not None and input2_geofiletype is not None:
+        if input2_path is not None and input2_info is not None:
             if (
-                input2_geofiletype == input1_geofiletype
-                and input2_geofiletype.is_spatialite_based
+                input2_info.driver == input1_info.driver
+                and input2_info.is_spatialite_based
             ):
                 input2_layerinfo = gfo.get_layerinfo(
                     input2_path, input2_layer, raise_on_nogeom=False
                 )
                 if (
-                    input2_geofiletype == GeofileType.GPKG
+                    input2_info.driver == "GPKG"
                     and input2_layerinfo.geometrycolumn is not None
                 ):
                     # HasSpatialindex doesn't work for spatialite file

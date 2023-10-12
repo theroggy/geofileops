@@ -17,6 +17,7 @@ else:
 from geofileops.fileops import *  # noqa: F403
 from geofileops.geoops import *  # noqa: F403
 from geofileops.helpers.layerstyles import *  # noqa: F403
+from geofileops.util._geofileinfo import get_driver  # noqa: F401
 
 
 def _get_version():

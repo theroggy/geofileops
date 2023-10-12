@@ -14,12 +14,13 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
+from geofileops.util import _geofileinfo
 from geofileops.util import _geometry_util
 from geofileops.util import _geoops_gpd as geoops_gpd
 from tests import test_helper
 from tests.test_helper import (
     EPSGS,
-    SUFFIXES,
+    SUFFIXES_GEOOPS,
     TESTFILES,
     WHERE_LENGTH_GT_1000,
     WHERE_LENGTH_GT_200000,
@@ -32,7 +33,7 @@ def test_get_parallelization_params():
     assert parallelization_params is not None
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
     "only_geom_input, gridsize, keep_empty_geoms, where_post",
     [
@@ -122,7 +123,7 @@ def test_apply(
             assert len(cur_geometry.interiors) == 1
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("only_geom_input", [False, True])
 @pytest.mark.parametrize("force_output_geometrytype", [None, GeometryType.POLYGON])
 def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype):
@@ -187,7 +188,7 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
     else:
         assert output_layerinfo.geometrytype == GeometryType.POLYGON
 
-    for index in range(0, 2):
+    for index in range(2):
         output_geometry = output_gdf["geometry"][index]
         if index == 2:
             assert output_geometry is None
@@ -272,7 +273,7 @@ def test_buffer_styles(tmp_path, suffix, epsg):
     assert area_square_buffer > area_default_buffer
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
     "epsg, gridsize, explodecollections, where_post",
     [
@@ -342,7 +343,7 @@ def test_dissolve_linestrings(
     # TODO: add more in depth check of result
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("epsg", EPSGS)
 def test_dissolve_linestrings_groupby(tmp_path, suffix, epsg):
     # Prepare test data
@@ -386,7 +387,7 @@ def test_dissolve_linestrings_groupby(tmp_path, suffix, epsg):
     # TODO: add more in depth check of result
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("epsg", EPSGS)
 def test_dissolve_linestrings_aggcolumns_columns(tmp_path, suffix, epsg):
     # Prepare test data
@@ -442,7 +443,7 @@ def test_dissolve_linestrings_aggcolumns_columns(tmp_path, suffix, epsg):
     # Some more default checks for NISCODE 12009
     niscode_idx = output_gdf[output_gdf["NIScode"] == "12009"].index.item()
     fid_concat_result = sorted(output_gdf["fid_concat"][niscode_idx].split(","))
-    if gfo.GeofileType(input_path).is_fid_zerobased:
+    if _geofileinfo.get_geofileinfo(input_path).is_fid_zerobased:
         assert fid_concat_result == ["38", "42", "44", "54"]
     else:
         assert fid_concat_result == ["39", "43", "45", "55"]
@@ -505,7 +506,7 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
     ]
     assert naam_result == exp
     fid_result = sorted([str(value["fid_orig"]) for value in json_value])
-    if gfo.GeofileType(input_path).is_fid_zerobased:
+    if _geofileinfo.get_geofileinfo(input_path).is_fid_zerobased:
         assert fid_result == ["38", "42", "44", "54"]
     else:
         assert fid_result == ["39", "43", "45", "55"]
@@ -627,7 +628,7 @@ def test_dissolve_polygons(
 
 @pytest.mark.parametrize("explodecollections", [True, False])
 @pytest.mark.parametrize("testfile", TESTFILES)
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_dissolve_emptyfile(tmp_path, testfile, suffix, explodecollections):
     # Prepare test data
     input_path = test_helper.get_testfile(testfile, suffix=suffix, empty=True)
@@ -780,7 +781,7 @@ def test_dissolve_polygons_groupby_None(tmp_path):
     )
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_dissolve_polygons_specialcases(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -845,7 +846,7 @@ def test_dissolve_polygons_specialcases(tmp_path, suffix):
             assert output_path.stat().st_mtime != mtime_orig
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("nb_parallel", [-1, 2])
 def test_dissolve_polygons_tiles_empty(tmp_path, suffix, nb_parallel):
     # Prepare test data
@@ -901,7 +902,7 @@ def test_dissolve_polygons_tiles_empty(tmp_path, suffix, nb_parallel):
     assert output_gdf["geometry"][0] is not None
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -999,7 +1000,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     )
     assert output_gdf["lbl_cnt_d"][groenten_idx] == 4
     fid_concat_result = sorted(output_gdf["fid_concat"][groenten_idx].split(","))
-    if gfo.GeofileType(input_path).is_fid_zerobased:
+    if _geofileinfo.get_geofileinfo(input_path).is_fid_zerobased:
         assert fid_concat_result == ["41", "42", "43", "44", "45"]
     else:
         assert fid_concat_result == ["42", "43", "44", "45", "46"]

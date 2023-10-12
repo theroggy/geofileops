@@ -14,13 +14,15 @@ import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
+from geofileops.util import _geofileinfo
 from geofileops.util import geodataframe_util
 from geofileops.util import _geoseries_util
 
 _data_dir = Path(__file__).parent.resolve() / "data"
 EPSGS = [31370, 4326]
 GRIDSIZE_DEFAULT = 0.0
-SUFFIXES = [".gpkg", ".shp"]
+SUFFIXES_FILEOPS = [".gpkg", ".shp", ".csv"]
+SUFFIXES_GEOOPS = [".gpkg", ".shp"]
 TESTFILES = ["polygon-parcel", "linestring-row-trees", "point"]
 WHERE_AREA_GT_400 = "ST_Area({geometrycolumn}) > 400"
 WHERE_AREA_GT_5000 = "ST_Area({geometrycolumn}) > 5000"
@@ -149,14 +151,14 @@ def get_testfile(
     # Prepare file + return
     empty_str = "_empty" if empty else ""
     prepared_path = dst_dir / f"{testfile_path.stem}_{epsg}{empty_str}{suffix}"
-    dst_geofiletype = gfo.GeofileType(prepared_path)
     if prepared_path.exists():
         return prepared_path
     layers = gfo.listlayers(testfile_path)
-    if len(layers) > 1 and dst_geofiletype.is_singlelayer:
+    dst_info = _geofileinfo.get_geofileinfo(prepared_path)
+    if len(layers) > 1 and dst_info.is_singlelayer:
         raise ValueError(
             f"multilayer testfile ({testfile}) cannot be converted to single layer "
-            f"geofiletype: {dst_geofiletype}"
+            f"geofiletype: {dst_info.driver}"
         )
 
     # Convert all layers found
@@ -175,9 +177,12 @@ def get_testfile(
         if empty:
             # Remove all rows from destination layer.
             # GDAL only supports DELETE using SQLITE dialect, not with OGRSQL.
-            if dst_geofiletype.is_singlelayer:
+            if dst_info.is_singlelayer:
                 # Layer name can be different for singlelayer output files
-                layer = gfo.listlayers(prepared_path)[0]
+                only_spatial_layers = False if suffix == ".csv" else True
+                layer = gfo.listlayers(
+                    prepared_path, only_spatial_layers=only_spatial_layers
+                )[0]
             gfo.execute_sql(
                 prepared_path,
                 sql_stmt=f'DELETE FROM "{layer}"',

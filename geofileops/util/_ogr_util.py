@@ -13,7 +13,7 @@ from osgeo import gdal
 from pygeoops import GeometryType
 
 import geofileops as gfo
-from geofileops.util.geofiletype import GeofileType
+from geofileops import fileops
 
 # Make sure only one instance per process is running
 lock = Lock()
@@ -31,10 +31,10 @@ class GDALError(Exception):
         log_details: [List[str]] = [],
         error_details: [List[str]] = [],
     ):
-        super().__init__(message)
-
+        self.message = message
         self.log_details = log_details
         self.error_details = error_details
+        super().__init__(self.message)
 
     def __str__(self):
         retstring = ""
@@ -198,9 +198,9 @@ def vector_translate(
     gdal_options = _prepare_gdal_options(options, split_by_option_type=True)
 
     # Input file parameters
-    input_filetype = GeofileType(input_path)
+    input_info = fileops._geofileinfo.get_geofileinfo(input_path)
     # Cleanup the input_layers variable.
-    if input_filetype == GeofileType.ESRIShapefile:
+    if input_info.driver == "ESRI Shapefile":
         # For shapefiles, having input_layers not None gives issues
         input_layers = None
     elif sql_stmt is not None:
@@ -257,11 +257,11 @@ def vector_translate(
         args.extend(["-oo", f"{option_name}={value}"])
 
     # Output file parameters
-    # Get output format from the filename
-    output_filetype = GeofileType(output_path)
+    # Get driver for the output_path
+    output_info = fileops._geofileinfo.get_geofileinfo(output_path)
 
     # Shapefiles only can have one layer, and the layer name == the stem of the file
-    if output_filetype == GeofileType.ESRIShapefile:
+    if output_info.driver == "ESRI Shapefile":
         output_layer = output_path.stem
 
     # SRS
@@ -280,7 +280,7 @@ def vector_translate(
     # will be created
     if output_path.exists() is False or update is False:
         dataset_creation_options = gdal_options["DATASET_CREATION"]
-        if output_filetype == GeofileType.SQLite:
+        if output_info.driver == "SQLite":
             # If SQLite file, use the spatialite type of sqlite by default
             if "SPATIALITE" not in dataset_creation_options:
                 dataset_creation_options["SPATIALITE"] = "YES"
@@ -321,7 +321,7 @@ def vector_translate(
     # Remark: passing them as parameter using --config doesn't work, but they are set as
     # runtime config options later on (using a context manager).
     config_options = dict(gdal_options["CONFIG"])
-    if input_filetype.is_spatialite_based or output_filetype.is_spatialite_based:
+    if input_info.is_spatialite_based or output_info.is_spatialite_based:
         # If spatialite based file, increase SQLITE cache size by default
         if "OGR_SQLITE_CACHE" not in config_options:
             config_options["OGR_SQLITE_CACHE"] = "128"
@@ -414,7 +414,7 @@ def vector_translate(
             args_copy = list(args)
             options = gdal.VectorTranslateOptions(
                 options=args_copy,
-                format=output_filetype.ogrdriver,
+                format=output_info.driver,
                 accessMode=None,
                 srcSRS=input_srs,
                 dstSRS=output_srs,
@@ -507,7 +507,7 @@ def vector_translate(
         output_ds = None
 
         # Prepare exception message
-        message = f"Error {ex} while creating {output_path}"
+        message = f"Error {ex} while creating/updating {output_path}"
         if sql_stmt is not None:
             message = f"{message} using sql_stmt {sql_stmt}"
 
@@ -517,7 +517,7 @@ def vector_translate(
         # Raise
         raise GDALError(
             message, log_details=log_lines, error_details=log_errors
-        ) from ex
+        ).with_traceback(ex.__traceback__)
 
     finally:
         output_ds = None

@@ -13,6 +13,8 @@
 - Add support for lang+ algorithm in `simplify` (#334)
 - Add support to use `select` and `select_two_layers` on attribute tables (= tables
   without geometry column) and/or have an attribute table as result (#322, #379)
+- Add support to process all file types supported by gdal in most general file and layer
+  operations, e.g. `get_layerinfo`, `read_file`,... (#402)
 - Improve performance of `makevalid` and `isvalid` (#258)
 - Improve performance of `intersection`, 30% faster for typical data, up to 4x faster
   for large input geometries (#340, #358)
@@ -56,11 +58,14 @@
   terminology in other libraries (#273)
 - Parameter `area_inters_column_name` in `export_by_location` now defaults to `None`
   instead of "area_inters" (#370)
-- Removed the long-deprecated functions `get_driver`, `get_driver_for_ext`,
-  `to_multi_type` and `to_generaltypeid`  (#276)
 - Deprecate `convert` and rename to `copy_layer` (#310)
-- Deprecate `split` and rename to `identity` #397
-- Removed the long-deprecated `vector_util`, `geofileops.geofile` and
+- Deprecate `split` and rename to `identity` (#397)
+- Deprecate `is_geofile` and `is_geofile_ext` (#402)
+- Make the `GeofileType` enum private, in preparation of probably removing it later on
+  (#402)
+- Remove the long-deprecated functions `get_driver_for_ext`, `to_multi_type` and
+  `to_generaltypeid`  (#276)
+- Remove the long-deprecated `vector_util`, `geofileops.geofile` and
   `geofileops.geofileops` namespaces (#276)
 - Remove `geometry_util`, `geoseries_util` and `grid_util` (#339):
    - Most functions were moved to `pygeoops` because they are generally reusable.
