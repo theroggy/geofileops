@@ -59,7 +59,7 @@ General layer operations
    append_to
    add_column
    add_layerstyle
-   convert
+   copy_layer
    create_spatial_index
    drop_column
    execute_sql

@@ -858,7 +858,20 @@ def _apply_geooperation(
 
     if gridsize != 0.0:
         assert isinstance(data_gdf, gpd.GeoDataFrame)
-        data_gdf.geometry = shapely.set_precision(data_gdf.geometry, grid_size=gridsize)
+        try:
+            data_gdf.geometry = shapely.set_precision(
+                data_gdf.geometry, grid_size=gridsize
+            )
+        except shapely.errors.GEOSException as ex:  # pragma: no cover
+            # If set_precision fails with TopologyException, try again after make_valid
+            if str(ex).lower().startswith("topologyexception"):
+                data_gdf.geometry = shapely.make_valid(data_gdf.geometry)
+                data_gdf.geometry = shapely.set_precision(
+                    data_gdf.geometry, grid_size=gridsize
+                )
+                logger.warning(
+                    f"gridsize succesfully set after makevalid: you can ignore <{ex}>"
+                )
 
     # Remove rows where geom is None/null/empty
     if not keep_empty_geoms:
