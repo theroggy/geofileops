@@ -10,6 +10,7 @@
   (#262, #398)
 - Add `where_post` parameter to many two layer spatial operations (#312)
 - Add `where` parameter to `copy_layer` and `append_to` (#311)
+- Add `dissolve_within_distance` operation (#409)
 - Add support for lang+ algorithm in `simplify` (#334)
 - Add support to use `select` and `select_two_layers` on attribute tables (= tables
   without geometry column) and/or have an attribute table as result (#322, #379)
@@ -28,7 +29,7 @@
   (#329, #330, #331, #357, #396)
 - Improve performance of spatial operations when only one batch is used (#271)
 - Improve performance of single layer operations (#375)
-- Improve performance of some geopandas/shapely based operations (#342)
+- Improve performance of some geopandas/shapely based operations (#342, #408)
 - Add checks that `output_path` must not be equal to the/an `input_path` for geo
   operations (#246)
 - Follow geopandas behaviour of using shapely2 and/or pygeos instead of forcing pygeos
@@ -36,6 +37,7 @@
 - Improve handling of "SELECT * ..." style queries in `select` and `select_two_layers`
   (#283)
 - Improve handling + tests regarding empty input layers/NULL geometries (#320)
+- Improve logging: use geo operation being executed as `logger name` (#410)
 - Many small improvements to logging, documentation, (gdal)error messages,...
   (#321, #366, #394,...)
 - Use smaller footprint conda packages for tests (use `geopandas-base`, `nomkl`) (#377)

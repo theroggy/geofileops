@@ -21,6 +21,7 @@ Spatial operations on a single layer
    convexhull
    delete_duplicate_geometries
    dissolve
+   dissolve_within_distance
    export_by_bounds
    isvalid
    makevalid

@@ -28,11 +28,6 @@ from tests.test_helper import (
 )
 
 
-def test_get_parallelization_params():
-    parallelization_params = geoops_gpd._get_parallelization_params(500000)
-    assert parallelization_params is not None
-
-
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
     "only_geom_input, gridsize, keep_empty_geoms, where_post",

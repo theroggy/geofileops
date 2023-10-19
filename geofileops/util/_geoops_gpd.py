@@ -3,6 +3,7 @@ Module containing the implementation of Geofile operations using GeoPandas.
 """
 
 from concurrent import futures
+import copy
 from datetime import datetime
 import enum
 import json
@@ -15,18 +16,7 @@ import pickle
 import re
 import shutil
 import time
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    NamedTuple,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 import warnings
 
 import cloudpickle
@@ -58,144 +48,201 @@ logger = logging.getLogger(__name__)
 
 
 class ParallelizationConfig:
+    """
+    Heuristics for geopandas based geo operations.
+
+    Heuristics meant to be able to optimize the parallelisation parameters for
+    geopandas based geo operation.
+    """
+
     def __init__(
         self,
         bytes_basefootprint: int = 50 * 1024 * 1024,
-        bytes_per_row: int = 100,
-        min_avg_rows_per_batch: int = 1000,
-        max_avg_rows_per_batch: int = 10000,
-        bytes_min_per_process=None,
-        bytes_usable=None,
+        bytes_per_row: int = 1000,
+        min_rows_per_batch: int = 1000,
+        max_rows_per_batch: int = 100000,
+        bytes_min_per_process: Optional[int] = None,
+        bytes_usable: Optional[int] = None,
+        cpu_count: int = -1,
     ):
+        """
+        Heuristics for geopandas based geo operations.
+
+        Heuristics meant to be able to optimize the parallelisation parameters for
+        geopandas based geo operation.
+
+        Args:
+            bytes_basefootprint (int, optional): The base memory usage of a geofileops
+                worker process. Defaults to 50 MB.
+            bytes_per_row (int, optional): The number if bytes needed to store/process
+                one row of data. Defaults to 1000.
+            min_rows_per_batch (int, optional): The minimum number of rows to aim for in
+                one batch. Defaults to 1000.
+            max_rows_per_batch (int, optional): The maximum number of rows to aim for in
+                a batch. Defaults to 100000.
+            bytes_min_per_process (Optional[int], optional): The minimum number of bytes
+                needed for a geofileops worker process. Defaults to None.
+            bytes_usable (Optional[int], optional): the memory available for processing.
+                Defaults to None, then the free memory is automatically determined.
+            cpu_count (int, optional): the number of CPU's available. Defaults to -1,
+                then the cpu_count is determined automatically.
+        """
         self.bytes_basefootprint = bytes_basefootprint
         self.bytes_per_row = bytes_per_row
-        self.min_avg_rows_per_batch = min_avg_rows_per_batch
-        self.max_avg_rows_per_batch = max_avg_rows_per_batch
-        if bytes_min_per_process is None:
-            self.bytes_min_per_process = (
-                bytes_basefootprint + bytes_per_row * min_avg_rows_per_batch
+        self.min_rows_per_batch = min_rows_per_batch
+        self.max_rows_per_batch = max_rows_per_batch
+
+        # Needs some logic to get value if not set explicitly...
+        self._bytes_min_per_process = bytes_min_per_process
+        # If not specified, determine yourself
+        self.bytes_usable = (
+            bytes_usable
+            if bytes_usable is not None
+            else int(psutil.virtual_memory().available * 0.9)
+        )
+        # If not specified, determine yourself
+        self.cpu_count = cpu_count if cpu_count > 0 else multiprocessing.cpu_count()
+
+    @property
+    def bytes_min_per_process(self):
+        if self._bytes_min_per_process is not None:
+            return self._bytes_min_per_process
+        else:
+            return (
+                self.bytes_basefootprint + self.bytes_per_row * self.min_rows_per_batch
             )
-        else:
-            self.bytes_min_per_process = bytes_min_per_process
-        if bytes_usable is None:
-            self.bytes_usable = psutil.virtual_memory().available * 0.9
-        else:
-            self.bytes_usable = bytes_usable
+
+    @bytes_min_per_process.setter
+    def bytes_min_per_process(self, value):
+        self._bytes_min_per_process = value
 
 
-class parallelizationParams(NamedTuple):
-    nb_parallel: int
-    nb_batches_recommended: int
-    nb_rows_per_batch: int
-
-
-def _get_parallelization_params(
+def _determine_nb_batches(
     nb_rows_total: int,
     nb_parallel: int = -1,
-    nb_batches_previous_pass: Optional[int] = None,
+    batchsize: int = -1,
     parallelization_config: Optional[ParallelizationConfig] = None,
-) -> parallelizationParams:
+) -> Tuple[int, int]:
     """
     Determines recommended parallelization params.
 
     Args:
         nb_rows_total (int): The total number of rows that will be processed
-        nb_parallel (int, optional): The level of parallelization requested.
-            If -1, tries to use all resources available. Defaults to -1.
-        nb_batches_previous_pass (int, optional): If applicable, the number of batches
-            used in a previous pass of the calculation. Defaults to None.
+        nb_parallel (int): The level of parallelization requested.
+            If -1, tries to use all resources available.
+        batchsize (int): indicative number of rows to process per batch.
+            If -1: (try to) determine optimal size automatically using the heuristics in
+            'parallelization_config'.
         parallelization_config (ParallelizationConfig, optional): Configuration
             parameters to use to suggest parallelisation parameters.
 
     Returns:
-        parallelizationParams: The recommended parameters.
+        Tuple[int, int]: Tuple of (nb_parallel, nb_batches)
     """
-    # Init parallelization config
+    # If 0 or 1 rows to process, one batch
+    if nb_rows_total <= 1:
+        return (1, 1)
 
-    # If config is None, set to empty dict
-    if parallelization_config is not None:
-        parallelization_config_local = parallelization_config
+    # If config is None, use default config
+    if parallelization_config is None:
+        config_local = ParallelizationConfig()
     else:
-        parallelization_config_local = ParallelizationConfig()
+        config_local = copy.deepcopy(parallelization_config)
 
     # If the number of rows is really low, just use one batch
-    # TODO: for very complex features, possibly this limit is not a good idea
-    if nb_rows_total < parallelization_config_local.min_avg_rows_per_batch:
-        return parallelizationParams(1, 1, nb_rows_total)
+    if nb_parallel < 1 and batchsize < 1:
+        if nb_rows_total <= config_local.min_rows_per_batch:
+            return (1, 1)
 
-    if nb_parallel == -1:
-        nb_parallel = multiprocessing.cpu_count()
+    if nb_parallel <= 0:
+        nb_parallel = config_local.cpu_count
 
-    mem_usable = _general_util.formatbytes(parallelization_config_local.bytes_usable)
-    logger.debug(f"memory_usable: {mem_usable}, with:")
-    mem_available = _general_util.formatbytes(psutil.virtual_memory().available)
-    logger.debug(f"  -> mem.available: {mem_available}")
-    swap_free = _general_util.formatbytes(psutil.swap_memory().free)
-    logger.debug(f"  -> swap.free: {swap_free}")
+    if logger.isEnabledFor(logging.DEBUG):
+        mem_usable = _general_util.formatbytes(config_local.bytes_usable)
+        logger.debug(f"memory_usable: {mem_usable}, with:")
+        mem_available = _general_util.formatbytes(psutil.virtual_memory().available)
+        logger.debug(f"  -> mem.available: {mem_available}")
+        swap_free = _general_util.formatbytes(psutil.swap_memory().free)
+        logger.debug(f"  -> swap.free: {swap_free}")
 
     # If not enough memory for the amount of parallellism asked, reduce
-    if (
-        nb_parallel * parallelization_config_local.bytes_min_per_process
-    ) > parallelization_config_local.bytes_usable:
+    if (nb_parallel * config_local.bytes_min_per_process) > config_local.bytes_usable:
         nb_parallel = int(
-            parallelization_config_local.bytes_usable
-            / parallelization_config_local.bytes_min_per_process
+            config_local.bytes_usable / config_local.bytes_min_per_process
         )
         logger.debug(f"Nb_parallel reduced to {nb_parallel} to reduce memory usage")
 
-    # Optimal number of batches and rows per batch based on memory usage
-    nb_batches = math.ceil(
-        (nb_rows_total * parallelization_config_local.bytes_per_row * nb_parallel)
-        / (
-            parallelization_config_local.bytes_usable
-            - parallelization_config_local.bytes_basefootprint * nb_parallel
-        )
+    # Having more workers than rows doesn't make sense
+    if nb_parallel > nb_rows_total:
+        nb_parallel = nb_rows_total
+
+    # If batchsize is specified, use it to determine number of batches.
+    if batchsize > 0:
+        nb_batches = math.ceil(nb_rows_total / batchsize)
+
+        # No use to have more workers than number of batches
+        if nb_parallel > nb_batches:
+            nb_parallel = nb_batches
+
+        return (nb_parallel, nb_batches)
+
+    # No batchsize specified, so use heuristics.
+    # Start with 1 batch per worker
+    nb_batches = nb_parallel
+
+    # If the batches < min_rows_per_batch, decrease number batches
+    if nb_rows_total / nb_batches < config_local.min_rows_per_batch:
+        nb_batches = math.ceil(nb_rows_total / config_local.min_rows_per_batch)
+
+    # If the batches > max_rows_per_batch, increase number batches
+    if nb_rows_total / nb_batches > config_local.max_rows_per_batch:
+        nb_batches = math.ceil(nb_rows_total / config_local.max_rows_per_batch)
+        # Round nb_batches up to the nearest multiple of nb_parallel
+        nb_batches = math.ceil(nb_batches / nb_parallel) * nb_parallel
+
+    # Having more workers than batches isn't logical...
+    if nb_parallel > nb_batches:
+        nb_parallel = nb_batches
+
+    # Finally, make sure there are enough batches to avoid memory issues:
+    #   = total memory usage for all rows /
+    #     (free memory - base memory used by all parallel processes)
+    nb_batches_min = math.ceil(
+        (nb_rows_total * config_local.bytes_per_row)
+        / (config_local.bytes_usable - config_local.bytes_basefootprint * nb_parallel)
     )
-
-    # Make sure the average batch doesn't contain > max_avg_rows_per_batch
-    batch_size = math.ceil(nb_rows_total / nb_batches)
-    if batch_size > parallelization_config_local.max_avg_rows_per_batch:
-        batch_size = parallelization_config_local.max_avg_rows_per_batch
-        nb_batches = math.ceil(nb_rows_total / batch_size)
-
-    mem_predicted = (
-        parallelization_config_local.bytes_basefootprint
-        + batch_size * parallelization_config_local.bytes_per_row
-    ) * nb_batches
-
-    # Make sure there are enough batches to use as much parallelism as possible
-    if nb_batches > 1 and nb_batches < nb_parallel:
-        max_parallel_batchsize = int(
-            parallelization_config_local.max_avg_rows_per_batch
-            * nb_batches
-            / batch_size
-        )
-        nb_parallel = min(max_parallel_batchsize, nb_parallel)
-        if nb_batches_previous_pass is None:
-            nb_batches = round(nb_parallel * 1.25)
-        elif nb_batches < nb_batches_previous_pass / 4:
-            nb_batches = round(nb_parallel * 1.25)
-
-    batch_size = math.ceil(nb_rows_total / nb_batches)
+    if nb_batches < nb_batches_min:
+        # Round nb_batches up to the nearest multiple of nb_parallel
+        nb_batches = math.ceil(nb_batches_min / nb_parallel) * nb_parallel
 
     # Log result
-    logger.debug(f"nb_batches_recommended: {nb_batches}, rows_per_batch: {batch_size}")
-    logger.debug(f" -> nb_rows_input_layer: {nb_rows_total}")
-    logger.debug(f" -> mem_predicted: {_general_util.formatbytes(mem_predicted)}")
+    if logger.isEnabledFor(logging.DEBUG):
+        batchsize = math.ceil(nb_rows_total / nb_batches)
+        mem_predicted = (
+            config_local.bytes_basefootprint + batchsize * config_local.bytes_per_row
+        ) * nb_batches
 
-    return parallelizationParams(nb_parallel, nb_batches, batch_size)
+        logger.debug(
+            f"nb_batches_recommended: {nb_batches}, rows_per_batch: {batchsize}"
+        )
+        logger.debug(f" -> nb_rows_input_layer: {nb_rows_total}")
+        logger.debug(f" -> mem_predicted: {_general_util.formatbytes(mem_predicted)}")
+
+    return (nb_parallel, nb_batches)
 
 
 class ProcessingParams:
     def __init__(
         self,
         nb_rows_to_process: int,
-        nb_parallel: int = -1,
-        batches: Optional[List[str]] = None,
+        nb_parallel: int,
+        batches: List[str],
+        batchsize: int,
     ):
         self.nb_rows_to_process = nb_rows_to_process
         self.nb_parallel = nb_parallel
         self.batches = batches
+        self.batchsize = batchsize
 
     def to_json(self, path: Path):
         prepared = _general_util.prepare_for_serialize(vars(self))
@@ -207,19 +254,17 @@ def _prepare_processing_params(
     input_path: Path,
     input_layer: str,
     nb_parallel: int,
+    batchsize: int,
     parallelization_config: Optional[ParallelizationConfig] = None,
     tmp_dir: Optional[Path] = None,
 ) -> ProcessingParams:
     input_info = gfo.get_layerinfo(input_path, input_layer)
     fid_column = input_info.fid_column if input_info.fid_column != "" else "fid"
-    nb_parallel, nb_batches, real_batchsize = _get_parallelization_params(
+    nb_parallel, nb_batches = _determine_nb_batches(
         nb_rows_total=input_info.featurecount,
         nb_parallel=nb_parallel,
+        batchsize=batchsize,
         parallelization_config=parallelization_config,
-    )
-
-    returnvalue = ProcessingParams(
-        nb_rows_to_process=input_info.featurecount, nb_parallel=nb_parallel
     )
 
     # Prepare batches to process
@@ -294,10 +339,16 @@ def _prepare_processing_params(
                 batches.append(f"{fid_column} >= {batch_info.start_fid} ")
 
     # No use starting more processes than the number of batches...
-    if len(batches) < returnvalue.nb_parallel:
-        returnvalue.nb_parallel = len(batches)
+    if len(batches) < nb_parallel:
+        nb_parallel = len(batches)
 
-    returnvalue.batches = batches
+    returnvalue = ProcessingParams(
+        nb_rows_to_process=input_info.featurecount,
+        nb_parallel=nb_parallel,
+        batches=batches,
+        batchsize=int(input_info.featurecount / len(batches)),
+    )
+
     if tmp_dir is not None:
         returnvalue.to_json(tmp_dir / "processing_params.json")
     return returnvalue
@@ -375,9 +426,11 @@ def buffer(
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
+    operation_prefix: str = "",
 ):
     # Init
     operation_params = {
+        "operation_name": f"{operation_prefix}buffer",
         "distance": distance,
         "quadrantsegments": quadrantsegments,
         "endcap_style": endcap_style,
@@ -590,7 +643,8 @@ def _apply_geooperation_to_layer(
     start_time_global = datetime.now()
     operation_name = operation_params.get("operation_name")
     if operation_name is None:
-        operation_name = operation.name.lower()
+        operation_name = operation.value
+    logger = logging.getLogger(f"geofileops.{operation_name}")
 
     # Check input parameters...
     if not input_path.exists():
@@ -601,7 +655,7 @@ def _apply_geooperation_to_layer(
         input_layer = gfo.get_only_layer(input_path)
     if output_path.exists():
         if force is False:
-            logger.info(f"Stop {operation_name}: output exists already {output_path}")
+            logger.info(f"Stop, output exists already {output_path}")
             return
         else:
             gfo.remove(output_path)
@@ -628,30 +682,25 @@ def _apply_geooperation_to_layer(
 
     # Prepare tmp files
     tmp_dir = _io_util.create_tempdir(f"geofileops/{operation.value}")
-    logger.info(f"Start calculation to temp files in {tmp_dir}")
+    logger.debug(f"Start calculation to temp files in {tmp_dir}")
 
     try:
         # Calculate the best number of parallel processes and batches for
         # the available resources
-        if batchsize > 0:
-            parallellization_config = ParallelizationConfig(
-                min_avg_rows_per_batch=math.ceil(batchsize / 2),
-                max_avg_rows_per_batch=batchsize,
-            )
-        else:
-            parallellization_config = ParallelizationConfig(
-                max_avg_rows_per_batch=50000
-            )
-
         processing_params = _prepare_processing_params(
             input_path=input_path,
             input_layer=input_layer,
             nb_parallel=nb_parallel,
-            parallelization_config=parallellization_config,
+            batchsize=batchsize,
+            parallelization_config=None,
             tmp_dir=tmp_dir,
         )
         assert processing_params.batches is not None
 
+        logger.info(
+            f"Start processing ({processing_params.nb_parallel} "
+            f"parallel workers, batch size: {processing_params.batchsize})"
+        )
         # Processing in threads is 2x faster for small datasets (on Windows)
         calculate_in_threads = (
             True if processing_params.nb_rows_to_process <= 100 else False
@@ -769,12 +818,12 @@ def _apply_geooperation_to_layer(
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
             gfo.move(tmp_output_path, output_path)
         else:
-            logger.debug(f"Result of {operation} was empty!")
+            logger.debug("Result was empty")
 
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    logger.info(f"{operation} ready, took {datetime.now()-start_time_global}!")
+    logger.info(f"Ready, took {datetime.now()-start_time_global}")
 
 
 def _apply_geooperation(
@@ -795,7 +844,7 @@ def _apply_geooperation(
     # Init
     if output_path.exists():
         if force is False:
-            message = f"Stop {operation}: output exists already {output_path}"
+            message = f"Stop, output exists already {output_path}"
             return message
         else:
             gfo.remove(output_path)
@@ -902,7 +951,7 @@ def _apply_geooperation(
         create_spatial_index=False,
     )
 
-    message = f"Took {datetime.now()-start_time} for {len(data_gdf)} rows ({where})!"
+    message = f"Took {datetime.now()-start_time} for {len(data_gdf)} rows ({where})"
     return message
 
 
@@ -921,6 +970,7 @@ def dissolve(
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
+    operation_prefix: str = "",
 ) -> dict:
     """
     Function that applies a dissolve.
@@ -934,7 +984,8 @@ def dissolve(
     # Init and validate input parameters
     # ----------------------------------
     start_time = datetime.now()
-    operation = "dissolve"
+    operation_name = f"{operation_prefix}dissolve"
+    logger = logging.getLogger(f"geofileops.{operation_name}")
     result_info = {}
 
     # Check input parameters
@@ -1004,7 +1055,7 @@ def dissolve(
         if force is False:
             result_info[
                 "message"
-            ] = f"output exists already {output_path} and force is false"
+            ] = f"Stop, output exists already {output_path} and force is false"
             logger.info(result_info["message"])
             return result_info
         else:
@@ -1094,7 +1145,7 @@ def dissolve(
         # The dissolve for polygons is done in several passes, and after the first
         # pass, only the 'onborder' features are further dissolved, as the
         # 'notonborder' features are already OK.
-        tempdir = _io_util.create_tempdir(f"geofileops/{operation}")
+        tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
         try:
             if output_layer is None:
                 output_layer = gfo.get_default_layer(output_path)
@@ -1102,7 +1153,7 @@ def dissolve(
             prev_nb_batches = None
             last_pass = False
             pass_id = 0
-            logger.info(f"Start dissolve on file {input_path}")
+            logger.info(f"Start, with input {input_path}")
             input_pass_layer: Optional[str] = input_layer
             while True:
                 # Get info of the current file that needs to be dissolved
@@ -1111,24 +1162,20 @@ def dissolve(
 
                 # Calculate the best number of parallel processes and batches for
                 # the available resources for the current pass
-                if batchsize > 0:
-                    parallelization_config = ParallelizationConfig(
-                        min_avg_rows_per_batch=int(math.ceil(batchsize / 2)),
-                        max_avg_rows_per_batch=batchsize,
-                    )
-                else:
-                    parallelization_config = ParallelizationConfig()
-                nb_parallel, nb_batches_recommended, _ = _get_parallelization_params(
+                # Limit the nb of rows per batch, as dissolve slows down with more rows.
+                nb_parallel, nb_batches = _determine_nb_batches(
                     nb_rows_total=nb_rows_total,
                     nb_parallel=nb_parallel,
-                    nb_batches_previous_pass=prev_nb_batches,
-                    parallelization_config=parallelization_config,
+                    batchsize=batchsize,
+                    parallelization_config=ParallelizationConfig(
+                        max_rows_per_batch=10000
+                    ),
                 )
 
                 # If the ideal number of batches is close to the nb. result tiles asked,
                 # dissolve towards the asked result!
                 # If not, a temporary result is created using smaller tiles
-                if nb_batches_recommended <= len(result_tiles_gdf) * 1.1:
+                if nb_batches <= len(result_tiles_gdf) * 1.1:
                     tiles_gdf = result_tiles_gdf
                     last_pass = True
                     nb_parallel = min(len(result_tiles_gdf), nb_parallel)
@@ -1138,10 +1185,11 @@ def dissolve(
                     nb_squarish_tiles_max = None
                     if prev_nb_batches is not None:
                         nb_squarish_tiles_max = max(prev_nb_batches - 1, 1)
+                        nb_batches = min(nb_batches, nb_squarish_tiles_max)
                     tiles_gdf = gpd.GeoDataFrame(
                         geometry=pygeoops.create_grid2(
                             total_bounds=input_pass_layerinfo.total_bounds,
-                            nb_squarish_tiles=nb_batches_recommended,
+                            nb_squarish_tiles=nb_batches,
                             nb_squarish_tiles_max=nb_squarish_tiles_max,
                         ),
                         crs=input_pass_layerinfo.crs,
@@ -1149,9 +1197,7 @@ def dissolve(
                 else:
                     # If a grid is specified already, add extra columns/rows instead of
                     # creating new one...
-                    tiles_gdf = pygeoops.split_tiles(
-                        result_tiles_gdf, nb_batches_recommended
-                    )
+                    tiles_gdf = pygeoops.split_tiles(result_tiles_gdf, nb_batches)
 
                 # Apply gridsize tolerance on tiles, otherwise the border polygons can't
                 # be unioned properly because gaps appear after rounding coordinates.
@@ -1176,7 +1222,11 @@ def dissolve(
                     output_tmp_onborder_path = output_tmp_path
 
                 # Now go!
-                logger.info(f"Start dissolve pass {pass_id} to {len(tiles_gdf)} tiles")
+                logger.info(
+                    f"Start pass {pass_id} to {len(tiles_gdf)} tiles "
+                    f"(batch size: {int(nb_rows_total/len(tiles_gdf))})"
+                )
+                pass_start = datetime.now()
                 _ = _dissolve_polygons_pass(
                     input_path=input_path,
                     output_notonborder_path=output_tmp_path,
@@ -1191,6 +1241,7 @@ def dissolve(
                     keep_empty_geoms=False,
                     nb_parallel=nb_parallel,
                 )
+                logger.info(f"Pass {pass_id} ready, took {datetime.now()-pass_start}")
 
                 # Prepare the next pass
                 # The input path is the onborder file
@@ -1309,7 +1360,7 @@ def dissolve(
                 # All tiles are already dissolved to groups, but now the
                 # results from all tiles still need to be
                 # grouped/collected together.
-                logger.info("Postprocess prepared features...")
+                logger.info("Finalize result")
                 if agg_columns is None:
                     # If there are no aggregation columns, things are not too
                     # complicated.
@@ -1378,7 +1429,6 @@ def dissolve(
                     # where_post has been applied already so set to None.
                     where_post = None
 
-                logger.info("Postprocess output file")
                 if where_post is None:
                     name = f"output_tmp2_final{output_path.suffix}"
                 else:
@@ -1435,9 +1485,7 @@ def dissolve(
         )
 
     # Return result info
-    result_info[
-        "message"
-    ] = f"Dissolve completely ready, took {datetime.now()-start_time}!"
+    result_info["message"] = f"Ready, took {datetime.now()-start_time}"
     logger.info(result_info["message"])
     return result_info
 
@@ -1456,12 +1504,12 @@ def _dissolve_polygons_pass(
     keep_empty_geoms: bool,
     nb_parallel: int,
 ):
+    start_time = datetime.now()
+
     # Make sure the input file has a spatial index
     gfo.create_spatial_index(input_path, layer=input_layer, exist_ok=True)
 
     # Start calculation in parallel
-    start_time = datetime.now()
-    start_time = datetime.now()
     input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
 
     # Processing in threads is 2x faster for small datasets (on Windows)
@@ -1589,8 +1637,6 @@ def _dissolve_polygons_pass(
                 start_time, nb_batches_done, nb_batches, "dissolve"
             )
 
-    logger.info(f"Dissolve pass ready, took {datetime.now()-start_time}!")
-
 
 def _dissolve_polygons(
     input_path: Path,
@@ -1680,7 +1726,7 @@ def _dissolve_polygons(
     perfinfo["time_read"] = (datetime.now() - start_read).total_seconds()
     return_info["nb_rows_done"] = len(input_gdf)
     if return_info["nb_rows_done"] == 0:
-        message = f"No input geometries found in {input_path}"
+        message = f"dissolve_polygons: no input geometries found in {input_path}"
         logger.info(message)
         return_info["message"] = message
         return_info["total_time"] = (datetime.now() - start_time).total_seconds()
@@ -1836,7 +1882,7 @@ def _dissolve_polygons(
     perfinfo["time_to_file"] = (datetime.now() - start_to_file).total_seconds()
 
     # Finalise...
-    message = f"dissolve ready in {datetime.now()-start_time} on {input_path}!"
+    message = f"dissolve_polygons: ready in {datetime.now()-start_time} on {input_path}"
     logger.debug(message)
 
     # Collect perfinfo
