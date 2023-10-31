@@ -14,8 +14,9 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops.util import _geoops_sql as geoops_sql
+from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.util import _geofileinfo
+from geofileops.util import _geoops_sql as geoops_sql
 from tests import test_helper
 from tests.test_helper import SUFFIXES_GEOOPS, TESTFILES
 from tests.test_helper import assert_geodataframe_equal
@@ -777,6 +778,8 @@ def test_join_nearest(tmp_path, suffix, epsg):
         input2_path=input2_path,
         output_path=output_path,
         nb_nearest=nb_nearest,
+        distance=1000,
+        expand=True,
         batchsize=batchsize,
         force=True,
     )
@@ -787,9 +790,10 @@ def test_join_nearest(tmp_path, suffix, epsg):
     input2_layerinfo = gfo.get_layerinfo(input2_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == nb_nearest * input1_layerinfo.featurecount
-    assert len(output_layerinfo.columns) == (
-        len(input1_columns) + len(input2_layerinfo.columns) + 2
-    )
+    exp_columns = len(input1_columns) + len(input2_layerinfo.columns) + 2
+    if SPATIALITE_GTE_51:
+        exp_columns += 1
+    assert len(output_layerinfo.columns) == exp_columns
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
     # Check the contents of the result file
@@ -800,6 +804,50 @@ def test_join_nearest(tmp_path, suffix, epsg):
         assert output_gdf.l1_fid.min() == 0
     else:
         assert output_gdf.l1_fid.min() == 1
+
+
+@pytest.mark.parametrize(
+    "kwargs, error_spatialite51, error_spatialite50",
+    [
+        ({"expand": True}, "distance is mandatory", None),
+        (
+            {"expand": False},
+            "distance is mandatory with spatialite >= 5.1",
+            "expand=False is not supported with spatialite < 5.1",
+        ),
+        ({"distance": 1000}, "expand is mandatory with spatialite >= 5.1", None),
+        ({"distance": 1000, "expand": True}, None, None),
+    ],
+)
+def test_join_nearest_invalid_params(
+    tmp_path, kwargs, error_spatialite51, error_spatialite50
+):
+    # Check what version of spatialite we are dealing with
+    error = error_spatialite51 if SPATIALITE_GTE_51 else error_spatialite50
+
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / "output.gpkg"
+
+    # Test
+    if error is not None:
+        with pytest.raises(ValueError, match=error):
+            gfo.join_nearest(
+                input1_path=input1_path,
+                input2_path=input2_path,
+                output_path=output_path,
+                nb_nearest=1,
+                **kwargs,
+            )
+    else:
+        gfo.join_nearest(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=output_path,
+            nb_nearest=1,
+            **kwargs,
+        )
 
 
 @pytest.mark.parametrize(

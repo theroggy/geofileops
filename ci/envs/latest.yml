@@ -9,7 +9,7 @@ dependencies:
   - fiona
   - gdal >=3.6.3
   - geopandas-base >=0.12
-  - libspatialite >=5.0,<5.1  # knn index replaced by knn2 in 5.1
+  - libspatialite >=5.0
   # - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
   - numpy
   - pandas

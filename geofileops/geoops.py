@@ -2347,6 +2347,8 @@ def join_nearest(
     input2_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     nb_nearest: int,
+    distance: Optional[float] = None,
+    expand: Optional[bool] = None,
     input1_layer: Optional[str] = None,
     input1_columns: Optional[List[str]] = None,
     input1_columns_prefix: str = "l1_",
@@ -2359,7 +2361,23 @@ def join_nearest(
     force: bool = False,
 ):
     """
-    Joins features with the nb_nearest features that are closest.
+    Joins features of `input1` with the `nb_nearest` closest features of `input2`.
+
+    In addition to the columns requested via the `input*_columns` parameters, the
+    following columns will be in the output file as well:
+        - pos (int): relative rank (sorted by distance): the closest item will be #1,
+          the second closest item will be #2 and so on.
+        - distance (float): if the dataset is in a planar (= projected) crs, `distance`
+          will be in the unit defined by the projection (meters, feet, chains etc.).
+          For a geographic dataset (longitude and latitude degrees), `distance` will be
+          in meters, with the most precise geodetic formulas being applied.
+        - distance_crs (float): if the dataset is in a planar (= projected) crs,
+          `distance_crs` will be in the unit defined by the projection (meters, feet,
+          chains etc.). For a geographic dataset (longitude and latitude degrees),
+          `distance_crs` will be in angles. Only available with spatialite >= 5.1.
+
+    Note: if spatialite version >= 5.1 is used, parameters `distance` and `expand` are
+    mandatory.
 
     Args:
         input1_path (PathLike): the input file to join to nb_nearest features.
@@ -2367,8 +2385,17 @@ def join_nearest(
         output_path (PathLike): the file to write the result to
         nb_nearest (int): the number of nearest features from input 2 to join
             to input1.
+        distance (float): maximum distance to search for the nearest items. If `expand`
+            is True, this is the initial search distance, which will be gradually
+            expanded (doubled) till `nb_nearest` are found. For optimal performance,
+            it is important to choose the typical value that will be needed to find
+            `nb_nearest` items. If `distance` is too large, performance can be bad.
+            Parameter is only relevant if spatialite version >= 5.1 is used.
+        expand (bool): `True` to keep searching till nb_nearest items are found. If
+            `False`, only items found within `distance` are returned (`False` is only
+            supported if spatialite version >= 5.1 is used).
         input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+            file only contains one layer. Defaults to `None`.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
@@ -2401,6 +2428,8 @@ def join_nearest(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         nb_nearest=nb_nearest,
+        distance=distance,
+        expand=expand,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,

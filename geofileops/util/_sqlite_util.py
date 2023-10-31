@@ -43,10 +43,37 @@ class EmptyResultError(Exception):
 #####################################################################
 
 
-def check_runtimedependencies():
+def check_runtimedependencies() -> Dict[str, str]:
+    """
+    Checks if runtime dependencies are available and returns the versions.
+
+    Versions returned: spatialite_version, geos_version.
+
+    Raises:
+        RuntimeError: if a runtime dependency is not available.
+
+    Returns:
+        Dict[str, str]: a dict with the version of the runtime dependencies.
+    """
     test_path = Path(__file__).resolve().parent / "test.gpkg"
     conn = sqlite3.connect(test_path)
-    load_spatialite(conn)
+    try:
+        load_spatialite(conn)
+        sql = "SELECT spatialite_version(), geos_version()"
+        result = conn.execute(sql).fetchall()
+        spatialite_version = result[0][0]
+        geos_version = result[0][1]
+    except Exception as ex:
+        conn.rollback()
+        raise RuntimeError(f"Error {ex} executing {sql}") from ex
+    finally:
+        conn.close()
+
+    versions = {
+        "spatialite_version": spatialite_version,
+        "geos_version": geos_version,
+    }
+    return versions
 
 
 class SqliteProfile(enum.Enum):

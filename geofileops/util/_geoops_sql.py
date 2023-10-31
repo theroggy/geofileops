@@ -21,6 +21,7 @@ import geofileops as gfo
 from geofileops import GeometryType, PrimitiveType
 from geofileops import fileops
 
+from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.fileops import _append_to_nolock
 from geofileops.util import _general_util
 from geofileops.util import _geofileinfo
@@ -1585,6 +1586,8 @@ def join_nearest(
     input2_path: Path,
     output_path: Path,
     nb_nearest: int,
+    distance: float,
+    expand: bool,
     input1_layer: Optional[str] = None,
     input1_columns: Optional[List[str]] = None,
     input1_columns_prefix: str = "l1_",
@@ -1608,6 +1611,17 @@ def join_nearest(
         input1_layer = gfo.get_only_layer(input1_path)
     if input2_layer is None:
         input2_layer = gfo.get_only_layer(input2_path)
+
+    # If spatialite >= 5.1, check some more parameters
+    if SPATIALITE_GTE_51:
+        if distance is None:
+            raise ValueError("distance is mandatory with spatialite >= 5.1")
+        if expand is None:
+            raise ValueError("expand is mandatory with spatialite >= 5.1")
+        expand_int = 1 if expand else False
+    else:
+        if expand is not None and not expand:
+            raise ValueError("expand=False is not supported with spatialite < 5.1")
 
     # Prepare input files
     # To use knn index, the input layers need to be in sqlite file format
@@ -1643,21 +1657,39 @@ def join_nearest(
         )
 
     # Remark: the 2 input layers need to be in one file!
-    sql_template = f"""
-        SELECT layer1.{{input1_geometrycolumn}} as geom
-              {{layer1_columns_prefix_alias_str}}
-              {{layer2_columns_prefix_alias_str}}
-              ,k.pos, k.distance
-          FROM {{input1_databasename}}."{{input1_layer}}" layer1
-          JOIN {{input2_databasename}}.knn k
-          JOIN {{input2_databasename}}."{{input2_layer}}" layer2
-            ON layer2.rowid = k.fid
-         WHERE k.f_table_name = '{{input2_layer}}'
-           AND k.f_geometry_column = '{{input2_geometrycolumn}}'
-           AND k.ref_geometry = layer1.{{input1_geometrycolumn}}
-           AND k.max_items = {nb_nearest}
-           {{batch_filter}}
-    """
+    if SPATIALITE_GTE_51:
+        sql_template = f"""
+            SELECT layer1.{{input1_geometrycolumn}} as geom
+                  {{layer1_columns_prefix_alias_str}}
+                  {{layer2_columns_prefix_alias_str}}
+                  ,k.pos, k.distance_m AS distance, k.distance_crs
+              FROM "{{input1_layer}}" layer1
+              JOIN knn2 k
+              JOIN "{{input2_layer}}" layer2 ON layer2.rowid = k.fid
+             WHERE f_table_name = '{{input2_layer}}'
+               AND f_geometry_column = '{{input2_geometrycolumn}}'
+               AND ref_geometry = ST_Centroid(layer1.{{input1_geometrycolumn}})
+               AND radius = {distance}
+               AND max_items = {nb_nearest}
+               AND expand = {expand_int}
+               {{batch_filter}}
+        """
+    else:
+        sql_template = f"""
+            SELECT layer1.{{input1_geometrycolumn}} as geom
+                  {{layer1_columns_prefix_alias_str}}
+                  {{layer2_columns_prefix_alias_str}}
+                  ,k.pos, k.distance
+              FROM {{input1_databasename}}."{{input1_layer}}" layer1
+              JOIN {{input2_databasename}}.knn k
+              JOIN {{input2_databasename}}."{{input2_layer}}" layer2
+                ON layer2.rowid = k.fid
+             WHERE k.f_table_name = '{{input2_layer}}'
+               AND k.f_geometry_column = '{{input2_geometrycolumn}}'
+               AND k.ref_geometry = layer1.{{input1_geometrycolumn}}
+               AND k.max_items = {nb_nearest}
+               {{batch_filter}}
+        """
 
     input1_layer_info = gfo.get_layerinfo(input1_path, input1_layer)
 

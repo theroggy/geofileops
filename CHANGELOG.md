@@ -16,6 +16,7 @@
   without geometry column) and/or have an attribute table as result (#322, #379)
 - Add support to process all file types supported by gdal in most general file and layer
   operations, e.g. `get_layerinfo`, `read_file`,... (#402)
+- Add support for spatialite 5.1 in `join_nearest` (#412)
 - Improve performance of `makevalid` and `isvalid` (#258)
 - Improve performance of `intersection`, 30% faster for typical data, up to 4x faster
   for large input geometries (#340, #358)
@@ -58,6 +59,8 @@
 - Drop support for shapely1 (#329, #338)
 - Parameter `precision` of `makevalid` is renamed to `gridsize` as this is the typical
   terminology in other libraries (#273)
+- When `join_nearest` is used with spatialite, >= 5.1, two additional mandatory
+  parameters need to be specified: `distance` and `expand` (#412)
 - Parameter `area_inters_column_name` in `export_by_location` now defaults to `None`
   instead of "area_inters" (#370)
 - Deprecate `convert` and rename to `copy_layer` (#310)
