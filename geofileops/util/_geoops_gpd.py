@@ -937,7 +937,7 @@ def _apply_geooperation(
 
     # If the index is still unique, save it to fid column so to_file can save it
     if preserve_fid:
-        data_gdf["fid"] = data_gdf.index
+        data_gdf = data_gdf.reset_index(drop=False)
 
     # Use force_multitype, to avoid warnings when some batches contain
     # singletype and some contain multitype geometries

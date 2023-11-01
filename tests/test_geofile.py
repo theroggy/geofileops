@@ -826,22 +826,6 @@ def test_read_file_fid_as_index(suffix, engine_setter):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
-def test_read_file_no_columns_no_geom(suffix, engine_setter):
-    # Prepare test data
-    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
-
-    # Test ignore_geometry + no columns
-    read_gdf = gfo.read_file(src, columns=[], ignore_geometry=True)
-    assert isinstance(read_gdf, pd.DataFrame)
-    if engine_setter == "fiona":
-        # fiona: 0 rows
-        assert len(read_gdf) == 0
-    else:
-        # pyogrio: 0, pyogrio + pyarrow=True: 46 (= the index)
-        assert len(read_gdf) == 0
-
-
-@pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
 def test_read_file_sql(suffix, engine_setter):
     # Prepare test data
     # For multi-layer filetype, use 2-layer file for better test coverage

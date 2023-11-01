@@ -22,6 +22,7 @@ from geopandas.io import file as gpd_io_file
 import numpy as np
 from osgeo import gdal
 import pandas as pd
+from pandas.api.types import is_integer_dtype
 from pygeoops import GeometryType, PrimitiveType  # noqa: F401
 import pyogrio
 import pyproj
@@ -1827,6 +1828,11 @@ def _to_file_pyogrio(
         kwargs["geometry_type"] = force_output_geometrytype
     if force_multitype:
         kwargs["promote_to_multi"] = True
+
+    # Temp fix for bug in pyogrio 0.7.2 (https://github.com/geopandas/pyogrio/pull/324)
+    # Logic based on geopandas.to_file
+    if list(gdf.index.names) == [None] and is_integer_dtype(gdf.index.dtype):
+        gdf = gdf.reset_index(drop=True)
 
     # Now we can write
     if path_info.is_singlelayer:
