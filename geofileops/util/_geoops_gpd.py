@@ -906,15 +906,18 @@ def _apply_geooperation(
         data_gdf = data_gdf.explode(ignore_index=True)
 
     if gridsize != 0.0:
-        assert isinstance(data_gdf, gpd.GeoDataFrame)
         try:
             data_gdf.geometry = shapely.set_precision(
                 data_gdf.geometry, grid_size=gridsize
             )
         except shapely.errors.GEOSException as ex:  # pragma: no cover
             # If set_precision fails with TopologyException, try again after make_valid
+            # Because it is applied on a GeoDataFrame with typically many rows, we don't
+            # know which row is invalid, so use only_if_invalid=True.
             if str(ex).lower().startswith("topologyexception"):
-                data_gdf.geometry = shapely.make_valid(data_gdf.geometry)
+                data_gdf.geometry = pygeoops.make_valid(
+                    data_gdf.geometry, keep_collapsed=False, only_if_invalid=True
+                )
                 data_gdf.geometry = shapely.set_precision(
                     data_gdf.geometry, grid_size=gridsize
                 )
@@ -1829,6 +1832,24 @@ def _dissolve_polygons(
 
     if gridsize != 0.0:
         diss_gdf.geometry = shapely.set_precision(diss_gdf.geometry, grid_size=gridsize)
+        try:
+            diss_gdf.geometry = shapely.set_precision(
+                diss_gdf.geometry, grid_size=gridsize
+            )
+        except shapely.errors.GEOSException as ex:  # pragma: no cover
+            # If set_precision fails with TopologyException, try again after make_valid
+            # Because it is applied on a GeoDataFrame with typically many rows, we don't
+            # know which row is invalid, so use only_if_invalid=True.
+            if str(ex).lower().startswith("topologyexception"):
+                diss_gdf.geometry = pygeoops.make_valid(
+                    diss_gdf.geometry, keep_collapsed=False, only_if_invalid=True
+                )
+                diss_gdf.geometry = shapely.set_precision(
+                    diss_gdf.geometry, grid_size=gridsize
+                )
+                logger.warning(
+                    f"gridsize succesfully set after makevalid: you can ignore <{ex}>"
+                )
 
     # Save the result to destination file(s)
     start_to_file = datetime.now()

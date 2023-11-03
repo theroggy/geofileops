@@ -95,11 +95,7 @@ def gfo_difference_collection(
         return None
 
 
-def gfo_reduceprecision(
-    geom_wkb: bytes,
-    gridsize: int,
-    makevalid_first: int = 0,
-) -> Optional[bytes]:
+def gfo_reduceprecision(geom_wkb: bytes, gridsize: int) -> Optional[bytes]:
     """
     Reduces the precision of the geometry to the gridsize specified.
 
@@ -109,15 +105,13 @@ def gfo_reduceprecision(
     than 0. Line and polygon geometries may collapse to empty geometries if all vertices
     are closer together than grid_size. Z values, if present, will not be modified.
 
-    Note: unless parameter makevalid_first=1 is used, the input geometry should be
-    geometrically valid. Unexpected results may occur if input geometry is not.
+    If the input geometry is found to be invalid while reducing precision, it is retried
+    after makevalid applying makevalid.
 
     Args:
         geom_wkb (bytes): geometry to reduce precision from in wkb format.
         gridsize (int): the size of the grid the coordinates of the ouput will be
             rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change the
-            precision.
-        makevalid_first (int): if 1, the input is first made valid before reducing the
             precision.
 
     Returns:
@@ -140,14 +134,17 @@ def gfo_reduceprecision(
         raise
 
     try:
-        # If needed, apply makevalid first
-        result = geom
-        if makevalid_first:
-            result = shapely.make_valid(result)
-
         # Apply set_precision
-        result = shapely.set_precision(result, grid_size=gridsize)
-
+        try:
+            result = shapely.set_precision(geom, grid_size=gridsize)
+        except shapely.errors.GEOSException as ex:  # pragma: no cover
+            # If set_precision fails with TopologyException, try again after make_valid
+            if str(ex).lower().startswith("topologyexception"):
+                result = pygeoops.make_valid(result, keep_collapsed=False)
+                result = shapely.set_precision(result, grid_size=gridsize)
+                logger.warning(
+                    f"gridsize succesfully set after makevalid: you can ignore <{ex}>"
+                )
         # If an empty result, return None
         # Remark: apparently ST_IsEmpty of spatialite doesn't work (in combination with
         # gpkg and/or wkb?).

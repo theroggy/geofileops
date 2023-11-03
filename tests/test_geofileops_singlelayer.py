@@ -712,6 +712,57 @@ def test_makevalid(tmp_path, suffix, input_empty, geoops_module):
 @pytest.mark.parametrize(
     "descr, geometry, expected_geometry",
     [
+        ("sliver", Polygon([(0, 0), (5, 0), (10, 0), (15, 0)]), Polygon()),
+        (
+            "poly + line",
+            MultiPolygon(
+                [
+                    Polygon([(0, 5), (5, 5), (5, 10), (0, 10), (0, 5)]),
+                    Polygon([(0, 0), (5, 0), (10, 0), (15, 0)]),
+                ]
+            ),
+            Polygon([(0, 5), (5, 5), (5, 10), (0, 10), (0, 5)]),
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "geoops_module", ["geofileops.geoops", "geofileops.util._geoops_sql"]
+)
+def test_makevalid_collapsing_part(
+    tmp_path, descr: str, geometry, geoops_module, expected_geometry
+):
+    # Prepare test data
+    # -----------------
+    set_geoops_module(geoops_module)
+    input_gdf = gpd.GeoDataFrame({"descr": [descr]}, geometry=[geometry], crs=31370)
+    input_path = tmp_path / "test.gpkg"
+    fileops.to_file(input_gdf, input_path)
+
+    # Now we are ready to test
+    # ------------------------
+    result_path = tmp_path / "test_makevalid_collapsing_part.gpkg"
+    geoops.makevalid(
+        input_path=input_path,
+        output_path=result_path,
+        keep_empty_geoms=False,
+        force=True,
+    )
+    result_gdf = fileops.read_file(result_path)
+
+    # Compare with expected result
+    expected_gdf = gpd.GeoDataFrame(
+        {"descr": [descr]}, geometry=[expected_geometry], crs=31370
+    )
+    expected_gdf = expected_gdf[~expected_gdf.geometry.is_empty]
+    if len(expected_gdf) == 0:
+        assert len(result_gdf) == 0
+    else:
+        assert_geodataframe_equal(result_gdf, expected_gdf)
+
+
+@pytest.mark.parametrize(
+    "descr, geometry, expected_geometry",
+    [
         ("sliver", Polygon([(0, 0), (10, 0), (10, 0.5), (0, 0)]), Polygon()),
         (
             "poly + sliver",

@@ -14,7 +14,7 @@ dependencies:
   - numpy
   - pandas
   - psutil
-  - pygeoops >=0.3,<0.4
+  # - pygeoops >=0.4,<0.5
   - pyogrio >=0.5
   - pyproj
   - shapely >=2,<2.1
@@ -32,6 +32,7 @@ dependencies:
   # docs
   - pydata-sphinx-theme
   - pip:
+    - pygeoops ==0.4.0a1
     - sphinx-automodapi==0.13
     # optional
     - simplification
