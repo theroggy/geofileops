@@ -16,6 +16,7 @@
   without geometry column) and/or have an attribute table as result (#322, #379)
 - Add support to process all file types supported by gdal in most general file and layer
   operations, e.g. `get_layerinfo`, `read_file`,... (#402)
+- Add support for files with Z/M dimensions in the general file and layer operations (#369)
 - Add support for spatialite 5.1 in `join_nearest` (#412)
 - Improve performance of `makevalid` and `isvalid` (#258)
 - Improve performance of `intersection`, 30% faster for typical data, up to 4x faster

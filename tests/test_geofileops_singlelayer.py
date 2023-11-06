@@ -60,6 +60,7 @@ def basic_combinations_to_test(
     # On .gpkg test:
     #   - all combinations of geoops_modules, testfiles and epsgs
     #   - fixed empty_input, suffix
+    #   - dimensions="XYZ" for polygon input
     for epsg in epsgs:
         for geoops_module in geoops_modules:
             for testfile in testfiles:
@@ -67,6 +68,7 @@ def basic_combinations_to_test(
                 keep_empty_geoms = None
                 gridsize = 0.001 if epsg == 31370 else GRIDSIZE_DEFAULT
                 if testfile == "polygon-parcel":
+                    dimensions = "XYZ"
                     keep_empty_geoms = False
                     if epsg == 31370:
                         where_post = WHERE_AREA_GT_400
@@ -82,6 +84,7 @@ def basic_combinations_to_test(
                         gridsize,
                         keep_empty_geoms,
                         where_post,
+                        dimensions,
                     )
                 )
 
@@ -100,6 +103,7 @@ def basic_combinations_to_test(
                     where_post = WHERE_AREA_GT_400
                 else:
                     keep_empty_geoms = True
+                dimensions = None
                 result.append(
                     (
                         suffix,
@@ -110,6 +114,7 @@ def basic_combinations_to_test(
                         gridsize,
                         keep_empty_geoms,
                         where_post,
+                        dimensions,
                     )
                 )
 
@@ -121,6 +126,7 @@ def basic_combinations_to_test(
             gridsize = 0.001 if suffix == ".gpkg" else GRIDSIZE_DEFAULT
             keep_empty_geoms = False
             where_post = None
+            dimensions = None
             result.append(
                 (
                     suffix,
@@ -131,6 +137,7 @@ def basic_combinations_to_test(
                     gridsize,
                     keep_empty_geoms,
                     where_post,
+                    dimensions,
                 )
             )
 
@@ -139,7 +146,7 @@ def basic_combinations_to_test(
 
 @pytest.mark.parametrize(
     "suffix, epsg, geoops_module, testfile, empty_input, gridsize, keep_empty_geoms, "
-    "where_post",
+    "where_post, dimensions",
     basic_combinations_to_test(),
 )
 def test_buffer(
@@ -152,11 +159,12 @@ def test_buffer(
     gridsize,
     keep_empty_geoms,
     where_post,
+    dimensions,
 ):
     """Buffer basics are available both in the gpd and sql implementations."""
     # Prepare test data
     input_path = test_helper.get_testfile(
-        testfile, suffix=suffix, epsg=epsg, empty=empty_input
+        testfile, suffix=suffix, epsg=epsg, empty=empty_input, dimensions=dimensions
     )
 
     # Now run test
@@ -346,7 +354,7 @@ def test_buffer_invalid_params(
 
 @pytest.mark.parametrize(
     "suffix, epsg, geoops_module, testfile, empty_input, gridsize, keep_empty_geoms, "
-    "where_post",
+    "where_post, dimensions",
     basic_combinations_to_test(epsgs=[31370]),
 )
 def test_buffer_negative(
@@ -359,6 +367,7 @@ def test_buffer_negative(
     gridsize,
     keep_empty_geoms,
     where_post,
+    dimensions,
 ):
     """Buffer basics are available both in the gpd and sql implementations."""
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
@@ -830,7 +839,7 @@ def test_makevalid_invalidparams():
 
 @pytest.mark.parametrize(
     "suffix, epsg, geoops_module, testfile, empty_input, gridsize, keep_empty_geoms, "
-    "where_post",
+    "where_post, dimensions",
     basic_combinations_to_test(testfiles=["polygon-parcel", "linestring-row-trees"]),
 )
 def test_simplify(
@@ -843,6 +852,7 @@ def test_simplify(
     gridsize,
     keep_empty_geoms,
     where_post,
+    dimensions,
 ):
     # Prepare test data
     tmp_dir = tmp_path / f"{geoops_module}_{epsg}"

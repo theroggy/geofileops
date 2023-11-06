@@ -213,9 +213,12 @@ def test_cmp(tmp_path, suffix):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
-def test_copy_layer(tmp_path, suffix):
+@pytest.mark.parametrize("dimensions", [None, "XYZ"])
+def test_copy_layer(tmp_path, dimensions, suffix):
     # Prepare test data
-    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    src = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dimensions=dimensions
+    )
     raise_on_nogeom = False if suffix == ".csv" else True
     dst = tmp_path / f"{src.stem}-output{suffix}"
 
@@ -230,10 +233,15 @@ def test_copy_layer(tmp_path, suffix):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
-def test_copy_layer_emptyfile(tmp_path, suffix):
+@pytest.mark.parametrize("dimensions", [None, "XYZ"])
+def test_copy_layer_emptyfile(tmp_path, dimensions, suffix):
     # Prepare test data
     src = test_helper.get_testfile(
-        "polygon-parcel", suffix=suffix, dst_dir=tmp_path, empty=True
+        "polygon-parcel",
+        suffix=suffix,
+        dst_dir=tmp_path,
+        empty=True,
+        dimensions=dimensions,
     )
     raise_on_nogeom = False if suffix == ".csv" else True
     dst = tmp_path / f"{src.stem}-output{suffix}"
@@ -247,6 +255,7 @@ def test_copy_layer_emptyfile(tmp_path, suffix):
     dst_layerinfo = gfo.get_layerinfo(dst, raise_on_nogeom=raise_on_nogeom)
     assert src_layerinfo.featurecount == dst_layerinfo.featurecount
     assert len(src_layerinfo.columns) == len(dst_layerinfo.columns)
+    assert src_layerinfo.geometrytypename == dst_layerinfo.geometrytypename
 
 
 def test_copy_layer_explodecollections(tmp_path):
@@ -465,8 +474,11 @@ def test_get_layer_geometrytypes_geometry(tmp_path):
 
 
 @pytest.mark.parametrize("suffix", [".gpkg", ".shp"])
-def test_get_layerinfo(suffix):
-    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+@pytest.mark.parametrize("dimensions", [None, "XYZ"])
+def test_get_layerinfo(suffix, dimensions):
+    src = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dimensions=dimensions
+    )
     # Tests
     layerinfo = gfo.get_layerinfo(src)
     assert str(layerinfo).startswith("<class 'geofileops.fileops.LayerInfo'>")
@@ -481,8 +493,12 @@ def test_get_layerinfo(suffix):
         assert layerinfo.name == "parcels"
         assert layerinfo.fid_column == "fid"
 
-    assert layerinfo.geometrytypename == gfo.GeometryType.MULTIPOLYGON.name
-    assert layerinfo.geometrytype == gfo.GeometryType.MULTIPOLYGON
+    if dimensions is None:
+        assert layerinfo.geometrytypename == gfo.GeometryType.MULTIPOLYGON.name
+        assert layerinfo.geometrytype == gfo.GeometryType.MULTIPOLYGON
+    else:
+        assert layerinfo.geometrytypename == gfo.GeometryType.MULTIPOLYGONZ.name
+        assert layerinfo.geometrytype == gfo.GeometryType.MULTIPOLYGONZ
     assert layerinfo.total_bounds is not None
     assert layerinfo.crs is not None
     assert layerinfo.crs.to_epsg() == 31370
@@ -696,9 +712,16 @@ def test_update_column_error(tmp_path):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
-def test_read_file(suffix, engine_setter):
-    # Prepare test data
-    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+@pytest.mark.parametrize("dimensions", [None, "XYZ"])
+def test_read_file(suffix, dimensions, engine_setter):
+    # Remark: it seems like Z dimensions aren't read in geopandas.
+    # Prepare and validate test data
+    src = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dimensions=dimensions
+    )
+    src_info = gfo.get_layerinfo(src, raise_on_nogeom=False)
+    if src_info.geometrycolumn is not None and dimensions is not None:
+        assert src_info.geometrytypename == "MULTIPOLYGONZ"
 
     # Test with defaults
     read_gdf = gfo.read_file(src)
@@ -712,6 +735,8 @@ def test_read_file(suffix, engine_setter):
     else:
         assert len(read_gdf.columns) == 12
         assert isinstance(read_gdf, gpd.GeoDataFrame)
+        if src_info.geometrycolumn is not None and dimensions is not None:
+            assert read_gdf.iloc[0].geometry.has_z
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
@@ -1104,8 +1129,14 @@ def test_spatial_index_unsupported(tmp_path):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
-def test_to_file(tmp_path, suffix, engine_setter):
-    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+@pytest.mark.parametrize("dimensions", [None])
+def test_to_file(tmp_path, suffix, dimensions, engine_setter):
+    # Remark: geopandas doesn't seem seem to read the Z dimension, so writing can't be
+    # tested?
+    # Prepare test file
+    src = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dimensions=dimensions
+    )
     output_path = tmp_path / f"{src.stem}-output{suffix}"
 
     # Read test file and write to tmppath

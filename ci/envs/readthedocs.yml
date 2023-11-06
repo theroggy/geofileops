@@ -24,6 +24,6 @@ dependencies:
   - sphinx<6
   - pydata-sphinx-theme
   - pip:
-    - pygeoops ==0.4.0a1
+    - pygeoops ==0.4.0a2
     - sphinx-automodapi ==0.13
     - simplification

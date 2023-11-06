@@ -338,22 +338,16 @@ def get_layerinfo(
                     )
 
         # Get geometry column info...
-        geometrytypename = gdal.ogr.GeometryTypeToName(datasource_layer.GetGeomType())
-        geometrytypename = geometrytypename.replace(" ", "").upper()
-
-        # For shape files, the difference between the 'MULTI' variant and the
-        # single one doesn't exists... so always report MULTI variant by convention.
-        if driver == "ESRI Shapefile":
-            if geometrytypename.startswith(("POLYGON", "LINESTRING", "POINT")):
-                geometrytypename = f"MULTI{geometrytypename}"
-        if geometrytypename == "UNKNOWN(ANY)":
-            geometrytypename = "GEOMETRY"
-
-        # Geometrytype
-        if geometrytypename != "NONE":
-            geometrytype = GeometryType[geometrytypename]
+        geometrytype = _ogr_util.ogrtype_to_geometrytype[datasource_layer.GetGeomType()]
+        if geometrytype is None:
+            geometrytypename = "NONE"
         else:
-            geometrytype = None
+            # For shape files, the difference between the 'MULTI' variant and the
+            # single one doesn't exists... so always report MULTI variant by convention.
+            if driver == "ESRI Shapefile":
+                geometrytype = geometrytype.to_multitype
+
+            geometrytypename = geometrytype.name
 
         # If the geometry type is not None, fill out the extra properties
         geometrycolumn = None
@@ -960,6 +954,8 @@ def update_column(
         layer = get_only_layer(path)
     layerinfo_orig = get_layerinfo(path, layer)
     columns_upper = [column.upper() for column in layerinfo_orig.columns]
+    if layerinfo_orig.geometrycolumn is not None:
+        columns_upper.append(layerinfo_orig.geometrycolumn.upper())
     if name.upper() not in columns_upper:
         # If column doesn't exist yet, error!
         raise ValueError(f"Column {name} doesn't exist in {path}, layer {layer}")
@@ -2053,6 +2049,7 @@ def append_to(
     append_timeout_s: int = 600,
     transaction_size: int = 50000,
     preserve_fid: Optional[bool] = None,
+    dst_dimensions: Optional[str] = None,
     options: dict = {},
 ):
     """
@@ -2112,6 +2109,9 @@ def append_to(
             to use the default behaviour of gdal, that already preserves in some cases.
             Some file formats don't explicitly store the fid (e.g. shapefile), so they
             will never be able to preserve fids. Defaults to None.
+        dst_dimensions (str, optional): Force the dimensions of the destination layer to
+            the value specified. Valid values: "XY", "XYZ", "XYM" or "XYZM".
+            Defaults to None.
         options (dict, optional): options to pass to gdal.
 
     Raises:
@@ -2162,6 +2162,7 @@ def append_to(
                     create_spatial_index=create_spatial_index,
                     transaction_size=transaction_size,
                     preserve_fid=preserve_fid,
+                    dst_dimensions=dst_dimensions,
                     options=options,
                 )
             finally:
@@ -2193,6 +2194,7 @@ def _append_to_nolock(
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     transaction_size: int = 50000,
     preserve_fid: Optional[bool] = None,
+    dst_dimensions: Optional[str] = None,
     options: dict = {},
 ):
     # Check/clean input params
@@ -2275,6 +2277,7 @@ def _append_to_nolock(
         force_output_geometrytype=force_output_geometrytype,
         options=options,
         preserve_fid=preserve_fid,
+        dst_dimensions=dst_dimensions,
     )
     _ogr_util.vector_translate_by_info(info=translate_info)
 
@@ -2332,6 +2335,7 @@ def copy_layer(
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     create_spatial_index: Optional[bool] = True,
     preserve_fid: Optional[bool] = None,
+    dst_dimensions: Optional[str] = None,
     options: dict = {},
     append: bool = False,
     force: bool = False,
@@ -2391,6 +2395,9 @@ def copy_layer(
             to use the default behaviour of gdal, that already preserves in some cases.
             Some file formats don't explicitly store the fid (e.g. shapefile), so they
             will never be able to preserve fids. Defaults to None.
+        dst_dimensions (str, optional): Force the dimensions of the destination layer to
+            the value specified. Valid values: "XY", "XYZ", "XYM" or "XYZM".
+            Defaults to None.
         options (dict, optional): options to pass to gdal.
         append (bool, optional): True to append to the output file if it exists.
             Defaults to False.
@@ -2432,6 +2439,7 @@ def copy_layer(
         force_output_geometrytype=force_output_geometrytype,
         create_spatial_index=create_spatial_index,
         preserve_fid=preserve_fid,
+        dst_dimensions=dst_dimensions,
         options=options,
     )
 

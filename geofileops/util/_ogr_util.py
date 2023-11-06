@@ -10,6 +10,7 @@ from threading import Lock
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
 from osgeo import gdal
+from osgeo import ogr
 from pygeoops import GeometryType
 
 import geofileops as gfo
@@ -53,6 +54,52 @@ class GDALError(Exception):
             return f"{retstring}\n{super().__str__()}"
         else:
             return super().__str__()
+
+
+ogrtype_to_geometrytype = {
+    ogr.wkbNone: None,
+    ogr.wkbUnknown: GeometryType.GEOMETRY,
+    ogr.wkbPoint: GeometryType.POINT,
+    ogr.wkbLineString: GeometryType.LINESTRING,
+    ogr.wkbPolygon: GeometryType.POLYGON,
+    ogr.wkbTriangle: GeometryType.TRIANGLE,
+    ogr.wkbMultiPoint: GeometryType.MULTIPOINT,
+    ogr.wkbMultiLineString: GeometryType.MULTILINESTRING,
+    ogr.wkbMultiPolygon: GeometryType.MULTIPOLYGON,
+    ogr.wkbGeometryCollection: GeometryType.GEOMETRYCOLLECTION,
+    ogr.wkbPolyhedralSurface: GeometryType.POLYHEDRALSURFACE,
+    ogr.wkbTIN: GeometryType.TIN,
+    ogr.wkbPoint25D: GeometryType.POINTZ,
+    ogr.wkbLineString25D: GeometryType.LINESTRINGZ,
+    ogr.wkbPolygon25D: GeometryType.POLYGONZ,
+    ogr.wkbTriangleZ: GeometryType.TRIANGLEZ,
+    ogr.wkbMultiPoint25D: GeometryType.MULTIPOINTZ,
+    ogr.wkbMultiLineString25D: GeometryType.MULTILINESTRINGZ,
+    ogr.wkbMultiPolygon25D: GeometryType.MULTIPOLYGONZ,
+    ogr.wkbGeometryCollection25D: GeometryType.GEOMETRYCOLLECTIONZ,
+    ogr.wkbPolyhedralSurfaceZ: GeometryType.POLYHEDRALSURFACEZ,
+    ogr.wkbTINZ: GeometryType.TINZ,
+    ogr.wkbPointM: GeometryType.POINTM,
+    ogr.wkbLineStringM: GeometryType.LINESTRINGM,
+    ogr.wkbPolygonM: GeometryType.POLYGONM,
+    ogr.wkbTriangleM: GeometryType.TRIANGLEM,
+    ogr.wkbMultiPointM: GeometryType.MULTIPOINTM,
+    ogr.wkbMultiLineStringM: GeometryType.MULTILINESTRINGM,
+    ogr.wkbMultiPolygonM: GeometryType.MULTIPOLYGONM,
+    ogr.wkbGeometryCollectionM: GeometryType.GEOMETRYCOLLECTIONM,
+    ogr.wkbPolyhedralSurfaceM: GeometryType.POLYHEDRALSURFACEM,
+    ogr.wkbTINM: GeometryType.TINM,
+    ogr.wkbPointZM: GeometryType.POINTZM,
+    ogr.wkbLineStringZM: GeometryType.LINESTRINGZM,
+    ogr.wkbPolygonZM: GeometryType.POLYGONZM,
+    ogr.wkbTriangleZM: GeometryType.TRIANGLEZM,
+    ogr.wkbMultiPointZM: GeometryType.MULTIPOINTZM,
+    ogr.wkbMultiLineStringZM: GeometryType.MULTILINESTRINGZM,
+    ogr.wkbMultiPolygonZM: GeometryType.MULTIPOLYGONZM,
+    ogr.wkbGeometryCollectionZM: GeometryType.GEOMETRYCOLLECTIONZM,
+    ogr.wkbPolyhedralSurfaceZM: GeometryType.POLYHEDRALSURFACEZM,
+    ogr.wkbTINZM: GeometryType.TINZM,
+}
 
 
 def get_drivers() -> dict:
@@ -117,6 +164,7 @@ class VectorTranslateInfo:
         columns: Optional[List[str]] = None,
         warp: Optional[dict] = None,
         preserve_fid: Optional[bool] = None,
+        dst_dimensions: Optional[str] = None,
     ):
         self.input_path = input_path
         self.output_path = output_path
@@ -139,6 +187,7 @@ class VectorTranslateInfo:
         self.columns = columns
         self.warp = warp
         self.preserve_fid = preserve_fid
+        self.dst_dimensions = dst_dimensions
 
 
 def vector_translate_by_info(info: VectorTranslateInfo):
@@ -164,6 +213,7 @@ def vector_translate_by_info(info: VectorTranslateInfo):
         columns=info.columns,
         warp=info.warp,
         preserve_fid=info.preserve_fid,
+        dst_dimensions=info.dst_dimensions,
     )
 
 
@@ -189,6 +239,7 @@ def vector_translate(
     columns: Optional[List[str]] = None,
     warp: Optional[dict] = None,
     preserve_fid: Optional[bool] = None,
+    dst_dimensions: Optional[bool] = None,
 ) -> bool:
     # API Doc of VectorTranslateOptions:
     #   https://gdal.org/api/python/osgeo.gdal.html#osgeo.gdal.VectorTranslateOptions
@@ -432,7 +483,7 @@ def vector_translate(
                 layers=input_layers,
                 layerName=output_layer,
                 geometryType=output_geometrytypes,
-                dim=None,
+                dim=dst_dimensions,
                 segmentizeMaxDist=None,
                 zField=None,
                 skipFailures=False,
