@@ -29,7 +29,11 @@ from tests.test_helper import assert_geodataframe_equal
 
 # Init gfo module
 current_geoops_module = "unknown"
-GEOOPS_MODULES = ["geofileops.geoops", "geofileops.util._geoops_gpd"]
+GEOOPS_MODULES = [
+    "geofileops.geoops",
+    "geofileops.util._geoops_gpd",
+    "geofileops.util._geoops_sql",
+]
 
 
 def set_geoops_module(geoops_module: str):
@@ -654,9 +658,7 @@ def test_convexhull(
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("input_empty", [True, False])
-@pytest.mark.parametrize(
-    "geoops_module", ["geofileops.geoops", "geofileops.util._geoops_sql"]
-)
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
 def test_makevalid(tmp_path, suffix, input_empty, geoops_module):
     # Prepare test data
     input_path = test_helper.get_testfile(
@@ -734,21 +736,17 @@ def test_makevalid(tmp_path, suffix, input_empty, geoops_module):
         ),
     ],
 )
-@pytest.mark.parametrize(
-    "geoops_module", ["geofileops.geoops", "geofileops.util._geoops_sql"]
-)
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
 def test_makevalid_collapsing_part(
     tmp_path, descr: str, geometry, geoops_module, expected_geometry
 ):
     # Prepare test data
-    # -----------------
     set_geoops_module(geoops_module)
     input_gdf = gpd.GeoDataFrame({"descr": [descr]}, geometry=[geometry], crs=31370)
     input_path = tmp_path / "test.gpkg"
     fileops.to_file(input_gdf, input_path)
 
     # Now we are ready to test
-    # ------------------------
     result_path = tmp_path / "test_makevalid_collapsing_part.gpkg"
     geoops.makevalid(
         input_path=input_path,
@@ -785,14 +783,11 @@ def test_makevalid_collapsing_part(
         ),
     ],
 )
-@pytest.mark.parametrize(
-    "geoops_module", ["geofileops.geoops", "geofileops.util._geoops_sql"]
-)
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
 def test_makevalid_gridsize(
     tmp_path, descr: str, geometry, geoops_module, expected_geometry
 ):
     # Prepare test data
-    # -----------------
     set_geoops_module(geoops_module)
     input_gdf = gpd.GeoDataFrame({"descr": [descr]}, geometry=[geometry], crs=31370)
     input_path = tmp_path / "test.gpkg"
@@ -800,7 +795,6 @@ def test_makevalid_gridsize(
     gridsize = 1
 
     # Now we are ready to test
-    # ------------------------
     result_path = tmp_path / "test_makevalid.gpkg"
     geoops.makevalid(
         input_path=input_path,

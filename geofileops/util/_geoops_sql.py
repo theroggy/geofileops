@@ -299,25 +299,22 @@ def makevalid(
 
     # Init + prepare sql template for this operation
     # ----------------------------------------------
-    operation = "{geometrycolumn}"
+    if SPATIALITE_GTE_51:
+        operation = "GEOSMakeValid({geometrycolumn}, 0)"
+    else:
+        # Prepare sql template for this operation
+        operation = "ST_MakeValid({geometrycolumn})"
 
-    # If the precision needs to be reduced, snap to grid
-    if gridsize != 0.0:
-        operation = f"ST_SnapToGrid({operation}, {gridsize})"
+        # Determine output_geometrytype if it wasn't specified. Otherwise makevalid
+        # can result in column type 'GEOMETRY'/'UNKNOWN(ANY)'
+        input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
+        if force_output_geometrytype is None:
+            force_output_geometrytype = input_layerinfo.geometrytype
 
-    # Prepare sql template for this operation
-    operation = f"ST_MakeValid({operation})"
-
-    # Determine output_geometrytype if it wasn't specified. Otherwise makevalid results
-    # in column type 'GEOMETRY'/'UNKNOWN(ANY)'
-    input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
-    if force_output_geometrytype is None:
-        force_output_geometrytype = input_layerinfo.geometrytype
-
-    # If we want a specific geometrytype, only extract the relevant type
-    if force_output_geometrytype is not GeometryType.GEOMETRYCOLLECTION:
-        primitivetypeid = force_output_geometrytype.to_primitivetype.value
-        operation = f"ST_CollectionExtract({operation}, {primitivetypeid})"
+        # If we want a specific geometrytype, only extract the relevant type
+        if force_output_geometrytype is not GeometryType.GEOMETRYCOLLECTION:
+            primitivetypeid = force_output_geometrytype.to_primitivetype.value
+            operation = f"ST_CollectionExtract({operation}, {primitivetypeid})"
 
     # Now we can prepare the entire statement
     sql_template = f"""
@@ -339,7 +336,7 @@ def makevalid(
         columns=columns,
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,
-        gridsize=0.0,
+        gridsize=gridsize,
         keep_empty_geoms=keep_empty_geoms,
         where_post=where_post,
         sql_dialect="SQLITE",

@@ -11,7 +11,6 @@ from typing import Any, Callable, List, Literal, Optional, Tuple, Union, TYPE_CH
 import warnings
 
 from pygeoops import GeometryType
-import pygeoops
 
 from geofileops import fileops
 from geofileops.util import _geoops_gpd
@@ -1240,26 +1239,9 @@ def makevalid(
             stacklevel=2,
         )
 
-    # Determine if collapsed parts need to be kept after makevalid or not
-    keep_collapsed = True
-    if force_output_geometrytype is None:
-        keep_collapsed = False
-    else:
-        if isinstance(force_output_geometrytype, GeometryType):
-            force_output_geometrytype = force_output_geometrytype.name
-        info = fileops.get_layerinfo(input_path)
-        if force_output_geometrytype.startswith(
-            info.geometrytypename
-        ) or info.geometrytypename.startswith(force_output_geometrytype):
-            keep_collapsed = False
-
-    _geoops_gpd.apply(
+    return _geoops_gpd.makevalid(
         input_path=Path(input_path),
         output_path=Path(output_path),
-        func=lambda geom: pygeoops.make_valid(
-            geom, keep_collapsed=keep_collapsed, only_if_invalid=True
-        ),
-        operation_name="makevalid",
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
