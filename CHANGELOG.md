@@ -54,6 +54,7 @@
 - Fix error in `read_file` when `read_geometry=False` and `columns` specified (#393)
 - Fix error in `copy_layer`/`convert` with `explodecollections` on some input files
   (#395)
+- Fix dissolve forcing output to wrong geometrytype in some cases (#424)
 
 ### Deprecations and compatibility notes
 

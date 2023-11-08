@@ -516,24 +516,26 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, groupby_columns, explode, gridsize, where_post, "
+    "suffix, epsg, explode_input, groupby_columns, explode, gridsize, where_post, "
     "expected_featurecount",
     [
-        (".gpkg", 31370, ["GEWASGROEP"], True, 0.0, "", 25),
-        (".gpkg", 31370, ["GEWASGROEP"], False, 0.0, "", 6),
-        (".gpkg", 31370, ["gewasGROEP"], False, 0.01, WHERE_AREA_GT_5000, 4),
-        (".gpkg", 31370, ["gewasGROEP"], True, 0.01, WHERE_AREA_GT_5000, 13),
-        (".gpkg", 31370, [], True, 0.0, None, 23),
-        (".gpkg", 31370, None, False, 0.0, None, 1),
-        (".gpkg", 4326, ["GEWASGROEP"], True, 0.0, None, 25),
-        (".shp", 31370, ["GEWASGROEP"], True, 0.0, None, 25),
-        (".shp", 31370, [], True, 0.0, None, 23),
+        (".gpkg", 31370, False, ["GEWASGROEP"], True, 0.0, "", 25),
+        (".gpkg", 31370, False, ["GEWASGROEP"], False, 0.0, "", 6),
+        (".gpkg", 31370, True, ["GEWASGROEP"], False, 0.0, "", 6),
+        (".gpkg", 31370, False, ["gewasGROEP"], False, 0.01, WHERE_AREA_GT_5000, 4),
+        (".gpkg", 31370, False, ["gewasGROEP"], True, 0.01, WHERE_AREA_GT_5000, 13),
+        (".gpkg", 31370, False, [], True, 0.0, None, 23),
+        (".gpkg", 31370, False, None, False, 0.0, None, 1),
+        (".gpkg", 4326, False, ["GEWASGROEP"], True, 0.0, None, 25),
+        (".shp", 31370, False, ["GEWASGROEP"], True, 0.0, None, 25),
+        (".shp", 31370, False, [], True, 0.0, None, 23),
     ],
 )
 def test_dissolve_polygons(
     tmp_path,
     suffix,
     epsg,
+    explode_input,
     groupby_columns,
     explode,
     gridsize,
@@ -541,7 +543,21 @@ def test_dissolve_polygons(
     expected_featurecount,
 ):
     # Prepare test data
-    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
+    test_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
+    if explode_input:
+        # A bug caused in the past that the output was forced to the same type as the
+        # input. If input was simple Polygon, this cause invalid output because
+        # MultiPolygons were forced to Simple Polygons.
+        input_path = tmp_path / f"input{suffix}"
+        gfo.copy_layer(
+            src=test_path,
+            dst=input_path,
+            explodecollections=True,
+            force_output_geometrytype=GeometryType.POLYGON,
+        )
+    else:
+        input_path = test_path
+
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
 
@@ -564,6 +580,7 @@ def test_dissolve_polygons(
     # Now check if the tmp file is correctly created
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
+    assert gfo.isvalid(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == expected_featurecount
     if groupby is True:
@@ -575,7 +592,12 @@ def test_dissolve_polygons(
             assert len(output_layerinfo.columns) == 0
     else:
         assert len(output_layerinfo.columns) == len(groupby_columns)
-    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+    if not explode or suffix == ".shp":
+        # Shapefile always returns MultiPolygon
+        assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    else:
+        assert output_layerinfo.geometrytype == GeometryType.POLYGON
 
     # Now check the contents of the result file
     input_gdf = gfo.read_file(input_path)
@@ -769,7 +791,7 @@ def test_dissolve_polygons_groupby_None(tmp_path):
     # Now check if the tmp file is correctly created
     assert output_path.exists()
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    assert output_layerinfo.geometrytype == GeometryType.POLYGON
     assert (
         output_layerinfo.columns["none_values"].gdal_type
         == input_layerinfo.columns["none_values"].gdal_type
@@ -813,7 +835,7 @@ def test_dissolve_polygons_specialcases(tmp_path, suffix):
         assert output_layerinfo.featurecount == 25
         assert len(output_layerinfo.columns) == 1
         assert output_layerinfo.name == "banana"
-        assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+        assert output_layerinfo.geometrytype == GeometryType.POLYGON
 
         # Now check the contents of the result file
         input_gdf = gfo.read_file(input_path)

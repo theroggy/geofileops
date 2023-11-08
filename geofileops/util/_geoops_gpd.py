@@ -1294,6 +1294,7 @@ def dissolve(
                     break
 
             # Calculation ready! Now finalise output!
+            logger.info("Finalize result")
             # If there is a result on border, append it to the rest
             if (
                 str(output_tmp_onborder_path) != str(output_tmp_path)
@@ -1399,7 +1400,6 @@ def dissolve(
                 # All tiles are already dissolved to groups, but now the
                 # results from all tiles still need to be
                 # grouped/collected together.
-                logger.info("Finalize result")
                 if agg_columns is None:
                     # If there are no aggregation columns, things are not too
                     # complicated.
@@ -1476,14 +1476,20 @@ def dissolve(
                 sql_stmt = sql_stmt.format(
                     geometrycolumn="geom", input_layer=output_layer
                 )
+
                 create_spatial_index = True if where_post is None else False
+                output_geometrytype = (
+                    input_layerinfo.geometrytype.to_singletype
+                    if explodecollections
+                    else input_layerinfo.geometrytype.to_multitype
+                )
                 _ogr_util.vector_translate(
                     input_path=output_tmp_path,
                     output_path=output_tmp2_final_path,
                     output_layer=output_layer,
                     sql_stmt=sql_stmt,
                     sql_dialect="SQLITE",
-                    force_output_geometrytype=input_layerinfo.geometrytype,
+                    force_output_geometrytype=output_geometrytype,
                     explodecollections=explodecollections,
                     options={"LAYER_CREATION.SPATIAL_INDEX": create_spatial_index},
                 )
@@ -1506,7 +1512,7 @@ def dissolve(
                         input_path=output_tmp2_final_path,
                         output_path=output_tmp3_where_path,
                         output_layer=output_layer,
-                        force_output_geometrytype=input_layerinfo.geometrytype,
+                        force_output_geometrytype=output_geometrytype,
                         sql_stmt=sql_stmt,
                         sql_dialect="SQLITE",
                         options={"LAYER_CREATION.SPATIAL_INDEX": True},
