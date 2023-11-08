@@ -17,10 +17,6 @@ from geofileops import GeometryType
 from geofileops.util._general_util import MissingRuntimeDependencyError
 from geofileops.util import _sqlite_userdefined as sqlite_userdefined
 
-#####################################################################
-# First define/init some general variables/constants
-#####################################################################
-
 # Get a logger...
 logger = logging.getLogger(__name__)
 
@@ -38,14 +34,9 @@ class EmptyResultError(Exception):
         super().__init__(self.message)
 
 
-#####################################################################
-# The real work
-#####################################################################
-
-
-def check_runtimedependencies() -> Dict[str, str]:
+def spatialite_version_info() -> Dict[str, str]:
     """
-    Checks if runtime dependencies are available and returns the versions.
+    Returns the versions of the spatialite modules.
 
     Versions returned: spatialite_version, geos_version.
 

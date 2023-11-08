@@ -9,6 +9,7 @@ from typing import List
 
 import geopandas as gpd
 import pytest
+import shapely
 from shapely import MultiPolygon, Polygon
 
 from geofileops import fileops
@@ -684,6 +685,11 @@ def test_makevalid(tmp_path, suffix, input_empty, geoops_module):
         )
         assert isvalid is False, "Input file should contain invalid features"
 
+    # Add some extra kwargs
+    kwargs = {}
+    if geoops_module == "geofileops.geoops":
+        kwargs["validate_attribute_data"] = True
+
     # Do operation
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
     geoops.makevalid(
@@ -691,7 +697,7 @@ def test_makevalid(tmp_path, suffix, input_empty, geoops_module):
         output_path=output_path,
         nb_parallel=2,
         force_output_geometrytype=fileops.GeometryType.MULTIPOLYGON,
-        validate_attribute_data=True,
+        **kwargs,
     )
 
     # Now check if the output file is correctly created
@@ -814,6 +820,64 @@ def test_makevalid_gridsize(
         assert len(result_gdf) == 0
     else:
         assert_geodataframe_equal(result_gdf, expected_gdf)
+
+
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
+def test_makevalid_gridsize_topoerror(tmp_path, geoops_module):
+    """
+    Test on a specific valid polygon that gives a topologyerror when gridsize is set.
+    """
+    # The only currently known test case only works with geos 3.12. sql implementation
+    # doesn't handle this case properly.
+    if (
+        shapely.geos_version != (3, 12, 0)
+        or geoops_module == "geofileops.util._geoops_sql"
+    ):
+        pytest.skip()
+
+    # Prepare test data
+    poly_gridsize_error = shapely.from_wkt(
+        "Polygon ((26352.5 175096.6, 26352.6 175096.6, 26352.6 175096.7, "
+        "26352.5 175096.7, 26352.5 175096.6),(26352.528000000002 175096.676, "
+        "26352.528369565214 175096.67489130437, 26352.528140495866 175096.67619834712, "
+        "26352.52785714286 175096.67714285714, 26352.53 175096.66, "
+        "26352.528000000002 175096.676))"
+    )
+    poly_ok = shapely.from_wkt(
+        "Polygon ((26352.5 175096.7, 26352.66895 175096.76895, 26352.6 175096.6, "
+        "26352.5 175096.6, 26352.5 175096.7))"
+    )
+    test_data = {
+        "descr": ["gridsize_error", "ok"],
+        "geometry": [poly_gridsize_error, poly_ok],
+    }
+    test_gdf = gpd.GeoDataFrame(test_data, crs=31370)
+    input_path = tmp_path / "input.gpkg"
+    fileops.to_file(test_gdf, input_path)
+
+    gridsize = 0.001
+
+    # Prepare expected result
+    expected_data = {
+        "descr": ["gridsize_error", "ok"],
+        "geometry": [
+            poly_gridsize_error,
+            shapely.set_precision(poly_ok, grid_size=gridsize),
+        ],
+    }
+    assert test_data["geometry"][1] != expected_data["geometry"][1]
+    expected_gdf = gpd.GeoDataFrame(expected_data, crs=31370)
+
+    # Now run test
+    set_geoops_module(geoops_module)
+    output_path = tmp_path / "output.gpkg"
+    geoops.makevalid(input_path=input_path, output_path=output_path, gridsize=gridsize)
+
+    # Check result
+    output_gdf = fileops.read_file(output_path)
+    assert_geodataframe_equal(
+        output_gdf, expected_gdf, promote_to_multi=True, normalize=True
+    )
 
 
 def test_makevalid_invalidparams():

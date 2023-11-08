@@ -4,6 +4,8 @@ Tests for functionalities in geoseries_util.
 
 import geopandas as gpd
 from pygeoops import GeometryType
+import pytest
+import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
@@ -237,3 +239,51 @@ def test_is_valid_reason(tmp_path):
 
     assert len(result) == len(gdf)
     assert result[0].startswith("Ring Self-intersection")
+
+
+poly_gridsize_error = shapely.from_wkt(
+    "Polygon ((26352.5 175096.6, 26352.6 175096.6, 26352.6 175096.7, "
+    "26352.5 175096.7, 26352.5 175096.6),(26352.528000000002 175096.676, "
+    "26352.528369565214 175096.67489130437, 26352.528140495866 175096.67619834712, "
+    "26352.52785714286 175096.67714285714, 26352.53 175096.66, "
+    "26352.528000000002 175096.676))"
+)
+poly_ok = shapely.from_wkt(
+    "Polygon ((26352.5 175096.7, 26352.66895 175096.76895, 26352.6 175096.6, "
+    "26352.5 175096.6, 26352.5 175096.7))"
+)
+
+
+@pytest.mark.parametrize("raise_on_topoerror", [True, False])
+@pytest.mark.parametrize(
+    "geometry, exp_geometry",
+    [
+        (
+            [poly_gridsize_error, poly_ok],
+            [poly_gridsize_error, shapely.set_precision(poly_ok, grid_size=0.001)],
+        ),
+        (poly_gridsize_error, poly_gridsize_error),
+    ],
+)
+def test_set_precision(geometry, exp_geometry, raise_on_topoerror):
+    # The only currently known test case only works with geos 3.12
+    if shapely.geos_version != (3, 12, 0):
+        pytest.skip()
+
+    grid_size = 0.001
+
+    if raise_on_topoerror:
+        with pytest.raises(Exception, match="TopologyException: Ring edge missing at"):
+            # raise_on_topoerror is default False
+            result = _geoseries_util.set_precision(geometry, grid_size=grid_size)
+        return
+
+    result = _geoseries_util.set_precision(
+        geometry, grid_size=grid_size, raise_on_topoerror=raise_on_topoerror
+    )
+
+    # Check result
+    if hasattr(geometry, "__len__"):
+        assert result.tolist() == exp_geometry
+    else:
+        assert result == exp_geometry

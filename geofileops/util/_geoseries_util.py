@@ -3,14 +3,19 @@ Module containing utilities regarding operations on geoseries.
 """
 
 import logging
-from typing import List
+from typing import List, Union
+import warnings
 
 import geopandas as gpd
 import geopandas._compat as gpd_compat
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 from pygeoops import GeometryType
+from pygeoops._general import _extract_0dim_ndarray
+import pygeoops
 import shapely
+from shapely.geometry.base import BaseGeometry
 
 if gpd_compat.USE_PYGEOS:
     import pygeos as shapely2_or_pygeos
@@ -160,3 +165,120 @@ def _harmonize_to_multitype(
     )
     assert isinstance(geoseries_result, gpd.GeoSeries)
     return geoseries_result
+
+
+def set_precision(
+    geometry,
+    grid_size: float,
+    mode: str = "valid_output",
+    raise_on_topoerror: bool = True,
+) -> Union[BaseGeometry, NDArray[BaseGeometry], None]:
+    """
+    Returns geometry with the precision set to a precision grid size.
+
+    By default, geometries use double precision coordinates (grid_size = 0).
+
+    Coordinates will be rounded if a precision grid is less precise than the input
+    geometry. Duplicated vertices will be dropped from lines and polygons for grid sizes
+    greater than 0. Line and polygon geometries may collapse to empty geometries if all
+    vertices are closer together than grid_size. Z values, if present, will not be
+    modified.
+
+    Note: subsequent operations will always be performed in the precision of the
+    geometry with higher precision (smaller "grid_size"). That same precision will be
+    attached to the operation outputs.
+
+    Also note: input geometries should be geometrically valid; unexpected results may
+    occur if input geometries are not.
+
+    Args:
+        geometry: Geometry or array_like
+        grid_size (float): Precision grid size. If 0, will use double precision (will
+            not modify geometry if precision grid size was not previously set). If this
+            value is more precise than input geometry, the input geometry will not be
+            modified.
+        mode (str, optional): This parameter determines how to handle invalid output
+            geometries. There are three modes:
+
+            1. 'valid_output' (default):  The output is always valid. Collapsed
+                geometry elements  (including both polygons and lines) are removed.
+                Duplicate vertices are removed.
+            2. 'pointwise': Precision reduction is performed pointwise. Output geometry
+                may be invalid due to collapse or self-intersection. Duplicate vertices
+                are not removed. In GEOS this option is called NO_TOPO.
+            3. 'keep_collapsed': Like the default mode, except that collapsed linear
+                geometry elements are preserved. Collapsed polygonal input elements are
+                removed. Duplicate vertices are removed.
+        raise_on_topoerror (bool, optional): If False, instead of raising an error on a
+            topology error, retries after applying make_valid and returns the input if
+            it still fails. Defaults to True.
+
+    Returns:
+        geometry or array_like: The input with the precision applied. Returns None if
+            geometry is None.
+    """
+    if raise_on_topoerror:
+        return shapely.set_precision(geometry, grid_size=grid_size, mode=mode)
+
+    # Don't return an error when topologyerror occurs
+    try:
+        return shapely.set_precision(geometry, grid_size=grid_size, mode=mode)
+
+    except shapely.errors.GEOSException as ex:
+        if not str(ex).lower().startswith("topologyexception"):  # pragma: no cover
+            raise
+
+        # If set_precision fails with TopologyException, try again after make_valid
+        # Because it is applied on a GeoDataFrame with typically many rows, we don't
+        # know which row is invalid, so use only_if_invalid=True.
+        geometry = pygeoops.make_valid(
+            geometry, keep_collapsed=False, only_if_invalid=True
+        )
+
+        # Try again now
+        try:
+            geometry = shapely.set_precision(geometry, grid_size=grid_size, mode=mode)
+            warnings.warn(
+                f"error setting grid_size, but it succeeded after makevalid: <{ex}>",
+                stacklevel=1,
+            )
+            return geometry
+
+        except shapely.errors.GEOSException as ex:
+            if not str(ex).lower().startswith("topologyexception"):  # pragma: no cover
+                raise
+
+            # Still getting a TopologyException, so apply set_precision to each element
+            # seperately and keep the input for the ones giving an error.
+            # Deal with 0 dim arrays as input
+            geometry = _extract_0dim_ndarray(geometry)
+
+            # If there is only one element, just return the input
+            if not hasattr(geometry, "__len__"):
+                warnings.warn(
+                    f"error setting grid_size, input was returned, for {geometry}, "
+                    f"error: {ex}",
+                    stacklevel=1,
+                )
+                return geometry
+
+            # The input is arraylike... so try set_precision on each element
+            result = []
+            for geom in geometry:
+                try:
+                    result.append(
+                        shapely.set_precision(geom, grid_size=grid_size, mode=mode)
+                    )
+                except shapely.errors.GEOSException as ex:
+                    if not str(ex).lower().startswith("topologyexception"):
+                        raise
+
+                    # Just return the input
+                    result.append(geom)
+                    warnings.warn(
+                        f"error setting grid_size, input was returned, for {geom}, "
+                        f"error: {ex}",
+                        stacklevel=1,
+                    )
+
+            return np.array(result)

@@ -12,6 +12,7 @@ dependencies:
   - libspatialite >=5.0
   - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
   - numpy
+  - packaging
   - pandas
   - psutil
   # - pygeoops >=0.4,<0.5

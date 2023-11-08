@@ -2,11 +2,57 @@
 Tests for functionalities in ogr_util.
 """
 
+from packaging import version
 import pytest
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
+from geofileops._compat import SPATIALITE_GTE_51
 from tests import test_helper
+
+
+@pytest.mark.parametrize(
+    "descr, sql, version_needed",
+    [
+        (
+            "1_geos_basic",
+            "SELECT ST_Buffer(ST_GeomFromText('POINT (5 5)'), 5) AS geom",
+            "5.0",
+        ),
+        (
+            "2_geos_advanced",
+            "SELECT ST_ConcaveHull(ST_GeomFromText('POINT (5 5)')) geom",
+            "5.0",
+        ),
+        (
+            "3_geos_3100",
+            "SELECT GeosMakeValid(ST_GeomFromText('POINT (5 5)')) AS geom",
+            "5.1",
+        ),
+        (
+            "4_geos_3110",
+            """
+            SELECT HilbertCode(
+                       ST_GeomFromText('POINT (5 5)'),
+                       ST_GeomFromText('POLYGON ((0 0, 0 10, 10 10, 10 0, 0 0))'),
+                       5
+                   ) AS geom
+            """,
+            "5.1",
+        ),
+    ],
+)
+def test_geos_functions(descr, sql, version_needed):
+    """Test some geos functions from different spatialite versions."""
+    test_path = test_helper.get_testfile(testfile="polygon-parcel")
+
+    if version.parse(version_needed) < version.parse("5.1") or (
+        version.parse(version_needed) >= version.parse("5.1") and SPATIALITE_GTE_51
+    ):
+        gfo.read_file(test_path, sql_stmt=sql)
+    else:
+        with pytest.raises(Exception, match="no such function"):
+            gfo.read_file(test_path, sql_stmt=sql)
 
 
 @pytest.mark.skipif(

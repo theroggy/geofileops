@@ -3,10 +3,12 @@ import logging
 from typing import Optional
 
 import pygeoops
-import shapely
 
 # from pygeoops import _difference as _difference
 # from pygeoops import _paramvalidation as paramvalidation
+import shapely
+
+from geofileops.util import _geoseries_util
 
 # Get a logger...
 logger = logging.getLogger(__name__)
@@ -99,6 +101,9 @@ def gfo_reduceprecision(geom_wkb: bytes, gridsize: int) -> Optional[bytes]:
     """
     Reduces the precision of the geometry to the gridsize specified.
 
+    If reducing the precison leads to a topologyerror, retries after applying make_valid
+    and returns the input if it still fails.
+
     By default, geometries use double precision coordinates (grid_size = 0). Coordinates
     will be rounded if a precision grid is less precise than the input geometry.
     Duplicated vertices will be dropped from lines and polygons for grid sizes greater
@@ -135,16 +140,10 @@ def gfo_reduceprecision(geom_wkb: bytes, gridsize: int) -> Optional[bytes]:
 
     try:
         # Apply set_precision
-        try:
-            result = shapely.set_precision(geom, grid_size=gridsize)
-        except shapely.errors.GEOSException as ex:  # pragma: no cover
-            # If set_precision fails with TopologyException, try again after make_valid
-            if str(ex).lower().startswith("topologyexception"):
-                result = pygeoops.make_valid(result, keep_collapsed=False)
-                result = shapely.set_precision(result, grid_size=gridsize)
-                logger.warning(
-                    f"gridsize succesfully set after makevalid: you can ignore <{ex}>"
-                )
+        result = _geoseries_util.set_precision(
+            geom, grid_size=gridsize, raise_on_topoerror=False
+        )
+
         # If an empty result, return None
         # Remark: apparently ST_IsEmpty of spatialite doesn't work (in combination with
         # gpkg and/or wkb?).

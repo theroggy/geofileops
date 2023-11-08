@@ -331,22 +331,24 @@ def assert_geodataframe_equal(
         right = right.copy()
         right.loc[right.geometry.is_empty, ["geometry"]] = None
 
+    if promote_to_multi:
+        left.geometry = _geoseries_util.harmonize_geometrytypes(
+            left.geometry, force_multitype=True
+        )
+        right.geometry = _geoseries_util.harmonize_geometrytypes(
+            right.geometry, force_multitype=True
+        )
+
+    if normalize:
+        left.geometry = gpd.GeoSeries(
+            shapely.normalize(left.geometry), index=left.index
+        )
+        right.geometry = gpd.GeoSeries(
+            shapely.normalize(right.geometry),
+            index=right.index,
+        )
+
     if sort_values:
-        if normalize:
-            left.geometry = gpd.GeoSeries(
-                shapely.normalize(left.geometry), index=left.index
-            )
-            right.geometry = gpd.GeoSeries(
-                shapely.normalize(right.geometry),
-                index=right.index,
-            )
-        if promote_to_multi:
-            left.geometry = _geoseries_util.harmonize_geometrytypes(
-                left.geometry, force_multitype=True
-            )
-            right.geometry = _geoseries_util.harmonize_geometrytypes(
-                right.geometry, force_multitype=True
-            )
         left = geodataframe_util.sort_values(left).reset_index(drop=True)
         right = geodataframe_util.sort_values(right).reset_index(drop=True)
 

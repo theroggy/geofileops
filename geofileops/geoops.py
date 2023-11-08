@@ -12,11 +12,14 @@ import warnings
 
 from pygeoops import GeometryType
 
+from geofileops._compat import SPATIALITE_GTE_51
 from geofileops import fileops
+from geofileops.util import _geofileinfo
 from geofileops.util import _geoops_gpd
 from geofileops.util import _geoops_sql
 from geofileops.util import _geoops_ogr
 from geofileops.util import _io_util
+from geofileops.util import _sqlite_util
 from geofileops.util._geometry_util import (
     BufferEndCapStyle,
     BufferJoinStyle,
@@ -1239,21 +1242,47 @@ def makevalid(
             stacklevel=2,
         )
 
-    return _geoops_gpd.makevalid(
-        input_path=Path(input_path),
-        output_path=Path(output_path),
-        input_layer=input_layer,
-        output_layer=output_layer,
-        columns=columns,
-        explodecollections=explodecollections,
-        force_output_geometrytype=force_output_geometrytype,
-        gridsize=gridsize,
-        keep_empty_geoms=keep_empty_geoms,
-        where_post=where_post,
-        nb_parallel=nb_parallel,
-        batchsize=batchsize,
-        force=force,
-    )
+    if SPATIALITE_GTE_51 and gridsize == 0.0:
+        # If spatialite >= 5.1 available use faster/less memory using sql implementation
+        # Only use this version if gridsize is 0.0, because when gridsize applied it is
+        # less robust than the gpd implementation.
+        _geoops_sql.makevalid(
+            input_path=Path(input_path),
+            output_path=Path(output_path),
+            input_layer=input_layer,
+            output_layer=output_layer,
+            columns=columns,
+            explodecollections=explodecollections,
+            force_output_geometrytype=force_output_geometrytype,
+            gridsize=gridsize,
+            keep_empty_geoms=keep_empty_geoms,
+            where_post=where_post,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            force=force,
+        )
+    else:
+        _geoops_gpd.makevalid(
+            input_path=Path(input_path),
+            output_path=Path(output_path),
+            input_layer=input_layer,
+            output_layer=output_layer,
+            columns=columns,
+            explodecollections=explodecollections,
+            force_output_geometrytype=force_output_geometrytype,
+            gridsize=gridsize,
+            keep_empty_geoms=keep_empty_geoms,
+            where_post=where_post,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            force=force,
+        )
+
+    # If asked and output is spatialite based, check if all data can be read
+    if validate_attribute_data:
+        output_geofileinfo = _geofileinfo.get_geofileinfo(input_path)
+        if output_geofileinfo.is_spatialite_based:
+            _sqlite_util.test_data_integrity(path=input_path)
 
 
 def warp(

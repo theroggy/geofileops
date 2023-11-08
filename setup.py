@@ -27,6 +27,7 @@ setuptools.setup(
         "gdal>=3.6.3",
         "geopandas>=0.12,<0.14",
         "numpy",
+        "packaging",
         "pandas",
         "psutil",
         # "pygeoops>=0.3,<0.4",
