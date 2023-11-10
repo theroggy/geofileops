@@ -1,5 +1,6 @@
 import pytest
 import shapely
+import shapely.ops
 from shapely import MultiPolygon, Point, Polygon
 from shapely.testing import assert_geometries_equal
 
@@ -53,7 +54,7 @@ def test_gfo_difference_collection_empty_geoms(
         assert result == exp_result, f"Issue with test {test_id}"
 
 
-def test_difference_collection_invalid_params():
+def test_gfo_difference_collection_invalid_params():
     # geom_to_subtract is not a wkb
     with pytest.raises(TypeError, match="Expected bytes or string, got Point"):
         sqlite_userdefined.gfo_difference_collection(
@@ -115,6 +116,60 @@ def test_gfo_reduceprecision(test_descr, geom, exp_result):
         assert_geometries_equal(
             result, exp_result, normalize=True, err_msg=f"Issue with test {test_descr}"
         )
+
+
+@pytest.mark.parametrize("test", ["poly", "multipoly", "None"])
+def test_gfo_split(test):
+    box1_4 = shapely.box(1, 0, 4, 4)
+    blade = shapely.LineString([(0, 2), (11, 2)])
+
+    if test == "poly":
+        # Split of polygon with linestring blade gives collection of polygons
+        result = shapely.from_wkb(sqlite_userdefined.gfo_split(box1_4.wkb, blade.wkb))
+        assert result == shapely.ops.split(box1_4, blade)
+
+    elif test == "multipoly":
+        # Split of multipolygon
+        box5_9 = shapely.box(5, 0, 9, 4)
+        multipoly = MultiPolygon([box1_4, box5_9])
+        result = shapely.from_wkb(
+            sqlite_userdefined.gfo_split(multipoly.wkb, blade.wkb)
+        )
+        expected_result = """
+            GEOMETRYCOLLECTION (POLYGON ((4 2, 4 0, 1 0, 1 2, 4 2)),
+            POLYGON ((1 2, 1 4, 4 4, 4 2, 1 2)),
+            POLYGON ((9 2, 9 0, 5 0, 5 2, 9 2)),
+            POLYGON ((5 2, 5 4, 9 4, 9 2, 5 2)))
+        """
+        expected_result = shapely.from_wkt(expected_result)
+        assert result == expected_result
+
+    elif test == "None":
+        # Result of splitting None is None.
+        assert sqlite_userdefined.gfo_split(None, blade) is None
+
+    else:
+        raise ValueError(f"test not implemented: {test}")
+
+
+@pytest.mark.parametrize(
+    "test_id, geom, blade, exp_result",
+    [
+        (1, None, None, None),
+        (2, shapely.Point().wkb, None, shapely.Point().wkb),
+        (3, shapely.Point().wkb, shapely.Point(1, 1).wkb, shapely.Point().wkb),
+        (4, None, shapely.Point(1, 1).wkb, None),
+        (5, None, shapely.Point(1, 1).wkb, None),
+        (6, shapely.Point(1, 1).wkb, None, shapely.Point(1, 1).wkb),
+        (7, shapely.Point(1, 1).wkb, shapely.Point().wkb, shapely.Point(1, 1).wkb),
+    ],
+)
+def test_gfo_split_empty_geoms(test_id, geom, blade, exp_result):
+    result = sqlite_userdefined.gfo_split(geom, blade)
+    if exp_result is None:
+        assert result is None, f"Issue with test {test_id}"
+    else:
+        assert result == exp_result, f"Issue with test {test_id}"
 
 
 @pytest.mark.parametrize(
