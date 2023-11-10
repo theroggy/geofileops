@@ -19,7 +19,6 @@ dependencies:
   - pyogrio >=0.5
   - pyproj
   - shapely >=2,<2.1
-  - topojson
   # docs
   # Restrict sphinx version to < 6 to avoid logo error
   - sphinx<6

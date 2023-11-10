@@ -20,8 +20,6 @@ dependencies:
   - pyogrio =0.5.1  # released 2023-01-26
   - pyproj =3.4  # released 2022-09-10
   - shapely >=2,<2.1  # released 2022-12-12
-  # optional
-  - topojson =1.5  # released 2022-09-10
   # testing
   - pytest
   - pytest-cov

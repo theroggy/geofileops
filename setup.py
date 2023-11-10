@@ -35,7 +35,6 @@ setuptools.setup(
         "pyogrio",
         "pyproj",
         "shapely>=2,<2.1",
-        "topojson<2",
     ],
     extras_require={"full": ["simplification"]},
     classifiers=[
