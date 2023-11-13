@@ -28,7 +28,7 @@
   applying on-the-fly subdividing of complex geometries to speed up processing. The new
   parameter `subdivide_coords` can be used to control the feature. For files with very
   large input geometries, up to 100x faster + 10x less memory usage.
-  (#329, #330, #331, #357, #396)
+  (#329, #330, #331, #357, #396, #427)
 - Improve performance of spatial operations when only one batch is used (#271)
 - Improve performance of single layer operations (#375)
 - Improve performance of some geopandas/shapely based operations (#342, #408)

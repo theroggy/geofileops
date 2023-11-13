@@ -347,6 +347,32 @@ def test_identity(tmp_path, suffix, epsg, gridsize):
     )
 
 
+def test_identity_force(tmp_path):
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"output{input1_path.suffix}"
+    output_path.touch()
+
+    # Test with force False (the default): existing output file should stay the same
+    mtime_orig = output_path.stat().st_mtime
+    gfo.identity(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+    )
+    assert output_path.stat().st_mtime == mtime_orig
+
+    # With force=True
+    gfo.identity(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        force=True,
+    )
+    assert output_path.stat().st_mtime != mtime_orig
+
+
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
 @pytest.mark.parametrize(
     "suffix, epsg, gridsize, explodecollections, nb_parallel",
@@ -1591,3 +1617,29 @@ def test_union_circles(tmp_path, suffix, epsg):
         check_less_precise=True,
         normalize=True,
     )
+
+
+def test_union_force(tmp_path):
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"output{input1_path.suffix}"
+    output_path.touch()
+
+    # Test with force False (the default): existing output file should stay the same
+    mtime_orig = output_path.stat().st_mtime
+    gfo.union(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+    )
+    assert output_path.stat().st_mtime == mtime_orig
+
+    # With force=True
+    gfo.union(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        force=True,
+    )
+    assert output_path.stat().st_mtime != mtime_orig
