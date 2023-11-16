@@ -8,6 +8,7 @@ from osgeo import gdal
 import pytest
 
 import geofileops as gfo
+from geofileops._compat import GDAL_GTE_38
 from geofileops.util import _ogr_util
 from tests import test_helper
 
@@ -220,25 +221,41 @@ def test_vector_translate_sql(tmp_path, input_suffix, output_suffix):
 
 
 @pytest.mark.parametrize(
-    "input_suffix, output_suffix, geom_null_asc, exp_null_geoms",
+    "input_suffix, output_suffix, geom_null_asc,"
+    "exp_null_geoms_st38, exp_null_geoms_gte38",
     [
-        (".gpkg", ".gpkg", True, 7),
-        (".gpkg", ".shp", False, 46),
-        (".shp", ".gpkg", False, 46),
-        (".shp", ".shp", True, 7),
+        (".gpkg", ".gpkg", True, 7, 7),
+        (".gpkg", ".shp", False, 46, 7),
+        (".shp", ".gpkg", False, 46, 7),
+        (".shp", ".shp", True, 7, 7),
     ],
 )
 def test_vector_translate_sql_geom_null(
-    tmp_path, input_suffix, output_suffix, geom_null_asc, exp_null_geoms
+    tmp_path,
+    input_suffix,
+    output_suffix,
+    geom_null_asc,
+    exp_null_geoms_st38,
+    exp_null_geoms_gte38,
 ):
     """
     If there the first row of the result has a NULL geometry in the result, all
     geometries become NULL. Using ORDER BY geom IS NULL controls this.
        -> https://github.com/geofileops/geofileops/issues/308
+    Has been partly solved in gdal 3.8: for SQLITE query on geopackage it is OK, on a
+    .shp file the problem is still there.
     """
+    # Prepare test file
     input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
     output_path = tmp_path / f"output{output_suffix}"
     input_layerinfo = gfo.get_layerinfo(input_path)
+
+    exp_null_geoms = (
+        exp_null_geoms_gte38
+        if GDAL_GTE_38 and input_suffix == ".gpkg"
+        else exp_null_geoms_st38
+    )
+
     orderby_direction = "ASC" if geom_null_asc else "DESC"
     sql_stmt = f"""
         SELECT * FROM (
