@@ -296,6 +296,14 @@ def makevalid(
         logger.info(f"Stop, output exists already {output_path}")
         return
 
+    # Determine output_geometrytype + make it multitype if it wasn't specified.
+    # Otherwise makevalid can result in column type 'GEOMETRY'/'UNKNOWN(ANY)'.
+    if force_output_geometrytype is None:
+        input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
+        force_output_geometrytype = input_layerinfo.geometrytype
+        if not explodecollections:
+            force_output_geometrytype = force_output_geometrytype.to_multitype
+
     # Init + prepare sql template for this operation
     # ----------------------------------------------
     # Only apply makevalid if the geometry is truly invalid, this is faster
@@ -312,12 +320,6 @@ def makevalid(
                 {geometrycolumn},
                 ST_MakeValid({geometrycolumn})
             )"""
-
-        # Determine output_geometrytype if it wasn't specified. Otherwise makevalid
-        # can result in column type 'GEOMETRY'/'UNKNOWN(ANY)'
-        input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
-        if force_output_geometrytype is None:
-            force_output_geometrytype = input_layerinfo.geometrytype
 
         # If we want a specific geometrytype, only extract the relevant type
         if force_output_geometrytype is not GeometryType.GEOMETRYCOLLECTION:
@@ -383,6 +385,9 @@ def select(
         force_output_geometrytype = gfo.get_layerinfo(
             input_path, input_layer, raise_on_nogeom=False
         ).geometrytype
+        if force_output_geometrytype is not None and not explodecollections:
+            force_output_geometrytype = force_output_geometrytype.to_multitype
+
         logger.info(
             "No force_output_geometrytype specified, so defaults to input "
             f"layer geometrytype: {force_output_geometrytype}"
@@ -536,7 +541,11 @@ def _single_layer_vector_operation(
 
     # Determine if fid can be preserved
     preserve_fid = False
-    if not explodecollections and gfo.get_driver(output_path) == "GPKG":
+    if (
+        not explodecollections
+        and _geofileinfo.get_geofileinfo(input_path).is_spatialite_based
+        and _geofileinfo.get_geofileinfo(output_path).is_spatialite_based
+    ):
         preserve_fid = True
 
     # Calculate
@@ -868,11 +877,11 @@ def clip(
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
     primitivetypeid = input_layer_info.geometrytype.to_primitivetype.value
 
-    # If the input type is not point, force the output type to multi,
-    # because erase clip cause eg. polygons to be split to multipolygons...
+    # If explodecollections is False and the input type is not point, force the output
+    # type to multi, because erase clip cause eg. polygons to be split to multipolygons.
     force_output_geometrytype = input_layer_info.geometrytype
-    if force_output_geometrytype is not GeometryType.POINT:
-        force_output_geometrytype = input_layer_info.geometrytype.to_multitype
+    if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
+        force_output_geometrytype = force_output_geometrytype.to_multitype
 
     # Prepare sql template for this operation
     # Remarks:
@@ -972,10 +981,10 @@ def erase(
     # Init
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
 
-    # If the input type is not point, force the output type to multi,
-    # because erase can cause eg. polygons to be split to multipolygons...
+    # If explodecollections is False and the input type is not point, force the output
+    # type to multi, because erase can cause eg. polygons to be split to multipolygons.
     force_output_geometrytype = input_layer_info.geometrytype
-    if force_output_geometrytype is not GeometryType.POINT:
+    if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
         force_output_geometrytype = input_layer_info.geometrytype.to_multitype
 
     # Prepare sql template for this operation
@@ -1287,9 +1296,13 @@ def intersection(
         )
     )
 
-    # For the output file, if output is going to be polygon or linestring, force
-    # MULTI variant to avoid ugly warnings
-    force_output_geometrytype = primitivetype_to_extract.to_multitype
+    # If output is going to be polygon or linestring, force MULTI variant if
+    # explodecollections is False to avoid ugly warnings/issues.
+    if primitivetype_to_extract is not PrimitiveType.POINT:
+        if explodecollections:
+            force_output_geometrytype = primitivetype_to_extract.to_singletype
+        else:
+            force_output_geometrytype = primitivetype_to_extract.to_multitype
 
     # Prepare sql template for this operation
     #

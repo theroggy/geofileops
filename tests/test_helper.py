@@ -139,6 +139,7 @@ def get_testfile(
     epsg: int = 31370,
     empty: bool = False,
     dimensions: Optional[str] = None,
+    explodecollections: bool = False,
 ) -> Path:
     # Prepare original filepath
     testfile_path = _data_dir / f"{testfile}.gpkg"
@@ -177,8 +178,9 @@ def get_testfile(
             dst_crs=epsg,
             reproject=True,
             append=True,
-            preserve_fid=True,
+            preserve_fid=not explodecollections,
             dst_dimensions=dimensions,
+            explodecollections=explodecollections,
         )
 
         if empty:

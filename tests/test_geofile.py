@@ -212,15 +212,24 @@ def test_cmp(tmp_path, suffix):
     assert gfo.cmp(src2, dst) is False
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
+@pytest.mark.parametrize("suffix_input", SUFFIXES_FILEOPS)
+@pytest.mark.parametrize("suffix_output", SUFFIXES_FILEOPS)
 @pytest.mark.parametrize("dimensions", [None, "XYZ"])
-def test_copy_layer(tmp_path, dimensions, suffix):
+def test_copy_layer(tmp_path, dimensions, suffix_input, suffix_output):
     # Prepare test data
     src = test_helper.get_testfile(
-        "polygon-parcel", suffix=suffix, dimensions=dimensions
+        "polygon-parcel", suffix=suffix_input, dimensions=dimensions
     )
-    raise_on_nogeom = False if suffix == ".csv" else True
-    dst = tmp_path / f"{src.stem}-output{suffix}"
+    if suffix_input == ".csv" or suffix_output == ".csv":
+        raise_on_nogeom = False
+    else:
+        raise_on_nogeom = True
+
+    if suffix_input == ".csv" and suffix_output == ".shp":
+        # If no geometry column, there will only be a .dbf output file
+        dst = tmp_path / f"{src.stem}-output.dbf"
+    else:
+        dst = tmp_path / f"{src.stem}-output{suffix_output}"
 
     # Test
     gfo.copy_layer(src, dst)

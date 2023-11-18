@@ -417,7 +417,12 @@ def test_intersection(
     assert len(output_layerinfo.columns) == (
         len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     )
-    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+    if explodecollections and suffix != ".shp":
+        assert output_layerinfo.geometrytype == GeometryType.POLYGON
+    else:
+        assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
     if explodecollections:
         assert output_layerinfo.featurecount == 31
     else:
@@ -658,7 +663,11 @@ def test_intersection_where_post(
     assert len(output_layerinfo.columns) == (
         len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     )
-    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    if explodecollections and suffix != ".shp":
+        assert output_layerinfo.geometrytype == GeometryType.POLYGON
+    else:
+        assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
     assert output_layerinfo.featurecount == exp_featurecount
 
     # Check the contents of the result file
@@ -1477,7 +1486,12 @@ def test_union(
     if keep_fid:
         exp_columns += 2
     assert len(output_layerinfo.columns) == exp_columns
-    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+    if explodecollections and suffix != ".shp":
+        assert output_layerinfo.geometrytype == GeometryType.POLYGON
+    else:
+        assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
     assert output_layerinfo.featurecount == exp_featurecount
 
     # Check the contents of the result file

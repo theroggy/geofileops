@@ -953,13 +953,14 @@ def _apply_geooperation(
             new_name = f"{fid_column}_{fid_number}"
             if new_name not in columns_lower_lookup:
                 data_gdf = data_gdf.rename(columns={fid_column: new_name}, copy=False)
-    if explodecollections:
-        data_gdf = data_gdf.explode(ignore_index=True)
 
     if gridsize != 0.0:
         data_gdf.geometry = _geoseries_util.set_precision(
             data_gdf.geometry, grid_size=gridsize, raise_on_topoerror=False
         )
+
+    if explodecollections:
+        data_gdf = data_gdf.explode(ignore_index=True)
 
     # Remove rows where geom is None/null/empty
     if not keep_empty_geoms:
@@ -972,21 +973,24 @@ def _apply_geooperation(
     force_output_geometrytype = None
     if len(data_gdf) == 0:
         input_layerinfo = gfo.get_layerinfo(input_path, input_layer)
-        force_output_geometrytype = input_layerinfo.geometrytype.to_multitype.name
+        force_output_geometrytype = input_layerinfo.geometrytype
+        if not explodecollections:
+            force_output_geometrytype = force_output_geometrytype.to_multitype
+        force_output_geometrytype = force_output_geometrytype.name
 
     # If the index is still unique, save it to fid column so to_file can save it
     if preserve_fid:
         data_gdf = data_gdf.reset_index(drop=False)
 
-    # Use force_multitype, to avoid warnings when some batches contain
-    # singletype and some contain multitype geometries
+    # Use force_multitype if explodecollections=False to avoid warnings/issues when some
+    # batches contain singletype and some contain multitype geometries
     gfo.to_file(
         gdf=data_gdf,
         path=output_path,
         layer=output_layer,
         index=False,
         force_output_geometrytype=force_output_geometrytype,
-        force_multitype=True,
+        force_multitype=not explodecollections,
         create_spatial_index=False,
     )
 
