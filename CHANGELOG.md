@@ -9,7 +9,7 @@
 - Add `keep_empty_geoms` and `where_post` parameters to many single layer spatial operations
   (#262, #398)
 - Add `where_post` parameter to many two layer spatial operations (#312)
-- Add `where` parameter to `copy_layer` and `append_to` (#311)
+- Add `columns`, `sql` and `where` parameters to `copy_layer` and `append_to` (#311, #432)
 - Add `dissolve_within_distance` operation (#409)
 - Add support for lang+ algorithm in `simplify` (#334)
 - Add support to use `select` and `select_two_layers` on attribute tables (= tables

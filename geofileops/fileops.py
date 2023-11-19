@@ -2041,7 +2041,10 @@ def append_to(
     dst_layer: Optional[str] = None,
     src_crs: Union[int, str, None] = None,
     dst_crs: Union[int, str, None] = None,
+    columns: Optional[Iterable[str]] = None,
     where: Optional[str] = None,
+    sql_stmt: Optional[str] = None,
+    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     reproject: bool = False,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
@@ -2055,8 +2058,20 @@ def append_to(
     """
     Append src file to the dst file.
 
-    Remark: append is not supported for all filetypes in fiona/geopandas (0.8)
-    so workaround via gdal needed.
+    If an sql_stmt is specified, the sqlite query can contain following placeholders
+    that will be automatically replaced for you:
+
+      * {geometrycolumn}: the column where the primary geometry is stored.
+      * {columns_to_select_str}: if 'columns' is not None, those columns,
+        otherwise all columns of the layer.
+      * {input_layer}: the layer name of the input layer.
+
+    Example sql statement with placeholders:
+    ::
+
+        SELECT {geometrycolumn}
+              {columns_to_select_str}
+          FROM "{input_layer}" layer
 
     The options parameter can be used to pass any type of options to GDAL in
     the following form:
@@ -2085,11 +2100,23 @@ def append_to(
             by the OGRSpatialReference.SetFromUserInput() call, which includes
             an EPSG string (eg. "EPSG:4326"), a well known text (WKT) CRS
             definition,... Defaults to None.
+        columns (Iterable[str], optional): The (non-geometry) columns to read will
+            be returned in the order specified. If None, all standard columns are read.
+            In addition to standard columns, it is also possible
+            to specify "fid", a unique index available in all input files. Note that the
+            "fid" will be aliased eg. to "fid_1". Defaults to None.
         where (str, optional): only append the rows from src that comply to the filter
             specified. Applied before explodecollections. Filter should be in sqlite
             SQL WHERE syntax and |spatialite_reference_link| functions can be used. If
             where contains the {geometrycolumn} placeholder, it is filled out with the
             geometry column name of the src file. Defaults to None.
+        sql_stmt (str): sql statement to use. Only supported with "pyogrio" engine.
+        sql_dialect (str, optional): Sql dialect used. Options are None, "SQLITE" or
+            "OGRSQL". If None, for data sources with explicit SQL support the statement
+            is processed by the default SQL engine (e.g. for Geopackage and Spatialite
+            this is "SQLITE"). For data sources without native SQL support (e.g. .shp),
+            the "OGRSQL" dialect is the default. If the "SQLITE" dialect is specified,
+            |spatialite_reference_link| functions can also be used. Defaults to None.
         reproject (bool, optional): True to reproject while converting the
             file. Defaults to False.
         explodecollections (bool), optional): True to output only simple geometries.
@@ -2155,7 +2182,10 @@ def append_to(
                     dst_layer=dst_layer,
                     src_crs=src_crs,
                     dst_crs=dst_crs,
+                    columns=columns,
                     where=where,
+                    sql_stmt=sql_stmt,
+                    sql_dialect=sql_dialect,
                     reproject=reproject,
                     explodecollections=explodecollections,
                     force_output_geometrytype=force_output_geometrytype,
@@ -2187,7 +2217,10 @@ def _append_to_nolock(
     dst_layer: Optional[str] = None,
     src_crs: Union[int, str, None] = None,
     dst_crs: Union[int, str, None] = None,
+    columns: Optional[Iterable[str]] = None,
     where: Optional[str] = None,
+    sql_stmt: Optional[str] = None,
+    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     reproject: bool = False,
     explodecollections: bool = False,
     create_spatial_index: Optional[bool] = True,
@@ -2211,9 +2244,14 @@ def _append_to_nolock(
         src_layerinfo = get_layerinfo(src, src_layer, raise_on_nogeom=False)
         where = where.format(geometrycolumn=src_layerinfo.geometrycolumn)
 
+    if sql_stmt is not None:
+        # Fill out placeholders.
+        sql_stmt = _fill_out_sql_placeholders(
+            path=src, layer=src_layer, sql_stmt=sql_stmt, columns=columns
+        )
+
     # When creating/appending to a shapefile, some extra things need to be done/checked.
-    sql_stmt = None
-    if dst.suffix.lower() == ".shp":
+    if sql_stmt is None and dst.suffix.lower() == ".shp":
         # If the destination file doesn't exist yet, and the source file has
         # geometrytype "Geometry", raise because type is not supported by shp (and will
         # default to linestring).
@@ -2232,8 +2270,9 @@ def _append_to_nolock(
 
         # Launder the columns names via a sql statement, otherwise when appending the
         # laundered columns will get NULL values instead of the data.
-        src_columns = src_layerinfo.columns
-        columns_laundered = _launder_column_names(src_columns)
+        if columns is None:
+            columns = src_layerinfo.columns
+        columns_laundered = _launder_column_names(columns)
         columns_aliased = [
             f'"{column}" AS "{laundered}"' for column, laundered in columns_laundered
         ]
@@ -2250,6 +2289,8 @@ def _append_to_nolock(
               FROM "{src_layer}"
              {where_clause}
         """
+        sql_dialect = "SQLITE"
+        columns = None
 
     # When dst file doesn't exist and src is empty force_output_geometrytype should be
     # specified, otherwise invalid output.
@@ -2266,8 +2307,9 @@ def _append_to_nolock(
         output_layer=dst_layer,
         input_srs=src_crs,
         output_srs=dst_crs,
+        columns=columns,
         sql_stmt=sql_stmt,
-        sql_dialect="SQLITE",
+        sql_dialect=sql_dialect,
         where=where,
         reproject=reproject,
         transaction_size=transaction_size,
@@ -2329,7 +2371,10 @@ def copy_layer(
     dst_layer: Optional[str] = None,
     src_crs: Union[str, int, None] = None,
     dst_crs: Union[str, int, None] = None,
+    columns: Optional[Iterable[str]] = None,
     where: Optional[str] = None,
+    sql_stmt: Optional[str] = None,
+    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     reproject: bool = False,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
@@ -2374,11 +2419,23 @@ def copy_layer(
             by the OGRSpatialReference.SetFromUserInput() call, which includes
             an EPSG string (eg. "EPSG:4326"), a well known text (WKT) CRS
             definition,... Defaults to None.
+        columns (Iterable[str], optional): The (non-geometry) columns to read will
+            be returned in the order specified. If None, all standard columns are read.
+            In addition to standard columns, it is also possible
+            to specify "fid", a unique index available in all input files. Note that the
+            "fid" will be aliased eg. to "fid_1". Defaults to None.
         where (str, optional): only append the rows from src that comply to the filter
             specified. Applied before explodecollections. Filter should be in sqlite
             SQL WHERE syntax and |spatialite_reference_link| functions can be used. If
             where contains the {geometrycolumn} placeholder, it is filled out with the
             geometry column name of the src file. Defaults to None.
+        sql_stmt (str): sql statement to use. Only supported with "pyogrio" engine.
+        sql_dialect (str, optional): Sql dialect used. Options are None, "SQLITE" or
+            "OGRSQL". If None, for data sources with explicit SQL support the statement
+            is processed by the default SQL engine (e.g. for Geopackage and Spatialite
+            this is "SQLITE"). For data sources without native SQL support (e.g. .shp),
+            the "OGRSQL" dialect is the default. If the "SQLITE" dialect is specified,
+            |spatialite_reference_link| functions can also be used. Defaults to None.
         reproject (bool, optional): True to reproject while converting the
             file. Defaults to False.
         explodecollections (bool, optional): True to output only simple
@@ -2433,7 +2490,10 @@ def copy_layer(
         dst_layer,
         src_crs=src_crs,
         dst_crs=dst_crs,
+        columns=columns,
         where=where,
+        sql_stmt=sql_stmt,
+        sql_dialect=sql_dialect,
         reproject=reproject,
         explodecollections=explodecollections,
         force_output_geometrytype=force_output_geometrytype,

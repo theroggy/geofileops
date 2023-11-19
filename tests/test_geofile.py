@@ -241,6 +241,19 @@ def test_copy_layer(tmp_path, dimensions, suffix_input, suffix_output):
     assert len(src_layerinfo.columns) == len(dst_layerinfo.columns)
 
 
+@pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
+def test_copy_layer_columns(tmp_path, suffix):
+    # Prepare test data
+    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+
+    # Test
+    dst = tmp_path / f"output{suffix}"
+    gfo.copy_layer(src, dst, columns=["OIDN", "UIDN"])
+    copy_gdf = gfo.read_file(dst)
+    input_gdf = gfo.read_file(src, columns=["OIDN", "UIDN"])
+    assert_geodataframe_equal(input_gdf, copy_gdf)
+
+
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
 @pytest.mark.parametrize("dimensions", [None, "XYZ"])
 def test_copy_layer_emptyfile(tmp_path, dimensions, suffix):
@@ -370,6 +383,52 @@ def test_copy_layer_reproject(tmp_path, suffix, src_crs):
     assert first_poly.exterior is not None
     for x, y in first_poly.exterior.coords:
         assert x < 100 and y < 100
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
+def test_copy_layer_sql(tmp_path, suffix):
+    # Prepare test data
+    # For multi-layer filetype, use 2-layer file for better test coverage
+    if _geofileinfo.get_geofileinfo(suffix).is_singlelayer:
+        testfile = "polygon-parcel"
+        src = test_helper.get_testfile(testfile, suffix=suffix)
+        src_layer = src.stem
+    else:
+        testfile = "polygon-twolayers"
+        src = test_helper.get_testfile(testfile, suffix=suffix)
+        src_layer = "parcels"
+
+    # Test
+    sql_stmt = f'SELECT * FROM "{src_layer}"'
+    dst = tmp_path / f"output{suffix}"
+    gfo.copy_layer(src, dst, src_layer=src_layer, sql_stmt=sql_stmt)
+    read_gdf = gfo.read_file(src, sql_stmt=sql_stmt)
+    assert isinstance(read_gdf, pd.DataFrame)
+    if not suffix == ".csv":
+        assert isinstance(read_gdf, gpd.GeoDataFrame)
+    assert len(read_gdf) == 46
+
+
+@pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
+def test_copy_layer_sql_placeholders(tmp_path, suffix):
+    """
+    Test if placeholders are properly filled out + if casing used in columns parameter
+    is retained when using placeholders.
+    """
+    # Prepare test data
+    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+
+    # Test
+    sql_stmt = """
+        SELECT {geometrycolumn} AS geom
+              {columns_to_select_str}
+          FROM "{input_layer}"
+    """
+    dst = tmp_path / f"output{suffix}"
+    gfo.copy_layer(src, dst, sql_stmt=sql_stmt, sql_dialect="SQLITE", columns=["OIDN"])
+    copy_gdf = gfo.read_file(dst)
+    input_gdf = gfo.read_file(src, columns=["OIDN"])
+    assert_geodataframe_equal(input_gdf, copy_gdf)
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
