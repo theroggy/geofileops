@@ -152,7 +152,8 @@ def test_erase_explodecollections(tmp_path):
     )
 
 
-def test_erase_subdivide_multipolygons(tmp_path):
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
+def test_erase_subdivide_multipolygons(tmp_path, suffix):
     """
     Test if erase with subdivide also works if the erase layer contains multipolygons.
 
@@ -161,12 +162,12 @@ def test_erase_subdivide_multipolygons(tmp_path):
     MultiPolygons).
     """
     # Prepare test data
-    input_path = test_helper.get_testfile("point")
+    input_path = test_helper.get_testfile("point", suffix=suffix)
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
 
-    # Prepare erase test data: should be multipolygons
-    zone_path = test_helper.get_testfile("polygon-zone")
+    # Prepare erase test data: should be multipolygons for good test coverage
+    zone_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
     zones_gdf = gfo.read_file(zone_path)
 
     erase_geometries = [
@@ -184,10 +185,10 @@ def test_erase_subdivide_multipolygons(tmp_path):
         },
     ]
     erase_gdf = gpd.GeoDataFrame(erase_geometries, crs=31370)
-    erase_path = tmp_path / f"{zone_path.stem}_multi.gpkg"
+    erase_path = tmp_path / f"{zone_path.stem}_multi{suffix}"
     gfo.to_file(erase_gdf, erase_path)
 
-    output_path = tmp_path / f"{input_path.stem}-output_exploded{input_path.suffix}"
+    output_path = tmp_path / f"{input_path.stem}-output_exploded{suffix}"
     gfo.erase(
         input_path=input_path,
         erase_path=erase_path,

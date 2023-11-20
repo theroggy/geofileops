@@ -987,6 +987,41 @@ def erase(
     if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
         force_output_geometrytype = input_layer_info.geometrytype.to_multitype
 
+    # If the erase layer is made out of polygons, check if they are complex
+    tmp_dir = None
+    erase_layer_info = gfo.get_layerinfo(erase_path, erase_layer)
+    if erase_layer_info.geometrytype.to_primitivetype == PrimitiveType.POLYGON:
+        # If erase layer has complex geometries, subdivide them to speed up processing.
+        complexgeom_sql = f"""
+            SELECT COUNT(*) nb_complexgeom
+              FROM "{{input_layer}}"
+             WHERE ST_NPoints({{geometrycolumn}}) > {subdivide_coords}
+        """
+        complexgeom_df = gfo.read_file(
+            erase_path, erase_layer, sql_stmt=complexgeom_sql, sql_dialect="SQLITE"
+        )
+        if complexgeom_df.iloc[0].nb_complexgeom > 0:
+            tmp_dir = _io_util.create_tempdir("geofileops/erase_input")
+            geometrycolumn = erase_layer_info.geometrycolumn
+            erase_layer = erase_layer_info.name
+            subdivide_geom_sql = f"""
+                SELECT IIF(ST_NPoints(layer.{geometrycolumn}) < {subdivide_coords},
+                           layer.{geometrycolumn},
+                           ST_Subdivide(layer.{geometrycolumn}, {subdivide_coords})
+                       ) AS geom
+                 FROM "{erase_layer}" layer
+            """
+            erase_subdidided_path = tmp_dir / f"{erase_path.stem}_subdivided.gpkg"
+            gfo.copy_layer(
+                src=erase_path,
+                dst=erase_subdidided_path,
+                dst_layer=erase_layer,
+                sql_stmt=subdivide_geom_sql,
+                sql_dialect="SQLITE",
+                explodecollections=True,
+            )
+            erase_path = erase_subdidided_path
+
     # Prepare sql template for this operation
     # - WHERE geom IS NOT NULL to avoid rows with a NULL geom, they give issues in
     #   later operations
@@ -1004,9 +1039,6 @@ def erase(
     #   Tried to return EMPTY GEOMETRY from GFO_Difference_Collection, but it didn't
     #   work to use spatialite's ST_IsEmpty(geom) = 0 to filter on this for an unclear
     #   reason.
-    # - Using ST_Subdivide instead of GFO_Subdivide is 10 * slower, not sure why. Maybe
-    #   the result of that function isn't cached?
-    # - First checking ST_NPoints before GFO_Subdivide provides another 20% speed up.
     # - Not relevant anymore, but ST_difference(geometry , NULL) gives NULL as result
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
@@ -1016,19 +1048,12 @@ def erase(
           SELECT IFNULL(
                    ( SELECT IFNULL(
                                ST_GeomFromWKB(GFO_Difference_Collection(
-                                  ST_AsBinary(layer1.{{input1_geometrycolumn}}),
-                                  ST_AsBinary(ST_Collect(
-                                     IIF(
-                                        ST_NPoints(layer2_sub.{{input2_geometrycolumn}})
-                                           < {subdivide_coords},
-                                        layer2_sub.{{input2_geometrycolumn}},
-                                        ST_GeomFromWKB(GFO_Subdivide(
-                                           ST_AsBinary(
-                                              layer2_sub.{{input2_geometrycolumn}}),
-                                           {subdivide_coords}))
-                                     ))),
-                                     1,
-                                     {subdivide_coords}
+                                    ST_AsBinary(layer1.{{input1_geometrycolumn}}),
+                                    ST_AsBinary(ST_Collect(
+                                       layer2_sub.{{input2_geometrycolumn}}
+                                    )),
+                                    1,
+                                    {subdivide_coords}
                                )),
                                'DIFF_EMPTY'
                             ) AS diff_geom
@@ -1041,9 +1066,6 @@ def erase(
                         AND layer1tree.maxx >= layer2tree.minx
                         AND layer1tree.miny <= layer2tree.maxy
                         AND layer1tree.maxy >= layer2tree.miny
-                        AND ST_Intersects(
-                                layer1.{{input1_geometrycolumn}},
-                                layer2_sub.{{input2_geometrycolumn}}) = 1
                       LIMIT -1 OFFSET 0
                    ),
                    layer1.{{input1_geometrycolumn}}
@@ -1060,28 +1082,32 @@ def erase(
     """
 
     # Go!
-    return _two_layer_vector_operation(
-        input1_path=input_path,
-        input2_path=erase_path,
-        output_path=output_path,
-        sql_template=sql_template,
-        operation_name=f"{operation_prefix}erase",
-        input1_layer=input_layer,
-        input1_columns=input_columns,
-        input1_columns_prefix=input_columns_prefix,
-        input2_layer=erase_layer,
-        input2_columns=[],
-        input2_columns_prefix="",
-        output_layer=output_layer,
-        explodecollections=explodecollections,
-        force_output_geometrytype=force_output_geometrytype,
-        gridsize=gridsize,
-        where_post=where_post,
-        nb_parallel=nb_parallel,
-        batchsize=batchsize,
-        force=force,
-        output_with_spatial_index=output_with_spatial_index,
-    )
+    try:
+        return _two_layer_vector_operation(
+            input1_path=input_path,
+            input2_path=erase_path,
+            output_path=output_path,
+            sql_template=sql_template,
+            operation_name=f"{operation_prefix}erase",
+            input1_layer=input_layer,
+            input1_columns=input_columns,
+            input1_columns_prefix=input_columns_prefix,
+            input2_layer=erase_layer,
+            input2_columns=[],
+            input2_columns_prefix="",
+            output_layer=output_layer,
+            explodecollections=explodecollections,
+            force_output_geometrytype=force_output_geometrytype,
+            gridsize=gridsize,
+            where_post=where_post,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            force=force,
+            output_with_spatial_index=output_with_spatial_index,
+        )
+    finally:
+        if tmp_dir is not None:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def export_by_location(
@@ -1947,7 +1973,7 @@ def symmetric_difference(
                 gfo.add_column(
                     erase1_output_path,
                     name=f"{input2_columns_prefix}{column}",
-                    type=input2_info.columns[column].gdal_type,
+                    type=input2_info.columns[column].sqlite_type,
                 )
 
         # Now erase input1 from input2 to another temporary output file

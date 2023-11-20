@@ -164,6 +164,17 @@ class ColumnInfo:
         self.width = width
         self.precision = precision
 
+    @property
+    def sqlite_type(self):
+        """Returns the data type as a type that will be recognised by sqlite."""
+        gdal_type_lower = self.gdal_type.lower()
+        if gdal_type_lower == "integer64":
+            return "INTEGER"
+        elif gdal_type_lower == "string":
+            return "TEXT"
+        else:
+            return self.gdal_type
+
     def __repr__(self):
         """Overrides the representation property of ColumnInfo."""
         return f"{self.__class__}({self.__dict__})"
@@ -848,6 +859,8 @@ def add_column(
             type_str = "BLOB"
         elif type_lower == "time":
             type_str = "DATETIME"
+        elif type_lower == "integer64":
+            type_str = "INTEGER"
         else:
             type_str = type
     path = Path(path)
