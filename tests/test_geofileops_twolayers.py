@@ -50,6 +50,49 @@ def test_clip(tmp_path, testfile, suffix):
     )
 
 
+@pytest.mark.parametrize("suffix", [".gpkg", ".shp"])
+@pytest.mark.parametrize("clip_empty", [True, False])
+def test_clip_resultempty(tmp_path, suffix, clip_empty):
+    # Prepare test data
+    # -----------------
+    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+
+    if clip_empty:
+        clip_path = test_helper.get_testfile(
+            "polygon-zone", suffix=suffix, dst_dir=tmp_path, empty=True
+        )
+    else:
+        input2_data = [
+            {"desc": "input2_1", "geometry": shapely.box(5, 5, 1000, 1000)},
+            {"desc": "input2_2", "geometry": shapely.box(2000, 5, 3000, 1000)},
+        ]
+        clip_gdf = gpd.GeoDataFrame(input2_data, crs=31370)
+        clip_path = tmp_path / f"input2{suffix}"
+        gfo.to_file(clip_gdf, clip_path)
+
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    # Now run test
+    # ------------
+    output_path = tmp_path / f"{input_path.stem}_clip_{clip_path.stem}{suffix}"
+    gfo.clip(
+        input_path=input_path,
+        clip_path=clip_path,
+        output_path=output_path,
+        nb_parallel=2,
+        batchsize=batchsize,
+    )
+
+    # Check if the output file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert output_layerinfo.featurecount == 0
+    assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
+    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
     "testfile, gridsize, where_post",
@@ -539,17 +582,27 @@ def test_intersection_output_path_exists(tmp_path):
 
 
 @pytest.mark.parametrize("suffix", [".gpkg", ".shp"])
-def test_intersection_resultempty(tmp_path, suffix):
+@pytest.mark.parametrize("input2_empty", [True, False])
+def test_intersection_resultempty(tmp_path, suffix, input2_empty):
     # Prepare test data
     # -----------------
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
-    input2_path = test_helper.get_testfile(
-        "polygon-zone", suffix=suffix, dst_dir=tmp_path, empty=True
-    )
+
+    if input2_empty:
+        input2_path = test_helper.get_testfile(
+            "polygon-zone", suffix=suffix, dst_dir=tmp_path, empty=True
+        )
+    else:
+        input2_data = [
+            {"desc": "input2_1", "geometry": shapely.box(5, 5, 1000, 1000)},
+            {"desc": "input2_2", "geometry": shapely.box(2000, 5, 3000, 1000)},
+        ]
+        input2_gdf = gpd.GeoDataFrame(input2_data, crs=31370)
+        input2_path = tmp_path / f"input2{suffix}"
+        gfo.to_file(input2_gdf, input2_path)
+
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
-    input2_layerinfo = gfo.get_layerinfo(input2_path)
-    assert input2_layerinfo.featurecount == 0
 
     # Now run test
     # ------------
@@ -569,6 +622,7 @@ def test_intersection_resultempty(tmp_path, suffix):
     assert gfo.has_spatial_index(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == 0
+    input2_layerinfo = gfo.get_layerinfo(input2_path)
     assert len(output_layerinfo.columns) == (
         len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     )
