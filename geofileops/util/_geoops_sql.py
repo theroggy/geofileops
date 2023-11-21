@@ -1973,7 +1973,7 @@ def symmetric_difference(
                 gfo.add_column(
                     erase1_output_path,
                     name=f"{input2_columns_prefix}{column}",
-                    type=input2_info.columns[column].sqlite_type,
+                    type=input2_info.columns[column].gdal_type,
                 )
 
         # Now erase input1 from input2 to another temporary output file
