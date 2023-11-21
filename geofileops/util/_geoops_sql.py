@@ -16,6 +16,8 @@ from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union
 import warnings
 
 import pandas as pd
+import pygeoops
+import shapely
 
 import geofileops as gfo
 from geofileops import GeometryType, PrimitiveType
@@ -25,6 +27,7 @@ from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.fileops import _append_to_nolock
 from geofileops.util import _general_util
 from geofileops.util import _geofileinfo
+from geofileops.util import _geoops_gpd
 from geofileops.util import _io_util
 from geofileops.util import _ogr_sql_util
 from geofileops.util import _ogr_util
@@ -371,9 +374,10 @@ def select(
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
+    operation_prefix: str = "",
 ):
     # Check if output exists already here, to avoid to much logging to be written
-    logger = logging.getLogger("geofileops.select")
+    logger = logging.getLogger(f"geofileops.{operation_prefix}select")
     if output_path.exists():
         if force is False:
             logger.info(f"Stop, output exists already {output_path}")
@@ -399,7 +403,7 @@ def select(
         output_path=output_path,
         sql_template=sql_stmt,
         geom_selected=None,
-        operation_name="select",
+        operation_name=f"{operation_prefix}select",
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
@@ -756,7 +760,11 @@ def _single_layer_vector_operation(
             # the same file at the time.
             nb_done = 0
             _general_util.report_progress(
-                start_time, nb_done, nb_batches, operation_name, nb_parallel=nb_parallel
+                start_time,
+                nb_done,
+                nb_todo=nb_batches,
+                operation=operation_name,
+                nb_parallel=processing_params.nb_parallel,
             )
             for future in futures.as_completed(future_to_batch_id):
                 try:
@@ -811,9 +819,9 @@ def _single_layer_vector_operation(
                 _general_util.report_progress(
                     start_time,
                     nb_done,
-                    nb_batches,
-                    operation_name,
-                    nb_parallel=nb_parallel,
+                    nb_todo=nb_batches,
+                    operation=operation_name,
+                    nb_parallel=processing_params.nb_parallel,
                 )
 
         # Round up and clean up
@@ -979,6 +987,9 @@ def erase(
     operation_prefix: str = "",
 ):
     # Init
+    start_time = datetime.now()
+    operation = f"{operation_prefix}erase"
+    logger = logging.getLogger(f"geofileops.{operation}")
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
 
     # If explodecollections is False and the input type is not point, force the output
@@ -991,35 +1002,61 @@ def erase(
     tmp_dir = None
     erase_layer_info = gfo.get_layerinfo(erase_path, erase_layer)
     if erase_layer_info.geometrytype.to_primitivetype == PrimitiveType.POLYGON:
+        erase_layer = erase_layer_info.name
+
         # If erase layer has complex geometries, subdivide them to speed up processing.
         complexgeom_sql = f"""
-            SELECT COUNT(*) nb_complexgeom
-              FROM "{{input_layer}}"
+            SELECT 1
+              FROM "{{input_layer}}" layer
              WHERE ST_NPoints({{geometrycolumn}}) > {subdivide_coords}
+             LIMIT 1
         """
-        complexgeom_df = gfo.read_file(
-            erase_path, erase_layer, sql_stmt=complexgeom_sql, sql_dialect="SQLITE"
+        logger.info(
+            f"Check if complex geometries in erase layer (> {subdivide_coords} coords)"
         )
-        if complexgeom_df.iloc[0].nb_complexgeom > 0:
+        complexgeom_df = gfo.read_file(
+            erase_path, sql_stmt=complexgeom_sql, sql_dialect="SQLITE"
+        )
+        if len(complexgeom_df) > 0:
+            logger.info("Subdivide needed: complex geometries found")
+
+            # Do subdivide using python function, because all spatialite options didn't
+            # seem to work.
+            # Check out commits in https://github.com/geofileops/geofileops/pull/433
+            def subdivide(geom, num_coords_max):
+                result = pygeoops.subdivide(geom, num_coords_max=num_coords_max)
+
+                if result is None:
+                    return None
+                if not hasattr(result, "__len__"):
+                    return result
+                if len(result) == 1:
+                    return result[0]
+
+                # Explode because
+                #   - they will be exploded anyway by spatialite.ST_Collect
+                #   - spatialite.ST_AsBinary and/or spatialite.ST_GeomFromWkb don't seem
+                #     to handle nested collections well.
+                return shapely.GeometryCollection(shapely.get_parts(result).tolist())
+
             tmp_dir = _io_util.create_tempdir("geofileops/erase_input")
-            geometrycolumn = erase_layer_info.geometrycolumn
-            erase_layer = erase_layer_info.name
-            subdivide_geom_sql = f"""
-                SELECT IIF(ST_NPoints(layer.{geometrycolumn}) < {subdivide_coords},
-                           layer.{geometrycolumn},
-                           ST_Subdivide(layer.{geometrycolumn}, {subdivide_coords})
-                       ) AS geom
-                 FROM "{erase_layer}" layer
-            """
             erase_subdidided_path = tmp_dir / f"{erase_path.stem}_subdivided.gpkg"
-            gfo.copy_layer(
-                src=erase_path,
-                dst=erase_subdidided_path,
-                dst_layer=erase_layer,
-                sql_stmt=subdivide_geom_sql,
-                sql_dialect="SQLITE",
+            _geoops_gpd.apply(
+                input_path=erase_path,
+                input_layer=erase_layer,
+                output_path=erase_subdidided_path,
+                output_layer=erase_layer,
+                func=lambda geom: subdivide(geom, num_coords_max=subdivide_coords),
+                operation_name="erase/subdivide",
+                columns=[],
                 explodecollections=True,
+                nb_parallel=nb_parallel,
+                batchsize=batchsize,
+                parallelization_config=_geoops_gpd.ParallelizationConfig(
+                    bytes_per_row=2000, max_rows_per_batch=50000
+                ),
             )
+
             erase_path = erase_subdidided_path
 
     # Prepare sql template for this operation
@@ -1083,12 +1120,12 @@ def erase(
 
     # Go!
     try:
-        return _two_layer_vector_operation(
+        _two_layer_vector_operation(
             input1_path=input_path,
             input2_path=erase_path,
             output_path=output_path,
             sql_template=sql_template,
-            operation_name=f"{operation_prefix}erase",
+            operation_name=operation,
             input1_layer=input_layer,
             input1_columns=input_columns,
             input1_columns_prefix=input_columns_prefix,
@@ -1108,6 +1145,9 @@ def erase(
     finally:
         if tmp_dir is not None:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    # Print time taken
+    logger.info(f"Ready, full erase took {datetime.now()-start_time}")
 
 
 def export_by_location(
@@ -1322,13 +1362,11 @@ def intersection(
         )
     )
 
-    # If output is going to be polygon or linestring, force MULTI variant if
-    # explodecollections is False to avoid ugly warnings/issues.
-    if primitivetype_to_extract is not PrimitiveType.POINT:
-        if explodecollections:
-            force_output_geometrytype = primitivetype_to_extract.to_singletype
-        else:
-            force_output_geometrytype = primitivetype_to_extract.to_multitype
+    # Force MULTI variant if explodecollections is False to avoid ugly warnings/issues.
+    if explodecollections:
+        force_output_geometrytype = primitivetype_to_extract.to_singletype
+    else:
+        force_output_geometrytype = primitivetype_to_extract.to_multitype
 
     # Prepare sql template for this operation
     #
@@ -1901,7 +1939,7 @@ def identity(
     finally:
         shutil.rmtree(tempdir, ignore_errors=True)
 
-    logger.info(f"Ready, took {datetime.now()-start_time}")
+    logger.info(f"Ready, full identity took {datetime.now()-start_time}")
 
 
 def symmetric_difference(
@@ -2165,7 +2203,7 @@ def union(
     finally:
         shutil.rmtree(tempdir, ignore_errors=True)
 
-    logger.info(f"Ready, took {datetime.now()-start_time}")
+    logger.info(f"Ready, full union took {datetime.now()-start_time}")
 
 
 def _two_layer_vector_operation(

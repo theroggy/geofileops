@@ -379,6 +379,7 @@ def apply(
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
+    parallelization_config: ParallelizationConfig = None,
 ):
     # Init
     operation_params = {
@@ -405,6 +406,7 @@ def apply(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        parallelization_config=parallelization_config,
     )
 
 
@@ -613,6 +615,7 @@ def _apply_geooperation_to_layer(
     nb_parallel: int,  # = -1
     batchsize: int,  # = -1
     force: bool,  # = False
+    parallelization_config: ParallelizationConfig = None,
 ):
     """
     Applies a geo operation on a layer.
@@ -677,6 +680,7 @@ def _apply_geooperation_to_layer(
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): [description]. Defaults to False.
+        parallelization_config (ParallelizationConfig, optional): Defaults to None.
 
     Technical remarks:
         - Retaining None geometry values in the output files is hard, because when
@@ -743,7 +747,7 @@ def _apply_geooperation_to_layer(
             input_layer=input_layer,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
-            parallelization_config=None,
+            parallelization_config=parallelization_config,
             tmp_dir=tmp_dir,
         )
         assert processing_params.batches is not None
@@ -766,8 +770,6 @@ def _apply_geooperation_to_layer(
 
             batches: Dict[int, dict] = {}
             future_to_batch_id = {}
-            nb_batches = len(processing_params.batches)
-            nb_done = 0
 
             for batch_id, batch_filter in enumerate(processing_params.batches):
                 batches[batch_id] = {}
@@ -808,6 +810,8 @@ def _apply_geooperation_to_layer(
             # Remark: calculating can be done in parallel, but only one process
             # can write to the same output file at the time...
             start_time = datetime.now()
+            nb_done = 0
+            nb_batches = len(processing_params.batches)
             _general_util.report_progress(
                 start_time,
                 nb_done,
@@ -860,7 +864,11 @@ def _apply_geooperation_to_layer(
                 # Log the progress and prediction speed
                 nb_done += 1
                 _general_util.report_progress(
-                    start_time, nb_done, nb_batches, operation.value, nb_parallel
+                    start_time,
+                    nb_done,
+                    nb_todo=nb_batches,
+                    operation=operation.value,
+                    nb_parallel=processing_params.nb_parallel,
                 )
 
         # Round up and clean up
