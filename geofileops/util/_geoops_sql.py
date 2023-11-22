@@ -1103,6 +1103,8 @@ def erase(
                         AND layer1tree.maxx >= layer2tree.minx
                         AND layer1tree.miny <= layer2tree.maxy
                         AND layer1tree.maxy >= layer2tree.miny
+                        AND ST_intersects(layer1.{{input1_geometrycolumn}},
+                                          layer2_sub.{{input2_geometrycolumn}}) = 1
                       LIMIT -1 OFFSET 0
                    ),
                    layer1.{{input1_geometrycolumn}}
