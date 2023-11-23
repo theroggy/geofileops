@@ -980,16 +980,25 @@ def erase(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
     input_columns_prefix: str = "",
     output_with_spatial_index: bool = True,
     operation_prefix: str = "",
 ):
-    # Init
-    start_time = datetime.now()
+    # Because there might be extra preparation of the erase layer before going ahead
+    # with the real calculation, do some additional init + checks here...
     operation = f"{operation_prefix}erase"
     logger = logging.getLogger(f"geofileops.{operation}")
+    if output_path.exists():
+        if force is False:
+            logger.info(f"Stop, output exists already {output_path}")
+            return
+        else:
+            gfo.remove(output_path)
+
+    # Init
+    start_time = datetime.now()
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
 
     # If explodecollections is False and the input type is not point, force the output
@@ -1848,7 +1857,7 @@ def identity(
     where_post: Optional[str] = None,
     nb_parallel: int = 1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
 ):
     # An identity is the combination of the results of an "intersection" of input1 and
@@ -1960,7 +1969,7 @@ def symmetric_difference(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
 ):
     # A symmetric difference can be simulated by doing an "erase" of input1
@@ -2083,7 +2092,7 @@ def union(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
 ):
     # A union is the combination of the results of an intersection of input1 and input2,

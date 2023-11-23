@@ -1720,7 +1720,7 @@ def erase(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
 ):
     """
@@ -1766,7 +1766,7 @@ def erase(
             parts with about subdivide_coords coordinates during processing which can
             offer a large speed up for complex geometries. Subdividing can result in
             extra collinear points being added to the boundaries of the output. If < 0,
-            no subdividing is applied. Defaults to 1000.
+            no subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -1977,7 +1977,7 @@ def identity(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
 ):
     """
@@ -2026,7 +2026,7 @@ def identity(
             parts with about subdivide_coords coordinates during processing which can
             offer a large speed up for complex geometries. Subdividing can result in
             extra collinear points being added to the boundaries of the output. If < 0,
-            no subdividing is applied. Defaults to 1000.
+            no subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -2074,7 +2074,7 @@ def split(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
 ):
     """
@@ -2696,7 +2696,7 @@ def symmetric_difference(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
 ):
     """
@@ -2747,7 +2747,7 @@ def symmetric_difference(
             parts with about subdivide_coords coordinates during processing which can
             offer a large speed up for complex geometries. Subdividing can result in
             extra collinear points being added to the boundaries of the output. If < 0,
-            no subdividing is applied. Defaults to 1000.
+            no subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -2798,7 +2798,7 @@ def union(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
     force: bool = False,
 ):
     """
@@ -2847,7 +2847,7 @@ def union(
             parts with about subdivide_coords coordinates during processing which can
             offer a large speed up for complex geometries. Subdividing can result in
             extra collinear points being added to the boundaries of the output. If < 0,
-            no subdividing is applied. Defaults to 1000.
+            no subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 

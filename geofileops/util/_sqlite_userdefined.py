@@ -20,7 +20,7 @@ def gfo_difference_collection(
     geom_wkb: bytes,
     geom_to_subtract_wkb: bytes,
     keep_geom_type: int = 0,
-    subdivide_coords: int = 1000,
+    subdivide_coords: int = 2000,
 ) -> Optional[bytes]:
     """
     Applies the difference of geom_to_subtract on geom.
@@ -45,7 +45,7 @@ def gfo_difference_collection(
             subdivided to parts with about this number of points which can speed up
             processing for complex geometries. Subdividing can result in extra collinear
             points being added to the boundaries of the output. If <= 0, no subdividing
-            is applied. Defaults to 1000.
+            is applied. Defaults to 2000.
 
     Returns:
         Optional[bytes]: return the difference. If geom was completely removed due to
@@ -220,7 +220,7 @@ def gfo_split(
         return None
 
 
-def gfo_subdivide(geom_wkb: bytes, coords: int = 1000):
+def gfo_subdivide(geom_wkb: bytes, coords: int = 2000):
     """
     Divide the input geometry to smaller parts using rectilinear lines.
 
@@ -229,7 +229,7 @@ def gfo_subdivide(geom_wkb: bytes, coords: int = 1000):
         coords (int): number of coordinates per subdivision to aim for. In the current
             implementation, coords will be the average number of coordinates the
             subdividions will consist of. If <= 0, no subdividing is applied.
-            Defaults to 1000.
+            Defaults to 2000.
 
     Returns:
         geometry wkb: if geometry has < coords coordinates, the input geometry is

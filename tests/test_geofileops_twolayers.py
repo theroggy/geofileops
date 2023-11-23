@@ -195,6 +195,32 @@ def test_erase_explodecollections(tmp_path):
     )
 
 
+def test_erase_force(tmp_path):
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel")
+    erase_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"output{input_path.suffix}"
+    output_path.touch()
+
+    # Test with force False (the default): existing output file should stay the same
+    mtime_orig = output_path.stat().st_mtime
+    gfo.erase(
+        input_path=input_path,
+        erase_path=erase_path,
+        output_path=output_path,
+    )
+    assert output_path.stat().st_mtime == mtime_orig
+
+    # With force=True
+    gfo.erase(
+        input_path=input_path,
+        erase_path=erase_path,
+        output_path=output_path,
+        force=True,
+    )
+    assert output_path.stat().st_mtime != mtime_orig
+
+
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_erase_subdivide_multipolygons(tmp_path, suffix):
     """
