@@ -54,6 +54,9 @@ def spatialite_version_info() -> Dict[str, str]:
         result = conn.execute(sql).fetchall()
         spatialite_version = result[0][0]
         geos_version = result[0][1]
+    except MissingRuntimeDependencyError:
+        conn.rollback()
+        raise
     except Exception as ex:
         conn.rollback()
         raise RuntimeError(f"Error {ex} executing {sql}") from ex

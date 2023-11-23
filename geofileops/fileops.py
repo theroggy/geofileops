@@ -2127,8 +2127,9 @@ def append_to(
             to (try to) force the output to. Defaults to None.
         create_spatial_index (bool, optional): True to create a spatial index
             on the destination file/layer. If None, the default behaviour by gdal for
-            that file type is respected. If the LAYER_CREATION.SPATIAL_INDEX
-            parameter is specified in options, create_spatial_index is ignored.
+            that file type is respected. If the `LAYER_CREATION.SPATIAL_INDEX`
+            parameter is specified in options, `create_spatial_index` is ignored. If the
+            destination layer exists already, `create_spatial_index` is also ignored.
             Defaults to True.
         append_timeout_s (int, optional): timeout to use if the output file is
             being written to by another process already. Defaults to 600.

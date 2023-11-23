@@ -57,6 +57,8 @@ def gfo_difference_collection(
             return None
         if geom_to_subtract_wkb is None:
             return geom_wkb
+        if subdivide_coords <= 0:
+            return geom_wkb
 
         # Extract wkb's, and return if empty
         geom = shapely.from_wkb(geom_wkb)

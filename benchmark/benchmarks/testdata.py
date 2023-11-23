@@ -8,8 +8,9 @@ from pathlib import Path
 import pprint
 import shutil
 import tempfile
-from typing import Optional
+from typing import Optional, Tuple
 
+import geopandas as gpd
 import shapely
 import urllib.request
 import zipfile
@@ -30,35 +31,73 @@ logger = logging.getLogger(__name__)
 class TestFile(enum.Enum):
     AGRIPRC_2018 = (
         0,
-        "https://downloadagiv.blob.core.windows.net/landbouwgebruikspercelen/2018/Landbouwgebruikspercelen_LV_2018_GewVLA_Shape.zip",  # noqa: E501
+        "https://www.landbouwvlaanderen.be/bestanden/gis/Landbouwgebruikspercelen_2018_-_Definitief_(extractie_23-03-2022)_GPKG.zip",  # noqa: E501
         "agriprc_2018.gpkg",
     )
     AGRIPRC_2019 = (
         1,
-        "https://downloadagiv.blob.core.windows.net/landbouwgebruikspercelen/2019/Landbouwgebruikspercelen_LV_2019_GewVLA_Shapefile.zip",  # noqa: E501
+        "https://www.landbouwvlaanderen.be/bestanden/gis/Landbouwgebruikspercelen_2019_-_Definitief_(extractie_20-03-2020)_GPKG.zip",  # noqa: E501
         "agriprc_2019.gpkg",
     )
-    COMMUNES = (
-        2,
-        "https://downloadagiv.blob.core.windows.net/referentiebestand-gemeenten/VoorlopigRefBestandGemeentegrenzen_2019-01-01/VRBG_toestand_16_05_2018_(geldend_vanaf_01_01_2019)_GewVLA_Shape.zip",  # noqa: E501
-        "communes.gpkg",
-    )
+    COMPLEX_POLYS = (2, None, "complexpolys.gpkg")
 
     def __init__(self, value, url, filename):
         self._value_ = value
         self.url = url
         self.filename = filename
 
-    def get_file(self, tmp_dir: Path) -> Path:
-        testfile_path = download_samplefile(
-            url=self.url, dst_name=self.filename, dst_dir=tmp_dir
-        )
-        testfile_info = gfo.get_layerinfo(testfile_path)
-        logger.debug(
-            f"TestFile {self.name} contains {testfile_info.featurecount} rows."
-        )
+    def get_file(self, output_dir: Path) -> Tuple[Path, str]:
+        """
+        Creates the test file.
 
-        return testfile_path
+        Args:
+            tmp_dir (Path): the directory to write the file to.
+
+        Returns:
+            _type_: The path to the file + a description of the test file.
+        """
+        if self.url is not None:
+            testfile_path = download_samplefile(
+                url=self.url, dst_name=self.filename, dst_dir=output_dir
+            )
+            testfile_info = gfo.get_layerinfo(testfile_path)
+            logger.debug(
+                f"TestFile {self.name} contains {testfile_info.featurecount} rows."
+            )
+            description = f"agri parcels, {testfile_info.featurecount} rows"
+
+        elif self.name == "COMPLEX_POLYS":
+            # Prepare some complex polygons to test with
+            xmin_start = 30000
+            step = 20000
+            nb_polys = 10
+            polys_complex = [
+                create_complex_poly(
+                    xmin=xmin,
+                    ymin=170000.123,
+                    width=15000,
+                    height=15000,
+                    line_distance=500,
+                    max_segment_length=100,
+                )
+                for xmin in range(xmin_start, xmin_start + (nb_polys * step), step)
+            ]
+            logger.debug(
+                f"polys_complex: {len(polys_complex)} polys with num_coordinates: "
+                f"{shapely.get_num_coordinates(polys_complex[0])}"
+            )
+            testfile_path = output_dir / self.filename
+            complex_gdf = gpd.GeoDataFrame(geometry=polys_complex, crs="epsg:31370")
+            complex_gdf.to_file(testfile_path, engine="pyogrio")
+            description = (
+                f"{len(polys_complex)} complex polys "
+                f"(each {shapely.get_num_coordinates(polys_complex[0])} coords)"
+            )
+
+        else:
+            raise RuntimeError(f"get_file not implemented for {self.name}")
+
+        return (testfile_path, description)
 
 
 def create_complex_poly(

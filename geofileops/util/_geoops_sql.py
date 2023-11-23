@@ -921,9 +921,9 @@ def clip(
                  AND ST_Intersects(
                         layer1.{{input1_geometrycolumn}},
                         layer2.{{input2_geometrycolumn}}) = 1
-                 AND ST_Touches(
-                        layer1.{{input1_geometrycolumn}},
-                        layer2.{{input2_geometrycolumn}}) = 0
+                 --AND ST_Touches(
+                 --       layer1.{{input1_geometrycolumn}},
+                 --       layer2.{{input2_geometrycolumn}}) = 0
                GROUP BY layer1.rowid
                LIMIT -1 OFFSET 0
             )
@@ -1000,6 +1000,7 @@ def erase(
     # Init
     start_time = datetime.now()
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
+    primitivetypeid = input_layer_info.geometrytype.to_primitivetype.value
 
     # If explodecollections is False and the input type is not point, force the output
     # type to multi, because erase can cause eg. polygons to be split to multipolygons.
@@ -1007,10 +1008,13 @@ def erase(
     if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
         force_output_geometrytype = input_layer_info.geometrytype.to_multitype
 
-    # If the erase layer is made out of polygons, check if they are complex
+    # If the erase layer is made out of polygons, subdivide them if needed
     tmp_dir = None
     erase_layer_info = gfo.get_layerinfo(erase_path, erase_layer)
-    if erase_layer_info.geometrytype.to_primitivetype == PrimitiveType.POLYGON:
+    if (
+        subdivide_coords > 0
+        and erase_layer_info.geometrytype.to_primitivetype == PrimitiveType.POLYGON
+    ):
         erase_layer = erase_layer_info.name
 
         # If erase layer has complex geometries, subdivide them to speed up processing.
@@ -1079,13 +1083,13 @@ def erase(
     #   BY on layer1.rowid was a few % faster, but this is not worth it. E.g. for one
     #   test file 4-7 GB per process versus 70-700 MB). For another: crash.
     # - Check if the result of GFO_Difference_Collection is empty (NULL) using IFNULL,
-    #   and if this ois the case set to 'DIFF_EMPTY'. This way we can make the
+    #   and if this is the case set to 'DIFF_EMPTY'. This way we can make the
     #   distinction whether the subquery is finding a row (no match with spatial index)
     #   or if the difference results in an empty/NULL geometry.
     #   Tried to return EMPTY GEOMETRY from GFO_Difference_Collection, but it didn't
     #   work to use spatialite's ST_IsEmpty(geom) = 0 to filter on this for an unclear
     #   reason.
-    # - Not relevant anymore, but ST_difference(geometry , NULL) gives NULL as result
+    # - ST_difference(geometry , NULL) gives NULL as result -> handle explicitly
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
 
@@ -1093,14 +1097,29 @@ def erase(
         SELECT * FROM (
           SELECT IFNULL(
                    ( SELECT IFNULL(
-                               ST_GeomFromWKB(GFO_Difference_Collection(
-                                    ST_AsBinary(layer1.{{input1_geometrycolumn}}),
-                                    ST_AsBinary(ST_Collect(
-                                       layer2_sub.{{input2_geometrycolumn}}
-                                    )),
-                                    1,
-                                    {subdivide_coords}
-                               )),
+                               IIF(ST_NPoints(layer1.{{input1_geometrycolumn}})
+                                        < {subdivide_coords},
+                                   IIF(ST_Union(layer2_sub.{{input2_geometrycolumn}})
+                                            IS NULL,
+                                       layer1.{{input1_geometrycolumn}},
+                                       ST_CollectionExtract(
+                                          ST_difference(
+                                             layer1.{{input1_geometrycolumn}},
+                                             ST_Union(
+                                                layer2_sub.{{input2_geometrycolumn}})
+                                          ),
+                                          {primitivetypeid}
+                                       )
+                                   ),
+                                   ST_GeomFromWKB(GFO_Difference_Collection(
+                                      ST_AsBinary(layer1.{{input1_geometrycolumn}}),
+                                      ST_AsBinary(ST_Collect(
+                                         layer2_sub.{{input2_geometrycolumn}}
+                                      )),
+                                      1,
+                                      {subdivide_coords}
+                                   ))
+                               ),
                                'DIFF_EMPTY'
                             ) AS diff_geom
                        FROM {{input1_databasename}}."{input1_layer_rtree}" layer1tree
@@ -1927,6 +1946,7 @@ def identity(
 
         # Now append
         logger.info("Step 3 of 3: finalize")
+        # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
             src=erase_output_path,
             dst=intersection_output_path,
@@ -1983,6 +2003,7 @@ def symmetric_difference(
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
+    start_time = datetime.now()
     logger = logging.getLogger("geofileops.symmetric_difference")
     logger.info(
         f"Start, with input1: {input1_path}, "
@@ -2050,6 +2071,7 @@ def symmetric_difference(
 
         # Now append
         logger.info("Step 3 of 3: finalize")
+        # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
             src=erase2_output_path,
             dst=erase1_output_path,
@@ -2074,6 +2096,8 @@ def symmetric_difference(
 
     finally:
         shutil.rmtree(tempdir, ignore_errors=True)
+
+    logger.info(f"Ready, full symmetric_difference took {datetime.now()-start_time}")
 
 
 def union(
@@ -2185,6 +2209,7 @@ def union(
 
         # Now append
         logger.info("Step 4 of 4: finalize")
+        # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
             src=erase1_output_path,
             dst=intersection_output_path,
