@@ -15,7 +15,7 @@ dependencies:
   - packaging
   - pandas
   - psutil
-  # - pygeoops >=0.4,<0.5
+  - pygeoops >=0.4,<0.5
   - pyogrio >=0.5
   - pyproj
   - shapely >=2,<2.1
@@ -24,6 +24,5 @@ dependencies:
   - sphinx<6
   - pydata-sphinx-theme
   - pip:
-    - pygeoops ==0.4.0a3
     - sphinx-automodapi ==0.13
     - simplification

@@ -42,8 +42,16 @@ def test_apply(
     # Prepare test data
     test_gdf = gpd.GeoDataFrame(
         data=[
-            {"uidn": 1, "geometry": test_helper.TestData.polygon_small_island},
-            {"uidn": 2, "geometry": test_helper.TestData.polygon_with_island},
+            {
+                "uidn": 1,
+                "min_area": 2,
+                "geometry": test_helper.TestData.polygon_small_island,
+            },
+            {
+                "uidn": 2,
+                "min_area": 2,
+                "geometry": test_helper.TestData.polygon_with_island,
+            },
         ],
         crs=31370,
     )
@@ -55,31 +63,26 @@ def test_apply(
 
     # Run test
     if only_geom_input:
-        gfo.apply(
-            input_path=input_path,
-            output_path=output_path,
-            func=lambda geom: pygeoops.remove_inner_rings(
-                geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
-            ),
-            only_geom_input=True,
-            gridsize=gridsize,
-            keep_empty_geoms=keep_empty_geoms,
-            where_post=where_post,
-            batchsize=batchsize,
+        func = lambda geom: pygeoops.remove_inner_rings(
+            geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
         )
     else:
-        gfo.apply(
-            input_path=input_path,
-            output_path=output_path,
-            func=lambda row: pygeoops.remove_inner_rings(
-                row.geometry, min_area_to_keep=2, crs=input_layerinfo.crs
-            ),
-            only_geom_input=False,
-            gridsize=gridsize,
-            keep_empty_geoms=keep_empty_geoms,
-            where_post=where_post,
-            batchsize=batchsize,
+        func = lambda row: pygeoops.remove_inner_rings(
+            row.geometry,
+            min_area_to_keep=row.min_area,
+            crs=input_layerinfo.crs,
         )
+
+    gfo.apply(
+        input_path=input_path,
+        output_path=output_path,
+        func=func,
+        only_geom_input=only_geom_input,
+        gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where_post=where_post,
+        batchsize=batchsize,
+    )
 
     # Now check if the output file is correctly created
     assert output_path.exists()
@@ -130,9 +133,17 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
     # Prepare test data
     test_gdf = gpd.GeoDataFrame(
         data=[
-            {"id": 1, "geometry": test_helper.TestData.polygon_small_island},
-            {"id": 2, "geometry": test_helper.TestData.polygon_with_island},
-            {"id": 3, "geometry": None},
+            {
+                "id": 1,
+                "min_area": 2,
+                "geometry": test_helper.TestData.polygon_small_island,
+            },
+            {
+                "id": 2,
+                "min_area": 2,
+                "geometry": test_helper.TestData.polygon_with_island,
+            },
+            {"id": 3, "min_area": 2, "geometry": None},
         ],
         crs=31370,
     )
@@ -143,27 +154,22 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
 
     if only_geom_input:
-        gfo.apply(
-            input_path=input_path,
-            output_path=output_path,
-            func=lambda geom: pygeoops.remove_inner_rings(
-                geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
-            ),
-            only_geom_input=True,
-            force_output_geometrytype=force_output_geometrytype,
-            batchsize=batchsize,
+        func = lambda geom: pygeoops.remove_inner_rings(
+            geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
         )
     else:
-        gfo.apply(
-            input_path=input_path,
-            output_path=output_path,
-            func=lambda row: pygeoops.remove_inner_rings(
-                row.geometry, min_area_to_keep=2, crs=input_layerinfo.crs
-            ),
-            only_geom_input=False,
-            force_output_geometrytype=force_output_geometrytype,
-            batchsize=batchsize,
+        func = lambda row: pygeoops.remove_inner_rings(
+            row.geometry, min_area_to_keep=row.min_area, crs=input_layerinfo.crs
         )
+
+    gfo.apply(
+        input_path=input_path,
+        output_path=output_path,
+        func=func,
+        only_geom_input=only_geom_input,
+        force_output_geometrytype=force_output_geometrytype,
+        batchsize=batchsize,
+    )
 
     # Now check if the output file is correctly created
     assert output_path.exists()
