@@ -452,7 +452,9 @@ def get_only_layer(path: Union[str, "os.PathLike[Any]"]) -> str:
             if len(layers) == 1:
                 datasource_layer = datasource.GetLayer(layers[0])
             else:
-                raise ValueError(f"Layer has > 1 layer: {path}: {layers}")
+                raise ValueError(
+                    f"input has > 1 layer, but no layer specified: {path}: {layers}"
+                )
 
         return datasource_layer.GetName()
 
@@ -1019,8 +1021,8 @@ def read_file(
 
     Args:
         path (file path): path to the file to read from
-        layer (str, optional): The layer to read. Defaults to None,
-            then reads the only layer in the file or throws error.
+        layer (str, optional): The layer to read. If None and there is only one layer in
+            the file it is read, otherwise an error is thrown. Defaults to None.
         columns (Iterable[str], optional): The (non-geometry) columns to read will
             be returned in the order specified. If None, all standard columns are read.
             In addition to standard columns, it is also possible
@@ -1336,6 +1338,8 @@ def _read_file_base_pyogrio(
         sql_stmt = _fill_out_sql_placeholders(
             path=path, layer=layer, sql_stmt=sql_stmt, columns=columns
         )
+        # Specifying a layer as well as an sql statement in pyogrio is not supported.
+        layer = None
 
     # Read!
     columns_list = None if columns_prepared is None else list(columns_prepared)
@@ -1388,6 +1392,7 @@ def _fill_out_sql_placeholders(
     for placeholder in placeholders:
         if layer_tmp is None:
             layer_tmp = get_only_layer(path)
+
         if placeholder == "input_layer":
             format_kwargs[placeholder] = layer_tmp
         elif placeholder == "geometrycolumn":

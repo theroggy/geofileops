@@ -1020,8 +1020,8 @@ def erase(
         # If erase layer has complex geometries, subdivide them to speed up processing.
         complexgeom_sql = f"""
             SELECT 1
-              FROM "{{input_layer}}" layer
-             WHERE ST_NPoints({{geometrycolumn}}) > {subdivide_coords}
+              FROM "{erase_layer}" layer
+             WHERE ST_NPoints({erase_layer_info.geometrycolumn}) > {subdivide_coords}
              LIMIT 1
         """
         logger.info(

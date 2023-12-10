@@ -637,7 +637,7 @@ def test_get_layerinfo_twolayers():
     assert len(layerinfo.columns) == 1
 
     # Test error if no layer specified
-    with pytest.raises(ValueError, match="Layer has > 1 layer"):
+    with pytest.raises(ValueError, match="input has > 1 layer, but no layer specified"):
         layerinfo = gfo.get_layerinfo(src)
 
 
@@ -657,7 +657,7 @@ def test_get_only_layer_two_layers():
     src = test_helper.get_testfile("polygon-twolayers")
     layers = gfo.listlayers(src)
     assert len(layers) == 2
-    with pytest.raises(ValueError, match="Layer has > 1 layer"):
+    with pytest.raises(ValueError, match="input has > 1 layer, but no layer specified"):
         _ = gfo.get_only_layer(src)
 
 
@@ -980,18 +980,22 @@ def test_read_file_sql_no_geom(suffix, engine_setter):
     assert read_df.aantal.item() == 46
 
 
-@pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
 @pytest.mark.parametrize("columns", [["OIDN", "UIDN"], ["OidN", "UidN"]])
-def test_read_file_sql_placeholders(suffix, engine_setter, columns):
+@pytest.mark.parametrize(
+    "suffix, testfile, layer",
+    [
+        (".gpkg", "polygon-parcel", None),
+        (".shp", "polygon-parcel", None),
+        (".gpkg", "polygon-twolayers", "parcels"),
+    ],
+)
+def test_read_file_sql_placeholders(suffix, testfile, layer, columns):
     """
     Test if placeholders are properly filled out + if casing used in columns parameter
     is retained when using placeholders.
     """
-    if engine_setter == "fiona":
-        pytest.skip("sql_stmt param not supported for fiona engine")
-
     # Prepare test data
-    src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    src = test_helper.get_testfile(testfile, suffix=suffix)
 
     # Test
     sql_stmt = """
@@ -1000,9 +1004,9 @@ def test_read_file_sql_placeholders(suffix, engine_setter, columns):
           FROM "{input_layer}" layer
     """
     read_sql_gdf = gfo.read_file(
-        src, sql_stmt=sql_stmt, sql_dialect="SQLITE", columns=columns
+        src, sql_stmt=sql_stmt, sql_dialect="SQLITE", layer=layer, columns=columns
     )
-    read_gdf = gfo.read_file(src, columns=columns)
+    read_gdf = gfo.read_file(src, columns=columns, layer=layer)
     assert_geodataframe_equal(read_gdf, read_sql_gdf)
 
 
@@ -1114,14 +1118,34 @@ def test_fill_out_sql_placeholders():
     assert result == 'SELECT geom FROM "parcels"'
 
 
-def test_fill_out_sql_placeholders_errors():
-    path = test_helper.get_testfile("polygon-parcel")
+@pytest.mark.parametrize(
+    "layer, sql_stmt, error",
+    [
+        (
+            "parcel",
+            'SELECT {invalid_placeholder} FROM "parcel"',
+            "unknown placeholder invalid_placeholder ",
+        ),
+        (
+            None,
+            'SELECT * FROM "{input_layer}"',
+            "input has > 1 layer, but no layer specified",
+        ),
+    ],
+)
+def test_fill_out_sql_placeholders_errors(layer, sql_stmt, error):
+    path = test_helper.get_testfile("polygon-twolayers")
 
     # Test invalid placeholder
-    sql_stmt = 'SELECT {invalid_placeholder} FROM "parcel"'
-    with pytest.raises(ValueError, match="unknown placeholder invalid_placeholder "):
+    with pytest.raises(ValueError, match=error):
         fileops._fill_out_sql_placeholders(
-            path, layer="parcel", sql_stmt=sql_stmt, columns=None
+            path, layer=layer, sql_stmt=sql_stmt, columns=None
+        )
+
+    # Test layer not passed with multi-layer input file
+    with pytest.raises(ValueError, match=error):
+        fileops._fill_out_sql_placeholders(
+            path, layer=layer, sql_stmt=sql_stmt, columns=None
         )
 
 
