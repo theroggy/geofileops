@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it as below.
+type: software
+title: geofileops
+version: 0.8.0
+date-released: 2023-11-24
+doi: 10.5281/zenodo.10340100
+abstract: GeofileOps is a python library that makes spatial operations on large geo
+  files fast and easy..
+url: https://github.com/geofileops/geofileops
+repository-code: https://github.com/geofileops/geofileops
+license: BSD-3-Clause
+authors:
+  - given-names: Pieter
+    family-names: Roggemans
+    orcid: https://orcid.org/0009-0009-2046-3284
+
+keywords:
+  - geofileops
+  - geospatial
+  - vector
+  - processing

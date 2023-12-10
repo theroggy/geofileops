@@ -4,6 +4,7 @@
 [![Coverage Status](https://codecov.io/gh/geofileops/geofileops/branch/main/graph/badge.svg)](https://codecov.io/gh/geofileops/geofileops)
 [![PyPI version](https://img.shields.io/pypi/v/geofileops.svg)](https://pypi.org/project/geofileops)
 [![Conda version](https://anaconda.org/conda-forge/geofileops/badges/version.svg)](https://anaconda.org/conda-forge/geofileops)
+[![DOI](https://zenodo.org/badge/203202318.svg)](https://zenodo.org/doi/10.5281/zenodo.10340100)
 
 Geofileops aims to speed up spatial analysis on large/complex vector datasets.
 
