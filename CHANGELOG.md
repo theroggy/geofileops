@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.8.1 (???)
+
+### Bugs fixed
+
+- Fix error in erase if erase_path countains multiple layers (#451)
+
 ## 0.8.0 (2023-11-24)
 
 ## Improvements

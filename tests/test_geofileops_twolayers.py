@@ -108,7 +108,12 @@ def test_clip_resultempty(tmp_path, suffix, clip_empty):
 )
 def test_erase(tmp_path, suffix, testfile, gridsize, where_post):
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
-    erase_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
+    if suffix == ".shp":
+        erase_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
+        erase_layer = None
+    else:
+        erase_path = test_helper.get_testfile("polygon-twolayers", suffix=suffix)
+        erase_layer = "zones"
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
@@ -116,6 +121,7 @@ def test_erase(tmp_path, suffix, testfile, gridsize, where_post):
     gfo.erase(
         input_path=input_path,
         erase_path=erase_path,
+        erase_layer=erase_layer,
         output_path=output_path,
         gridsize=gridsize,
         where_post=where_post,
@@ -127,7 +133,7 @@ def test_erase(tmp_path, suffix, testfile, gridsize, where_post):
     assert gfo.has_spatial_index(output_path)
     output_gdf = gfo.read_file(output_path)
     input_gdf = gfo.read_file(input_path)
-    erase_gdf = gfo.read_file(erase_path)
+    erase_gdf = gfo.read_file(erase_path, layer=erase_layer)
     output_gpd_gdf = gpd.overlay(
         input_gdf, erase_gdf, how="difference", keep_geom_type=True
     )
