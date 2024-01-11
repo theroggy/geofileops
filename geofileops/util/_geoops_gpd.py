@@ -1207,6 +1207,11 @@ def dissolve(
             logger.info(f"Start, with input {input_path}")
             input_pass_layer: Optional[str] = input_layer
             while True:
+                # If input_path does not exist, the last pass didn't have any onborder
+                # polygons as result, so we are ready dissolving...
+                if not input_path.exists():
+                    break
+
                 # Get info of the current file that needs to be dissolved
                 input_pass_layerinfo = gfo.get_layerinfo(input_path, input_pass_layer)
                 nb_rows_total = input_pass_layerinfo.featurecount
@@ -1237,9 +1242,14 @@ def dissolve(
                     if prev_nb_batches is not None:
                         nb_squarish_tiles_max = max(prev_nb_batches - 1, 1)
                         nb_batches = min(nb_batches, nb_squarish_tiles_max)
+                    grid_total_bounds = (
+                        sh_geom.box(*input_pass_layerinfo.total_bounds)
+                        .buffer(0.000001, join_style="mitre")
+                        .bounds
+                    )
                     tiles_gdf = gpd.GeoDataFrame(
                         geometry=pygeoops.create_grid2(
-                            total_bounds=input_pass_layerinfo.total_bounds,
+                            total_bounds=grid_total_bounds,
                             nb_squarish_tiles=nb_batches,
                             nb_squarish_tiles_max=nb_squarish_tiles_max,
                         ),
