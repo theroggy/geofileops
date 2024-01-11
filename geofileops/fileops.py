@@ -486,14 +486,14 @@ def execute_sql(
     sql_dialect: Optional[str] = None,
 ):
     """
-    Execute a sql statement (DML or DDL) on the file.
+    Execute a SQL statement (DML or DDL) on the file.
 
-    To run SELECT sql statements on a file, use :meth:`~read_file`.
+    To run SELECT SQL statements on a file, use :meth:`~read_file`.
 
     Args:
         path (PathLike): The path to the file.
-        sql_stmt (str): The sql statement to execute.
-        sql_dialect (str): The sql dialect to use:
+        sql_stmt (str): The SQL statement to execute.
+        sql_dialect (str): The SQL dialect to use:
             * None: use the native SQL dialect of the geofile.
             * 'OGRSQL': force the use of the OGR SQL dialect.
             * 'SQLITE': force the use of the SQLITE dialect.
@@ -739,10 +739,10 @@ def rename_column(
     Rename the column specified.
 
     Args:
-        path (PathLike): The file path.
-        column_name (str): the current column name.
-        new_column_name (str): the new column name.
-        layer (Optional[str]): The layer name. If not specified, and there is only
+        path (PathLike): the file path.
+        column_name (str): current column name.
+        new_column_name (str): new column name.
+        layer (Optional[str]): layer name. If not specified, and there is only
             one layer in the file, this layer is used. Otherwise exception.
     """
     # Check input parameters
@@ -942,8 +942,7 @@ def update_column(
     Args:
         path (PathLike): Path to the geofile
         name (str): Name for the new column
-        expression (str): SQLite expression to use to update
-            the value.
+        expression (str): SQLite expression to use to update the value.
         layer (str, optional): The layer name. If None and the geofile
             has only one layer, that layer is used. Defaults to None.
         where (str, optional): SQL where clause to restrict the rows that will
@@ -998,15 +997,15 @@ def read_file(
 
     The file format is detected based on the filepath extension.
 
-    If an sql_stmt is specified, the sqlite query can contain following placeholders
+    If ``sql_stmt`` is specified, the sqlite query can contain following placeholders
     that will be automatically replaced for you:
 
       * {geometrycolumn}: the column where the primary geometry is stored.
-      * {columns_to_select_str}: if 'columns' is not None, those columns,
+      * {columns_to_select_str}: if ``columns`` is not None, those columns,
         otherwise all columns of the layer.
       * {input_layer}: the layer name of the input layer.
 
-    Example sql statement with placeholders:
+    Example SQL statement with placeholders:
     ::
 
         SELECT {geometrycolumn}
@@ -1034,14 +1033,14 @@ def read_file(
             (e.g. Geopackage) this is slow, so using e.g. a where filter instead is
             recommended. Defaults to None, then all rows are returned.
         where (str, optional): where clause to filter features in layer by attribute
-            values. If the datasource natively supports sql, its specific sql dialect
+            values. If the datasource natively supports sql, its specific SQL dialect
             should be used (eg. SQLite and GeoPackage: `SQLITE`_, PostgreSQL). If it
             doesn't, the `OGRSQL WHERE`_ syntax should be used. Note that it is not
-            possible to overrule the sql dialect, this is only possible when you use the
-            sql parameter. Examples: ``"ISO_A3 = 'CAN'"``,
+            possible to overrule the SQL dialect, this is only possible when you use the
+            SQL parameter. Examples: ``"ISO_A3 = 'CAN'"``,
             ``"POP_EST > 10000000 AND POP_EST < 100000000"``. Defaults to None.
-        sql_stmt (str): sql statement to use. Only supported with "pyogrio" engine.
-        sql_dialect (str, optional): Sql dialect used. Options are None, "SQLITE" or
+        sql_stmt (str): SQL statement to use. Only supported with "pyogrio" engine.
+        sql_dialect (str, optional): SQL dialect used. Options are None, "SQLITE" or
             "OGRSQL". If None, for data sources with explicit SQL support the statement
             is processed by the default SQL engine (e.g. for Geopackage and Spatialite
             this is "SQLITE"). For data sources without native SQL support (e.g. .shp),
@@ -1338,7 +1337,7 @@ def _read_file_base_pyogrio(
         sql_stmt = _fill_out_sql_placeholders(
             path=path, layer=layer, sql_stmt=sql_stmt, columns=columns
         )
-        # Specifying a layer as well as an sql statement in pyogrio is not supported.
+        # Specifying a layer as well as an SQL statement in pyogrio is not supported.
         layer = None
 
     # Read!
@@ -1428,12 +1427,12 @@ def read_file_sql(
     ignore_geometry: bool = False,
 ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """
-    DEPRECATED: Reads a file using an sql statement.
+    DEPRECATED: Reads a file using an SQL statement.
 
     Args:
         path (file path): path to the file to read from
-        sql_stmt (str): sql statement to use
-        sql_dialect (str, optional): Sql dialect used. Defaults to 'SQLITE'.
+        sql_stmt (str): SQL statement to use
+        sql_dialect (str, optional): SQL dialect used. Defaults to 'SQLITE'.
         layer (str, optional): The layer to read. If no layer is specified,
             reads the only layer in the file or throws an Exception.
         ignore_geometry (bool, optional): True not to read/return the geomatry.
@@ -2073,7 +2072,7 @@ def append_to(
         otherwise all columns of the layer.
       * {input_layer}: the layer name of the input layer.
 
-    Example sql statement with placeholders:
+    Example SQL statement with placeholders:
     ::
 
         SELECT {geometrycolumn}
@@ -2091,8 +2090,7 @@ def append_to(
         - DESTINATION_OPEN: destination dataset open option (doo)
         - CONFIG: config option (config)
 
-    The options can be found in the [GDAL vector driver documentation]
-    (https://gdal.org/drivers/vector/index.html).
+    The options can be found in the |GDAL_vector_driver_documentation|.
 
     Args:
         src (Union[str,): source file path.
@@ -2117,8 +2115,8 @@ def append_to(
             SQL WHERE syntax and |spatialite_reference_link| functions can be used. If
             where contains the {geometrycolumn} placeholder, it is filled out with the
             geometry column name of the src file. Defaults to None.
-        sql_stmt (str): sql statement to use. Only supported with "pyogrio" engine.
-        sql_dialect (str, optional): Sql dialect used. Options are None, "SQLITE" or
+        sql_stmt (str): SQL statement to use. Only supported with "pyogrio" engine.
+        sql_dialect (str, optional): SQL dialect used. Options are None, "SQLITE" or
             "OGRSQL". If None, for data sources with explicit SQL support the statement
             is processed by the default SQL engine (e.g. for Geopackage and Spatialite
             this is "SQLITE"). For data sources without native SQL support (e.g. .shp),
@@ -2156,6 +2154,10 @@ def append_to(
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    .. |GDAL_vector_driver_documentation| raw:: html
+
+        <a href="https://gdal.org/drivers/vector/index.html" target="_blank">GDAL vector driver documentation</a>
 
     """  # noqa: E501
     # Check/clean input params
@@ -2276,7 +2278,7 @@ def _append_to_nolock(
                 "which is not supported in .shp. Maybe use force_output_geometrytype?"
             )
 
-        # Launder the columns names via a sql statement, otherwise when appending the
+        # Launder the columns names via a SQL statement, otherwise when appending the
         # laundered columns will get NULL values instead of the data.
         if columns is None:
             columns = src_layerinfo.columns
@@ -2409,8 +2411,7 @@ def copy_layer(
         - DESTINATION_OPEN: destination dataset open option (doo)
         - CONFIG: config option (config)
 
-    The options can be found in the [GDAL vector driver documentation]
-    (https://gdal.org/drivers/vector/index.html).
+    The options can be found in the |GDAL_vector_driver_documentation|.
 
     Args:
         src (PathLike): The source file path.
@@ -2433,12 +2434,12 @@ def copy_layer(
             to specify "fid", a unique index available in all input files. Note that the
             "fid" will be aliased eg. to "fid_1". Defaults to None.
         where (str, optional): only append the rows from src that comply to the filter
-            specified. Applied before explodecollections. Filter should be in sqlite
+            specified. Applied before ``explodecollections``. Filter should be in sqlite
             SQL WHERE syntax and |spatialite_reference_link| functions can be used. If
             where contains the {geometrycolumn} placeholder, it is filled out with the
             geometry column name of the src file. Defaults to None.
-        sql_stmt (str): sql statement to use. Only supported with "pyogrio" engine.
-        sql_dialect (str, optional): Sql dialect used. Options are None, "SQLITE" or
+        sql_stmt (str): SQL statement to use. Only supported with "pyogrio" engine.
+        sql_dialect (str, optional): SQL dialect used. Options are None, "SQLITE" or
             "OGRSQL". If None, for data sources with explicit SQL support the statement
             is processed by the default SQL engine (e.g. for Geopackage and Spatialite
             this is "SQLITE"). For data sources without native SQL support (e.g. .shp),
@@ -2472,6 +2473,10 @@ def copy_layer(
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    .. |GDAL_vector_driver_documentation| raw:: html
+
+        <a href="https://gdal.org/drivers/vector/index.html" target="_blank">GDAL vector driver documentation</a>
 
     """  # noqa: E501
     # Init
