@@ -362,7 +362,7 @@ def test_dissolve_linestrings_groupby(tmp_path, suffix, epsg):
         output_basepath.parent
         / f"{output_basepath.stem}_groupby_noexpl{output_basepath.suffix}"
     )
-    groupby_columns = ["NISCODE"]
+    groupby_columns = ["NiScoDe"]
     gfo.dissolve(
         input_path=input_path,
         output_path=output_path,
@@ -526,7 +526,7 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
     "suffix, epsg, explode_input, groupby_columns, explode, gridsize, where_post, "
     "expected_featurecount",
     [
-        (".gpkg", 31370, False, ["GEWASGROEP"], True, 0.0, "", 25),
+        (".gpkg", 31370, False, ["GEWASgroep"], True, 0.0, "", 25),
         (".gpkg", 31370, False, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg", 31370, True, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg", 31370, False, ["gewasGROEP"], False, 0.01, WHERE_AREA_GT_5000, 4),
@@ -965,9 +965,9 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     #       unique values, to be a better test case!
     agg_columns = {
         "columns": [
-            {"column": "lblhfdtlt", "agg": "max", "as": "lbl_max"},
+            {"column": "lblHFDtlt", "agg": "max", "as": "lbl_max"},
             {"column": "GEWASGROEP", "agg": "count", "as": "gwsgrp_cnt"},
-            {"column": "lblhfdtlt", "agg": "count", "as": "lbl_count"},
+            {"column": "lblhfdTLT", "agg": "count", "as": "lbl_count"},
             {
                 "column": "lblhfdtlt",
                 "agg": "count",
@@ -993,7 +993,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
             {"column": "fid", "agg": "concat", "as": "fid_concat"},
         ]
     }
-    groupby_columns = ["GEWASGROEP"]
+    groupby_columns = ["GEWASgroep"]
     gfo.dissolve(
         input_path=input_path,
         output_path=output_path,
@@ -1021,7 +1021,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     assert output_gdf["geometry"][0] is not None
 
     # Check agg_columns results
-    grasland_idx = output_gdf[output_gdf["GEWASGROEP"] == "Grasland"].index.to_list()[0]
+    grasland_idx = output_gdf[output_gdf["GEWASgroep"] == "Grasland"].index.to_list()[0]
     assert output_gdf["lbl_max"][grasland_idx] == "Grasland"
     assert output_gdf["gwsgrp_cnt"][grasland_idx] == 30
     assert output_gdf["lbl_count"][grasland_idx] == 30
@@ -1035,7 +1035,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     assert output_gdf["tlt_sum"][grasland_idx] == 1800
 
     groenten_idx = output_gdf[
-        output_gdf["GEWASGROEP"] == "Groenten, kruiden en sierplanten"
+        output_gdf["GEWASgroep"] == "Groenten, kruiden en sierplanten"
     ].index.to_list()[0]
     assert output_gdf["lbl_count"][groenten_idx] == 5
     print(
@@ -1070,7 +1070,7 @@ def test_dissolve_polygons_aggcolumns_json(tmp_path, agg_columns):
     gfo.dissolve(
         input_path=input_path,
         output_path=output_path,
-        groupby_columns=["GEWASGROEP"],
+        groupby_columns=["GEWASgroep"],
         agg_columns=agg_columns,
         explodecollections=False,
         nb_parallel=2,

@@ -7,6 +7,8 @@
 - Fix error in `erase` if `erase_path` countains multiple layers (#451)
 - Fix error in `dissolve` on polygon input if a pass that is not the last one has 0 
   onborder polygons in its result (#459, #461)
+- Fix `groupby` parameter becoming case sensitive in `dissolve` when `agg_columns` is
+  also specified (#462)
 
 ## 0.8.0 (2023-11-24)
 
