@@ -25,6 +25,7 @@ from tests.test_helper import (
     WHERE_LENGTH_GT_1000,
     WHERE_LENGTH_GT_200000,
     WHERE_AREA_GT_5000,
+    assert_geodataframe_equal,
 )
 
 
@@ -647,6 +648,26 @@ def test_dissolve_polygons(
     output_area = output_gdf.geometry.area.sort_values().reset_index(drop=True)
     expected_area = expected_gdf.geometry.area.sort_values().reset_index(drop=True)
     pd.testing.assert_series_equal(output_area, expected_area)
+
+
+def test_dissolve_empty_onborder_result(tmp_path):
+    """
+    Test case where the 1st pass of dissolve does not result in any onborder features.
+    """
+    test_gdf = gpd.GeoDataFrame(
+        geometry=[sh_geom.box(5, 5, 10, 10), sh_geom.box(20, 5, 25, 10)], crs=31370
+    )
+    test_path = tmp_path / "test.gpkg"
+    gfo.to_file(test_gdf, test_path)
+
+    output_path = tmp_path / "output.gpkg"
+    gfo.dissolve(
+        test_path, output_path=output_path, explodecollections=True, batchsize=1
+    )
+
+    assert output_path.exists()
+    output_gdf = gfo.read_file(output_path)
+    assert_geodataframe_equal(test_gdf, output_gdf, normalize=True, sort_values=True)
 
 
 @pytest.mark.parametrize("explodecollections", [True, False])

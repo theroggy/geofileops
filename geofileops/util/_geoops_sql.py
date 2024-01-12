@@ -1006,7 +1006,7 @@ def erase(
     # type to multi, because erase can cause eg. polygons to be split to multipolygons.
     force_output_geometrytype = input_layer_info.geometrytype
     if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
-        force_output_geometrytype = input_layer_info.geometrytype.to_multitype
+        force_output_geometrytype = force_output_geometrytype.to_multitype
 
     # If the erase layer is made out of polygons, subdivide them if needed
     tmp_dir = None
@@ -2563,13 +2563,25 @@ def _two_layer_vector_operation(
                 )
                 batches[batch_id]["sqlite_stmt"] = sql_stmt
 
-                # If explodecollections and there is a where_post to be applied, we need
-                # to apply explodecollections now already to be able to apply the
-                # where_post in the append of partial files later on even though this
-                # involves an extra copy of the result data under the hood in practice!
+                # calculate_two_layers doesn't support explodecollections in one step:
+                # there is an extra layer copy involved.
+                # Normally explodecollections can be deferred to the appending of the
+                # partial files, but if explodecollections and there is a where_post to
+                # be applied, it needs to be applied now already. Otherwise the
+                # where_post in the append of partial files later on won't give correct
+                # results!
                 explodecollections_now = False
+                output_geometrytype_now = force_output_geometrytype
                 if explodecollections and where_post is not None:
                     explodecollections_now = True
+                if (
+                    force_output_geometrytype is not None
+                    and explodecollections
+                    and not explodecollections_now
+                ):
+                    # convert geometrytype to multitype to avoid ogr warnings
+                    output_geometrytype_now = force_output_geometrytype.to_multitype
+
                 # Remark: this temp file doesn't need spatial index
                 future = calculate_pool.submit(
                     calculate_two_layers,
@@ -2581,7 +2593,7 @@ def _two_layer_vector_operation(
                     sql_stmt=sql_stmt,
                     output_layer=output_layer,
                     explodecollections=explodecollections_now,
-                    force_output_geometrytype=force_output_geometrytype,
+                    force_output_geometrytype=output_geometrytype_now,
                     use_ogr=use_ogr,
                     create_spatial_index=False,
                     column_datatypes=column_datatypes,
