@@ -1243,9 +1243,10 @@ def dissolve(
                         nb_squarish_tiles_max = max(prev_nb_batches - 1, 1)
                         nb_batches = min(nb_batches, nb_squarish_tiles_max)
                     grid_total_bounds = (
-                        sh_geom.box(*input_pass_layerinfo.total_bounds)
-                        .buffer(0.000001, join_style="mitre")
-                        .bounds
+                        input_pass_layerinfo.total_bounds[0] - 0.000001,
+                        input_pass_layerinfo.total_bounds[1] - 0.000001,
+                        input_pass_layerinfo.total_bounds[2] + 0.000001,
+                        input_pass_layerinfo.total_bounds[3] + 0.000001,
                     )
                     tiles_gdf = gpd.GeoDataFrame(
                         geometry=pygeoops.create_grid2(

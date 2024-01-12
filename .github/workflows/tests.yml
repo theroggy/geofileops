@@ -28,7 +28,7 @@ jobs:
 
   Test:
     needs: Linting
-    name: ${{ matrix.env }} - python ${{ matrix.python }} - ${{ matrix.os }}
+    name: ${{ matrix.env }}, python ${{ matrix.python }}, ${{ matrix.os }}
     timeout-minutes: 30
     runs-on: ${{ matrix.os }}
     defaults:
