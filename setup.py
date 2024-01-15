@@ -15,7 +15,7 @@ setuptools.setup(
     version=version,
     author="Pieter Roggemans",
     author_email="pieter.roggemans@gmail.com",
-    description="Package to do spatial operations on large geo files.",
+    description="Python toolbox to process large vector files faster.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/geofileops/geofileops",

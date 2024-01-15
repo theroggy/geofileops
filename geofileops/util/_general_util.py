@@ -42,17 +42,20 @@ def align_casing(string_to_align: str, strings_to_align_to: Iterable) -> str:
 
 
 def align_casing_list(
-    strings_to_align: List[str], strings_to_align_to: Iterable
+    strings_to_align: List[str],
+    strings_to_align_to: Iterable,
+    raise_on_missing: bool = True,
 ) -> List[str]:
     """
     Search the string caseintensitive in a list of strings.
-
-    If a string is not found in strings_to_align_to, a ValueError is thrown.
 
     Args:
         strings_to_align (List[str]): strings to align the casing of to
             strings_to_align_to.
         strings_to_align_to (Iterable): strings to align the casing with.
+        raise_on_missing (bool, optional): if True, a ValueError is raised if a string
+            in ``strings_to_align`` is not found in ``strings_to_align_to``. If False,
+            the casing in ``strings_to_align`` is retained in the output.
 
     Raises:
         ValueError: a string in strings_to_align was nog found in strings_to_align_to.
@@ -68,8 +71,11 @@ def align_casing_list(
         string_aligned = strings_to_align_to_upper_dict.get(string.upper())
         if string_aligned is not None:
             strings_aligned.append(string_aligned)
-        else:
+        elif raise_on_missing:
             raise ValueError(f"{string} not available in: {strings_to_align_to}")
+        else:
+            strings_aligned.append(string)
+
     return strings_aligned
 
 

@@ -1064,15 +1064,17 @@ def dissolve(
         output_layer = gfo.get_default_layer(output_path)
 
     # Check columns in groupby_columns
+    columns_available = list(input_layerinfo.columns) + ["fid"]
     if groupby_columns is not None:
-        columns_in_layer_upper = [
-            column.upper() for column in list(input_layerinfo.columns) + ["fid"]
-        ]
+        columns_in_layer_upper = [column.upper() for column in columns_available]
         for column in groupby_columns:
             if column.upper() not in columns_in_layer_upper:
                 raise ValueError(
                     f"column in groupby_columns not available in layer: {column}"
                 )
+        columns_available = _general_util.align_casing_list(
+            columns_available, groupby_columns, raise_on_missing=False
+        )
 
     # Check agg_columns param
     if agg_columns is not None:
@@ -1086,19 +1088,19 @@ def dissolve(
         if "json" in agg_columns:
             if agg_columns["json"] is None:
                 agg_columns["json"] = [
-                    col for col in input_layerinfo.columns if col.upper() != "INDEX"
+                    c for c in columns_available if c.lower() not in ("index", "fid")
                 ]
             else:
                 # Align casing of column names to data
                 agg_columns["json"] = _general_util.align_casing_list(
-                    agg_columns["json"], list(input_layerinfo.columns) + ["fid"]
+                    agg_columns["json"], columns_available
                 )
         elif "columns" in agg_columns:
             # Loop through all rows
             for agg_column in agg_columns["columns"]:
                 # Check if column exists + set casing same as in data
                 agg_column["column"] = _general_util.align_casing(
-                    agg_column["column"], list(input_layerinfo.columns) + ["fid"]
+                    agg_column["column"], columns_available
                 )
 
     # Now input parameters are checked, check if we need to calculate anyway

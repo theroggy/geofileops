@@ -2317,7 +2317,7 @@ def join_by_location(
     contains, covers, coveredby.
 
     If you want even more control, you can also use "spatial masks" as defined by the
-    [DE-9IM](https://en.wikipedia.org/wiki/DE-9IM) model.
+    |DE-9IM| model.
 
     Examples for valid ``spatial_relations_query`` values:
 
@@ -2380,6 +2380,10 @@ def join_by_location(
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    .. |DE-9IM| raw:: html
+
+        <a href="https://en.wikipedia.org/wiki/DE-9IM" target="_blank">DE-9IM</a>
 
     """  # noqa: E501
     logger = logging.getLogger("geofileops.join_by_location")
@@ -2667,35 +2671,46 @@ def select_two_layers(
         Additionally, there are some examples listed here that highlight
         other features/possibilities.
 
-        **Join nearest features**
+        **Join nearest features with filter**
 
-        For each feature in layer1, get the nearest feature of layer2 with the
-        same values for the column join_id.
+        To join nearest features, geofileops has a specific :meth:`~join_nearest`
+        function. This provides a fast way to find the nearest feature(s) if there
+        doesn't need to be a filter on the features to be found.
 
-        .. code-block:: sqlite3
+        For a use case where for each element in layer 1, you want to find the nearest
+        features in layer 2 while applying a filter that eliminates many kandidates,
+        the query below will be a better solution.
 
-            WITH join_with_dist AS (
-                SELECT layer1.{{input1_geometrycolumn}} AS geom
-                      {{layer1_columns_prefix_alias_str}}
-                      {{layer2_columns_prefix_alias_str}}
-                      ,ST_Distance(
-                            layer1.{{input1_geometrycolumn}},
-                            layer2.{{input2_geometrycolumn}}
-                       ) AS distance
-                      ,RANK() OVER ( PARTITION BY layer1.rowid ORDER BY ST_Distance(
-                                        layer1.{{input1_geometrycolumn}},
-                                        layer2.{{input2_geometrycolumn}}
-                                   )
-                       ) AS pos
-                  FROM {{input1_databasename}}."{{input1_layer}}" layer1
-                  JOIN {{input2_databasename}}."{{input2_layer}}" layer2
-                    ON layer1.join_id = layer2.join_id
-                 WHERE 1=1
-                   {{batch_filter}}
-            )
-            SELECT *
-              FROM join_with_dist jwd
-             WHERE pos = 1
+        Note: Using ``MIN(ST_Distance(layer1.geom, layer2.geom)`` sometimes seems to
+        round the distances calculated slightly resulting in some nearest features not
+        being found. Using ``RANK`` avoids this issue.
+
+        .. code-block:: python
+
+            sql_stmt = f"""
+                WITH join_with_dist AS (
+                    SELECT layer1.{{input1_geometrycolumn}} AS geom
+                          {{layer1_columns_prefix_alias_str}}
+                          {{layer2_columns_prefix_alias_str}}
+                          ,ST_Distance(
+                                layer1.{{input1_geometrycolumn}},
+                                layer2.{{input2_geometrycolumn}}
+                           ) AS distance
+                          ,RANK() OVER ( PARTITION BY layer1.rowid ORDER BY ST_Distance(
+                                            layer1.{{input1_geometrycolumn}},
+                                            layer2.{{input2_geometrycolumn}}
+                                       )
+                           ) AS pos
+                      FROM {{input1_databasename}}."{{input1_layer}}" layer1
+                      JOIN {{input2_databasename}}."{{input2_layer}}" layer2
+                        ON layer1.join_id = layer2.join_id
+                     WHERE 1=1
+                       {{batch_filter}}
+                )
+                SELECT *
+                  FROM join_with_dist jwd
+                 WHERE pos = 1
+            """
 
 
     .. |spatialite_reference_link| raw:: html
