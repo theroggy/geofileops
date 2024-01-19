@@ -31,9 +31,9 @@ def test_clip(tmp_path, testfile, suffix):
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     gfo.clip(
-        input_path=input_path,
-        clip_path=clip_path,
-        output_path=output_path,
+        input_path=str(input_path),
+        clip_path=str(clip_path),
+        output_path=str(output_path),
         where_post=None,
         batchsize=batchsize,
     )
@@ -119,10 +119,10 @@ def test_erase(tmp_path, suffix, testfile, gridsize, where_post):
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
 
     gfo.erase(
-        input_path=input_path,
-        erase_path=erase_path,
+        input_path=str(input_path),
+        erase_path=str(erase_path),
         erase_layer=erase_layer,
-        output_path=output_path,
+        output_path=str(output_path),
         gridsize=gridsize,
         where_post=where_post,
         batchsize=batchsize,
@@ -309,9 +309,9 @@ def test_export_by_location(
 
     # Test
     gfo.export_by_location(
-        input_to_select_from_path=input_to_select_from_path,
-        input_to_compare_with_path=input_to_compare_with_path,
-        output_path=output_path,
+        input_to_select_from_path=str(input_to_select_from_path),
+        input_to_compare_with_path=str(input_to_compare_with_path),
+        output_path=str(output_path),
         area_inters_column_name=area_inters_column_name,
         gridsize=gridsize,
         where_post=where_post,
@@ -346,10 +346,10 @@ def test_export_by_distance(tmp_path, testfile, suffix):
 
     # Test
     gfo.export_by_distance(
-        input_to_select_from_path=input_to_select_from_path,
-        input_to_compare_with_path=input_to_compare_with_path,
+        input_to_select_from_path=str(input_to_select_from_path),
+        input_to_compare_with_path=str(input_to_compare_with_path),
         max_distance=10,
-        output_path=output_path,
+        output_path=str(output_path),
         batchsize=batchsize,
     )
 
@@ -381,9 +381,9 @@ def test_identity(tmp_path, suffix, epsg, gridsize):
 
     # Test
     gfo.identity(
-        input1_path=input1_path,
-        input2_path=input2_path,
-        output_path=output_path,
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
         gridsize=gridsize,
         batchsize=batchsize,
     )
@@ -476,9 +476,9 @@ def test_intersection(
     if nb_parallel > 1:
         batchsize = math.ceil(input1_layerinfo.featurecount / 2)
     gfo.intersection(
-        input1_path=input1_path,
-        input2_path=input2_path,
-        output_path=output_path,
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
         gridsize=gridsize,
         explodecollections=explodecollections,
         nb_parallel=nb_parallel,
@@ -846,9 +846,9 @@ def test_join_by_location(
     output_path = tmp_path / name
 
     gfo.join_by_location(
-        input1_path=input1_path,
-        input2_path=input2_path,
-        output_path=output_path,
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
         spatial_relations_query=spatial_relations_query,
         discard_nonmatching=discard_nonmatching,
         min_area_intersect=min_area_intersect,
@@ -895,10 +895,10 @@ def test_join_nearest(tmp_path, suffix, epsg):
     nb_nearest = 2
     input1_columns = ["OIDN", "UIDN", "HFDTLT", "fid"]
     gfo.join_nearest(
-        input1_path=input1_path,
+        input1_path=str(input1_path),
         input1_columns=input1_columns,
-        input2_path=input2_path,
-        output_path=output_path,
+        input2_path=str(input2_path),
+        output_path=str(output_path),
         nb_nearest=nb_nearest,
         distance=1000,
         expand=True,
@@ -1009,9 +1009,9 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
                   layer2.{{input2_geometrycolumn}}) = 0
     """
     gfo.select_two_layers(
-        input1_path=input1_path,
-        input2_path=input2_path,
-        output_path=output_path,
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
         gridsize=gridsize,
         sql_stmt=sql_stmt,
     )
@@ -1425,9 +1425,9 @@ def test_split(tmp_path):
 
     # Test
     gfo.split(
-        input1_path=input1_path,
-        input2_path=input2_path,
-        output_path=output_path,
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
         batchsize=batchsize,
     )
 
@@ -1476,9 +1476,9 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
     # Test
     output_path = tmp_path / f"{input1_path.stem}_symmdiff_{input2_path.stem}{suffix}"
     gfo.symmetric_difference(
-        input1_path=input1_path,
-        input2_path=input2_path,
-        output_path=output_path,
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
         gridsize=gridsize,
         batchsize=batchsize,
     )
@@ -1554,9 +1554,9 @@ def test_union(
 
     # Test
     gfo.union(
-        input1_path=input1_path,
-        input2_path=input2_path,
-        output_path=output_path,
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
         input1_columns=input1_columns,
         input2_columns=input2_columns,
         gridsize=gridsize,
