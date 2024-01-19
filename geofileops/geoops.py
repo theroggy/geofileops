@@ -1,5 +1,5 @@
 """
-Module exposing all supported operations on geomatries in geofiles.
+Module exposing all supported operations on geometries in geofiles.
 """
 
 from datetime import datetime
