@@ -57,7 +57,9 @@ def test_export_by_bounds(tmp_path, suffix):
     # Do operation
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
     filter = (156036, 196691, 156368, 196927)
-    gfo.export_by_bounds(input_path=input_path, output_path=output_path, bounds=filter)
+    gfo.export_by_bounds(
+        input_path=str(input_path), output_path=str(output_path), bounds=filter
+    )
 
     # Now check if the output file is correctly created
     assert output_path.exists()
@@ -95,8 +97,8 @@ def test_warp(tmp_path):
     output_path = tmp_path / f"{input_path.stem}-output.gpkg"
     output_path.touch()
     gfo.warp(
-        input_path=input_path,
-        output_path=output_path,
+        input_path=str(input_path),
+        output_path=str(output_path),
         gcps=gcps,
         algorithm="tps",
     )

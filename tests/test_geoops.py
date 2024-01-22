@@ -30,9 +30,9 @@ def test_dissolve_within_distance(
 
     # Test
     gfo.dissolve_within_distance(
-        input_path=input_path,
+        input_path=str(input_path),
         input_layer=input_layer,
-        output_path=output_path,
+        output_path=str(output_path),
         output_layer=output_layer,
         distance=10,
         gridsize=0.0001,

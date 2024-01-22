@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 def dissolve_within_distance(
-    input_path: Path,
-    output_path: Path,
+    input_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
     distance: float,
     gridsize: float,
     close_internal_gaps: bool = False,
@@ -90,6 +90,9 @@ def dissolve_within_distance(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
     """
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+
     start_time = datetime.now()
     operation_name = "dissolve_within_distance"
     logger = logging.getLogger(f"geofileops.{operation_name}")
@@ -1310,8 +1313,8 @@ def makevalid(
 
 
 def warp(
-    input_path: Path,
-    output_path: Path,
+    input_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
     gcps: List[Tuple[float, float, float, float, Optional[float]]],
     algorithm: str = "polynomial",
     order: Optional[int] = None,
@@ -2848,9 +2851,9 @@ def symmetric_difference(
 
 
 def union(
-    input1_path: Path,
-    input2_path: Path,
-    output_path: Path,
+    input1_path: Union[str, "os.PathLike[Any]"],
+    input2_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
     input1_layer: Optional[str] = None,
     input1_columns: Optional[List[str]] = None,
     input1_columns_prefix: str = "l1_",
