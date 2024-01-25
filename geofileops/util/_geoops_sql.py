@@ -1087,8 +1087,8 @@ def erase(
     #   distinction whether the subquery is finding a row (no match with spatial index)
     #   or if the difference results in an empty/NULL geometry.
     #   Tried to return EMPTY GEOMETRY from GFO_Difference_Collection, but it didn't
-    #   work to use spatialite's ST_IsEmpty(geom) = 0 to filter on this for an unclear
-    #   reason.
+    #   work to use spatialite's ST_IsEmpty(geom) = 0 to filter on this, probably
+    #   because ST_GeomFromWKB doesn't seem to support empty polygons.
     # - ST_difference(geometry , NULL) gives NULL as result -> handle explicitly
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
@@ -1146,6 +1146,7 @@ def erase(
           )
          WHERE geom IS NOT NULL
            AND geom <> 'DIFF_EMPTY'
+           AND ST_IsEmpty(geom) = 0
     """
 
     # Go!
@@ -2481,8 +2482,10 @@ def _two_layer_vector_operation(
             if SPATIALITE_GTE_51:
                 # Spatialite >= 5.1 available, so we can try ST_ReducePrecision first,
                 # which should be faster.
+                # ST_ReducePrecision seems to crash on EMPTY geometry, so check
+                # ST_IsEmpty not being 0 (result can be -1, 0 or 1).
                 gridsize_op = f"""
-                    IIF(sub_gridsize.geom IS NULL,
+                    IIF(sub_gridsize.geom IS NULL OR ST_IsEmpty(sub_gridsize.geom) <> 0,
                         NULL,
                         IFNULL(
                             ST_ReducePrecision(sub_gridsize.geom, {gridsize}),
@@ -2688,12 +2691,11 @@ def _two_layer_vector_operation(
             logger.debug("Result was empty!")
 
         logger.info(f"Ready, took {datetime.now()-start_time}")
+        shutil.rmtree(tempdir, ignore_errors=True)
     except Exception:
         gfo.remove(output_path, missing_ok=True)
         gfo.remove(tmp_output_path, missing_ok=True)
         raise
-    finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
 
 
 def calculate_two_layers(
@@ -3358,8 +3360,10 @@ def _format_apply_gridsize_operation(
         # It is not possible to return the original geometry if error stays after
         # makevalid, because spatialite functions return NULL for failures as well as
         # when the result is correctly NULL, so not possible to make the distinction.
+        # ST_ReducePrecision seems to crash on EMPTY geometry, so check ST_IsEmpty not
+        # being 0 (result can be -1, 0 or 1).
         gridsize_op = f"""
-            IIF({geometrycolumn} IS NULL,
+            IIF({geometrycolumn} IS NULL OR ST_IsEmpty({geometrycolumn}) <> 0,
                 NULL,
                 IFNULL(
                     ST_ReducePrecision({geometrycolumn}, {gridsize}),

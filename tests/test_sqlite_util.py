@@ -185,4 +185,7 @@ def test_create_table_as_sql_single_input(tmp_path):
 
     assert output_path.exists()
     output_gdf = fileops.read_file(output_path)
+
+    # EMPTY geometry becomes NULL/None...
+    expected_gdf.loc[expected_gdf.geometry.is_empty, "geometry"] = None
     assert_geodataframe_equal(output_gdf, expected_gdf)

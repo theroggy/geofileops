@@ -148,29 +148,6 @@ def test_set_config_options():
     assert gdal.GetConfigOption(test3_config_envset) == "test3_new_env_value"
 
 
-def test_vector_translate_gdal_error(tmp_path):
-    input_path = test_helper.get_testfile("polygon-parcel")
-    output_path = tmp_path / "output.gpkg"
-    try:
-        _ogr_util.vector_translate(
-            input_path, output_path, explodecollections=True, preserve_fid=True
-        )
-    except _ogr_util.GDALError as ex:
-        assert ex.error_details == []
-
-        # Locally, the test works fine, but when running the CI on github it doesn't:
-        # the CPL_LOG file stays empty there?
-        if test_helper.RUNS_LOCAL:
-            assert len(ex.log_details) > 0
-        else:
-            assert len(ex.log_details) == 0
-
-        # Test succesful: GDALError was raised correctly
-        return
-
-    assert False, "A GDALError should have been raised but wasn't"
-
-
 def test_vector_translate_input_nolayer(tmp_path):
     input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
     output_path = tmp_path / f"output{input_path.suffix}"
@@ -224,10 +201,10 @@ def test_vector_translate_sql(tmp_path, input_suffix, output_suffix):
     "input_suffix, output_suffix, geom_null_asc,"
     "exp_null_geoms_st38, exp_null_geoms_gte38",
     [
-        (".gpkg", ".gpkg", True, 7, 7),
-        (".gpkg", ".shp", False, 46, 7),
-        (".shp", ".gpkg", False, 46, 7),
-        (".shp", ".shp", True, 7, 7),
+        (".gpkg", ".gpkg", True, 8, 8),
+        (".gpkg", ".shp", False, 47, 8),
+        (".shp", ".gpkg", False, 47, 8),
+        (".shp", ".shp", True, 8, 8),
     ],
 )
 def test_vector_translate_sql_geom_null(

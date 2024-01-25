@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## ??? (???)
+
+### Bugs fixed
+
+- Fix crash when using e.g. `erase` with `gridsize` specified on input file containing
+  an EMPTY geometry (#470)
+
 ## 0.8.1 (2024-01-13)
 
 ### Bugs fixed
