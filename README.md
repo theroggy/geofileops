@@ -33,6 +33,6 @@ as possible:
 
 The following chart gives an impression of the speed improvement that can be expected
 when processing larger files. The [benchmarks](https://github.com/geofileops/geobenchmark)
-ran on a Windows PC with 12 cores and include I/O.
+typically use input file(s) with 500K polygons, ran on a Windows PC with 12 cores and include I/O.
 
 ![Geo benchmark](https://github.com/geofileops/geobenchmark/blob/main/results_vector_ops/GeoBenchmark.png)

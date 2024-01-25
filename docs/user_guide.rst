@@ -46,6 +46,14 @@ This is how eg. a buffer operation can be applied on a file/layer:
     
     gfo.buffer(input_path='...', output_path='...', distance=2)
 
+
+.. tip::
+
+    Because in most geofileops operations multiprocessing is used, it is a good idea to
+    always use the ``if __name__ == "__main__":`` block in standalone Python scripts.
+    More information in :ref:`FAQ - Standalone scripts<FAQ-standalone-scripts>`
+
+
 Most spatial operations in geofileops have the same optional parameters:
 
 * input_layer: if the file contains 1 layer, you don't need to specify a 
