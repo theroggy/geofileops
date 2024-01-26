@@ -7,138 +7,157 @@ User guide
 The main objective of geofileops is to provide a simple to use but powerful API to do
 fast spatial operations on large vector GIS files.
 
-To get the most out of geofileops, these are some things to note:
 
-* Geofileops is tested on geopackage and shapefile input/output files. However,
-  geopackage is highly recommended because it will offer better performance in
-  geofileops as well as for the reasons listed here: |www.switchfromshapefile.org|.
-* A typical use case for geofileops is to script complex GIS analysis involving many
-  spatial operations on multiple large input files. To support this use case, if an
-  output file already exists, all spatial operations will by default just return
-  without error or further processing. This way it is easy to incrementally develop/
-  run the script and only new/missing output files (or output files you remove) will
-  be (re)processed.
-* Because of the previous point, it is typically not supported for spatial operations
-  to directly append a layer in an existing Geopackage file. If wanted, it is
-  possible to append it in a seperate step using :meth:`~append_to`.
+General  
+-------
 
+To speed up processing, geofileops uses multiprocessing under the hood. Because of that,
+you should always use the ``if __name__ == "__main__":`` block in standalone Python
+scripts. More information: :ref:`FAQ - Standalone scripts<FAQ-standalone-scripts>`.
 
-Spatial operations on one layer
--------------------------------
+Also interesting to know: because processing large files can take some time, geofileops
+logs progress info using the standard logging module.
 
-The first type of supported operations are operations that target one 
-file/layer. The output is always written to a seperate output file.
-
-The typical spatial operations are supported, eg. :meth:`~buffer`, 
-:meth:`~simplify`, :meth:`~dissolve`,... 
-
-You can also execute an sqlite sql statement (including  
-|spatialite_reference_link|) on an input file using the :meth:`~select` operation. 
-
-A full list of operations can be found in the 
-:ref:`API reference<API-reference-single-layer>`. 
-
-This is how eg. a buffer operation can be applied on a file/layer:
+Combining both, a basic script using geofileops can look like this:
 
 .. code-block:: python
 
+    import logging
     import geofileops as gfo
     
-    gfo.buffer(input_path='...', output_path='...', distance=2)
+    if __name__ == "__main__":
+        logging.basicConfig(level=logging.INFO)
+        gfo.buffer(input_path="input.gpkg", output_path="output.gpkg", distance=2)
 
 
-.. tip::
-
-    Because in most geofileops operations multiprocessing is used, it is a good idea to
-    always use the ``if __name__ == "__main__":`` block in standalone Python scripts.
-    More information in :ref:`FAQ - Standalone scripts<FAQ-standalone-scripts>`
+Finally, most general file/layer operations can be used on any file format supported by
+GDAL. For the spatial tools, only geopackages and shapefiles are supported but
+geopackage is **very** recommended for :ref:`many reasons <FAQ-supported-file-formats>`.
 
 
-Most spatial operations in geofileops have the same optional parameters:
+Geometry tools  
+--------------
 
-* input_layer: if the file contains 1 layer, you don't need to specify a 
-  layer. For a file with multiple layers, use the "layer" parameter. 
-* output_layer: if not specified, the output layer name will be 
-  output_path.stem.
-* columns: if not specified, all standard attribute columns will be retained in the
+The typical :ref:`geometry tools <reference-geometry-tools>` are directly
+supported, eg. :meth:`~buffer`, :meth:`~simplify`, :meth:`~convexhull`,
+:meth:`~dissolve`, ...
+
+.. code-block:: python
+
+    gfo.simplify(input_path="...", output_path="...", algorythm="vw", tolerance=1)
+
+
+Some more exotic ones are e.g. :meth:`dissolve_within_distance` and :meth:`warp`.
+
+For more advanced uses, you can execute any sqlite SQL statement on an input file using
+:meth:`~select`. Because 
+`spatialite functions <https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html>`_ 
+are also supported, this is quite powerful. To simplify the SQL statements, there are
+some placeholders you can use that will be filled out by geofileops:
+
+.. code-block:: python
+
+    city = "Brussels"
+    sql_stmt = f"""
+        SELECT ST_OrientedEnvelope({{geometrycolumn}}) AS geom
+              {{columns_to_select_str}}
+          FROM "{{input_layer}}" layer
+         WHERE city_name = '{city}'"
+    """
+    gfo.select(
+        input_path="...",
+        output_path="...",
+        columns=["city_name", "city_code"],
+        sql_stmt=sql_stmt,
+    )
+
+Finally, you can apply any python function on the geometry column using :meth:`~apply`.
+
+.. code-block:: python
+
+    import pygeoops
+
+    def cleanup(geom, min_area_to_keep):
+        new_geom = pygeoops.remove_inner_rings(geom, min_area_to_keep=min_area_to_keep)
+        return new_geom
+
+    gfo.apply(
+        input_path="...",
+        output_path="...",
+        func=lambda geom: cleanup(geom, min_area_to_keep=1),
+    )
+
+Most functions in geofileops have some similar optional parameters. These are the
+most interesting ones:
+
+* **columns**: if not specified, all standard attribute columns will be retained in the
   output file. If you don't need all columns, specify the ones you want to keep. 
   You can retain a copy of the special "fid" column in the output file by specifing
   "fid" in addition to the standard attribute columns you want to retain.
-* explodecollections: the output features will be "exploded", so multipart
+* **explodecollections**: the output features will be "exploded", so multipart
   features will be converted to single parts.
-* gridsize: the size of the grid the coordinates of the ouput will be rounded to.
-  Eg. 0.001 to keep 3 decimals. If eg. a polygon is narrower than the gridsize, it
+* **gridsize**: the size of the grid the coordinates of the ouput will be rounded to.
+  Eg. 0.001 to keep 3 decimals. If eg. a polygon is narrower than the ``gridsize``, it
   will be removed. Value 0.0, the default, doesn't change the precision.
-* keep_empty_geoms: True to keep rows with empty/null geometries in the output.
-  Default value is different for different functions at the moment.
-* where_post (str, optional): sql filter to apply after all other processing,
-  including e.g. explodecollections. It should be in sqlite syntax and
-  |spatialite_reference_link| functions can be used. Defaults to None.
-* nb_parallel: specify the number of CPU's to be used. By default all 
-  CPU's are used.
-* batchsize: indication of the number of rows to be processed per batch. You can
-  use this parameter to reduce memory usage. 
-* force: by default, if the output_path already exists, geofileops will  
-  just log that this is the fact and return without throwing a error. 
-  To overwrite the existing output_path, specify force=True.
+* **force**: by default, if the ``output_path`` already exists, geofileops will just log
+  this and return. To overwrite the existing ``output_path``, specify ``force=True``.
     
-Spatial operations between two files/layers
--------------------------------------------
 
-For operations between two layers, obviously 2 input files/layers need to be 
-specified.
+Spatial overlays
+----------------
 
-The standard spatial operations are supported, eg. :meth:`~intersection`, 
-:meth:`~erase`, :meth:`~union`,...
+The standard :ref:`spatial overlays <reference-spatial-overlays-joins>` are
+available: :meth:`~intersection`, :meth:`~erase`, :meth:`~clip`, :meth:`~identity`,
+:meth:`~union`, ...
 
-More specific features are:
-
-* :meth:`~select_two_layers`: execute a select statement (including  
-  |spatialite_reference_link|) on the input files. 
-* :meth:`~join_nearest`: find the n nearest features from one layer 
-  compared the other.
-
-The full list of operations can be found in the 
-:ref:`API reference<API-reference-two-layers>`.
-
-This is a code example for the intersection operation:
+An example:
 
 .. code-block:: python
 
-    import geofileops as gfo
-
-    gfo.intersection(input1_path='...', input2_path='...', output_path='...')
+    gfo.identity(input1_path="...", input2_path="...", output_path="...")
 
 
-The two-layer operations will have about the same optional parameters as the single
-layer operations, but where applicable they are duplicated for input1 and input2.
+In addition, if you specify ``input2_path=None``, the result will be the self-overlay of
+the 1st input layer. E.g. for ``intersection`` this will result in an output with all
+pairwise intersections between the features in this layer. The intersection of features
+with itself is omitted.
+
+
+Spatial joins
+-------------
+
+There are several options available to do
+:ref:`spatial joins <reference-spatial-overlays-joins>`.
+
+The most typical one is :meth:`~join_by_location`. This allows you to join the features
+in two layers with either "named spatial predicates" (e.g. equals, touches,
+intersects, ...) or with a "spatial mask" as defined by the
+`DE-9IM <https://en.wikipedia.org/wiki/DE-9IM>`_ model.
+
+Another option is to look for the n nearest features for all features from one layer
+compared to all features from the second layer using :meth:`~join_nearest`.
+
+If you only want to export rows from a layer that have some spatial relationship with
+features in another layer you can use :meth:`~export_by_location` or
+:meth:`~export_by_distance`.
+
+Finally, if you want full control, you can use SQL statements to build your own overlay
+and/or join logic. Check out the examples for :meth:`~select_two_layers` to get some
+inspiration.
 
 
 General file/layer operations
 -----------------------------
 
-Finally there are also some functions available to manipulate geo files or 
-layers. Eg. :meth:`~copy`, :meth:`~move`, :meth:`~get_layerinfo`, 
-:meth:`~add_column`,...  
+Finally there are also some :ref:`general functions <reference-general-layer-ops>`
+available to manipulate geo files or layers. Eg. :meth:`~copy`, :meth:`~move`,
+:meth:`~get_layerinfo`, :meth:`~add_column`, ...
 
-For the full list of functions, check out the 
-:ref:`API reference<API-general-layer-ops>`.
-
-This is an example to get information about the (only) layer in a geo file: 
+This is an example to get information like the number of features, the columns, ...
+of a layer. If there is only one layer in the file, the `layer` doesn't need
+to be specified:
 
 .. code-block:: python
 
-    import geofileops as gfo
-
-    layerinfo = gfo.get_layerinfo(path='...')
+    layerinfo = gfo.get_layerinfo(path="...")
     print(f"Layer {layerinfo.name} contains {layerinfo.featurecount} features")
-
-Remark: some functions might only work on Geopackage files, not on shapefiles.
-
-.. |spatialite_reference_link| raw:: html
-
-   <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite functions</a>
-
-.. |www.switchfromshapefile.org| raw:: html
-
-   <a href="http://www.switchfromshapefile.org" target="_blank">www.switchfromshapefile.org</a>

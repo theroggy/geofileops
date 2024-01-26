@@ -1557,23 +1557,26 @@ def simplify(
 
     The result is written to the output file specified.
 
+    Several `algorithm`s are available.
+
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
 
     Args:
         input_path (PathLike): the input file
         output_path (PathLike): the file to write the result to
-        tolerance (float): mandatory for the following algorithms:
-
-                * RAMER_DOUGLAS_PEUCKER: distance to use as tolerance.
-                * LANG: distance to use as tolerance.
-                * VISVALINGAM_WHYATT: area to use as tolerance.
-
+        tolerance (float): tolerance to use for the simplification. Depends on the
+            ``algorithm`` specified.
             In projected coordinate systems this tolerance will typically be
             in meter, in geodetic systems this is typically in degrees.
-        algorithm (str, optional): algorithm to use. Defaults to "rdp"
-            (Ramer Douglas Peucker).
-        lookahead (int, optional): used for LANG algorithm. Defaults to 8.
+        algorithm (str, optional): algorithm to use. Defaults to "rdp".
+
+                * **"rdp"**: Ramer Douglas Peucker: tolerance is a distance
+                * **"lang"**: Lang: tolerance is a distance
+                * **"lang+"**: Lang, with extensions to increase number of points reduced.
+                * **"vw"**: Visvalingam Whyatt: tolerance is an area.
+
+        lookahead (int, optional): used for Lang algorithms. Defaults to 8.
         input_layer (str, optional): input layer name. Optional if the input
             file only contains one layer.
         output_layer (str, optional): input layer name. Optional if the input

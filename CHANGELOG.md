@@ -2,6 +2,11 @@
 
 ## ??? (???)
 
+### Improvements
+
+- Several improvements to documentation: new FAQ, improved user guide,...
+  (#465, #469, #474)
+
 ### Bugs fixed
 
 - Fix crash when using e.g. `erase` with `gridsize <> 0.0` specified on input file
@@ -20,7 +25,7 @@
 
 ## 0.8.0 (2023-11-24)
 
-## Improvements
+### Improvements
 
 - Add support to read/add/remove embedded layer styles in gpkg (#263)
 - Add `gridsize` parameter to most spatial operations (#261, #407, #413)
