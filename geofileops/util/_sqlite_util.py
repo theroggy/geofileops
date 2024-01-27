@@ -571,7 +571,7 @@ def create_table_as_sql(
                                 ,ST_MaxY(geom)
                             FROM "{output_layer}"
                            WHERE geom IS NOT NULL
-                             AND NOT ST_IsEmpty(geom)
+                             AND ST_IsEmpty(geom) = 0
                     """
                     conn.execute(sql)
                 elif output_suffix_lower == ".sqlite":

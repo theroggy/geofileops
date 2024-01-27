@@ -264,7 +264,7 @@ def test_buffer_styles(tmp_path, suffix, epsg):
     # Now check if the output file is correctly created
     assert output_path.exists()
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert input_layerinfo.featurecount == output_layerinfo.featurecount
+    assert input_layerinfo.featurecount == output_layerinfo.featurecount + 1
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
@@ -1137,8 +1137,11 @@ def test_simplify_lang(tmp_path, suffix, epsg, testfile, gridsize):
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert input_layerinfo.featurecount == output_layerinfo.featurecount
-    assert len(input_layerinfo.columns) == len(output_layerinfo.columns)
+    expected_featurecount = input_layerinfo.featurecount
+    if testfile == "polygon-parcel":
+        expected_featurecount -= 1
+    assert output_layerinfo.featurecount == expected_featurecount
+    assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
     assert output_layerinfo.geometrytype == input_layerinfo.geometrytype
 
     # Check the contents of the result file
@@ -1190,7 +1193,10 @@ def test_simplify_vw(tmp_path, suffix, epsg, testfile, gridsize):
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert input_layerinfo.featurecount == output_layerinfo.featurecount
+    expected_featurecount = input_layerinfo.featurecount
+    if testfile == "polygon-parcel":
+        expected_featurecount -= 1
+    assert output_layerinfo.featurecount == expected_featurecount
     assert len(input_layerinfo.columns) == len(output_layerinfo.columns)
     assert output_layerinfo.geometrytype == input_layerinfo.geometrytype
 

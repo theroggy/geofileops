@@ -28,7 +28,7 @@ devdir = "./"
 # -- Project information -----------------------------------------------------
 
 project = "geofileops"
-copyright = "2022, Pieter Roggemans"
+copyright = "2024, Pieter Roggemans"
 author = "Pieter Roggemans"
 
 # The full version, including alpha/beta/rc tags
@@ -90,10 +90,13 @@ html_theme_options = {
         }
     ]
 }
+
 html_sidebars = {
-    "**": [
-        "localtoc.html",
-    ]
+    "getting_started": [],
+    "user_guide": [],
+    "reference": [],
+    "faq": [],
+    "development": [],
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,

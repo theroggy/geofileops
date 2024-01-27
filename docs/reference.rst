@@ -7,10 +7,10 @@ API Reference
 The API Reference provides an overview of all public objects, functions and 
 methods implemented in GeofileOps.
 
-.. _API-reference-single-layer:
+.. _reference-geometry-tools:
 
-Spatial operations on a single layer
-------------------------------------
+Geometry tools
+--------------
 
 .. autosummary::
    :toctree: api/
@@ -29,10 +29,10 @@ Spatial operations on a single layer
    simplify
    warp
 
-.. _API-reference-two-layers:
+.. _reference-spatial-overlays-joins:
 
-Spatial operations on two layers
---------------------------------
+Spatial overlays and joins
+--------------------------
 
 .. autosummary::
    :toctree: api/
@@ -49,7 +49,7 @@ Spatial operations on two layers
    symmetric_difference
    union
 
-.. _API-general-layer-ops:
+.. _reference-general-layer-ops:
 
 General layer operations
 ------------------------
@@ -79,7 +79,7 @@ General layer operations
    update_column
    to_file
 
-.. _API-general-file-ops:
+.. _reference-general-file-ops:
 
 General file operations
 -----------------------

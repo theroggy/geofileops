@@ -947,10 +947,6 @@ def _apply_geooperation(
         else:
             raise ValueError(f"operation not supported: {operation}")
 
-    # Set empty geometries to null/None
-    assert data_gdf.geometry is not None
-    data_gdf.loc[data_gdf.geometry.is_empty, ["geometry"]] = None
-
     # If there is an fid column in the dataset, rename it, because the fid column is a
     # "special case" in gdal that should not be written.
     assert isinstance(data_gdf, gpd.GeoDataFrame)
@@ -970,11 +966,12 @@ def _apply_geooperation(
     if explodecollections:
         data_gdf = data_gdf.explode(ignore_index=True)
 
-    # Remove rows where geom is None/null/empty
+    # Set empty geometries to None
+    data_gdf.loc[data_gdf.geometry.is_empty, data_gdf.geometry.name] = None
+
     if not keep_empty_geoms:
-        assert isinstance(data_gdf, gpd.GeoDataFrame)
+        # Remove rows where geometry is None
         data_gdf = data_gdf[~data_gdf.geometry.isna()]
-        data_gdf = data_gdf[~data_gdf.geometry.is_empty]
 
     # If the result is empty, and no output geometrytype specified, use input
     # geometrytype
@@ -1873,16 +1870,19 @@ def _dissolve_polygons(
 
         perfinfo["time_clip"] = (datetime.now() - start_clip).total_seconds()
 
-    # Set empty geometries to null/None
-    assert diss_gdf.geometry is not None
-    diss_gdf.loc[
-        diss_gdf.geometry.is_empty, ["geometry"]  # type: ignore[union-attr]
-    ] = None
+    if gridsize != 0.0:
+        diss_gdf.geometry = _geoseries_util.set_precision(
+            diss_gdf.geometry, grid_size=gridsize, raise_on_topoerror=False
+        )
+        assert isinstance(diss_gdf.geometry, gpd.GeoSeries)
 
-    # Remove rows where geom is None/null/empty
+    # Set empty geometries to None
+    diss_gdf.loc[diss_gdf.geometry.is_empty, diss_gdf.geometry.name] = None
+
     if not keep_empty_geoms:
+        # Remove rows where geom is None
         assert isinstance(diss_gdf, gpd.GeoDataFrame)
-        diss_gdf = diss_gdf[~diss_gdf.geometry.isna()]  # type: ignore[union-attr]
+        diss_gdf = diss_gdf[~diss_gdf.geometry.isna()]
 
     # If there is no result, return
     if len(diss_gdf) == 0:
@@ -1896,11 +1896,6 @@ def _dissolve_polygons(
     assert isinstance(diss_gdf, gpd.GeoDataFrame)
     if tile_id is not None:
         diss_gdf["tile_id"] = tile_id
-
-    if gridsize != 0.0:
-        diss_gdf.geometry = _geoseries_util.set_precision(
-            diss_gdf.geometry, grid_size=gridsize, raise_on_topoerror=False
-        )
 
     # Save the result to destination file(s)
     start_to_file = datetime.now()
