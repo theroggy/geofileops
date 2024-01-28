@@ -1537,13 +1537,15 @@ def join_by_location(
               SELECT sub_filter.*
                     {area_inters_column_expression}
                 FROM (
-                  SELECT layer1.{{input1_geometrycolumn}} as geom
+                  SELECT layer1.{{input1_geometrycolumn}} AS geom
                         ,layer1.fid l1_fid
-                        ,layer2.{{input2_geometrycolumn}} as l2_geom
+                        ,layer2.{{input2_geometrycolumn}} AS l2_geom
                         {{layer1_columns_prefix_alias_str}}
                         {{layer2_columns_prefix_alias_str}}
-                        ,ST_relate(layer1.{{input1_geometrycolumn}},
-                                   layer2.{{input2_geometrycolumn}}) as spatial_relation
+                        ,ST_relate(
+                            layer1.{{input1_geometrycolumn}},
+                            layer2.{{input2_geometrycolumn}}
+                         ) AS GFO_$TEMP$_SPATIAL_RELATION
                     FROM {{input1_databasename}}."{{input1_layer}}" layer1
                     JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
                       ON layer1.fid = layer1tree.id
@@ -1559,7 +1561,7 @@ def join_by_location(
                    LIMIT -1 OFFSET 0
                   ) sub_filter
                WHERE {spatial_relations_filter.format(
-                    spatial_relation="sub_filter.spatial_relation")}
+                    spatial_relation="sub_filter.GFO_$TEMP$_SPATIAL_RELATION")}
                LIMIT -1 OFFSET 0
               ) sub_area
            {area_inters_filter}
@@ -1567,7 +1569,7 @@ def join_by_location(
         SELECT sub.geom
               {{layer1_columns_from_subselect_str}}
               {{layer2_columns_from_subselect_str}}
-              ,sub.spatial_relation
+              ,sub.GFO_$TEMP$_SPATIAL_RELATION AS spatial_relation
               {area_inters_column_in_output}
           FROM layer1_relations_filtered sub
     """
@@ -1581,7 +1583,7 @@ def join_by_location(
             SELECT layer1.{{input1_geometrycolumn}} as geom
                   {{layer1_columns_prefix_alias_str}}
                   {{layer2_columns_prefix_alias_null_str}}
-                  ,NULL as spatial_relation
+                  ,NULL AS spatial_relation
                   {area_inters_column_0_in_output}
               FROM {{input1_databasename}}."{{input1_layer}}" layer1
              WHERE 1=1
