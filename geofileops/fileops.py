@@ -189,6 +189,7 @@ class LayerInfo:
         fid_column (str): column name of the FID column. Is "" for file types that don't
             explicitly store an FID, like shapefile.
         crs (pyproj.CRS): the spatial reference of the layer.
+        driver (str): shortname of the gdal driver.
         errors (List[str]): list of errors in the layer, eg. invalid column
             names,...
     """
@@ -204,6 +205,7 @@ class LayerInfo:
         columns: Dict[str, ColumnInfo],
         fid_column: str,
         crs: Optional[pyproj.CRS],
+        driver: str,
         errors: List[str],
     ):
         """
@@ -219,6 +221,7 @@ class LayerInfo:
             columns (Dict[str, ColumnInfo]): the attribute columns of the layer.
             fid_column (str): the name of the fid column.
             crs (Optional[pyproj.CRS]): the crs of the layer.
+            driver (str): shortname of the gdal driver.
             errors (List[str]): errors encountered reading the layer info.
         """
         self.name = name
@@ -230,6 +233,7 @@ class LayerInfo:
         self.columns = columns
         self.fid_column = fid_column
         self.crs = crs
+        self.driver = driver
         self.errors = errors
 
     def __repr__(self):
@@ -404,6 +408,7 @@ def get_layerinfo(
                 columns=columns,
                 fid_column=datasource_layer.GetFIDColumn(),
                 crs=crs,
+                driver=driver,
                 errors=errors,
             )
 
@@ -617,7 +622,7 @@ def has_spatial_index(
     datasource = None
     path_info = _geofileinfo.get_geofileinfo(path)
     try:
-        if path_info.is_spatialite_based:
+        if path_info.driver == "GPKG":
             layerinfo = get_layerinfo(path, layer, raise_on_nogeom=not no_geom_ok)
             if no_geom_ok and layerinfo.geometrycolumn is None:
                 return False
@@ -625,6 +630,21 @@ def has_spatial_index(
             sql = f"""
                 SELECT HasSpatialIndex('{layerinfo.name}',
                                        '{layerinfo.geometrycolumn}')
+            """
+            result = datasource.ExecuteSQL(sql, dialect="SQLITE")
+            has_spatial_index = result.GetNextFeature().GetField(0) == 1
+            datasource.ReleaseResultSet(result)
+            return has_spatial_index
+        elif path_info.driver == "SQLite":
+            layerinfo = get_layerinfo(path, layer, raise_on_nogeom=not no_geom_ok)
+            if no_geom_ok and layerinfo.geometrycolumn is None:
+                return False
+            datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_READONLY)
+            index_tablename = f"idx_{layerinfo.name}_{layerinfo.geometrycolumn}"
+            sql = f"""
+                SELECT count(*)
+                  FROM sqlite_master
+                 WHERE type='table' AND name='{index_tablename}';
             """
             result = datasource.ExecuteSQL(sql, dialect="SQLITE")
             has_spatial_index = result.GetNextFeature().GetField(0) == 1

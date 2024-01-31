@@ -1528,8 +1528,8 @@ def join_by_location(
     # Remark: use "LIMIT -1 OFFSET 0" to avoid that the sqlite query optimizer
     #     "flattens" the subquery, as that makes checking the spatial
     #     relations (using ST_RelateMatch) very slow!
-    input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
-    input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
+    input1_layer_rtree = "{rtree_prefix}{input1_layer}_{input1_geometrycolumn}"
+    input2_layer_rtree = "{rtree_prefix}{input2_layer}_{input2_geometrycolumn}"
     sql_template = f"""
         WITH layer1_relations_filtered AS (
           SELECT sub_area.*
@@ -1548,16 +1548,16 @@ def join_by_location(
                          ) AS "GFO_$TEMP$_SPATIAL_RELATION"
                     FROM {{input1_databasename}}."{{input1_layer}}" layer1
                     JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-                      ON layer1.fid = layer1tree.id
+                      ON layer1.fid = layer1tree.{{rtree_id}}
                     JOIN {{input2_databasename}}."{{input2_layer}}" layer2
                     JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                      ON layer2.fid = layer2tree.id
+                      ON layer2.fid = layer2tree.{{rtree_id}}
                    WHERE 1=1
                      {{batch_filter}}
-                     AND layer1tree.minx <= layer2tree.maxx
-                     AND layer1tree.maxx >= layer2tree.minx
-                     AND layer1tree.miny <= layer2tree.maxy
-                     AND layer1tree.maxy >= layer2tree.miny
+                     AND layer1tree.{{rtree_minx}} <= layer2tree.{{rtree_maxx}}
+                     AND layer1tree.{{rtree_maxx}} >= layer2tree.{{rtree_minx}}
+                     AND layer1tree.{{rtree_miny}} <= layer2tree.{{rtree_maxy}}
+                     AND layer1tree.{{rtree_maxy}} >= layer2tree.{{rtree_miny}}
                    LIMIT -1 OFFSET 0
                   ) sub_filter
                WHERE {spatial_relations_filter.format(
@@ -2410,38 +2410,57 @@ def _two_layer_vector_operation(
         # ---------------------------------------------
         # Format column strings for use in select
         assert processing_params.input1_path is not None
-        input1_tmp_layerinfo = gfo.get_layerinfo(
+        input1_tmp_info = gfo.get_layerinfo(
             processing_params.input1_path,
             processing_params.input1_layer,
             raise_on_nogeom=False,
         )
         input1_col_strs = _ogr_sql_util.ColumnFormatter(
             columns_asked=input1_columns,
-            columns_in_layer=input1_tmp_layerinfo.columns,
-            fid_column=input1_tmp_layerinfo.fid_column,
+            columns_in_layer=input1_tmp_info.columns,
+            fid_column=input1_tmp_info.fid_column,
             table_alias="layer1",
             column_alias_prefix=input1_columns_prefix,
         )
         assert processing_params.input2_path is not None
-        input2_tmp_layerinfo = gfo.get_layerinfo(
+        input2_tmp_info = gfo.get_layerinfo(
             processing_params.input2_path,
             processing_params.input2_layer,
             raise_on_nogeom=False,
         )
         input2_col_strs = _ogr_sql_util.ColumnFormatter(
             columns_asked=input2_columns,
-            columns_in_layer=input2_tmp_layerinfo.columns,
-            fid_column=input2_tmp_layerinfo.fid_column,
+            columns_in_layer=input2_tmp_info.columns,
+            fid_column=input2_tmp_info.fid_column,
             table_alias="layer2",
             column_alias_prefix=input2_columns_prefix,
         )
 
         # Check input crs'es
-        if input1_tmp_layerinfo.crs != input2_tmp_layerinfo.crs:
+        if input1_tmp_info.crs != input2_tmp_info.crs:
             logger.warning(
                 f"input1 has a different crs than input2: \n\tinput1: "
-                f"{input1_tmp_layerinfo.crs} \n\tinput2: {input2_tmp_layerinfo.crs}"
+                f"{input1_tmp_info.crs} \n\tinput2: {input2_tmp_info.crs}"
             )
+
+        # Prepare the rtree index name. If both input files are spatialite files they
+        # don't need to be converted.
+        if input1_tmp_info.driver == "SQLite" and input2_tmp_info.driver == "SQLite":
+            rtree_prefix = "idx_"
+            rtree_id = "pkid"
+            rtree_minx = "xmin"
+            rtree_miny = "ymin"
+            rtree_maxx = "xmax"
+            rtree_maxy = "ymax"
+            tmp_suffix = ".sqlite"
+        else:
+            rtree_prefix = "rtree_"
+            rtree_id = "id"
+            rtree_minx = "minx"
+            rtree_miny = "miny"
+            rtree_maxx = "maxx"
+            rtree_maxy = "maxy"
+            tmp_suffix = ".gpkg"
 
         # Fill out sql_template as much as possible already
         # -------------------------------------------------
@@ -2454,15 +2473,21 @@ def _two_layer_vector_operation(
             layer1_columns_prefix_str=input1_col_strs.prefixed(),
             input1_layer=processing_params.input1_layer,
             input1_tmp_layer=processing_params.input1_layer,
-            input1_geometrycolumn=input1_tmp_layerinfo.geometrycolumn,
+            input1_geometrycolumn=input1_tmp_info.geometrycolumn,
             layer2_columns_from_subselect_str=input2_col_strs.from_subselect(),
             layer2_columns_prefix_alias_str=input2_col_strs.prefixed_aliased(),
             layer2_columns_prefix_str=input2_col_strs.prefixed(),
             layer2_columns_prefix_alias_null_str=input2_col_strs.null_aliased(),
             input2_layer=processing_params.input2_layer,
             input2_tmp_layer=processing_params.input2_layer,
-            input2_geometrycolumn=input2_tmp_layerinfo.geometrycolumn,
+            input2_geometrycolumn=input2_tmp_info.geometrycolumn,
             batch_filter="{batch_filter}",
+            rtree_prefix=rtree_prefix,
+            rtree_id=rtree_id,
+            rtree_minx=rtree_minx,
+            rtree_miny=rtree_miny,
+            rtree_maxx=rtree_maxx,
+            rtree_maxy=rtree_maxy,
         )
 
         # Determine column names and types based on sql statement
@@ -2536,9 +2561,7 @@ def _two_layer_vector_operation(
         # Calculate
         # ---------
         # Processing in threads is 2x faster for small datasets (on Windows)
-        calculate_in_threads = (
-            True if input1_tmp_layerinfo.featurecount <= 100 else False
-        )
+        calculate_in_threads = True if input1_tmp_info.featurecount <= 100 else False
         logger.info(
             f"Start processing ({processing_params.nb_parallel} "
             f"parallel workers, batch size: {processing_params.batchsize})"
@@ -2556,7 +2579,7 @@ def _two_layer_vector_operation(
                 batches[batch_id]["layer"] = output_layer
 
                 tmp_partial_output_path = (
-                    tempdir / f"{output_path.stem}_{batch_id}.gpkg"
+                    tempdir / f"{output_path.stem}_{batch_id}{tmp_suffix}"
                 )
                 batches[batch_id]["tmp_partial_output_path"] = tmp_partial_output_path
 
