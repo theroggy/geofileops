@@ -14,6 +14,8 @@
 - Fix `dissolve` possibly having EMPTY geometries as output if `gridsize <> 0.0` (#473)
 - Fix wrong results from `join_by_location` if ran on result of `join_by_location`
   with `column_prefixes=""` (#475)
+- Fix error in two layer operations if equal column aliases used based on a constant or
+  a function result (#477)
 
 ## 0.8.1 (2024-01-13)
 
