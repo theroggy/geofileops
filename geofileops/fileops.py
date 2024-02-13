@@ -813,7 +813,7 @@ def add_column(
     path: Union[str, "os.PathLike[Any]"],
     name: str,
     type: Union[DataType, str],
-    expression: Union[str, int, float, None] = None,
+    expression: Union[str, float, None] = None,
     expression_dialect: Optional[str] = None,
     layer: Optional[str] = None,
     force_update: bool = False,

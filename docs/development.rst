@@ -34,9 +34,9 @@ sooner or later: ::
     conda config --env --set channel_priority strict
 
 
-It is recommended to install the pre-commit hook that will take care of the automatic
-checks and formatting, so you don't run into linting errors when you create a pull
-request: ::
+It is recommended to install the pre-commit hook that will take care of the linting
+checks (ruff) and formatting (ruff-format), so you don't run into linting errors when
+you create a pull request: ::
 
     pre-commit install
 

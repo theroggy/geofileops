@@ -2076,9 +2076,7 @@ def _dissolve(
         agg_columns = list(set(aggfunc["to_json"]))
         agg_data = (
             data.groupby(**groupby_kwargs)
-            .apply(
-                lambda g: g[agg_columns].to_json(orient="records")
-            )  # type: ignore[index]
+            .apply(lambda g: g[agg_columns].to_json(orient="records"))
             .to_frame(name="__DISSOLVE_TOJSON")
         )
     elif isinstance(aggfunc, str) and aggfunc == "merge_json_lists":
