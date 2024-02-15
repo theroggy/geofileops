@@ -3,12 +3,12 @@ ci:
     autoupdate_schedule: weekly
 
 repos:
-    - repo: https://github.com/psf/black
-      rev: 23.1.0
-      hooks:
-          - id: black
-            language_version: python3
-    - repo: https://github.com/astral-sh/ruff-pre-commit
-      rev: "v0.0.271"
-      hooks:
-          - id: ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.1.13"
+    hooks:
+      - id: ruff-format
+      - id: ruff
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: "v1.8.0"
+    hooks:
+      - id: mypy

@@ -31,7 +31,7 @@ def test_determine_nb_batches(
     nb_parallel: int,
     batchsize: int,
     cpu_count: int,
-    bytes_usable: float,
+    bytes_usable: int,
     exp_nb_parallel: int,
     exp_nb_batches: int,
 ):
