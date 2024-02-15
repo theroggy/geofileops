@@ -5,7 +5,7 @@ Tests for operations that are executed using a sql statement on one layer.
 from importlib import import_module
 import logging
 import math
-from typing import List
+from typing import Any, List
 
 import geopandas as gpd
 import pytest
@@ -55,7 +55,7 @@ def basic_combinations_to_test(
     testfiles: List[str] = TESTFILES,
     epsgs: List[int] = EPSGS,
     suffixes: List[str] = SUFFIXES_GEOOPS,
-) -> list:
+) -> List[Any]:
     """
     Return sensible combinations of parameters to be used in tests for following params:
         suffix, epsg, geoops_module, testfile, empty_input, gridsize, where_post
@@ -71,6 +71,7 @@ def basic_combinations_to_test(
             for testfile in testfiles:
                 where_post = None
                 keep_empty_geoms = None
+                dimensions = None
                 gridsize = 0.001 if epsg == 31370 else GRIDSIZE_DEFAULT
                 if testfile == "polygon-parcel":
                     dimensions = "XYZ"

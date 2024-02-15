@@ -4,11 +4,8 @@ from typing import Optional
 
 import pygeoops
 import shapely
+from shapely.geometry.base import BaseGeometry
 import shapely.ops
-
-# from pygeoops import _difference as _difference
-# from pygeoops import _paramvalidation as paramvalidation
-import shapely
 
 from geofileops.util import _geoseries_util
 
@@ -147,6 +144,7 @@ def gfo_reduceprecision(geom_wkb: bytes, gridsize: int) -> Optional[bytes]:
         result = _geoseries_util.set_precision(
             geom, grid_size=gridsize, raise_on_topoerror=False
         )
+        assert isinstance(result, BaseGeometry)
 
         # If an empty result, return None
         # Remark: apparently ST_IsEmpty of spatialite doesn't work (in combination with
@@ -202,7 +200,7 @@ def gfo_split(
     try:
         # Apply split. Only supports single geometries, so explode twice to be sure.
         result = geom
-        output_primitivetype_id = pygeoops.get_primitivetype_id(geom)
+        output_primitivetype_id = int(pygeoops.get_primitivetype_id(geom))
         for blade_part in shapely.get_parts(blade):
             for blade_part2 in shapely.get_parts(blade_part):
                 result = shapely.ops.split(result, blade_part2)

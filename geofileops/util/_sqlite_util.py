@@ -511,6 +511,7 @@ def create_table_as_sql(
 
                 # If there is a geometry column, register it
                 if "geom" in column_types:
+                    assert output_geometrytype is not None
                     sql = f"""
                         INSERT INTO {output_databasename}.gpkg_geometry_columns (
                             table_name, column_name, geometry_type_name, srs_id, z, m)
@@ -526,6 +527,7 @@ def create_table_as_sql(
             elif output_suffix_lower == ".sqlite":
                 # Create geom metadata if there is one
                 if "geom" in column_types:
+                    assert output_geometrytype is not None
                     sql = f"""
                         SELECT RecoverGeometryColumn(
                           '{output_layer}', 'geom',

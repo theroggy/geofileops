@@ -91,7 +91,7 @@ html_theme_options = {
     ]
 }
 
-html_sidebars = {
+html_sidebars: dict[str, list[str]] = {
     "getting_started": [],
     "user_guide": [],
     "reference": [],

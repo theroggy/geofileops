@@ -1,12 +1,14 @@
 # CHANGELOG
 
-## ??? (???)
+## 0.9.0 (???)
 
 ### Improvements
 
+- Add support for self-overlays in overlay operations (#468)
 - Several improvements to documentation: new FAQ, improved user guide,...
   (#465, #469, #474)
-- Use ruff-format instead of black for formatting (#479)
+- Linting improvements: use mypy + use ruff-format instead of black for formatting
+  (#478, #479)
 
 ### Bugs fixed
 

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import tempfile
 from threading import Lock
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union
 
 from osgeo import gdal
 from osgeo import ogr
@@ -29,8 +29,8 @@ class GDALError(Exception):
     def __init__(
         self,
         message: str,
-        log_details: [List[str]] = [],
-        error_details: [List[str]] = [],
+        log_details: List[str] = [],
+        error_details: List[str] = [],
     ):
         self.message = message
         self.log_details = log_details
@@ -161,7 +161,7 @@ class VectorTranslateInfo:
         explodecollections: bool = False,
         force_output_geometrytype: Union[GeometryType, str, None] = None,
         options: dict = {},
-        columns: Optional[List[str]] = None,
+        columns: Optional[Iterable[str]] = None,
         warp: Optional[dict] = None,
         preserve_fid: Optional[bool] = None,
         dst_dimensions: Optional[str] = None,
@@ -236,10 +236,10 @@ def vector_translate(
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     options: dict = {},
-    columns: Optional[List[str]] = None,
+    columns: Optional[Iterable[str]] = None,
     warp: Optional[dict] = None,
     preserve_fid: Optional[bool] = None,
-    dst_dimensions: Optional[bool] = None,
+    dst_dimensions: Optional[str] = None,
 ) -> bool:
     # API Doc of VectorTranslateOptions:
     #   https://gdal.org/api/python/osgeo.gdal.html#osgeo.gdal.VectorTranslateOptions
@@ -392,10 +392,10 @@ def vector_translate(
     if "CPL_LOG" not in config_options:
         gdal_cpl_log_dir = Path(tempfile.gettempdir()) / "geofileops/gdal_cpl_log"
         gdal_cpl_log_dir.mkdir(parents=True, exist_ok=True)
-        fd, gdal_cpl_log_path = tempfile.mkstemp(suffix=".log", dir=gdal_cpl_log_dir)
+        fd, gdal_cpl_log = tempfile.mkstemp(suffix=".log", dir=gdal_cpl_log_dir)
         os.close(fd)
-        config_options["CPL_LOG"] = gdal_cpl_log_path
-        gdal_cpl_log_path = Path(gdal_cpl_log_path)
+        config_options["CPL_LOG"] = gdal_cpl_log
+        gdal_cpl_log_path = Path(gdal_cpl_log)
     else:
         gdal_cpl_log_path = Path(config_options["CPL_LOG"])
     if "CPL_LOG_ERRORS" not in config_options:
