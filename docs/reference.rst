@@ -106,4 +106,4 @@ Classes
    LayerInfo
    PrimitiveType
    SimplifyAlgorithm
-   
+   TempEnv

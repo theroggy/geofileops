@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Union
 
 import geofileops as gfo
 from geofileops import GeometryType
+from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util._general_util import MissingRuntimeDependencyError
 from geofileops.util import _sqlite_userdefined as sqlite_userdefined
 
@@ -269,7 +270,8 @@ def get_columns(
         raise RuntimeError(f"Error {ex} executing {sql}") from ex
     finally:
         conn.close()
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return columns
 

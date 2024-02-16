@@ -24,6 +24,7 @@ from geofileops import GeometryType, PrimitiveType
 from geofileops import fileops
 
 from geofileops._compat import SPATIALITE_GTE_51
+from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.fileops import _append_to_nolock
 from geofileops.util import _general_util
 from geofileops.util import _geofileinfo
@@ -858,7 +859,8 @@ def _single_layer_vector_operation(
 
     finally:
         # Clean tmp dir
-        shutil.rmtree(tempdir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now()-start_time}")
 
@@ -1206,7 +1208,7 @@ def erase(
             output_with_spatial_index=output_with_spatial_index,
         )
     finally:
-        if tmp_dir is not None:
+        if ConfigOptions.remove_temp_files and tmp_dir is not None:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     # Print time taken
@@ -2015,7 +2017,8 @@ def identity(
         gfo.move(tmp_output_path, output_path)
 
     finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, full identity took {datetime.now()-start_time}")
 
@@ -2145,7 +2148,8 @@ def symmetric_difference(
         gfo.move(tmp_output_path, output_path)
 
     finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, full symmetric_difference took {datetime.now()-start_time}")
 
@@ -2294,7 +2298,8 @@ def union(
         gfo.move(tmp_output_path, output_path)
 
     finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, full union took {datetime.now()-start_time}")
 
@@ -2747,11 +2752,14 @@ def _two_layer_vector_operation(
             logger.debug("Result was empty!")
 
         logger.info(f"Ready, took {datetime.now()-start_time}")
-        shutil.rmtree(tempdir, ignore_errors=True)
+
     except Exception:
         gfo.remove(output_path, missing_ok=True)
         gfo.remove(tmp_output_path, missing_ok=True)
         raise
+    finally:
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tempdir, ignore_errors=True)
 
 
 def calculate_two_layers(
@@ -3402,7 +3410,8 @@ def dissolve_singlethread(
         gfo.move(tmp_output_path, output_path)
 
     finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now()-start_time}")
 

@@ -32,6 +32,7 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import fileops
+from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.helpers import _parameter_helper
 from geofileops.util import _general_util
 from geofileops.util import _geoops_sql
@@ -880,7 +881,8 @@ def _apply_geooperation_to_layer(
             logger.debug("Result was empty")
 
     finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now()-start_time_global}")
 
@@ -1544,7 +1546,8 @@ def dissolve(
                 gfo.move(output_tmp2_final_path, output_path)
 
         finally:
-            shutil.rmtree(tempdir, ignore_errors=True)
+            if ConfigOptions.remove_temp_files:
+                shutil.rmtree(tempdir, ignore_errors=True)
     else:
         raise NotImplementedError(
             f"Unsupported input geometrytype: {input_layerinfo.geometrytype}"

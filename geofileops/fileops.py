@@ -6,14 +6,23 @@ import enum
 from datetime import date, datetime
 import filecmp
 import logging
-import os
 from pathlib import Path
 import pprint
 import shutil
 import string
 import tempfile
 import time
-from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+    TYPE_CHECKING,
+)
 import warnings
 
 import fiona
@@ -32,6 +41,10 @@ from geofileops.util import _geoseries_util
 from geofileops.util import _io_util
 from geofileops.util import _ogr_util
 from geofileops.util import _ogr_sql_util
+from geofileops.helpers._configoptions_helper import ConfigOptions
+
+if TYPE_CHECKING:
+    import os
 
 #####################################################################
 # First define/init some general variables/constants
@@ -1140,7 +1153,7 @@ def _read_file_base(
             fid_as_column = True
 
     # Read with the engine specified
-    engine = _get_engine()
+    engine = ConfigOptions.io_engine
     if engine == "pyogrio":
         gdf = _read_file_base_pyogrio(
             path=path,
@@ -1226,7 +1239,7 @@ def _read_file_base_fiona(
 
             path = tmp_fid_path
         finally:
-            if tmp_fid_path.parent.exists():
+            if ConfigOptions.remove_temp_files and tmp_fid_path.parent.exists():
                 shutil.rmtree(tmp_fid_path, ignore_errors=True)
 
     # Checking if field/column names should be read is case sensitive in fiona, so
@@ -1544,7 +1557,7 @@ def to_file(
         engine = "fiona"
         create_spatial_index = False
     else:
-        engine = _get_engine()
+        engine = ConfigOptions.io_engine
 
     # Now write with the correct engine
     if engine == "pyogrio":
@@ -1574,10 +1587,6 @@ def to_file(
         )
     else:
         raise ValueError(f"Unsupported engine: {engine}")
-
-
-def _get_engine():
-    return os.environ.get("GFO_IO_ENGINE", "pyogrio")
 
 
 def _to_file_fiona(

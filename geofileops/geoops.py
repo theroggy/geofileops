@@ -14,6 +14,7 @@ from pygeoops import GeometryType
 
 from geofileops._compat import SPATIALITE_GTE_51
 from geofileops import fileops
+from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import _geofileinfo
 from geofileops.util import _geoops_gpd
 from geofileops.util import _geoops_sql
@@ -336,7 +337,8 @@ def dissolve_within_distance(
         )
 
     finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now()-start_time}")
 

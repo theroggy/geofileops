@@ -4,6 +4,7 @@ Module containing some general utilities.
 
 import datetime
 import logging
+import os
 from typing import Any, Dict, Iterable, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -181,3 +182,40 @@ def prepare_for_serialize(data: dict) -> dict:
             prepared[key] = str(value)
 
     return prepared
+
+
+class TempEnv:
+    """
+    Context manager to temporarily set/change environment variables.
+
+    Existing values for variables are backed up and reset when the scope is left,
+    variables that didn't exist before are deleted again.
+
+    Args:
+        envs (Dict[str, Any]): dict with environment variables to set.
+    """
+
+    def __init__(self, envs: Dict[str, Any]):
+        self._envs_backup: Dict[str, str] = {}
+        self._envs = envs
+
+    def __enter__(self):
+        # Only if a name and value is specified...
+        for name, value in self._envs.items():
+            # If the environment variable is already defined, make backup
+            if name in os.environ:
+                self._envs_backup[name] = os.environ[name]
+
+            # Set env variable to value
+            os.environ[name] = str(value)
+
+    def __exit__(self, type, value, traceback):
+        # Set variables that were backed up back to original value
+        for name, value in self._envs_backup.items():
+            # Recover backed up value
+            os.environ[name] = value
+        # For variables without backup, remove them
+        for name, value in self._envs.items():
+            if name not in self._envs_backup:
+                if name in os.environ:
+                    del os.environ[name]
