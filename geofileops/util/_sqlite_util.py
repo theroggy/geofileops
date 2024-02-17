@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Union
 
 import geofileops as gfo
 from geofileops import GeometryType
+from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util._general_util import MissingRuntimeDependencyError
 from geofileops.util import _sqlite_userdefined as sqlite_userdefined
 
@@ -269,7 +270,8 @@ def get_columns(
         raise RuntimeError(f"Error {ex} executing {sql}") from ex
     finally:
         conn.close()
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     return columns
 
@@ -511,6 +513,7 @@ def create_table_as_sql(
 
                 # If there is a geometry column, register it
                 if "geom" in column_types:
+                    assert output_geometrytype is not None
                     sql = f"""
                         INSERT INTO {output_databasename}.gpkg_geometry_columns (
                             table_name, column_name, geometry_type_name, srs_id, z, m)
@@ -526,6 +529,7 @@ def create_table_as_sql(
             elif output_suffix_lower == ".sqlite":
                 # Create geom metadata if there is one
                 if "geom" in column_types:
+                    assert output_geometrytype is not None
                     sql = f"""
                         SELECT RecoverGeometryColumn(
                           '{output_layer}', 'geom',

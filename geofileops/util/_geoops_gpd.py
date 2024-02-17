@@ -32,6 +32,7 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import fileops
+from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.helpers import _parameter_helper
 from geofileops.util import _general_util
 from geofileops.util import _geoops_sql
@@ -374,12 +375,12 @@ def apply(
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     gridsize: float = 0.0,
-    keep_empty_geoms: bool = True,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-    parallelization_config: ParallelizationConfig = None,
+    parallelization_config: Optional[ParallelizationConfig] = None,
 ):
     # Init
     operation_params = {
@@ -424,7 +425,7 @@ def buffer(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    keep_empty_geoms: bool = True,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -476,7 +477,7 @@ def convexhull(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    keep_empty_geoms: bool = True,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -512,9 +513,9 @@ def makevalid(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Optional[GeometryType] = None,
+    force_output_geometrytype: Union[str, None, GeometryType] = None,
     gridsize: float = 0.0,
-    keep_empty_geoms: bool = True,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     validate_attribute_data: bool = False,
     nb_parallel: int = -1,
@@ -566,7 +567,7 @@ def simplify(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    keep_empty_geoms: bool = True,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -610,12 +611,12 @@ def _apply_geooperation_to_layer(
     explodecollections: bool,  # = False
     force_output_geometrytype: Union[GeometryType, str, None],  # = None
     gridsize: float,  # = 0.0
-    keep_empty_geoms: bool,  # = True
+    keep_empty_geoms: bool,  # = False
     where_post: Optional[str],  # = None
     nb_parallel: int,  # = -1
     batchsize: int,  # = -1
     force: bool,  # = False
-    parallelization_config: ParallelizationConfig = None,
+    parallelization_config: Optional[ParallelizationConfig] = None,
 ):
     """
     Applies a geo operation on a layer.
@@ -670,7 +671,7 @@ def _apply_geooperation_to_layer(
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
-            in the output. Defaults to True.
+            in the output. Defaults to False.
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
@@ -880,7 +881,8 @@ def _apply_geooperation_to_layer(
             logger.debug("Result was empty")
 
     finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now()-start_time_global}")
 
@@ -896,7 +898,7 @@ def _apply_geooperation(
     where=None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    keep_empty_geoms: bool = True,
+    keep_empty_geoms: bool = False,
     preserve_fid: bool = False,
     force: bool = False,
 ) -> str:
@@ -981,7 +983,6 @@ def _apply_geooperation(
         force_output_geometrytype = input_layerinfo.geometrytype
         if not explodecollections:
             force_output_geometrytype = force_output_geometrytype.to_multitype
-        force_output_geometrytype = force_output_geometrytype.name
 
     # If the index is still unique, save it to fid column so to_file can save it
     if preserve_fid:
@@ -1545,7 +1546,8 @@ def dissolve(
                 gfo.move(output_tmp2_final_path, output_path)
 
         finally:
-            shutil.rmtree(tempdir, ignore_errors=True)
+            if ConfigOptions.remove_temp_files:
+                shutil.rmtree(tempdir, ignore_errors=True)
     else:
         raise NotImplementedError(
             f"Unsupported input geometrytype: {input_layerinfo.geometrytype}"

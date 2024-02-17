@@ -14,6 +14,7 @@ from pygeoops import GeometryType
 
 from geofileops._compat import SPATIALITE_GTE_51
 from geofileops import fileops
+from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import _geofileinfo
 from geofileops.util import _geoops_gpd
 from geofileops.util import _geoops_sql
@@ -202,6 +203,7 @@ def dissolve_within_distance(
             input_path=buff_diss_bufm_path,
             erase_path=diss_path,
             output_path=added_pieces_path,
+            overlay_self=False,
             explodecollections=True,
             gridsize=gridsize,
             nb_parallel=nb_parallel,
@@ -324,6 +326,7 @@ def dissolve_within_distance(
             input_path=buff_diss_bufm_path,
             erase_path=added_pieces_to_be_erased_input,
             output_path=output_path,
+            overlay_self=False,
             output_layer=output_layer,
             explodecollections=True,
             gridsize=gridsize,
@@ -334,7 +337,8 @@ def dissolve_within_distance(
         )
 
     finally:
-        shutil.rmtree(tempdir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now()-start_time}")
 
@@ -350,7 +354,7 @@ def apply(
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     gridsize: float = 0.0,
-    keep_empty_geoms: Optional[bool] = None,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -472,7 +476,7 @@ def buffer(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    keep_empty_geoms: Optional[bool] = None,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -733,7 +737,7 @@ def convexhull(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    keep_empty_geoms: Optional[bool] = None,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -808,7 +812,7 @@ def delete_duplicate_geometries(
     output_layer: Optional[str] = None,
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
-    keep_empty_geoms: Optional[bool] = None,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     force: bool = False,
 ):
@@ -1189,7 +1193,7 @@ def makevalid(
     explodecollections: bool = False,
     force_output_geometrytype: Union[str, None, GeometryType] = None,
     gridsize: float = 0.0,
-    keep_empty_geoms: Optional[bool] = None,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     precision: Optional[float] = None,
     validate_attribute_data: bool = False,
@@ -1253,6 +1257,8 @@ def makevalid(
     """  # noqa: E501
     logger = logging.getLogger("geofileops.makevalid")
     logger.info(f"Start, on {input_path}")
+    input_path = Path(input_path)
+    output_path = Path(output_path)
 
     if gridsize is None:
         gridsize = 0.0
@@ -1274,8 +1280,8 @@ def makevalid(
         # Only use this version if gridsize is 0.0, because when gridsize applied it is
         # less robust than the gpd implementation.
         _geoops_sql.makevalid(
-            input_path=Path(input_path),
-            output_path=Path(output_path),
+            input_path=input_path,
+            output_path=output_path,
             input_layer=input_layer,
             output_layer=output_layer,
             columns=columns,
@@ -1290,8 +1296,8 @@ def makevalid(
         )
     else:
         _geoops_gpd.makevalid(
-            input_path=Path(input_path),
-            output_path=Path(output_path),
+            input_path=input_path,
+            output_path=output_path,
             input_layer=input_layer,
             output_layer=output_layer,
             columns=columns,
@@ -1546,7 +1552,7 @@ def simplify(
     columns: Optional[List[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    keep_empty_geoms: Optional[bool] = None,
+    keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -1676,7 +1682,7 @@ def clip(
     The resulting layer will contain the parts of the geometries in the
     input layer that overlap with the dissolved geometries in the clip layer.
 
-    Clarifications:
+    Notes:
         - every row in the input layer will result in maximum one row in the
           output layer.
         - geometries in the input layer that overlap with multiple adjacent
@@ -1755,7 +1761,7 @@ def clip(
 
 def erase(
     input_path: Union[str, "os.PathLike[Any]"],
-    erase_path: Union[str, "os.PathLike[Any]"],
+    erase_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
     input_layer: Optional[str] = None,
     input_columns: Optional[List[str]] = None,
@@ -1770,20 +1776,30 @@ def erase(
     force: bool = False,
 ):
     """
-    Erase all geometries in the erase layer from the input layer.
+    Erase all features in the erase layer from the features in the input layer.
 
-    Clarifications:
-        - every row in the input layer will result in maximum one row in the
+    Notes:
+        - Every row in the input layer will result in maximum one row in the
           output layer.
-        - columns from the erase layer cannot be retained.
+        - The output will contain the columns from the input layer, no columns from the
+          erase layer. The attribute values wont't be changed, so columns like area,...
+          will have to be recalculated manually.
+        - If ``erase_path`` is None, the 1st input layer is used for both inputs but
+          interactions between the same rows in this layer will be ignored. The output
+          will be the (pieces of) features in this layer that don't have any
+          intersections with other features in this layer.
 
     Alternative names:
         - QGIS: difference
 
     Args:
         input_path (PathLike): The file to erase from.
-        erase_path (PathLike): The file with the geometries to erase with.
-        output_path (PathLike): the file to write the result to
+        erase_path (PathLike, optional): The file with the geometries to erase with. If
+            None, the 1st input layer is used for both inputs but interactions between
+            the same rows in this layer will be ignored. The output will be the (pieces
+            of) features in this layer that don't have any intersections with other
+            features in this layer.
+        output_path (PathLike): the file to write the result to.
         input_layer (str, optional): input layer name. Optional if the
             file only contains one layer.
         input_columns (List[str], optional): list of columns to retain. If None, all
@@ -1823,10 +1839,21 @@ def erase(
     """  # noqa: E501
     logger = logging.getLogger("geofileops.erase")
     logger.info(f"Start, on {input_path} with {erase_path} to {output_path}")
+
+    # In erase_path is None, we are doing a self-overlay
+    overlay_self = False
+    if erase_path is None:
+        if erase_layer is not None:
+            raise ValueError("erase_layer must be None if erase_path is None")
+        erase_path = input_path
+        erase_layer = input_layer
+        overlay_self = True
+
     return _geoops_sql.erase(
         input_path=Path(input_path),
         erase_path=Path(erase_path),
         output_path=Path(output_path),
+        overlay_self=overlay_self,
         input_layer=input_layer,
         input_columns=input_columns,
         erase_layer=erase_layer,
@@ -2009,7 +2036,7 @@ def export_by_distance(
 
 def identity(
     input1_path: Union[str, "os.PathLike[Any]"],
-    input2_path: Union[str, "os.PathLike[Any]"],
+    input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
     input1_layer: Optional[str] = None,
     input1_columns: Optional[List[str]] = None,
@@ -2027,14 +2054,23 @@ def identity(
     force: bool = False,
 ):
     r"""
-    Intersection of the input layers, but retain the non-intersecting parts of input1.
+    Calculates the pairwise identity of the two input layers.
 
-    The result is the equivalent of an intersect between the two layers + layer
-    1 erased with layer 2.
+    The result is the equivalent of the intersection between the two layers + layer 1
+    erased with layer 2.
+
+    Notes:
+        - The result will contain the attribute columns from both input layers. The
+          attribute values wont't be changed, so columns like area,... will have to be
+          recalculated manually if this is wanted.
+        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
+          interactions between the same rows in this layer will be ignored.
 
     Args:
-        input1_path (PathLike): the 1st input file
-        input2_path (PathLike): the 2nd input file
+        input1_path (PathLike): the 1st input file.
+        input2_path (PathLike, optional): the 2nd input file. If None, the 1st input
+            layer is used for both inputs but interactions between the same rows in this
+            layer will be ignored.
         output_path (PathLike): the file to write the result to
         input1_layer (str, optional): input layer name. Optional if the
             file only contains one layer. Defaults to None.
@@ -2083,10 +2119,21 @@ def identity(
     """  # noqa: E501
     logger = logging.getLogger("geofileops.identity")
     logger.info(f"Start, between {input1_path} and {input2_path} to {output_path}")
+
+    # In input2_path is None, we are doing a self-overlay
+    overlay_self = False
+    if input2_path is None:
+        if input2_layer is not None:
+            raise ValueError("input2_layer must be None if input2_path is None")
+        input2_path = input1_path
+        input2_layer = input1_layer
+        overlay_self = True
+
     return _geoops_sql.identity(
         input1_path=Path(input1_path),
         input2_path=Path(input2_path),
         output_path=Path(output_path),
+        overlay_self=overlay_self,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2138,6 +2185,7 @@ def split(
         input1_path=Path(input1_path),
         input2_path=Path(input2_path),
         output_path=Path(output_path),
+        overlay_self=False,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2202,7 +2250,7 @@ def intersect(
 
 def intersection(
     input1_path: Union[str, "os.PathLike[Any]"],
-    input2_path: Union[str, "os.PathLike[Any]"],
+    input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
     input1_layer: Optional[str] = None,
     input1_columns: Optional[List[str]] = None,
@@ -2219,14 +2267,24 @@ def intersection(
     force: bool = False,
 ):
     r"""
-    Calculate the pairwise intersection of alle features.
+    Calculates the pairwise intersection of the two input layers.
+
+    Notes:
+        - The result will contain the attribute columns from both input layers. The
+          attribute values wont't be changed, so columns like area,... will have to be
+          recalculated manually if this is wanted.
+        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
+          intersections between the same rows in this layer will be omitted from the
+          result.
 
     Alternative names:
         - GeoPandas: overlay(how="intersection")
 
     Args:
         input1_path (PathLike): the 1st input file
-        input2_path (PathLike): the 2nd input file
+        input2_path (PathLike): the 2nd input file. If None, the 1st input layer is used
+            for both inputs but intersections between the same rows in this layer will
+            be omitted from the result.
         output_path (PathLike): the file to write the result to
         input1_layer (str, optional): input layer name. Optional if the
             file only contains one layer. Defaults to None.
@@ -2270,10 +2328,21 @@ def intersection(
     """  # noqa: E501
     logger = logging.getLogger("geofileops.intersection")
     logger.info(f"Start, between {input1_path} and {input2_path} to {output_path}")
+
+    # In input2_path is None, we are doing a self-overlay
+    overlay_self = False
+    if input2_path is None:
+        if input2_layer is not None:
+            raise ValueError("input2_layer must be None if input2_path is None")
+        input2_path = input1_path
+        input2_layer = input1_layer
+        overlay_self = True
+
     return _geoops_sql.intersection(
         input1_path=Path(input1_path),
         input2_path=Path(input2_path),
         output_path=Path(output_path),
+        overlay_self=overlay_self,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2754,7 +2823,7 @@ def select_two_layers(
 
 def symmetric_difference(
     input1_path: Union[str, "os.PathLike[Any]"],
-    input2_path: Union[str, "os.PathLike[Any]"],
+    input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
     input1_layer: Optional[str] = None,
     input1_columns: Optional[List[str]] = None,
@@ -2772,15 +2841,28 @@ def symmetric_difference(
     force: bool = False,
 ):
     r"""
-    Calculates the "symmetric difference" of the two input layers.
+    Calculates the pairwise symmetric difference of the two input layers.
+
+    The result will be a layer containing features from both the input and overlay
+    layers but with the overlapping areas between the two layers removed.
+
+    Notes:
+        - The result will contain the attribute columns from both input layers. The
+          attribute values wont't be changed, so columns like area,... will have to be
+          recalculated manually if this is wanted.
+        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
+          interactions between the same rows in this layer will be ignored.
+
 
     Alternative names:
         - GeoPandas: overlay(how="symmetric_difference")
         - QGIS, ArcMap: symmetrical difference
 
     Args:
-        input1_path (PathLike): the 1st input file
-        input2_path (PathLike): the 2nd input file
+        input1_path (PathLike): the 1st input file.
+        input2_path (PathLike): the 2nd input file. If None, the 1st input layer is used
+          for both inputs but interactions between the same rows in this layer will be
+          ignored.
         output_path (PathLike): the file to write the result to
         input1_layer (str, optional): input layer name. Optional if the
             file only contains one layer. Defaults to None.
@@ -2832,10 +2914,21 @@ def symmetric_difference(
         f"Start, with input1: {input1_path}, "
         f"input2 {input2_path}, output: {output_path}"
     )
+
+    # In input2_path is None, we are doing a self-overlay
+    overlay_self = False
+    if input2_path is None:
+        if input2_layer is not None:
+            raise ValueError("input2_layer must be None if input2_path is None")
+        input2_path = input1_path
+        input2_layer = input1_layer
+        overlay_self = True
+
     return _geoops_sql.symmetric_difference(
         input1_path=Path(input1_path),
         input2_path=Path(input2_path),
         output_path=Path(output_path),
+        overlay_self=overlay_self,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2855,7 +2948,7 @@ def symmetric_difference(
 
 def union(
     input1_path: Union[str, "os.PathLike[Any]"],
-    input2_path: Union[str, "os.PathLike[Any]"],
+    input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
     input1_layer: Optional[str] = None,
     input1_columns: Optional[List[str]] = None,
@@ -2873,14 +2966,32 @@ def union(
     force: bool = False,
 ):
     r"""
-    Calculates the pairwise "union" of the two input layers.
+    Calculates the pairwise union of the two input layers.
+
+    Union needs to be interpreted here as such: the output layer will contain the
+    combination of all of the following operations:
+        - The pairwise intersection between the two layers.
+        - The (parts of) features of layer 1 that don't have any intersection with layer
+          2.
+        - The (parts of) features of layer 2 that don't have any intersection with layer
+          1.
+
+    Notes:
+        - The result will contain the attribute columns from both input layers. The
+          attribute values wont't be changed, so columns like area,... will have to be
+          recalculated manually if this is wanted.
+        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
+          interactions between the same rows in this layer will be ignored.
+
 
     Alternative names:
         - GeoPandas: overlay(how="union")
 
     Args:
-        input1_path (PathLike): the 1st input file
-        input2_path (PathLike): the 2nd input file
+        input1_path (PathLike): the 1st input file.
+        input2_path (PathLike, optional): the 2nd input file. If None, the 1st input
+            layer is used for both inputs but interactions between the same rows in this
+            layer will be ignored.
         output_path (PathLike): the file to write the result to
         input1_layer (str, optional): input layer name. Optional if the
             file only contains one layer. Defaults to None.
@@ -2932,10 +3043,21 @@ def union(
         f"Start, with input1: {input1_path}, input2: {input2_path}, output: "
         f"{output_path}"
     )
+
+    # In input2_path is None, we are doing a self-overlay
+    overlay_self = False
+    if input2_path is None:
+        if input2_layer is not None:
+            raise ValueError("input2_layer must be None if input2_path is None")
+        input2_path = input1_path
+        input2_layer = input1_layer
+        overlay_self = True
+
     return _geoops_sql.union(
         input1_path=Path(input1_path),
         input2_path=Path(input2_path),
         output_path=Path(output_path),
+        overlay_self=overlay_self,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,

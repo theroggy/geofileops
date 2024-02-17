@@ -3,8 +3,10 @@ Tests for functionalities in _general_util.
 """
 
 import datetime
+import os
 import time
 
+import geofileops as gfo
 from geofileops.util import _general_util
 
 
@@ -37,3 +39,24 @@ def test_format_progress():
         time.sleep(0.5)
         if message is not None:
             print(message)
+
+
+def test_TempEnv():
+    test_var1 = "TEST_ENV_VARIABLE1"
+    test_var2 = "TEST_ENV_VARIABLE2"
+    test_var1_value_context = 1234
+    test_var2_value_orig = "test2_value_orig"
+    test_var2_value_context = "test2_value_context"
+
+    assert test_var1 not in os.environ
+    assert test_var2 not in os.environ
+    os.environ[test_var2] = test_var2_value_orig
+
+    with gfo.TempEnv(
+        {test_var1: test_var1_value_context, test_var2: test_var2_value_context}
+    ):
+        assert os.environ[test_var1] == str(test_var1_value_context)
+        assert os.environ[test_var2] == test_var2_value_context
+
+    assert test_var1 not in os.environ
+    assert os.environ[test_var2] == test_var2_value_orig

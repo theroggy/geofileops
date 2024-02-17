@@ -227,6 +227,43 @@ def test_erase_force(tmp_path):
     assert output_path.stat().st_mtime != mtime_orig
 
 
+@pytest.mark.parametrize("subdivide_coords", [2000, 5])
+def test_erase_self(tmp_path, subdivide_coords):
+    input_path = test_helper.get_testfile("polygon-overlappingcircles-all")
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    # Now run test
+    output_path = tmp_path / f"{input_path.stem}_erase_self.gpkg"
+    gfo.erase(
+        input_path=input_path,
+        erase_path=None,
+        output_path=output_path,
+        subdivide_coords=subdivide_coords,
+        nb_parallel=2,
+        batchsize=batchsize,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
+    assert output_layerinfo.featurecount == 3
+
+
+def test_erase_self_invalid_params():
+    with pytest.raises(
+        ValueError, match="erase_layer must be None if erase_path is None"
+    ):
+        gfo.erase(
+            input_path="input.gpkg",
+            erase_path=None,
+            output_path="output.gpkg",
+            erase_layer="invalid",
+        )
+
+
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_erase_subdivide_multipolygons(tmp_path, suffix):
     """
@@ -449,6 +486,41 @@ def test_identity_force(tmp_path):
     assert output_path.stat().st_mtime != mtime_orig
 
 
+def test_identity_self(tmp_path):
+    input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+
+    # Now run test
+    output_path = tmp_path / f"{input1_path.stem}_identity_self.gpkg"
+    gfo.identity(
+        input1_path=input1_path,
+        input2_path=None,
+        output_path=output_path,
+        nb_parallel=2,
+        batchsize=batchsize,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == 2 * len(input1_layerinfo.columns)
+    assert output_layerinfo.featurecount == 9
+
+
+def test_identity_self_invalid_params():
+    with pytest.raises(
+        ValueError, match="input2_layer must be None if input2_path is None"
+    ):
+        gfo.identity(
+            input1_path="input.gpkg",
+            input2_path=None,
+            output_path="output.gpkg",
+            input2_layer="invalid",
+        )
+
+
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
 @pytest.mark.parametrize(
     "suffix, epsg, gridsize, explodecollections, nb_parallel",
@@ -549,28 +621,32 @@ def test_intersection_input_no_index(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "expected_error, input1_path, input2_path, output_path",
+    "expected_error, expected_exception, input1_path, input2_path, output_path",
     [
         (
             "intersection: output_path must not equal one of input paths",
+            ValueError,
             test_helper.get_testfile("polygon-parcel"),
             test_helper.get_testfile("polygon-zone"),
             test_helper.get_testfile("polygon-parcel"),
         ),
         (
             "intersection: output_path must not equal one of input paths",
+            ValueError,
             test_helper.get_testfile("polygon-parcel"),
             test_helper.get_testfile("polygon-zone"),
             test_helper.get_testfile("polygon-zone"),
         ),
         (
-            "input_path doesn't exist: ",
+            "not_existing_path: No such file or directory",
+            RuntimeError,
             "not_existing_path",
             test_helper.get_testfile("polygon-zone"),
             "output.gpkg",
         ),
         (
-            "input_path doesn't exist: ",
+            "not_existing_path: No such file or directory",
+            RuntimeError,
             test_helper.get_testfile("polygon-zone"),
             "not_existing_path",
             "output.gpkg",
@@ -578,15 +654,11 @@ def test_intersection_input_no_index(tmp_path):
     ],
 )
 def test_intersection_invalid_params(
-    tmp_path, input1_path, input2_path, output_path, expected_error
+    tmp_path, input1_path, input2_path, output_path, expected_exception, expected_error
 ):
-    """
-    Test if intersection works if the input gpkg files don't have a spatial index.
-    """
-    # Now run test
     if isinstance(output_path, str):
         output_path = tmp_path / output_path
-    with pytest.raises(ValueError, match=expected_error):
+    with pytest.raises(expected_exception, match=expected_error):
         gfo.intersection(
             input1_path=input1_path,
             input2_path=input2_path,
@@ -659,6 +731,41 @@ def test_intersection_resultempty(tmp_path, suffix, input2_empty):
         len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     )
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+
+def test_intersection_self(tmp_path):
+    input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+
+    # Now run test
+    output_path = tmp_path / f"{input1_path.stem}_inters_self.gpkg"
+    gfo.intersection(
+        input1_path=input1_path,
+        input2_path=None,
+        output_path=output_path,
+        nb_parallel=2,
+        batchsize=batchsize,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == 2 * len(input1_layerinfo.columns)
+    assert output_layerinfo.featurecount == 6
+
+
+def test_intersection_self_invalid_params():
+    with pytest.raises(
+        ValueError, match="input2_layer must be None if input2_path is None"
+    ):
+        gfo.intersection(
+            input1_path="input.gpkg",
+            input2_path=None,
+            output_path="output.gpkg",
+            input2_layer="invalid",
+        )
 
 
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
@@ -1518,6 +1625,41 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
     )
 
 
+def test_symmetric_difference_self(tmp_path):
+    input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+
+    # Now run test
+    output_path = tmp_path / f"{input1_path.stem}_symmetric_difference_self.gpkg"
+    gfo.symmetric_difference(
+        input1_path=input1_path,
+        input2_path=None,
+        output_path=output_path,
+        nb_parallel=2,
+        batchsize=batchsize,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == 2 * len(input1_layerinfo.columns)
+    assert output_layerinfo.featurecount == 6
+
+
+def test_symmetric_difference_self_invalid_params():
+    with pytest.raises(
+        ValueError, match="input2_layer must be None if input2_path is None"
+    ):
+        gfo.symmetric_difference(
+            input1_path="input.gpkg",
+            input2_path=None,
+            output_path="output.gpkg",
+            input2_layer="invalid",
+        )
+
+
 @pytest.mark.parametrize(
     "suffix, epsg, gridsize, where_post, explodecollections, keep_fid, "
     "exp_featurecount",
@@ -1751,3 +1893,38 @@ def test_union_force(tmp_path):
         force=True,
     )
     assert output_path.stat().st_mtime != mtime_orig
+
+
+def test_union_self(tmp_path):
+    input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+
+    # Now run test
+    output_path = tmp_path / f"{input1_path.stem}_union_self.gpkg"
+    gfo.union(
+        input1_path=input1_path,
+        input2_path=None,
+        output_path=output_path,
+        nb_parallel=2,
+        batchsize=batchsize,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == 2 * len(input1_layerinfo.columns)
+    assert output_layerinfo.featurecount == 12
+
+
+def test_union_self_invalid_params():
+    with pytest.raises(
+        ValueError, match="input2_layer must be None if input2_path is None"
+    ):
+        gfo.union(
+            input1_path="input.gpkg",
+            input2_path=None,
+            output_path="output.gpkg",
+            input2_layer="invalid",
+        )

@@ -3,17 +3,26 @@ Module with helper functions for geo files.
 """
 
 import enum
-import datetime
+from datetime import date, datetime
 import filecmp
 import logging
-import os
 from pathlib import Path
 import pprint
 import shutil
 import string
 import tempfile
 import time
-from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Union,
+    TYPE_CHECKING,
+)
 import warnings
 
 import fiona
@@ -32,6 +41,10 @@ from geofileops.util import _geoseries_util
 from geofileops.util import _io_util
 from geofileops.util import _ogr_util
 from geofileops.util import _ogr_sql_util
+from geofileops.helpers._configoptions_helper import ConfigOptions
+
+if TYPE_CHECKING:
+    import os
 
 #####################################################################
 # First define/init some general variables/constants
@@ -347,6 +360,7 @@ def get_layerinfo(
             if driver == "ESRI Shapefile":
                 geometrytype = geometrytype.to_multitype
 
+            assert geometrytype is not None
             geometrytypename = geometrytype.name
 
         # If the geometry type is not None, fill out the extra properties
@@ -826,7 +840,7 @@ def add_column(
         path (PathLike): Path to the geofile.
         name (str): Name for the new column.
         type (str): Column type of the new column.
-        expression (str, optional): SQLite expression to use to update
+        expression (str; int or float, optional): SQLite expression to use to update
             the value. Defaults to None.
         expression_dialect (str, optional): SQL dialect used for the expression.
         layer (str, optional): The layer name. If None and the geofile
@@ -1139,7 +1153,7 @@ def _read_file_base(
             fid_as_column = True
 
     # Read with the engine specified
-    engine = _get_engine()
+    engine = ConfigOptions.io_engine
     if engine == "pyogrio":
         gdf = _read_file_base_pyogrio(
             path=path,
@@ -1225,7 +1239,7 @@ def _read_file_base_fiona(
 
             path = tmp_fid_path
         finally:
-            if tmp_fid_path.parent.exists():
+            if ConfigOptions.remove_temp_files and tmp_fid_path.parent.exists():
                 shutil.rmtree(tmp_fid_path, ignore_errors=True)
 
     # Checking if field/column names should be read is case sensitive in fiona, so
@@ -1369,9 +1383,7 @@ def _read_file_base_pyogrio(
     # to proper datetime64 columns.
     if len(result_gdf) > 0:
         for column in result_gdf.select_dtypes(include=["object"]):
-            if isinstance(
-                result_gdf[column].iloc[0], (datetime.date, datetime.datetime)
-            ):
+            if isinstance(result_gdf[column].iloc[0], (date, datetime)):
                 result_gdf[column] = pd.to_datetime(result_gdf[column])
 
     assert isinstance(result_gdf, (gpd.GeoDataFrame, pd.DataFrame))
@@ -1545,7 +1557,7 @@ def to_file(
         engine = "fiona"
         create_spatial_index = False
     else:
-        engine = _get_engine()
+        engine = ConfigOptions.io_engine
 
     # Now write with the correct engine
     if engine == "pyogrio":
@@ -1577,10 +1589,6 @@ def to_file(
         raise ValueError(f"Unsupported engine: {engine}")
 
 
-def _get_engine():
-    return os.environ.get("GFO_IO_ENGINE", "pyogrio")
-
-
 def _to_file_fiona(
     gdf: Union[pd.DataFrame, gpd.GeoDataFrame],
     path: Path,
@@ -1606,7 +1614,7 @@ def _to_file_fiona(
         # type data instead of strings.
         if len(gdf) > 0:
             for column in gdf.select_dtypes(include=["object"]):
-                if isinstance(gdf[column][0], (datetime.date, datetime.datetime)):
+                if isinstance(gdf[column][0], (date, datetime)):
                     gdf[column] = gdf[column].astype(str)
 
     # Handle some specific cases where the file schema needs to be manipulated.
@@ -1732,7 +1740,7 @@ def _to_file_fiona(
         # Files don't typically support having multiple processes writing
         # simultanously to them, so use lock file to synchronize access.
         lockfile = Path(f"{str(path)}.lock")
-        start_time = datetime.datetime.now()
+        start_time = datetime.now()
         ready = False
         while not ready:
             if _io_util.create_file_atomic(lockfile) is True:
@@ -1773,7 +1781,7 @@ def _to_file_fiona(
                     ready = True
                     lockfile.unlink()
             else:
-                time_waiting = (datetime.datetime.now() - start_time).total_seconds()
+                time_waiting = (datetime.now() - start_time).total_seconds()
                 if time_waiting > append_timeout_s:
                     raise RuntimeError(
                         f"to_file timeout of {append_timeout_s} reached, stop append "
@@ -1960,18 +1968,17 @@ def copy(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"
 
     # For some file types, extra files need to be copied
     # If dest is a dir, just use move. Otherwise concat dest filepaths
-    if src_info.suffixes_extrafiles is not None:
-        if dst.is_dir():
-            for suffix in src_info.suffixes_extrafiles:
-                srcfile = src.parent / f"{src.stem}{suffix}"
-                if srcfile.exists():
-                    shutil.copy(str(srcfile), dst)
-        else:
-            for suffix in src_info.suffixes_extrafiles:
-                srcfile = src.parent / f"{src.stem}{suffix}"
-                dstfile = dst.parent / f"{dst.stem}{suffix}"
-                if srcfile.exists():
-                    shutil.copy(str(srcfile), dstfile)
+    if dst.is_dir():
+        for suffix in src_info.suffixes_extrafiles:
+            srcfile = src.parent / f"{src.stem}{suffix}"
+            if srcfile.exists():
+                shutil.copy(str(srcfile), dst)
+    else:
+        for suffix in src_info.suffixes_extrafiles:
+            srcfile = src.parent / f"{src.stem}{suffix}"
+            dstfile = dst.parent / f"{dst.stem}{suffix}"
+            if srcfile.exists():
+                shutil.copy(str(srcfile), dstfile)
 
 
 def move(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
@@ -1995,18 +2002,17 @@ def move(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"
 
     # For some file types, extra files need to be moved
     # If dest is a dir, just use move. Otherwise concat dest filepaths
-    if src_info.suffixes_extrafiles is not None:
-        if dst.is_dir():
-            for suffix in src_info.suffixes_extrafiles:
-                srcfile = src.parent / f"{src.stem}{suffix}"
-                if srcfile.exists():
-                    shutil.move(str(srcfile), dst)
-        else:
-            for suffix in src_info.suffixes_extrafiles:
-                srcfile = src.parent / f"{src.stem}{suffix}"
-                dstfile = dst.parent / f"{dst.stem}{suffix}"
-                if srcfile.exists():
-                    shutil.move(str(srcfile), dstfile)
+    if dst.is_dir():
+        for suffix in src_info.suffixes_extrafiles:
+            srcfile = src.parent / f"{src.stem}{suffix}"
+            if srcfile.exists():
+                shutil.move(str(srcfile), dst)
+    else:
+        for suffix in src_info.suffixes_extrafiles:
+            srcfile = src.parent / f"{src.stem}{suffix}"
+            dstfile = dst.parent / f"{dst.stem}{suffix}"
+            if srcfile.exists():
+                shutil.move(str(srcfile), dstfile)
 
 
 def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False):
@@ -2034,10 +2040,9 @@ def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False):
         path.unlink(missing_ok=missing_ok)
 
     # For some file types, extra files need to be removed
-    if path_info.suffixes_extrafiles is not None:
-        for suffix in path_info.suffixes_extrafiles:
-            curr_path = path.parent / f"{path.stem}{suffix}"
-            curr_path.unlink(missing_ok=True)
+    for suffix in path_info.suffixes_extrafiles:
+        curr_path = path.parent / f"{path.stem}{suffix}"
+        curr_path.unlink(missing_ok=True)
 
 
 def append_to(
@@ -2179,7 +2184,7 @@ def append_to(
             _ = None
 
     # Creating lockfile and append
-    start_time = datetime.datetime.now()
+    start_time = datetime.now()
     ready = False
     while not ready:
         if _io_util.create_file_atomic(lockfile) is True:
@@ -2209,7 +2214,7 @@ def append_to(
                 ready = True
                 lockfile.unlink()
         else:
-            time_waiting = (datetime.datetime.now() - start_time).total_seconds()
+            time_waiting = (datetime.now() - start_time).total_seconds()
             if time_waiting > append_timeout_s:
                 raise RuntimeError(
                     f"append_to timeout of {append_timeout_s} reached, so stop write "

@@ -37,3 +37,25 @@ better performance in geofileops as well as for the reasons listed here:
 
 Most general file/layer operations can be used on all vector formats supported by
 `GDAL <https://gdal.org/drivers/vector/index.html>`_.
+
+Runtime configuration options
+-----------------------------
+
+GeofileOps supports some runtime configuration options that can be set using environment
+variables:
+
+- `GFO_IO_ENGINE`: the IO engine to use when reading and writing GeoDataFrames. Valid
+  options are "pyogrio" and "fiona". Defaults to "pyogrio".
+- `GFO_REMOVE_TEMP_FILES`: whether to remove temp files being created after use, e.g. 
+  for debugging purposes. Valid values are e.g. "TRUE" or "FALSE". Defaults to True.
+
+You can use the :class:`.TempEnv` context manager if you want to set a configuration
+option temporarily:
+
+.. code-block:: python
+
+    import geofileops as gfo
+
+    if __name__ == "__main__":
+        with gfo.TempEnv("GFO_REMOVE_TEMP_FILES", "False"):
+            gfo. ...

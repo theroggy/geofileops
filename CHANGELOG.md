@@ -1,12 +1,17 @@
 # CHANGELOG
 
-## ??? (???)
+## 0.9.0 (???)
 
 ### Improvements
 
+- Add support for self-overlays in overlay operations (#468)
+- Add configuration option GFO_REMOVE_TEMP_FILES that can be used to avoid temp files
+  being removed for debugging purposes (#480)
+- Add a context manager, TempEnv, to set temporary env variables (#481)
 - Several improvements to documentation: new FAQ, improved user guide,...
   (#465, #469, #474)
-- Use ruff-format instead of black for formatting (#479)
+- Linting improvements: use mypy + use ruff-format instead of black for formatting
+  (#478, #479)
 
 ### Bugs fixed
 
