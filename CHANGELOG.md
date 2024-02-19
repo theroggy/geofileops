@@ -22,6 +22,8 @@
   with `column_prefixes=""` (#475)
 - Fix error in two layer operations if equal column aliases used based on a constant or
   a function result (#477)
+- Fix `erase` (and depending two layer operations like `union`,...) giving wrong results
+  if `subdivide_coords` < 1 (#489)
 
 ## 0.8.1 (2024-01-13)
 

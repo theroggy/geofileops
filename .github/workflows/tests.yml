@@ -21,11 +21,11 @@ jobs:
     python-version: "3.11"
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - uses: pre-commit/action@v3.0.0
+      - uses: pre-commit/action@v3.0.1
 
   Test:
     needs: Linting
@@ -59,7 +59,7 @@ jobs:
             python: "3.11"
             
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Conda environment with Micromamba
         uses: mamba-org/setup-micromamba@v1
@@ -74,5 +74,5 @@ jobs:
         run: |
           pytest --color=yes --cov=geofileops --cov-append --cov-report term-missing --cov-report xml tests/
 
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
       
