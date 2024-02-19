@@ -1827,8 +1827,8 @@ def erase(
         subdivide_coords (int, optional): the input geometries will be subdivided to
             parts with about ``subdivide_coords`` coordinates during processing which
             can offer a large speed up for complex geometries. Subdividing can result in
-            extra collinear points being added to the boundaries of the output. If < 0,
-            no subdividing is applied. Defaults to 2000.
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -2107,8 +2107,8 @@ def identity(
         subdivide_coords (int, optional): the input geometries will be subdivided to
             parts with about ``subdivide_coords`` coordinates during processing which
             can offer a large speed up for complex geometries. Subdividing can result in
-            extra collinear points being added to the boundaries of the output. If < 0,
-            no subdividing is applied. Defaults to 2000.
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -2899,8 +2899,8 @@ def symmetric_difference(
         subdivide_coords (int, optional): the input geometries will be subdivided to
             parts with about ``subdivide_coords`` coordinates during processing which
             can offer a large speed up for complex geometries. Subdividing can result in
-            extra collinear points being added to the boundaries of the output. If < 0,
-            no subdividing is applied. Defaults to 2000.
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -3028,8 +3028,8 @@ def union(
         subdivide_coords (int, optional): the input geometries will be subdivided to
             parts with about ``subdivide_coords`` coordinates during processing which
             can offer a large speed up for complex geometries. Subdividing can result in
-            extra collinear points being added to the boundaries of the output. If < 0,
-            no subdividing is applied. Defaults to 2000.
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
