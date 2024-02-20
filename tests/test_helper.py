@@ -141,10 +141,12 @@ def get_testfile(
     dimensions: Optional[str] = None,
     explodecollections: bool = False,
 ) -> Path:
-    # Prepare original filepath
+    # Prepare original filepath; but try first with .zip.gpkg file.
     testfile_path = _data_dir / f"{testfile}.gpkg"
-    if testfile_path.exists is False:
+    if not testfile_path.exists():
         raise ValueError(f"Invalid testfile type: {testfile}")
+
+    # Prepare destination location
     if dst_dir is None:
         dst_dir = Path(tempfile.gettempdir()) / "geofileops_test_data"
     assert isinstance(dst_dir, Path)

@@ -15,6 +15,7 @@ from shapely import MultiPolygon, Polygon
 from geofileops import fileops
 from geofileops import GeometryType
 from geofileops import geoops
+from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.util import _geofileinfo
 from geofileops.util import _geoops_sql
 from geofileops.util import _io_util as io_util
@@ -72,7 +73,7 @@ def basic_combinations_to_test(
                 where_post = None
                 keep_empty_geoms = None
                 dimensions = None
-                gridsize = 0.001 if epsg == 31370 else GRIDSIZE_DEFAULT
+                gridsize = 0.01 if epsg == 31370 else GRIDSIZE_DEFAULT
                 if testfile == "polygon-parcel":
                     dimensions = "XYZ"
                     keep_empty_geoms = False
@@ -104,7 +105,7 @@ def basic_combinations_to_test(
             for testfile in testfiles:
                 where_post = ""
                 keep_empty_geoms = False
-                gridsize = 0.001 if testfile == "polygon-parcel" else GRIDSIZE_DEFAULT
+                gridsize = 0.01 if testfile == "polygon-parcel" else GRIDSIZE_DEFAULT
                 if testfile == "polygon-parcel":
                     where_post = WHERE_AREA_GT_400
                 else:
@@ -129,7 +130,7 @@ def basic_combinations_to_test(
     #   - fixed epsg, testfile and empty_input
     for geoops_module in geoops_modules:
         for suffix in suffixes:
-            gridsize = 0.001 if suffix == ".gpkg" else GRIDSIZE_DEFAULT
+            gridsize = 0.01 if suffix == ".gpkg" else GRIDSIZE_DEFAULT
             keep_empty_geoms = False
             where_post = None
             dimensions = None
@@ -222,6 +223,7 @@ def test_buffer(
     assert_geodataframe_equal(
         output_gdf,
         expected_gdf,
+        normalize=True,
         promote_to_multi=True,
         check_less_precise=check_less_precise,
         sort_values=True,
@@ -655,7 +657,7 @@ def test_buffer_shp_to_gpkg(
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
     "empty_input, gridsize, keep_empty_geoms, where_post",
-    [(True, 0.0, True, None), (False, 0.001, None, WHERE_AREA_GT_400)],
+    [(True, 0.0, True, None), (False, 0.01, None, WHERE_AREA_GT_400)],
 )
 def test_convexhull(
     tmp_path, geoops_module, suffix, empty_input, gridsize, keep_empty_geoms, where_post
@@ -867,6 +869,40 @@ def test_makevalid_exploded_input(tmp_path, suffix, geoops_module, explodecollec
         assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
 
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
+@pytest.mark.parametrize("gridsize", [0.0, 0.01])
+def test_makevalid_gridsize(tmp_path, geoops_module, gridsize):
+    """
+    Apply gridsize on the default test file to make it removes sliver polygon.
+    """
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel")
+    input_info = fileops.get_layerinfo(input_path)
+    # The NULL polygon is always removed
+    expected_featurecount = input_info.featurecount - 1
+    # With gridsize specified, a sliver polygon is removed as well
+    if gridsize > 0.0:
+        # If sql based and spatialite < 5.1, the sliver isn't cleaned up...
+        if not (
+            not SPATIALITE_GTE_51 and geoops_module == "geofileops.util._geoops_sql"
+        ):
+            expected_featurecount -= 1
+
+    set_geoops_module(geoops_module)
+
+    # Do operation
+    output_path = tmp_path / f"{input_path.stem}-output-{gridsize}.gpkg"
+    geoops.makevalid(
+        input_path=input_path,
+        output_path=output_path,
+        gridsize=gridsize,
+        nb_parallel=2,
+    )
+
+    output_info = fileops.get_layerinfo(output_path)
+    assert output_info.featurecount == expected_featurecount
+
+
 @pytest.mark.parametrize(
     "descr, geometry, expected_geometry",
     [
@@ -884,7 +920,7 @@ def test_makevalid_exploded_input(tmp_path, suffix, geoops_module, explodecollec
     ],
 )
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
-def test_makevalid_gridsize(
+def test_makevalid_gridsize_extra(
     tmp_path, descr: str, geometry, geoops_module, expected_geometry
 ):
     # Prepare test data
@@ -949,7 +985,7 @@ def test_makevalid_gridsize_topoerror(tmp_path, geoops_module):
     input_path = tmp_path / "input.gpkg"
     fileops.to_file(test_gdf, input_path)
 
-    gridsize = 0.001
+    gridsize = 0.01
 
     # Prepare expected result
     expected_data = {
