@@ -279,9 +279,9 @@ def test_buffer_styles(tmp_path, suffix, epsg):
 @pytest.mark.parametrize(
     "epsg, gridsize, explodecollections, where_post",
     [
-        (31370, 0.001, True, WHERE_LENGTH_GT_1000),
-        (31370, 0.001, False, WHERE_LENGTH_GT_200000),
-        (31370, 0.001, True, ""),
+        (31370, 0.01, True, WHERE_LENGTH_GT_1000),
+        (31370, 0.01, False, WHERE_LENGTH_GT_200000),
+        (31370, 0.01, True, ""),
         (4326, 0.0, False, None),
     ],
 )
@@ -526,16 +526,17 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
     "suffix, epsg, explode_input, groupby_columns, explode, gridsize, where_post, "
     "expected_featurecount",
     [
-        (".gpkg", 31370, False, ["GEWASgroep"], True, 0.0, "", 25),
+        (".gpkg", 31370, False, ["GEWASgroep"], True, 0.0, "", 26),
+        (".gpkg", 31370, False, ["GEWASgroep"], True, 0.01, "", 25),
         (".gpkg", 31370, False, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg", 31370, True, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg", 31370, False, ["gewasGROEP"], False, 0.01, WHERE_AREA_GT_5000, 4),
         (".gpkg", 31370, False, ["gewasGROEP"], True, 0.01, WHERE_AREA_GT_5000, 13),
-        (".gpkg", 31370, False, [], True, 0.0, None, 23),
+        (".gpkg", 31370, False, [], True, 0.0, None, 24),
         (".gpkg", 31370, False, None, False, 0.0, None, 1),
-        (".gpkg", 4326, False, ["GEWASGROEP"], True, 0.0, None, 25),
-        (".shp", 31370, False, ["GEWASGROEP"], True, 0.0, None, 25),
-        (".shp", 31370, False, [], True, 0.0, None, 23),
+        (".gpkg", 4326, False, ["GEWASGROEP"], True, 0.0, None, 26),
+        (".shp", 31370, False, ["GEWASGROEP"], True, 0.0, None, 26),
+        (".shp", 31370, False, [], True, 0.0, None, 24),
     ],
 )
 def test_dissolve_polygons(
@@ -635,8 +636,8 @@ def test_dissolve_polygons(
 
     # Small differences with the geopandas result are expected, because gfo
     # adds points in the tiling process. So only basic checks possible.
-    # output_gdf.geometry = output_gdf.geometry.simplify(0.1)
-    # expected_gdf.geometry = expected_gdf.geometry.simplify(0.1)
+    # output_gdf.geometry = output_gdf.geometry.simplify(0.01)
+    # expected_gdf.geometry = expected_gdf.geometry.simplify(0.01)
     # assert_geodataframe_equal(
     #     output_gdf, expected_gdf, promote_to_multi=True, sort_values=True,
     #     normalize=True, check_less_precise=True
@@ -859,7 +860,7 @@ def test_dissolve_polygons_specialcases(tmp_path, suffix):
     if output_path.suffix.lower() != ".shp":
         assert output_path.exists()
         output_layerinfo = gfo.get_layerinfo(output_path)
-        assert output_layerinfo.featurecount == 25
+        assert output_layerinfo.featurecount == 26
         assert len(output_layerinfo.columns) == 1
         assert output_layerinfo.name == "banana"
         assert output_layerinfo.geometrytype == GeometryType.POLYGON
@@ -1023,8 +1024,8 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     # Check agg_columns results
     grasland_idx = output_gdf[output_gdf["GEWASgroep"] == "Grasland"].index.to_list()[0]
     assert output_gdf["lbl_max"][grasland_idx] == "Grasland"
-    assert output_gdf["gwsgrp_cnt"][grasland_idx] == 30
-    assert output_gdf["lbl_count"][grasland_idx] == 30
+    assert output_gdf["gwsgrp_cnt"][grasland_idx] == 31
+    assert output_gdf["lbl_count"][grasland_idx] == 31
     print(f"output_gdf.lbl_concat_distinct: {output_gdf['lbl_conc_d'][grasland_idx]}")
     assert output_gdf["lbl_cnt_d"][grasland_idx] == 1
     assert output_gdf["lbl_conc"][grasland_idx].startswith("Grasland,Grasland,")
@@ -1032,7 +1033,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     assert output_gdf["lbl_conc_d"][grasland_idx] == "Grasland"
     assert output_gdf["tlt_mea"][grasland_idx] == 60
     assert int(output_gdf["tlt_min"][grasland_idx]) == 60
-    assert output_gdf["tlt_sum"][grasland_idx] == 1800
+    assert output_gdf["tlt_sum"][grasland_idx] == 1860
 
     groenten_idx = output_gdf[
         output_gdf["GEWASgroep"] == "Groenten, kruiden en sierplanten"
@@ -1091,7 +1092,7 @@ def test_dissolve_polygons_aggcolumns_json(tmp_path, agg_columns):
     assert len(output_gdf) == output_layerinfo.featurecount
     assert output_gdf["geometry"][0] is not None
     grasland_json = json.loads(str(output_gdf["json"][0]))
-    assert len(grasland_json) == 30
+    assert len(grasland_json) == 31
     grasland_json_firstrow = json.loads(str(grasland_json[0]))
     if agg_columns["json"] is None:
         # fid_orig column is added in json, but index column disappeared ???
@@ -1104,10 +1105,10 @@ def test_dissolve_polygons_aggcolumns_json(tmp_path, agg_columns):
 @pytest.mark.parametrize(
     "suffix, epsg, testfile, gridsize",
     [
-        (".gpkg", 31370, "polygon-parcel", 0.001),
-        (".gpkg", 31370, "linestring-row-trees", 0.001),
+        (".gpkg", 31370, "polygon-parcel", 0.01),
+        (".gpkg", 31370, "linestring-row-trees", 0.01),
         (".gpkg", 4326, "polygon-parcel", 0.0),
-        (".shp", 31370, "polygon-parcel", 0.001),
+        (".shp", 31370, "polygon-parcel", 0.01),
         (".shp", 4326, "polygon-parcel", 0.0),
     ],
 )
@@ -1133,13 +1134,17 @@ def test_simplify_lang(tmp_path, suffix, epsg, testfile, gridsize):
         batchsize=batchsize,
     )
 
-    # Check if the tmp file is correctly created
+    # Check if the output file is correctly created
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
     expected_featurecount = input_layerinfo.featurecount
     if testfile == "polygon-parcel":
+        # The EMPTY geometry will be removed
         expected_featurecount -= 1
+        if gridsize > 0.0:
+            # The sliver geometry will be removed
+            expected_featurecount -= 1
     assert output_layerinfo.featurecount == expected_featurecount
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
     assert output_layerinfo.geometrytype == input_layerinfo.geometrytype
@@ -1156,10 +1161,10 @@ def test_simplify_lang(tmp_path, suffix, epsg, testfile, gridsize):
 @pytest.mark.parametrize(
     "suffix, epsg, testfile, gridsize",
     [
-        (".gpkg", 31370, "polygon-parcel", 0.001),
-        (".gpkg", 31370, "linestring-row-trees", 0.001),
+        (".gpkg", 31370, "polygon-parcel", 0.01),
+        (".gpkg", 31370, "linestring-row-trees", 0.01),
         (".gpkg", 4326, "polygon-parcel", 0.0),
-        (".shp", 31370, "polygon-parcel", 0.001),
+        (".shp", 31370, "polygon-parcel", 0.01),
         (".shp", 4326, "polygon-parcel", 0.0),
     ],
 )
@@ -1195,7 +1200,11 @@ def test_simplify_vw(tmp_path, suffix, epsg, testfile, gridsize):
     output_layerinfo = gfo.get_layerinfo(output_path)
     expected_featurecount = input_layerinfo.featurecount
     if testfile == "polygon-parcel":
+        # The EMPTY geometry will be removed
         expected_featurecount -= 1
+        if gridsize > 0.0:
+            # The sliver geometry will be removed
+            expected_featurecount -= 1
     assert output_layerinfo.featurecount == expected_featurecount
     assert len(input_layerinfo.columns) == len(output_layerinfo.columns)
     assert output_layerinfo.geometrytype == input_layerinfo.geometrytype

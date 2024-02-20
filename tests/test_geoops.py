@@ -8,8 +8,8 @@ from tests import test_helper
     "testfile, input_layer, output_layer, close_internal_gaps, force, "
     "exp_featurecount",
     [
-        ("polygon-twolayers", "parcels", "output_layername", True, True, 10),
-        ("polygon-parcel", None, None, False, True, 11),
+        ("polygon-twolayers", "parcels", "output_layername", True, True, 11),
+        ("polygon-parcel", None, None, False, True, 12),
         ("polygon-parcel", None, None, False, False, None),
     ],
 )

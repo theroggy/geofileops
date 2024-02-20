@@ -314,12 +314,16 @@ def makevalid(
 
     # Init + prepare sql template for this operation
     # ----------------------------------------------
-    # Only apply makevalid if the geometry is truly invalid, this is faster
+    # Only apply makevalid if the geometry is truly invalid, this is faster.
+    # GEOSMakeValid crashes with EMPTY input, so check this first.
     if SPATIALITE_GTE_51:
         operation = """
-            IIF(ST_IsValid({geometrycolumn}) = 1,
-                {geometrycolumn},
-                GEOSMakeValid({geometrycolumn}, 0)
+            IIF({geometrycolumn} IS NULL OR ST_IsEmpty({geometrycolumn}) <> 0,
+                NULL,
+                IIF(ST_IsValid({geometrycolumn}) = 1,
+                    {geometrycolumn},
+                    GEOSMakeValid({geometrycolumn}, 0)
+               )
             )"""
     else:
         # Prepare sql template for this operation
@@ -2580,11 +2584,15 @@ def _two_layer_vector_operation(
             cols = [col for col in column_datatypes if col.lower() != "geom"]
             columns_to_select = _ogr_sql_util.columns_quoted(cols)
             sql_template = f"""
-                SELECT {gridsize_op} AS geom
-                        {columns_to_select}
-                  FROM ( {sql_template}
-                         LIMIT -1 OFFSET 0
-                  ) sub_gridsize
+                SELECT * FROM
+                  ( SELECT {gridsize_op} AS geom
+                          {columns_to_select}
+                      FROM ( {sql_template}
+                              LIMIT -1 OFFSET 0
+                      ) sub_gridsize
+                     LIMIT -1 OFFSET 0
+                  ) sub_gridsize2
+                 WHERE sub_gridsize2.geom IS NOT NULL
             """
 
         # Prepare/apply where_post parameter

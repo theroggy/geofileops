@@ -201,10 +201,10 @@ def test_vector_translate_sql(tmp_path, input_suffix, output_suffix):
     "input_suffix, output_suffix, geom_null_asc,"
     "exp_null_geoms_st38, exp_null_geoms_gte38",
     [
-        (".gpkg", ".gpkg", True, 8, 8),
-        (".gpkg", ".shp", False, 47, 8),
-        (".shp", ".gpkg", False, 47, 8),
-        (".shp", ".shp", True, 8, 8),
+        (".gpkg", ".gpkg", True, 9, 9),
+        (".gpkg", ".shp", False, 48, 9),
+        (".shp", ".gpkg", False, 48, 9),
+        (".shp", ".shp", True, 9, 9),
     ],
 )
 def test_vector_translate_sql_geom_null(

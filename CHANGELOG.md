@@ -24,6 +24,7 @@
   a function result (#477)
 - Fix `erase` (and depending two layer operations like `union`,...) giving wrong results
   if `subdivide_coords` < 1 (#489)
+- Fix two-layer operations with `gridsize` sometimes outputting NULL geometries (#495)
 
 ## 0.8.1 (2024-01-13)
 

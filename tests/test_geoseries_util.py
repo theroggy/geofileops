@@ -260,7 +260,7 @@ poly_ok = shapely.from_wkt(
     [
         (
             [poly_gridsize_error, poly_ok],
-            [poly_gridsize_error, shapely.set_precision(poly_ok, grid_size=0.001)],
+            [poly_gridsize_error, shapely.set_precision(poly_ok, grid_size=0.01)],
         ),
         (poly_gridsize_error, poly_gridsize_error),
     ],
@@ -270,7 +270,7 @@ def test_set_precision(geometry, exp_geometry, raise_on_topoerror):
     if shapely.geos_version != (3, 12, 0):
         pytest.skip()
 
-    grid_size = 0.001
+    grid_size = 0.01
 
     if raise_on_topoerror:
         with pytest.raises(Exception, match="TopologyException: Ring edge missing at"):
