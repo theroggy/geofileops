@@ -43,15 +43,15 @@ def prepare_expected_result(
     columns: Optional[List[str]] = None,
 ) -> gpd.GeoDataFrame:
     """Prepare expected data"""
+    if keep_empty_geoms is None:
+        raise ValueError("keep_empty_geoms cannot be None")
 
-    expected_gdf = gdf.copy()
+    exp_gdf = gdf.copy()
 
     if gridsize != 0.0:
-        expected_gdf.geometry = shapely.set_precision(
-            expected_gdf.geometry, grid_size=gridsize
-        )
+        exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     if explodecollections:
-        expected_gdf = expected_gdf.explode(ignore_index=True)
+        exp_gdf = exp_gdf.explode(ignore_index=True)
 
     # Check what filtering is needed
     filter_area_gt = None
@@ -65,27 +65,28 @@ def prepare_expected_result(
         raise ValueError(f"unsupported where_post parameter in test: {where_post}")
 
     # Apply filtering
-    if keep_empty_geoms is None or not keep_empty_geoms:
-        expected_gdf = expected_gdf[~expected_gdf.geometry.isna()]
-        expected_gdf = expected_gdf[~expected_gdf.geometry.is_empty]
+    # If keep_empty_geoms is None, treat it as False as this is the default value
+    if not keep_empty_geoms:
+        exp_gdf = exp_gdf[~exp_gdf.geometry.isna()]
+        exp_gdf = exp_gdf[~exp_gdf.geometry.is_empty]
     if filter_area_gt is not None:
-        expected_gdf = expected_gdf[expected_gdf.geometry.area > filter_area_gt]
+        exp_gdf = exp_gdf[exp_gdf.geometry.area > filter_area_gt]
 
     if columns is not None:
         column_mapper = {}
         columns_to_drop = []
         columns_dict = {column.upper(): column for column in columns}
-        for column in expected_gdf.columns:
+        for column in exp_gdf.columns:
             if column.upper() in columns_dict:
                 column_mapper[column] = columns_dict[column.upper()]
             elif column != "geometry":
                 columns_to_drop.append(column)
-        expected_gdf = expected_gdf.rename(columns=column_mapper)
+        exp_gdf = exp_gdf.rename(columns=column_mapper)
         if len(columns_to_drop) > 0:
-            expected_gdf = expected_gdf.drop(columns=columns_to_drop)
+            exp_gdf = exp_gdf.drop(columns=columns_to_drop)
 
-    assert isinstance(expected_gdf, gpd.GeoDataFrame)
-    return expected_gdf
+    assert isinstance(exp_gdf, gpd.GeoDataFrame)
+    return exp_gdf
 
 
 def prepare_test_file(

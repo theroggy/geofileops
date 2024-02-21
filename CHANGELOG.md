@@ -26,6 +26,12 @@
   if `subdivide_coords` < 1 (#489)
 - Fix two-layer operations with `gridsize` sometimes outputting NULL geometries (#495)
 
+### Deprecations and compatibility notes
+
+- Set the default value of `keep_empty_geoms` to `False` for all standard operations.
+  This changes the default for `make_valid` and in some cases for `simplify`. The only
+  exception is `select`, where the default stays `True` (#472, #499).
+
 ## 0.8.1 (2024-01-13)
 
 ### Bugs fixed
