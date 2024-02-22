@@ -31,7 +31,9 @@
 
 - Set the default value of `keep_empty_geoms` to `False` for all standard operations.
   This changes the default for `make_valid` and in some cases for `simplify`. The only
-  exception is `select`, where the default stays `True` (#472, #499).
+  exception is `select`, where the default stays `True`. (#472, #499)
+- When `join_by_location` was applied, a column "spatial_relation" with the spatial
+  relation between the geometries was added. This is no longer the case. (#475)
 
 ## 0.8.1 (2024-01-13)
 

@@ -1620,7 +1620,6 @@ def join_by_location(
         SELECT sub.geom
               {{layer1_columns_from_subselect_str}}
               {{layer2_columns_from_subselect_str}}
-              ,sub."GFO_$TEMP$_SPATIAL_RELATION" AS spatial_relation
               {area_inters_column_in_output}
           FROM layer1_relations_filtered sub
     """
@@ -1631,10 +1630,9 @@ def join_by_location(
         sql_template = f"""
             {sql_template}
             UNION ALL
-            SELECT layer1.{{input1_geometrycolumn}} as geom
+            SELECT layer1.{{input1_geometrycolumn}} AS geom
                   {{layer1_columns_prefix_alias_str}}
                   {{layer2_columns_prefix_alias_null_str}}
-                  ,NULL AS spatial_relation
                   {area_inters_column_0_in_output}
               FROM {{input1_databasename}}."{{input1_layer}}" layer1
              WHERE 1=1
