@@ -1889,6 +1889,7 @@ def select_two_layers(
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
+    output_with_spatial_index: bool = True,
 ):
     # Go!
     return _two_layer_vector_operation(
@@ -1911,6 +1912,7 @@ def select_two_layers(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        output_with_spatial_index=output_with_spatial_index,
     )
 
 

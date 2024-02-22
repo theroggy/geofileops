@@ -97,10 +97,7 @@ def dissolve_within_distance(
     start_time = datetime.now()
     operation_name = "dissolve_within_distance"
     logger = logging.getLogger(f"geofileops.{operation_name}")
-    nb_steps = 4
-    if not close_internal_gaps:
-        # 3 extra steps if boundary gaps not to be closed.
-        nb_steps += 3
+    nb_steps = 9
 
     # Already check here if it is useful to continue
     if output_path.exists():
@@ -117,6 +114,7 @@ def dissolve_within_distance(
         # Note: this reduces the complexity of operations to be executed later on.
         # Note2: this already applies the gridsize, which needs to be applied anyway to
         # avoid issues when determining the addedpieces_1neighbour later on.
+        # Note2: don' apply gridsize yet
         logger.info(f"Start, with input file {input_path}")
         step = 1
         logger.info(f"Step {step} of {nb_steps}")
@@ -126,7 +124,7 @@ def dissolve_within_distance(
             output_path=diss_path,
             explodecollections=True,
             input_layer=input_layer,
-            gridsize=gridsize,
+            gridsize=0.0,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
@@ -134,29 +132,29 @@ def dissolve_within_distance(
 
         # Positive buffer of distance / 2 to close all gaps.
         #
-        # Note: gridsize is not applied to preserve all possible accuracy for these
+        # Note: no gridsize is applied to preserve all possible accuracy for these
         # temporary boundaries, otherwise the polygons are sometimes enlarged slightly,
         # which isn't wanted + creates issues when determining the
         # addedpieces_1neighbour later on.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        buff_path = tempdir / "110_diss_bufp.gpkg"
+        bufp_path = tempdir / "110_diss_bufp.gpkg"
         _geoops_gpd.buffer(
             input_path=diss_path,
-            output_path=buff_path,
+            output_path=bufp_path,
             distance=distance / 2,
             endcap_style=BufferEndCapStyle.SQUARE,
             join_style=BufferJoinStyle.MITRE,
             mitre_limit=1.25,
-            # gridsize=gridsize,
+            gridsize=0.0,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
         )
 
-        # Dissolve the buffered input
+        # Dissolve the buffered input.
         #
-        # Note: gridsize is not applied to preserve all possible accuracy for these
+        # Note: no gridsize is applied to preserve all possible accuracy for these
         # temporary boundaries, otherwise the polygons are sometimes enlarged slightly,
         # which isn't wanted + creates issues when determining the
         # addedpieces_1neighbour later on.
@@ -164,10 +162,10 @@ def dissolve_within_distance(
         logger.info(f"Step {step} of {nb_steps}")
         buff_diss_path = tempdir / "120_diss_bufp_diss.gpkg"
         _geoops_gpd.dissolve(
-            input_path=buff_path,
+            input_path=bufp_path,
             output_path=buff_diss_path,
             explodecollections=True,
-            # gridsize=gridsize,
+            gridsize=0.0,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
@@ -178,49 +176,82 @@ def dissolve_within_distance(
         # don't dissappear again.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        buff_diss_bufm_path = tempdir / "130_diss_bufp_diss_bufm.gpkg"
+        bufp_diss_bufm_path = tempdir / "130_diss_bufp_diss_bufm.gpkg"
         _geoops_gpd.buffer(
             input_path=buff_diss_path,
-            output_path=buff_diss_bufm_path,
+            output_path=bufp_diss_bufm_path,
             distance=-(distance / 2),
             endcap_style=BufferEndCapStyle.SQUARE,
             join_style=BufferJoinStyle.MITRE,
             mitre_limit=2,
-            gridsize=gridsize,
+            explodecollections=True,
+            gridsize=0.0,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
         )
 
-        # Determine which parts that were added were actually gaps within 'distance' in
-        # the original polygons, so they can be removed again.
-
-        # Determine all pieces added to the input in the process above.
-        step += 1
+        # We want to keep the original boundaries as identical as possible. However,
+        # when the same positive and negative buffer is applied on a polygon, even if no
+        # dissolve is happening with neighbouring polygons, the result won't be exactly
+        # the same as the input. Small differences will appear, e.g.:
+        #   - with a "standard" buffer, internal corners will be rounded afterwards
+        #   - with a "mitre" buffer the internal corners will in many cases stay the
+        #     same, but for external corners where the mitre kicks in, the boundaries of
+        #     the result will move slightly so the end result is smaller.
+        #
+        # To minimize changes to original boundaries, determine which parts are actually
+        # gaps "within distance" between original features that need to be filled. Then,
+        # those features can be added and dissolved into the original polygons.
+        # Note: no gridsize is applied to preserve all possible accuracy for these
+        # temporary boundariesstep += 1
         logger.info(f"Step {step} of {nb_steps}")
-        added_pieces_path = tempdir / "200_addedpieces.gpkg"
+        parts_to_add_path = tempdir / "200_parts_to_add.gpkg"
         _geoops_sql.erase(
-            input_path=buff_diss_bufm_path,
+            input_path=bufp_diss_bufm_path,
             erase_path=diss_path,
-            output_path=added_pieces_path,
+            output_path=parts_to_add_path,
             overlay_self=False,
             explodecollections=True,
-            gridsize=gridsize,
+            gridsize=0.0,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
         )
 
-        # Build a filter to select the pieces that we want to erase again from the
-        # result because they were incorrectly added.
+        # To avoid parts not being detected as touching to 2 neighbours because of
+        # rounding issues, apply a small buffer to them.
+        if gridsize > 0.0:
+            distance_parts_to_add = gridsize / 10
+        else:
+            distance_parts_to_add = 0.0000000001
+        step += 1
+        logger.info(f"Step {step} of {nb_steps}")
+        parts_to_add_bufp_path = tempdir / "200_parts_to_add_bufp.gpkg"
+        bufp_path = tempdir / "110_diss_bufp.gpkg"
+        _geoops_gpd.buffer(
+            input_path=parts_to_add_path,
+            output_path=parts_to_add_bufp_path,
+            distance=distance_parts_to_add,
+            endcap_style=BufferEndCapStyle.SQUARE,
+            join_style=BufferJoinStyle.MITRE,
+            mitre_limit=1.25,
+            gridsize=0.0,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            operation_prefix=f"{operation_name}-",
+        )
+
+        # Build a filter to only keep the pieces that actually need to be added to the
+        # input layer.
         # The filter will depend on input parameters.
         if close_internal_gaps:
             # True, so also gaps in the original input boundaries should be closed.
             # This means that in theory all pieces can be retained, but in practice
-            # there are some cases where the above algorithm adds unwanted area, so that
-            # needs to be erased again.
+            # there are some cases where unwanted area would be added anyway, so remove
+            # it from the area to be added.
             #
-            # Parameters that indicate that added pieces won't need to be erased:
+            # Parameters that indicate that added pieces should be added:
             #   - large areas (>= distance²) seem OK.
             #   - if > 1 neighbour, seems OK.
             #
@@ -231,15 +262,15 @@ def dissolve_within_distance(
             #   - pieces can be spikes. E.g. when a "road" of ~ 'distance' width is not
             #     filled up between two input geometries has a bend. Depending on the
             #     angle, the mitre of the negative buffer can leave a spike in place.
-            pieces_to_erase_filter = f"""
-                neighbours_count_distinct <= 1
-                AND geom_area < {distance} * {distance}
-                AND neighbours_perimeter/2 + neighbours_length <= 0.8 * geom_perimeter
+            parts_to_add_filter = f"""
+                neighbours_count_distinct > 1
+                OR geom_area > {distance} * {distance}
+                OR neighbours_perimeter/2 + neighbours_length > 0.8 * geom_perimeter
             """
         else:
-            # False, so we want to keep all pieces that intersect with only 1 neighbour
-            # in the input, so they can be remove again from the result.
-            pieces_to_erase_filter = "neighbours_count_distinct <= 1"
+            # False, so we only want to add yhe pieces that intersect with > 1 neighbour
+            # in the input.
+            parts_to_add_filter = "neighbours_count_distinct > 1"
 
         # Notes:
         # - The conversion to json followed by extraction from json allows to use a
@@ -302,37 +333,47 @@ def dissolve_within_distance(
                   LIMIT -1 OFFSET 0
                )
              WHERE geom IS NOT NULL
-               AND ({pieces_to_erase_filter})
+               AND ({parts_to_add_filter})
         """
 
+        # Note: no gridsize is applied to preserve all possible accuracy for these
+        # temporary boundariesstep += 1
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        added_pieces_to_be_erased_input = tempdir / "210_addedpieces_to_be_erased.gpkg"
+        parts_to_add_filtered_path = tempdir / "210_parts_to_add_filtered.gpkg"
         _geoops_sql.select_two_layers(
-            input1_path=added_pieces_path,
+            input1_path=parts_to_add_bufp_path,
             input2_path=input_path,
-            output_path=added_pieces_to_be_erased_input,
+            output_path=parts_to_add_filtered_path,
             sql_stmt=sql_stmt,
             input2_layer=input_layer,
-            # gridsize=gridsize,
+            gridsize=0.0,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            output_with_spatial_index=False,
+        )
+
+        # Note: no gridsize is applied to preserve all possible accuracy for these
+        # temporary boundariesstep += 1
+        step += 1
+        logger.info(f"Step {step} of {nb_steps}")
+        dst_layer = fileops.get_only_layer(diss_path)
+        fileops.append_to(
+            src=parts_to_add_filtered_path, dst=diss_path, dst_layer=dst_layer
         )
 
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        _geoops_sql.erase(
-            input_path=buff_diss_bufm_path,
-            erase_path=added_pieces_to_be_erased_input,
+        # Apply gridsize for output
+        _geoops_gpd.dissolve(
+            input_path=diss_path,
             output_path=output_path,
-            overlay_self=False,
-            output_layer=output_layer,
             explodecollections=True,
+            output_layer=output_layer,
             gridsize=gridsize,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
-            force=force,
             operation_prefix=f"{operation_name}-",
         )
 

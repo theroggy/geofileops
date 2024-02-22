@@ -5,6 +5,7 @@
 ### Improvements
 
 - Add support for self-overlays in overlay operations (#468)
+- Improve `dissolve_within_distance` results (#494)
 - Add configuration option GFO_REMOVE_TEMP_FILES that can be used to avoid temp files
   being removed for debugging purposes (#480)
 - Add a context manager, TempEnv, to set temporary env variables (#481)
