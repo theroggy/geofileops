@@ -1005,6 +1005,7 @@ def read_file(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    **kwargs,
 ) -> gpd.GeoDataFrame:
     """
     Reads a file to a geopandas GeoDataframe.
@@ -1065,6 +1066,8 @@ def read_file(
         fid_as_index (bool, optional): If True, will use the FIDs of the features that
             were read as the index of the GeoDataFrame. May start at 0 or 1 depending on
             the driver. Defaults to False.
+        **kwargs: All additional parameters will be passed on to the io-engine used
+            ("pyogrio" or "fiona").
 
     Raises:
         ValueError: an invalid parameter value was passed.
@@ -1092,6 +1095,7 @@ def read_file(
         sql_dialect=sql_dialect,
         ignore_geometry=ignore_geometry,
         fid_as_index=fid_as_index,
+        **kwargs,
     )
 
     # No assert to keep backwards compatibility
@@ -1142,6 +1146,7 @@ def _read_file_base(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    **kwargs,
 ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """
     Reads a file to a pandas Dataframe.
@@ -1166,6 +1171,7 @@ def _read_file_base(
             sql_dialect=sql_dialect,
             ignore_geometry=ignore_geometry,
             fid_as_index=fid_as_index or fid_as_column,
+            **kwargs,
         )
     elif engine == "fiona":
         gdf = _read_file_base_fiona(
@@ -1179,6 +1185,7 @@ def _read_file_base(
             sql_dialect=sql_dialect,
             ignore_geometry=ignore_geometry,
             fid_as_index=fid_as_index or fid_as_column,
+            **kwargs,
         )
     else:
         raise ValueError(f"Unsupported engine: {engine}")
@@ -1203,6 +1210,7 @@ def _read_file_base_fiona(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    **kwargs,
 ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """
     Reads a file to a pandas Dataframe using fiona.
@@ -1266,6 +1274,7 @@ def _read_file_base_fiona(
         sql=sql_stmt,
         sql_dialect=sql_dialect,
         ignore_geometry=ignore_geometry,
+        **kwargs,
     )
 
     # Set the index to the backed-up fid
@@ -1309,6 +1318,7 @@ def _read_file_base_pyogrio(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    **kwargs,
 ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """
     Reads a file to a pandas Dataframe using pyogrio.
@@ -1368,7 +1378,7 @@ def _read_file_base_pyogrio(
         sql_dialect=sql_dialect,
         read_geometry=not ignore_geometry,
         fid_as_index=fid_as_index,
-        # use_arrow=use_arrow,
+        **kwargs,
     )
 
     # Reorder columns + change casing so they are the same as columns parameter
@@ -1480,6 +1490,7 @@ def to_file(
     append_timeout_s: int = 600,
     index: Optional[bool] = None,
     create_spatial_index: Optional[bool] = True,
+    **kwargs,
 ):
     """
     Writes a pandas dataframe to file.
@@ -1518,6 +1529,8 @@ def to_file(
         create_spatial_index (bool, optional): True to force creation of spatial index,
             False to avoid creation. None leads to the default behaviour of gdal.
             Defaults to True.
+        **kwargs: All additional parameters will be passed on to the io-engine used
+            ("pyogrio" or "fiona").
 
     Raises:
         ValueError: an invalid parameter value was passed.
@@ -1572,6 +1585,7 @@ def to_file(
             append_timeout_s=append_timeout_s,
             index=index,
             create_spatial_index=create_spatial_index,
+            **kwargs,
         )
     elif engine == "fiona":
         return _to_file_fiona(
@@ -1584,6 +1598,7 @@ def to_file(
             append_timeout_s=append_timeout_s,
             index=index,
             create_spatial_index=create_spatial_index,
+            **kwargs,
         )
     else:
         raise ValueError(f"Unsupported engine: {engine}")
@@ -1599,6 +1614,7 @@ def _to_file_fiona(
     append_timeout_s: int = 600,
     index: Optional[bool] = None,
     create_spatial_index: Optional[bool] = True,
+    **kwargs,
 ):
     """
     Writes a pandas dataframe to file using fiona.
@@ -1660,6 +1676,7 @@ def _to_file_fiona(
         append: bool = False,
         schema: Optional[dict] = None,
         create_spatial_index: Optional[bool] = True,
+        **kwargs,
     ):
         # Prepare args for to_file
         if append is True:
@@ -1670,7 +1687,6 @@ def _to_file_fiona(
         else:
             mode = "w"
 
-        kwargs: Dict[str, Any] = {}
         kwargs["engine"] = "fiona"
         kwargs["mode"] = mode
         drivername = _geofileinfo.get_driver(path)
@@ -1708,6 +1724,7 @@ def _to_file_fiona(
             append=append,
             schema=schema,
             create_spatial_index=create_spatial_index,
+            **kwargs,
         )
     else:
         # Append is asked, check if the fiona driver supports appending. If
@@ -1757,6 +1774,7 @@ def _to_file_fiona(
                             append=True,
                             schema=schema,
                             create_spatial_index=create_spatial_index,
+                            **kwargs,
                         )
                     else:
                         # If gdf written to temp file, use append_to_nolock + cleanup
@@ -1802,6 +1820,7 @@ def _to_file_pyogrio(
     append_timeout_s: int = 600,
     index: Optional[bool] = None,
     create_spatial_index: Optional[bool] = True,
+    **kwargs,
 ):
     """
     Writes a pandas dataframe to file using pyogrio.
@@ -1809,7 +1828,6 @@ def _to_file_pyogrio(
     Remark: this function only supports writing GeoDataFrames at the moment.
     """
     # Prepare args for write_dataframe
-    kwargs: Dict[str, Any] = {}
     kwargs["engine"] = "pyogrio"
 
     # Check upfront if append is going to work to give nice error
