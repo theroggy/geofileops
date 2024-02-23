@@ -1557,7 +1557,7 @@ def join_by_location(
             area_inters_column_name_touse = "area_inters"
         area_inters_column_expression = (
             ",ST_area(ST_intersection(sub_filter.geom, sub_filter.l2_geom)) "
-            f'as "{area_inters_column_name_touse}"'
+            f'AS "{area_inters_column_name_touse}"'
         )
         if min_area_intersect is not None:
             area_inters_filter = (
@@ -1565,12 +1565,8 @@ def join_by_location(
                 f">= {min_area_intersect}"
             )
 
-    # Prepare spatial relations filter
-    if spatial_relations_query != "intersects is True":
-        # joining should only be possible on features that at least have an
-        # interaction! So, add "intersects is True" to query to avoid errors!
-        spatial_relations_query = f"({spatial_relations_query}) and intersects is True"
-    spatial_relations_filter = _prepare_spatial_relations_filter(
+    # Prepare spatial relation column and filter
+    spatial_relation_column, spatial_relation_filter = _prepare_join_by_location_fields(
         spatial_relations_query
     )
 
@@ -1593,10 +1589,7 @@ def join_by_location(
                         ,layer2.{{input2_geometrycolumn}} AS l2_geom
                         {{layer1_columns_prefix_alias_str}}
                         {{layer2_columns_prefix_alias_str}}
-                        ,ST_relate(
-                            layer1.{{input1_geometrycolumn}},
-                            layer2.{{input2_geometrycolumn}}
-                         ) AS "GFO_$TEMP$_SPATIAL_RELATION"
+                        {spatial_relation_column}
                     FROM {{input1_databasename}}."{{input1_layer}}" layer1
                     JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
                       ON layer1.fid = layer1tree.id
@@ -1611,16 +1604,15 @@ def join_by_location(
                      AND layer1tree.maxy >= layer2tree.miny
                    LIMIT -1 OFFSET 0
                   ) sub_filter
-               WHERE {spatial_relations_filter.format(
-                    spatial_relation='sub_filter."GFO_$TEMP$_SPATIAL_RELATION"')}
+               WHERE {spatial_relation_filter}
                LIMIT -1 OFFSET 0
               ) sub_area
            {area_inters_filter}
+           LIMIT -1 OFFSET 0
           )
         SELECT sub.geom
               {{layer1_columns_from_subselect_str}}
               {{layer2_columns_from_subselect_str}}
-              ,sub."GFO_$TEMP$_SPATIAL_RELATION" AS spatial_relation
               {area_inters_column_in_output}
           FROM layer1_relations_filtered sub
     """
@@ -1631,10 +1623,9 @@ def join_by_location(
         sql_template = f"""
             {sql_template}
             UNION ALL
-            SELECT layer1.{{input1_geometrycolumn}} as geom
+            SELECT layer1.{{input1_geometrycolumn}} AS geom
                   {{layer1_columns_prefix_alias_str}}
                   {{layer2_columns_prefix_alias_null_str}}
-                  ,NULL AS spatial_relation
                   {area_inters_column_0_in_output}
               FROM {{input1_databasename}}."{{input1_layer}}" layer1
              WHERE 1=1
@@ -1666,6 +1657,35 @@ def join_by_location(
         batchsize=batchsize,
         force=force,
     )
+
+
+def _prepare_join_by_location_fields(query) -> Tuple[str, str]:
+    # Add a specific optimisation for "intersects is True" as it is the most used
+    # filtering and it is very optimised in GEOS.
+    if query.lower() == "intersects is true":
+        spatial_relation_column = """
+            ,ST_intersects(
+                layer1.{input1_geometrycolumn},
+                layer2.{input2_geometrycolumn}
+             ) AS "GFO_$TEMP$_SPATIAL_RELATION"
+        """
+        spatial_relation_filter = 'sub_filter."GFO_$TEMP$_SPATIAL_RELATION" = 1'
+    else:
+        # joining should only be possible on features that at least have an
+        # interaction! So, add "intersects is True" to query to avoid errors!
+        query = f"({query}) and intersects is True"
+        spatial_relations_filter = _prepare_spatial_relations_filter(query)
+        spatial_relation_column = """
+            ,ST_relate(
+                layer1.{input1_geometrycolumn},
+                layer2.{input2_geometrycolumn}
+             ) AS "GFO_$TEMP$_SPATIAL_RELATION"
+        """
+        spatial_relation_filter = spatial_relations_filter.format(
+            spatial_relation='sub_filter."GFO_$TEMP$_SPATIAL_RELATION"'
+        )
+
+    return (spatial_relation_column, spatial_relation_filter)
 
 
 def _prepare_spatial_relations_filter(query: str) -> str:
@@ -1889,6 +1909,7 @@ def select_two_layers(
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
+    output_with_spatial_index: bool = True,
 ):
     # Go!
     return _two_layer_vector_operation(
@@ -1911,6 +1932,7 @@ def select_two_layers(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        output_with_spatial_index=output_with_spatial_index,
     )
 
 

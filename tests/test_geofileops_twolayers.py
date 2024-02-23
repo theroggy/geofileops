@@ -1004,7 +1004,7 @@ def test_join_by_location(
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == expected_featurecount
 
-    exp_nb_columns = len(input1_layerinfo.columns) + len(input2_layerinfo.columns) + 1
+    exp_nb_columns = len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     if area_inters_column_name is not None:
         assert area_inters_column_name in output_layerinfo.columns
         exp_nb_columns += 1
