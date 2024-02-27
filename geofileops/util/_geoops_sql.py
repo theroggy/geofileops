@@ -1227,6 +1227,7 @@ def export_by_location(
     input_path: Path,
     input_to_compare_with_path: Path,
     output_path: Path,
+    spatial_relations_query: str,
     min_area_intersect: Optional[float] = None,
     area_inters_column_name: Optional[str] = None,
     input_layer: Optional[str] = None,
@@ -1244,73 +1245,141 @@ def export_by_location(
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
 
-    # If intersect area needs to be calculated, other query needed
-    if area_inters_column_name is None and min_area_intersect is None:
-        sql_template = f"""
-            SELECT layer1.{{input1_geometrycolumn}} AS geom
-                  {{layer1_columns_prefix_alias_str}}
-              FROM {{input1_databasename}}."{{input1_layer}}" layer1
-              JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-                ON layer1.fid = layer1tree.id
-             WHERE 1=1
-               {{batch_filter}}
-               AND EXISTS (
-                  SELECT 1
-                    FROM {{input2_databasename}}."{{input2_layer}}" layer2
-                    JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                      ON layer2.fid = layer2tree.id
-                   WHERE layer1tree.minx <= layer2tree.maxx
-                     AND layer1tree.maxx >= layer2tree.minx
-                     AND layer1tree.miny <= layer2tree.maxy
-                     AND layer1tree.maxy >= layer2tree.miny
-                     AND ST_intersects(layer1.{{input1_geometrycolumn}},
-                                       layer2.{{input2_geometrycolumn}}) = 1
-                     AND ST_touches(layer1.{{input1_geometrycolumn}},
-                                    layer2.{{input2_geometrycolumn}}) = 0)
-            """
-    else:
-        # Intersect area needs to be calculated
-        if area_inters_column_name is None:
-            area_inters_column_name = "area_inters"
-        area_inters_column_expression = f"""
-            ,ST_area(ST_intersection(
-                    ST_union(layer1.{{input1_geometrycolumn}}),
-                    ST_union(layer2.{{input2_geometrycolumn}})
-                )) AS {area_inters_column_name}
-        """
+    # Prepare spatial relation column and filter
+    (
+        spatial_relation_column,
+        spatial_relation_filter,
+        include_disjoint,
+    ) = _prepare_filter_by_location_fields(spatial_relations_query)
 
-        # Prepare sql template with intersect area calculation
+    # Differenct query if intersecting features need to be unioned...
+    if (
+        include_disjoint is False
+        and area_inters_column_name is None
+        and min_area_intersect is None
+    ):
+        # No union needed.
         sql_template = f"""
-            SELECT ST_union(layer1.{{input1_geometrycolumn}}) as geom
-                  {{layer1_columns_prefix_str}}
-                  {area_inters_column_expression}
-              FROM {{input1_databasename}}."{{input1_layer}}" layer1
-              JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-                ON layer1.fid = layer1tree.id
-              JOIN {{input2_databasename}}."{{input2_layer}}" layer2
-              JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                ON layer2.fid = layer2tree.id
-             WHERE 1=1
-               {{batch_filter}}
-               AND layer1tree.minx <= layer2tree.maxx
-               AND layer1tree.maxx >= layer2tree.minx
-               AND layer1tree.miny <= layer2tree.maxy
-               AND layer1tree.maxy >= layer2tree.miny
-               AND ST_Intersects(layer1.{{input1_geometrycolumn}},
-                                 layer2.{{input2_geometrycolumn}}) = 1
-               AND ST_Touches(layer1.{{input1_geometrycolumn}},
-                              layer2.{{input2_geometrycolumn}}) = 0
-             GROUP BY layer1.rowid {{layer1_columns_prefix_str}}
-        """
+            WITH layer1_intersecting_filtered AS (
+              SELECT layer1.{{input1_geometrycolumn}} AS geom
+                    {{layer1_columns_prefix_alias_str}}
+                FROM {{input1_databasename}}."{{input1_layer}}" layer1
+               WHERE 1=1
+                 {{batch_filter}}
+                 AND EXISTS (
+                      SELECT 1 FROM (
+                        SELECT 1
+                              {spatial_relation_column}
+                          FROM {{input2_databasename}}."{{input2_layer}}" layer2
+                          JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                            ON layer2.fid = layer2tree.id
+                         WHERE ST_MinX(layer1.{{input1_geometrycolumn}}) <= layer2tree.maxx
+                           AND ST_MaxX(layer1.{{input1_geometrycolumn}}) >= layer2tree.minx
+                           AND ST_MinY(layer1.{{input1_geometrycolumn}}) <= layer2tree.maxy
+                           AND ST_MaxY(layer1.{{input1_geometrycolumn}}) >= layer2tree.miny
+                           --LIMIT -1 OFFSET 0
+                        ) sub_filter
+                       WHERE {spatial_relation_filter}
+                      )
+            )
+            SELECT sub.geom
+                  {{layer1_columns_from_subselect_str}}
+                  {{layer2_columns_from_subselect_str}}
+              FROM layer1_intersecting_filtered sub
+        """  # noqa: E501
+
+        # If disjoint is True according to the query, include features that don't match
+        # the spatial index.
+        if include_disjoint:
+            sql_template = f"""
+                {sql_template}
+                UNION ALL
+                SELECT layer1.{{input1_geometrycolumn}} AS geom
+                      {{layer1_columns_prefix_alias_str}}
+                      {{layer2_columns_prefix_alias_null_str}}
+                  FROM {{input1_databasename}}."{{input1_layer}}" layer1
+                  WHERE 1=1
+                   {{batch_filter}}
+                   AND NOT EXISTS (
+                        SELECT 1
+                          FROM {{input2_databasename}}."{{input2_layer}}" layer2
+                          JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                            ON layer2.fid = layer2tree.id
+                         WHERE ST_MinX(layer1.{{input1_geometrycolumn}}) <= layer2tree.maxx
+                           AND ST_MaxX(layer1.{{input1_geometrycolumn}}) >= layer2tree.minx
+                           AND ST_MinY(layer1.{{input1_geometrycolumn}}) <= layer2tree.maxy
+                           AND ST_MaxY(layer1.{{input1_geometrycolumn}}) >= layer2tree.miny
+                       )
+        """  # noqa: E501
+    else:
+        # Union needed to calculate intersection area or because spatial_relation_query
+        # returns True for disjoint features.
+
+        # Prepare area calculation is relevant
+        area_inters_column_expression = ""
+        if area_inters_column_name is not None or min_area_intersect is not None:
+            if area_inters_column_name is None:
+                area_inters_column_name = "area_inters"
+            area_inters_column_expression = (
+                f",ST_area(ST_intersection(geom, geom2)) AS {area_inters_column_name}"
+            )
+
+        (
+            spatial_relation_column,
+            spatial_relation_filter,
+            include_disjoint,
+        ) = _prepare_filter_by_location_fields(
+            spatial_relations_query, geom1="geom", geom2="geom2", subquery_alias="sub"
+        )
+
+        if include_disjoint:
+            spatial_relation_filter = f"geom2 IS NULL OR ({spatial_relation_filter})"
+        area_inters_column = (
+            f",{area_inters_column_name}" if area_inters_column_name is not None else ""
+        )
+        sql_template = f"""
+            SELECT sub.geom
+                  {{layer1_columns_from_subselect_str}}
+                  {area_inters_column}
+              FROM (
+                SELECT sub_union.*
+                      {spatial_relation_column}
+                      {area_inters_column_expression}
+                  FROM (
+                    SELECT layer1.*
+                          ,(SELECT ST_Union(layer2_sub.{{input2_geometrycolumn}}) AS geom2
+                              FROM {{input1_databasename}}."{input1_layer_rtree}" layer1tree
+                              JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
+                              JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                                ON layer2_sub.rowid = layer2tree.id
+                             WHERE layer1tree.id = layer1.rowid
+                               AND layer1tree.minx <= layer2tree.maxx
+                               AND layer1tree.maxx >= layer2tree.minx
+                               AND layer1tree.miny <= layer2tree.maxy
+                               AND layer1tree.maxy >= layer2tree.miny
+                               AND ST_intersects(
+                                        layer1.{{input1_geometrycolumn}},
+                                        layer2_sub.{{input2_geometrycolumn}}
+                                   ) = 1
+                             LIMIT -1 OFFSET 0
+                           ) AS geom2
+                      FROM {{input1_databasename}}."{{input1_layer}}" layer1
+                     WHERE 1=1
+                       {{batch_filter}}
+                     LIMIT -1 OFFSET 0
+                ) sub_union
+              ) sub
+             WHERE {spatial_relation_filter}
+        """  # noqa: E501
 
         # Filter on intersect area if necessary
         if min_area_intersect is not None:
             sql_template = f"""
-                SELECT sub.* FROM
+                SELECT * FROM
                   ( {sql_template}
                      LIMIT -1 OFFSET 0
-                  ) sub
-                WHERE sub.{area_inters_column_name} >= {min_area_intersect}
+                  ) sub_area
+                WHERE sub_area.{area_inters_column_name} >= {min_area_intersect}
             """
 
     # Go!
@@ -1542,6 +1611,13 @@ def join_by_location(
     batchsize: int = -1,
     force: bool = False,
 ):
+    # Check input
+    if "disjoint" in spatial_relations_query:
+        ValueError(f"'disjoint' is not supported in {spatial_relations_query=}")
+    if spatial_relations_query != "intersects is True":
+        # Only intersecting clauses supported at the moment
+        spatial_relations_query += " and intersects is True"
+
     # Prepare sql template for this operation
     # Prepare intersection area columns/filter
     area_inters_column_expression = ""
@@ -1566,9 +1642,11 @@ def join_by_location(
             )
 
     # Prepare spatial relation column and filter
-    spatial_relation_column, spatial_relation_filter = _prepare_join_by_location_fields(
-        spatial_relations_query
-    )
+    (
+        spatial_relation_column,
+        spatial_relation_filter,
+        include_disjoint,
+    ) = _prepare_filter_by_location_fields(spatial_relations_query)
 
     # Prepare sql template
     #
@@ -1659,38 +1737,75 @@ def join_by_location(
     )
 
 
-def _prepare_join_by_location_fields(query) -> Tuple[str, str]:
+def _prepare_filter_by_location_fields(
+    query: str,
+    geom1: str = "layer1.{input1_geometrycolumn}",
+    geom2: str = "layer2.{input2_geometrycolumn}",
+    subquery_alias: str = "sub_filter",
+) -> Tuple[str, str, bool]:
+    """
+    Prepare the fields needed to prepare a select to filter by location.
+
+    Args:
+        query (str): the spatial relations query that should be filtered on.
+        geom1 (str): the 1st geom in the spatial_relation_column.
+        geom2 (str): the 2nd geom in the spatial_relation_column.
+        subquery_alias (str): the alias tha will be used for the subquery to filter on.
+            Defaults to "sub_filter".
+
+    Returns:
+        Tuple[str, str, bool]: returns a tuple with the following values:
+            - spatial_relation_column: the string to use as column to filter on
+            - spatial_relation_filter: the string to use as filter
+            - include_disjoint: True if the query returns True for disjoint features
+    """
     # Add a specific optimisation for "intersects is True" as it is the most used
     # filtering and it is very optimised in GEOS.
     if query.lower() == "intersects is true":
         spatial_relation_column = """
             ,ST_intersects(
-                layer1.{input1_geometrycolumn},
-                layer2.{input2_geometrycolumn}
+                {input1},
+                {input2}
              ) AS "GFO_$TEMP$_SPATIAL_RELATION"
         """
-        spatial_relation_filter = 'sub_filter."GFO_$TEMP$_SPATIAL_RELATION" = 1'
+        spatial_relation_filter = f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION" = 1'
     else:
-        # joining should only be possible on features that at least have an
-        # interaction! So, add "intersects is True" to query to avoid errors!
-        query = f"({query}) and intersects is True"
         spatial_relations_filter = _prepare_spatial_relations_filter(query)
         spatial_relation_column = """
             ,ST_relate(
-                layer1.{input1_geometrycolumn},
-                layer2.{input2_geometrycolumn}
+                {input1},
+                {input2}
              ) AS "GFO_$TEMP$_SPATIAL_RELATION"
         """
         spatial_relation_filter = spatial_relations_filter.format(
-            spatial_relation='sub_filter."GFO_$TEMP$_SPATIAL_RELATION"'
+            spatial_relation=f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION"'
         )
 
-    return (spatial_relation_column, spatial_relation_filter)
+    # Determine of the spatial_relations_query returns True for disjoint features
+    spatial_relation_column_disjoint = spatial_relation_column.format(
+        input1="ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))')",
+        input2="ST_GeomFromText('POLYGON((5 0, 5 1, 6 1, 6 0, 5 0))')",
+    )
+    test_path = Path(__file__).resolve().parent / "test.gpkg"
+    sql_stmt = f"""
+        SELECT * FROM (
+            SELECT NULL AS ignore
+                  {spatial_relation_column_disjoint}
+            ) {subquery_alias}
+         WHERE {spatial_relation_filter}
+    """
+    df = fileops.read_file(test_path, sql_stmt=sql_stmt)
+    include_disjoint = True if len(df) > 0 else False
+
+    # Fill out input columns of the spatial_relation_column
+    spatial_relation_column = spatial_relation_column.format(input1=geom1, input2=geom2)
+
+    return (spatial_relation_column, spatial_relation_filter, include_disjoint)
 
 
 def _prepare_spatial_relations_filter(query: str) -> str:
     named_spatial_relations = {
-        # "disjoint": ["FF*FF****"],
+        "disjoint": ["FF*FF****"],
         "equals": ["TFFF*FFF*"],
         "touches": ["FT*******", "F**T*****", "F***T****"],
         "within": ["T*F**F***"],
