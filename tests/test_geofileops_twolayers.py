@@ -2,6 +2,7 @@
 Tests for operations that are executed using a sql statement on two layers.
 """
 
+from contextlib import nullcontext
 import math
 from pathlib import Path
 from typing import Optional
@@ -343,11 +344,19 @@ def test_erase_subdivide_multipolygons(tmp_path, suffix):
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
-    "area_inters_column_name, gridsize, where_post, exp_featurecount",
-    [("area_inters", 0.0, "ST_Area(geom) > 2000", 25), (None, 0.01, None, 27)],
+    "columns, gridsize, where_post, exp_featurecount",
+    [
+        (["OIDN", "UIDN"], 0.0, "ST_Area(geom) > 2000", 25),
+        (None, 0.01, None, 27),
+    ],
 )
 def test_export_by_location(
-    tmp_path, suffix, area_inters_column_name, gridsize, where_post, exp_featurecount
+    tmp_path,
+    suffix,
+    columns,
+    gridsize,
+    where_post,
+    exp_featurecount,
 ):
     input_to_select_from_path = test_helper.get_testfile(
         "polygon-parcel", suffix=suffix
@@ -362,7 +371,7 @@ def test_export_by_location(
         input_to_select_from_path=str(input_to_select_from_path),
         input_to_compare_with_path=str(input_to_compare_with_path),
         output_path=str(output_path),
-        area_inters_column_name=area_inters_column_name,
+        input1_columns=columns,
         gridsize=gridsize,
         where_post=where_post,
         batchsize=batchsize,
@@ -372,15 +381,116 @@ def test_export_by_location(
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    exp_columns = len(input_layerinfo.columns)
-    if area_inters_column_name:
-        exp_columns += 1
+    exp_columns = len(input_layerinfo.columns) if columns is None else len(columns)
     assert len(output_layerinfo.columns) == exp_columns
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
     assert output_layerinfo.featurecount == exp_featurecount
 
     # Check the contents of the result file
-    # TODO: this test should be more elaborate...
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None
+
+
+@pytest.mark.parametrize(
+    "query, area_inters_column_name, min_area_intersect, exp_featurecount",
+    [
+        (None, None, None, 27),
+        (None, "area_custom", None, 27),
+        ("within is False", "area_custom", None, 39),
+        (None, None, 1000, 24),
+        ("within is False", None, 1000, 15),
+    ],
+)
+def test_export_by_location_area(
+    tmp_path,
+    query,
+    area_inters_column_name,
+    min_area_intersect,
+    exp_featurecount,
+):
+    input_to_select_from_path = test_helper.get_testfile("polygon-parcel")
+    input_to_compare_with_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"{input_to_select_from_path.stem}-output.gpkg"
+    input_layerinfo = gfo.get_layerinfo(input_to_select_from_path)
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    # Test
+    kwargs = {}
+    if query is not None:
+        kwargs["spatial_relations_query"] = query
+    gfo.export_by_location(
+        input_to_select_from_path=str(input_to_select_from_path),
+        input_to_compare_with_path=str(input_to_compare_with_path),
+        output_path=str(output_path),
+        area_inters_column_name=area_inters_column_name,
+        min_area_intersect=min_area_intersect,
+        batchsize=batchsize,
+        **kwargs,
+    )
+
+    # Check if the output file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    exp_columns = len(input_layerinfo.columns)
+    exp_area_inters_column_name = area_inters_column_name
+    if exp_area_inters_column_name is None and min_area_intersect is not None:
+        exp_area_inters_column_name = "area_inters"
+    if exp_area_inters_column_name is not None:
+        exp_columns += 1
+        assert exp_area_inters_column_name in output_layerinfo.columns
+    assert len(output_layerinfo.columns) == exp_columns
+    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    assert output_layerinfo.featurecount == exp_featurecount
+
+    # Check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None
+
+    # If an area column name is specified, check the number of None values
+    # (= number features without intersection)
+    if area_inters_column_name is not None:
+        exp_nb_None = 21 if query == "within is False" else 0
+        assert len(output_gdf[output_gdf.area_custom.isna()]) == exp_nb_None
+
+
+@pytest.mark.parametrize(
+    "query, exp_featurecount",
+    [
+        ("intersects is True or intersects is False", 48),
+        ("intersects is True", 27),
+        ("within is True", 8),
+        ("intersects is False", 21),
+        ("within is False", 39),
+        ("disjoint is True", 21),
+    ],
+)
+def test_export_by_location_query(tmp_path, query, exp_featurecount):
+    input_to_select_from_path = test_helper.get_testfile("polygon-parcel")
+    input_to_compare_with_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"{input_to_select_from_path.stem}-output.gpkg"
+    input_layerinfo = gfo.get_layerinfo(input_to_select_from_path)
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    # Test
+    gfo.export_by_location(
+        input_to_select_from_path=str(input_to_select_from_path),
+        input_to_compare_with_path=str(input_to_compare_with_path),
+        output_path=str(output_path),
+        spatial_relations_query=query,
+        batchsize=batchsize,
+    )
+
+    # Check if the output file is correctly created
+    assert output_path.exists()
+    assert gfo.has_spatial_index(output_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    exp_columns = len(input_layerinfo.columns)
+    assert len(output_layerinfo.columns) == exp_columns
+    assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    assert output_layerinfo.featurecount == exp_featurecount
+
+    # Check the contents of the result file
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
 
@@ -954,29 +1064,40 @@ def test_prepare_spatial_relations_filter():
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, spatial_relations_query, discard_nonmatching, "
-    "min_area_intersect, area_inters_column_name, expected_featurecount",
+    "suffix, epsg, spatial_relations_query, discard_nonmatching, min_area_intersect, "
+    "area_inters_column_name, exp_disjoint_warning, exp_featurecount",
     [
-        (".gpkg", 31370, "intersects is False", False, None, None, 48),
-        (".gpkg", 31370, "intersects is False", True, None, None, 0),
-        (".gpkg", 31370, "intersects is True", False, 1000, "area_test", 50),
-        (".gpkg", 31370, "intersects is True", False, None, None, 51),
-        (".gpkg", 31370, "intersects is True", True, 1000, None, 26),
-        (".gpkg", 31370, "intersects is True", True, None, None, 30),
-        (".gpkg", 4326, "T******** is True or *T******* is True", True, None, None, 30),
-        (".gpkg", 4326, "intersects is True", False, None, None, 51),
-        (".shp", 31370, "intersects is True", False, None, None, 51),
+        (".gpkg", 31370, "intersects is False", False, None, None, True, 48),
+        (".gpkg", 31370, "intersects is False", True, None, None, True, 0),
+        (".gpkg", 31370, "intersects is True", False, 1000, "area_test", False, 50),
+        (".gpkg", 31370, "intersects is True", False, None, None, False, 51),
+        (".gpkg", 31370, "intersects is True", True, 1000, None, False, 26),
+        (".gpkg", 31370, "intersects is True", True, None, None, False, 30),
+        (
+            ".gpkg",
+            4326,
+            "T******** is True or *T******* is True",
+            True,
+            None,
+            None,
+            False,
+            30,
+        ),
+        (".gpkg", 4326, "intersects is True", False, None, None, False, 51),
+        (".shp", 31370, "intersects is True", False, None, None, False, 51),
     ],
 )
 def test_join_by_location(
     tmp_path,
+    recwarn,
     suffix: str,
     spatial_relations_query: str,
     epsg: int,
     discard_nonmatching: bool,
     min_area_intersect: float,
     area_inters_column_name: str,
-    expected_featurecount: int,
+    exp_disjoint_warning: bool,
+    exp_featurecount: int,
 ):
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
@@ -985,24 +1106,32 @@ def test_join_by_location(
     name = f"{input1_path.stem}_{discard_nonmatching}_{min_area_intersect}{suffix}"
     output_path = tmp_path / name
 
-    gfo.join_by_location(
-        input1_path=str(input1_path),
-        input2_path=str(input2_path),
-        output_path=str(output_path),
-        spatial_relations_query=spatial_relations_query,
-        discard_nonmatching=discard_nonmatching,
-        min_area_intersect=min_area_intersect,
-        area_inters_column_name=area_inters_column_name,
-        batchsize=batchsize,
-        force=True,
-    )
+    if exp_disjoint_warning:
+        handler = pytest.warns(
+            UserWarning,
+            match="The spatial relation query specified evaluated to True for disjoint",
+        )
+    else:
+        handler = nullcontext()  # type: ignore[assignment]
+
+    with handler:
+        gfo.join_by_location(
+            input1_path=str(input1_path),
+            input2_path=str(input2_path),
+            output_path=str(output_path),
+            spatial_relations_query=spatial_relations_query,
+            discard_nonmatching=discard_nonmatching,
+            min_area_intersect=min_area_intersect,
+            area_inters_column_name=area_inters_column_name,
+            batchsize=batchsize,
+        )
 
     # Check if the output file is correctly created
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
     input2_layerinfo = gfo.get_layerinfo(input2_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert output_layerinfo.featurecount == expected_featurecount
+    assert output_layerinfo.featurecount == exp_featurecount
 
     exp_nb_columns = len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     if area_inters_column_name is not None:
@@ -1014,8 +1143,8 @@ def test_join_by_location(
     # Check the contents of the result file
     # TODO: this test should be more elaborate...
     output_gdf = gfo.read_file(output_path)
-    assert len(output_gdf) == expected_featurecount
-    if expected_featurecount > 0:
+    assert len(output_gdf) == exp_featurecount
+    if exp_featurecount > 0:
         assert output_gdf["geometry"][0] is not None
 
 

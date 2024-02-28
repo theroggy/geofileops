@@ -50,3 +50,5 @@ run_datetime,package,package_version,operation,operation_descr,secs_taken,run_de
 2023-11-24 13:26:34.221,geofileops,0.8.0,symmetric_difference_complexpolys_agri,symmetric_difference_complexpolys_agri between 10 complex polys (each 20778 coords) and agriparcels BEFL (~500k poly),70.09789,{'nb_cpu': 12}
 2024-02-22 14:40:37.324730,geofileops,0.8.1,join_by_location_intersects,join_by_location_intersects between 2 agri parcel layers BEFL (2*~500.000 polygons),53.828073,{'nb_cpu': 12}
 2024-02-22 15:21:57.916586,geofileops,0.9.0,join_by_location_intersects,join_by_location_intersects between 2 agri parcel layers BEFL (2*~500.000 polygons),43.513091,{'nb_cpu': 12}
+2024-02-27 16:24:13.589543,geofileops,0.8.1,export_by_location_intersects,export_by_location_intersects between 2 agri parcel layers BEFL (2*~500.000 polygons),25.196765,{'nb_cpu': 12}
+2024-02-27 16:31:48.795442,geofileops,0.9.0,export_by_location_intersects,export_by_location_intersects between 2 agri parcel layers BEFL (2*~500.000 polygons),22.505285,{'nb_cpu': 12}

@@ -1913,6 +1913,7 @@ def export_by_location(
     input_to_select_from_path: Union[str, "os.PathLike[Any]"],
     input_to_compare_with_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
+    spatial_relations_query: str = "intersects is True",
     min_area_intersect: Optional[float] = None,
     area_inters_column_name: Optional[str] = None,
     input1_layer: Optional[str] = None,
@@ -1926,10 +1927,24 @@ def export_by_location(
     force: bool = False,
 ):
     """
-    Exports all intersecting features.
+    Exports all features filtered by the specified spatial query.
 
-    All features in ``input_to_select_from_path`` that intersect with any features in
+    All features in ``input_to_select_from_path`` that comply to the
+    ``spatial_relations_query`` compared with the features in
     ``input_to_compare_with_path`` are exported.
+
+    The ``spatial_relations_query`` has a specific format. For most cases can use the
+    following "named spatial predicates": contains, coveredby, covers, crosses,
+    disjoint, equals, intersects, overlaps, touches and within.
+    If you want even more control, you can also use "spatial masks" as defined by the
+    |DE-9IM| model.
+
+    Some examples of valid ``spatial_relations_query`` values:
+
+        - "touches is True or within is True"
+        - "intersect is True and touches is False"
+        - "(T*T***T** is True or 1*T***T** is True) and T*****FF* is False"
+
 
     Alternative names:
         - QGIS: extract by location
@@ -1938,6 +1953,8 @@ def export_by_location(
         input_to_select_from_path (PathLike): the 1st input file
         input_to_compare_with_path (PathLike): the 2nd input file
         output_path (PathLike): the file to write the result to
+        spatial_relations_query (str, optional): a query that specifies the spatial
+            relations to match between the 2 layers. Defaults to "intersects is True".
         min_area_intersect (float, optional): minimum area of the intersection.
             Defaults to None.
         area_inters_column_name (str, optional): column name of the intersect
@@ -1972,6 +1989,10 @@ def export_by_location(
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
 
+    .. |DE-9IM| raw:: html
+
+        <a href="https://en.wikipedia.org/wiki/DE-9IM" target="_blank">DE-9IM</a>
+
     """  # noqa: E501
     logger = logging.getLogger("geofileops.export_by_location")
     logger.info(
@@ -1982,6 +2003,7 @@ def export_by_location(
         input_path=Path(input_to_select_from_path),
         input_to_compare_with_path=Path(input_to_compare_with_path),
         output_path=Path(output_path),
+        spatial_relations_query=spatial_relations_query,
         min_area_intersect=min_area_intersect,
         area_inters_column_name=area_inters_column_name,
         input_layer=input1_layer,
@@ -2428,16 +2450,20 @@ def join_by_location(
     and ``min_area_intersect`` parameters will determine which geometries of input1 will
     be matched with input2.
 
-    The ``spatial_relations_query`` is a filter string where you can use the following
-    "named spatial predicates": equals, touches, within, overlaps, crosses, intersects,
-    contains, covers, coveredby.
-
+    The ``spatial_relations_query`` has a specific format. Most cases can be covered
+    using the following "named spatial predicates": contains, coveredby, covers,
+    crosses, equals, intersects, overlaps, touches and within.
     If you want even more control, you can also use "spatial masks" as defined by the
     |DE-9IM| model.
+    It is important to note that the query is used as the matching criterium for the
+    join. Hence, it should not evaluate to True for disjoint features, as this would
+    lead to a cartesian product of both layers. If it does, a warning will be triggered
+    and "intersects is True" is added to the query.
 
-    Examples for valid ``spatial_relations_query`` values:
+    Some examples of valid ``spatial_relations_query`` values:
 
-        - "overlaps is True and contains is False"
+        - "intersects is True and touches is False"
+        - "within is True or contains is True"
         - "(T*T***T** is True or 1*T***T** is True) and T*****FF* is False"
 
 
@@ -2452,10 +2478,9 @@ def join_by_location(
         spatial_relations_query (str, optional): a query that specifies the
             spatial relations to match between the 2 layers.
             Defaults to "intersects is True".
-        discard_nonmatching (bool, optional): True to only keep rows that
-            match with the spatial_relations_query. False to keep rows all
-            rows in the ``input1_layer`` (=left outer join). Defaults to True
-            (=inner join).
+        discard_nonmatching (bool, optional): True to only keep rows that match with the
+            spatial_relations_query. False to keep rows all rows in the ``input1_layer``
+            (=left outer join). Defaults to True (=inner join).
         min_area_intersect (float, optional): minimum area of the intersection
             to match. Defaults to None.
         area_inters_column_name (str, optional): column name of the intersect

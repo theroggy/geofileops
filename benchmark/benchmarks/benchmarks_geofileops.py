@@ -215,6 +215,43 @@ def clip(tmp_dir: Path) -> RunResult:
     return result
 
 
+def export_by_location_intersects(tmp_dir: Path) -> RunResult:
+    # Init-
+    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, _ = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
+
+    # Go!
+    start_time = datetime.now()
+    output_path = (
+        tmp_dir
+        / f"{input1_path.stem}_export_inters_{input2_path.stem}_{_get_package()}.gpkg"
+    )
+    gfo.export_by_location(
+        input_to_select_from_path=input1_path,
+        input_to_compare_with_path=input2_path,
+        output_path=output_path,
+        #spatial_relations_query="intersects is True",
+        nb_parallel=nb_parallel,
+        force=True,
+    )
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation="export_by_location_intersects",
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=(
+            "export_by_location_intersects between 2 agri parcel layers BEFL "
+            "(2*~500.000 polygons)"
+        ),
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    logger.info(f"nb features in result: {gfo.get_layerinfo(output_path).featurecount}")
+    output_path.unlink()
+    return result
+
+
 def intersection(tmp_dir: Path) -> RunResult:
     # Init
     input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
