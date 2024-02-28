@@ -2,6 +2,7 @@
 Tests for operations that are executed using a sql statement on two layers.
 """
 
+from contextlib import nullcontext
 import math
 from pathlib import Path
 from typing import Optional
@@ -1063,29 +1064,40 @@ def test_prepare_spatial_relations_filter():
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, spatial_relations_query, discard_nonmatching, "
-    "min_area_intersect, area_inters_column_name, expected_featurecount",
+    "suffix, epsg, spatial_relations_query, discard_nonmatching, min_area_intersect, "
+    "area_inters_column_name, exp_disjoint_warning, exp_featurecount",
     [
-        (".gpkg", 31370, "intersects is False", False, None, None, 48),
-        (".gpkg", 31370, "intersects is False", True, None, None, 0),
-        (".gpkg", 31370, "intersects is True", False, 1000, "area_test", 50),
-        (".gpkg", 31370, "intersects is True", False, None, None, 51),
-        (".gpkg", 31370, "intersects is True", True, 1000, None, 26),
-        (".gpkg", 31370, "intersects is True", True, None, None, 30),
-        (".gpkg", 4326, "T******** is True or *T******* is True", True, None, None, 30),
-        (".gpkg", 4326, "intersects is True", False, None, None, 51),
-        (".shp", 31370, "intersects is True", False, None, None, 51),
+        (".gpkg", 31370, "intersects is False", False, None, None, True, 48),
+        (".gpkg", 31370, "intersects is False", True, None, None, True, 0),
+        (".gpkg", 31370, "intersects is True", False, 1000, "area_test", False, 50),
+        (".gpkg", 31370, "intersects is True", False, None, None, False, 51),
+        (".gpkg", 31370, "intersects is True", True, 1000, None, False, 26),
+        (".gpkg", 31370, "intersects is True", True, None, None, False, 30),
+        (
+            ".gpkg",
+            4326,
+            "T******** is True or *T******* is True",
+            True,
+            None,
+            None,
+            False,
+            30,
+        ),
+        (".gpkg", 4326, "intersects is True", False, None, None, False, 51),
+        (".shp", 31370, "intersects is True", False, None, None, False, 51),
     ],
 )
 def test_join_by_location(
     tmp_path,
+    recwarn,
     suffix: str,
     spatial_relations_query: str,
     epsg: int,
     discard_nonmatching: bool,
     min_area_intersect: float,
     area_inters_column_name: str,
-    expected_featurecount: int,
+    exp_disjoint_warning: bool,
+    exp_featurecount: int,
 ):
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
@@ -1094,24 +1106,32 @@ def test_join_by_location(
     name = f"{input1_path.stem}_{discard_nonmatching}_{min_area_intersect}{suffix}"
     output_path = tmp_path / name
 
-    gfo.join_by_location(
-        input1_path=str(input1_path),
-        input2_path=str(input2_path),
-        output_path=str(output_path),
-        spatial_relations_query=spatial_relations_query,
-        discard_nonmatching=discard_nonmatching,
-        min_area_intersect=min_area_intersect,
-        area_inters_column_name=area_inters_column_name,
-        batchsize=batchsize,
-        force=True,
-    )
+    if exp_disjoint_warning:
+        handler = pytest.warns(
+            UserWarning,
+            match="The spatial relation query specified evaluated to True for disjoint",
+        )
+    else:
+        handler = nullcontext()  # type: ignore[assignment]
+
+    with handler:
+        gfo.join_by_location(
+            input1_path=str(input1_path),
+            input2_path=str(input2_path),
+            output_path=str(output_path),
+            spatial_relations_query=spatial_relations_query,
+            discard_nonmatching=discard_nonmatching,
+            min_area_intersect=min_area_intersect,
+            area_inters_column_name=area_inters_column_name,
+            batchsize=batchsize,
+        )
 
     # Check if the output file is correctly created
     assert output_path.exists()
     assert gfo.has_spatial_index(output_path)
     input2_layerinfo = gfo.get_layerinfo(input2_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert output_layerinfo.featurecount == expected_featurecount
+    assert output_layerinfo.featurecount == exp_featurecount
 
     exp_nb_columns = len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     if area_inters_column_name is not None:
@@ -1123,8 +1143,8 @@ def test_join_by_location(
     # Check the contents of the result file
     # TODO: this test should be more elaborate...
     output_gdf = gfo.read_file(output_path)
-    assert len(output_gdf) == expected_featurecount
-    if expected_featurecount > 0:
+    assert len(output_gdf) == exp_featurecount
+    if exp_featurecount > 0:
         assert output_gdf["geometry"][0] is not None
 
 

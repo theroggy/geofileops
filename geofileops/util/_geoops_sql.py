@@ -1249,12 +1249,12 @@ def export_by_location(
     (
         spatial_relation_column,
         spatial_relation_filter,
-        include_disjoint,
+        true_for_disjoint,
     ) = _prepare_filter_by_location_fields(spatial_relations_query)
 
-    # Differenct query if intersecting features need to be unioned...
+    # Different query if intersecting features need to be unioned...
     if (
-        include_disjoint is False
+        true_for_disjoint is False
         and area_inters_column_name is None
         and min_area_intersect is None
     ):
@@ -1290,7 +1290,7 @@ def export_by_location(
 
         # If disjoint is True according to the query, include features that don't match
         # the spatial index.
-        if include_disjoint:
+        if true_for_disjoint:
             sql_template = f"""
                 {sql_template}
                 UNION ALL
@@ -1327,12 +1327,12 @@ def export_by_location(
         (
             spatial_relation_column,
             spatial_relation_filter,
-            include_disjoint,
+            true_for_disjoint,
         ) = _prepare_filter_by_location_fields(
             spatial_relations_query, geom1="geom", geom2="geom2", subquery_alias="sub"
         )
 
-        if include_disjoint:
+        if true_for_disjoint:
             spatial_relation_filter = f"geom2 IS NULL OR ({spatial_relation_filter})"
         area_inters_column = (
             f",{area_inters_column_name}" if area_inters_column_name is not None else ""
@@ -1611,13 +1611,6 @@ def join_by_location(
     batchsize: int = -1,
     force: bool = False,
 ):
-    # Check input
-    if "disjoint" in spatial_relations_query:
-        ValueError(f"'disjoint' is not supported in {spatial_relations_query=}")
-    if spatial_relations_query != "intersects is True":
-        # Only intersecting clauses supported at the moment
-        spatial_relations_query += " and intersects is True"
-
     # Prepare sql template for this operation
     # Prepare intersection area columns/filter
     area_inters_column_expression = ""
@@ -1642,11 +1635,13 @@ def join_by_location(
             )
 
     # Prepare spatial relation column and filter
+    # As the query is used as the join criterium, it should not evaluate to True for
+    # disjoint features. So specify avoid_disjoint=True.
     (
         spatial_relation_column,
         spatial_relation_filter,
-        include_disjoint,
-    ) = _prepare_filter_by_location_fields(spatial_relations_query)
+        _,
+    ) = _prepare_filter_by_location_fields(spatial_relations_query, avoid_disjoint=True)
 
     # Prepare sql template
     #
@@ -1742,6 +1737,7 @@ def _prepare_filter_by_location_fields(
     geom1: str = "layer1.{input1_geometrycolumn}",
     geom2: str = "layer2.{input2_geometrycolumn}",
     subquery_alias: str = "sub_filter",
+    avoid_disjoint: bool = False,
 ) -> Tuple[str, str, bool]:
     """
     Prepare the fields needed to prepare a select to filter by location.
@@ -1752,34 +1748,35 @@ def _prepare_filter_by_location_fields(
         geom2 (str): the 2nd geom in the spatial_relation_column.
         subquery_alias (str): the alias tha will be used for the subquery to filter on.
             Defaults to "sub_filter".
+        avoid_disjoint (bool): avoid that the query evaluates disjoint featurs to True.
+            If it does, "intersects is True" is added to the input query.
 
     Returns:
         Tuple[str, str, bool]: returns a tuple with the following values:
             - spatial_relation_column: the string to use as column to filter on
             - spatial_relation_filter: the string to use as filter
-            - include_disjoint: True if the query returns True for disjoint features
+            - true_for_disjoint: True if the query returns True for disjoint features.
+                  If `avoid_disjoint` is True, `includes_disjoint` is always False.
     """
     # Add a specific optimisation for "intersects is True" as it is the most used
     # filtering and it is very optimised in GEOS.
     if query.lower() == "intersects is true":
-        spatial_relation_column = """
-            ,ST_intersects(
-                {input1},
-                {input2}
-             ) AS "GFO_$TEMP$_SPATIAL_RELATION"
-        """
-        spatial_relation_filter = f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION" = 1'
-    else:
-        spatial_relations_filter = _prepare_spatial_relations_filter(query)
-        spatial_relation_column = """
-            ,ST_relate(
-                {input1},
-                {input2}
-             ) AS "GFO_$TEMP$_SPATIAL_RELATION"
-        """
-        spatial_relation_filter = spatial_relations_filter.format(
-            spatial_relation=f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION"'
+        spatial_relation_column = (
+            f',ST_intersects({geom1}, {geom2}) AS "GFO_$TEMP$_SPATIAL_RELATION"'
         )
+        spatial_relation_filter = f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION" = 1'
+        true_for_disjoint = False
+
+        return (spatial_relation_column, spatial_relation_filter, true_for_disjoint)
+
+    # It is a more complex query, so some more processing needed
+    spatial_relations_filter = _prepare_spatial_relations_filter(query)
+    spatial_relation_column = (
+        ',ST_relate({input1}, {input2}) AS "GFO_$TEMP$_SPATIAL_RELATION"'
+    )
+    spatial_relation_filter = spatial_relations_filter.format(
+        spatial_relation=f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION"'
+    )
 
     # Determine of the spatial_relations_query returns True for disjoint features
     spatial_relation_column_disjoint = spatial_relation_column.format(
@@ -1795,12 +1792,28 @@ def _prepare_filter_by_location_fields(
          WHERE {spatial_relation_filter}
     """
     df = fileops.read_file(test_path, sql_stmt=sql_stmt)
-    include_disjoint = True if len(df) > 0 else False
+    true_for_disjoint = True if len(df) > 0 else False
+
+    if true_for_disjoint and avoid_disjoint:
+        # Avoid the query evaluating to True for disjoint features by adding
+        # "intersects is True"
+        query = f"({query}) and intersects is True"
+        spatial_relations_filter = _prepare_spatial_relations_filter(query)
+        spatial_relation_filter = spatial_relations_filter.format(
+            spatial_relation=f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION"'
+        )
+        true_for_disjoint = False
+
+        warnings.warn(
+            "The spatial relation query specified evaluated to True for disjoint "
+            f"features. To avoid this, 'intersects is True' was added: {query}",
+            stacklevel=2,
+        )
 
     # Fill out input columns of the spatial_relation_column
     spatial_relation_column = spatial_relation_column.format(input1=geom1, input2=geom2)
 
-    return (spatial_relation_column, spatial_relation_filter, include_disjoint)
+    return (spatial_relation_column, spatial_relation_filter, true_for_disjoint)
 
 
 def _prepare_spatial_relations_filter(query: str) -> str:
