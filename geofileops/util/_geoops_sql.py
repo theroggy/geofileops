@@ -25,14 +25,15 @@ from geofileops import fileops
 
 from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers import _parameter_helper
 from geofileops.fileops import _append_to_nolock
 from geofileops.util import _general_util
 from geofileops.util import _geofileinfo
+from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util import _geoops_gpd
 from geofileops.util import _io_util
 from geofileops.util import _ogr_sql_util
 from geofileops.util import _ogr_util
-from geofileops.helpers import _parameter_helper
 from geofileops.util import _processing_util
 from geofileops.util import _sqlite_util
 
@@ -745,9 +746,11 @@ def _single_layer_vector_operation(
                 # If there is only one batch, it is faster to create the spatial index
                 # immediately. Otherwise no index needed, because partial files still
                 # need to be merged to one file later on.
-                create_spatial_index = False
-                if nb_batches == 1:
-                    create_spatial_index = True
+                create_spatial_index = (
+                    GeofileInfo(tmp_partial_output_path).default_spatial_index
+                    if nb_batches == 1
+                    else False
+                )
                 translate_info = _ogr_util.VectorTranslateInfo(
                     input_path=processing_params.batches[batch_id]["input1_path"],
                     output_path=tmp_partial_output_path,
@@ -838,7 +841,8 @@ def _single_layer_vector_operation(
         # Now create spatial index and move to output location
         if tmp_output_path.exists():
             if (
-                gfo.get_layerinfo(
+                GeofileInfo(tmp_output_path).default_spatial_index
+                and gfo.get_layerinfo(
                     path=tmp_output_path, layer=output_layer, raise_on_nogeom=False
                 ).geometrycolumn
                 is not None
@@ -889,7 +893,7 @@ def clip(
     batchsize: int = -1,
     force: bool = False,
     input_columns_prefix: str = "",
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
 ):
     # Init
     # In the query, important to only extract the geometry types that are expected
@@ -995,7 +999,7 @@ def erase(
     subdivide_coords: int = 2000,
     force: bool = False,
     input_columns_prefix: str = "",
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
     operation_prefix: str = "",
 ):
     # Because there might be extra preparation of the erase layer before going ahead
@@ -1491,7 +1495,7 @@ def intersection(
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
     operation_prefix: str = "",
 ):
     # If we are doing a self overlay, we need to filter out rows with the same rowid.
@@ -2037,7 +2041,7 @@ def select_two_layers(
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
 ):
     # Go!
     return _two_layer_vector_operation(
@@ -2169,8 +2173,7 @@ def identity(
             # Output file should be in different format, so convert
             tmp_output_path = tempdir / output_path.name
             gfo.copy_layer(src=intersection_output_path, dst=tmp_output_path)
-        else:
-            # Create spatial index
+        elif GeofileInfo(tmp_output_path).default_spatial_index:
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
         # Now we are ready to move the result to the final spot...
@@ -2300,8 +2303,7 @@ def symmetric_difference(
             # Output file should be in diffent format, so convert
             tmp_output_path = tempdir / output_path.name
             gfo.copy_layer(src=erase1_output_path, dst=tmp_output_path)
-        else:
-            # Create spatial index
+        elif GeofileInfo(tmp_output_path).default_spatial_index:
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
         # Now we are ready to move the result to the final spot...
@@ -2455,8 +2457,7 @@ def union(
             # Output file should be in different format, so convert
             tmp_output_path = tempdir / output_path.name
             gfo.copy_layer(src=intersection_output_path, dst=tmp_output_path)
-        else:
-            # Create spatial index
+        elif GeofileInfo(tmp_output_path).default_spatial_index:
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
         # Now we are ready to move the result to the final spot...
@@ -2490,7 +2491,7 @@ def _two_layer_vector_operation(
     batchsize: int,
     force: bool,
     use_ogr: bool = False,
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
 ):
     """
     Executes an operation that needs 2 input files.
@@ -2536,7 +2537,7 @@ def _two_layer_vector_operation(
             NOT supported. If False, sqlite3 is used directly.
             Defaults to False.
         output_with_spatial_index (bool, optional): True to create output file with
-            spatial index. Defaults to True.
+            spatial index. None to use the GDAL default. Defaults to None.
 
     Raises:
         ValueError: [description]
@@ -2567,6 +2568,8 @@ def _two_layer_vector_operation(
             return
         else:
             gfo.remove(output_path)
+    if output_with_spatial_index is None:
+        output_with_spatial_index = GeofileInfo(output_path).default_spatial_index
 
     # Check if spatialite is properly installed to execute this query
     _sqlite_util.spatialite_version_info()
@@ -2880,9 +2883,9 @@ def _two_layer_vector_operation(
                 else:
                     # If there is only one batch, it is faster to create the spatial
                     # index immediately
-                    create_spatial_index = False
-                    if nb_batches == 1 and output_with_spatial_index:
-                        create_spatial_index = True
+                    create_spatial_index = (
+                        True if nb_batches == 1 and output_with_spatial_index else False
+                    )
 
                     fileops._append_to_nolock(
                         src=tmp_partial_output_path,
@@ -3534,11 +3537,11 @@ def dissolve_singlethread(
     # Now we can really start
     tempdir = _io_util.create_tempdir("geofileops/dissolve_singlethread")
     try:
-        create_spatial_index = True
         suffix = output_path.suffix
+        options = {}
         if where_post is not None:
             # where_post needs to be applied still, so no spatial index needed
-            create_spatial_index = False
+            options["LAYER_CREATION.SPATIAL_INDEX"] = False
             suffix = ".gpkg"
         tmp_output_path = tempdir / f"output_tmp{suffix}"
 
@@ -3550,7 +3553,7 @@ def dissolve_singlethread(
             sql_dialect="SQLITE",
             force_output_geometrytype=force_output_geometrytype,
             explodecollections=explodecollections,
-            options={"LAYER_CREATION.SPATIAL_INDEX": create_spatial_index},
+            options=options,
         )
 
         # We still need to apply the where_post filter
@@ -3571,7 +3574,6 @@ def dissolve_singlethread(
                 force_output_geometrytype=force_output_geometrytype,
                 sql_stmt=sql_stmt,
                 sql_dialect="SQLITE",
-                options={"LAYER_CREATION.SPATIAL_INDEX": True},
             )
             tmp_output_path = tmp_output_where_path
 

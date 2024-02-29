@@ -7,6 +7,10 @@
 - Set the default value of `keep_empty_geoms` to `False` for all standard operations.
   This changes the default for `make_valid` and in some cases for `simplify`. The only
   exception is `select`, where the default stays `True`. (#472, #499)
+- Up to now, geofileops always tried to create spatial indexes on output files. For some
+  formats this has disadvantages thought. Hence, and for consistency, from now on the
+  default behaviour regarding spatial index creation of GDAL will be followed. E.g.
+  default a spatial index for "GPKG", but no index for "ESRI Shapefile". (#511)
 - The default filter clause for `export_by_location` is now "intersects is True" while 
   in previous versions it was "intersects is True and touches is False", to be in line with `join_by_location`, other libraries and use for non-polygon data. (#508)
 - When `join_by_location` was applied, a column "spatial_relation" with the spatial

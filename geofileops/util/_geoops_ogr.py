@@ -27,7 +27,6 @@ def clip_by_geometry(
         geom = wkt.loads(clip_geometry)
         spatial_filter = tuple(geom.bounds)
 
-    options = {"LAYER_CREATION.SPATIAL_INDEX": True}
     _run_ogr(
         operation="clip_by_geometry",
         input_path=input_path,
@@ -38,7 +37,6 @@ def clip_by_geometry(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
-        options=options,
         force=force,
     )
 
@@ -53,7 +51,6 @@ def export_by_bounds(
     explodecollections: bool = False,
     force: bool = False,
 ):
-    options = {"LAYER_CREATION.SPATIAL_INDEX": True}
     _run_ogr(
         operation="export_by_bounds",
         input_path=input_path,
@@ -63,7 +60,6 @@ def export_by_bounds(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
-        options=options,
         force=force,
     )
 

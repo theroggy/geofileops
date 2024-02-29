@@ -10,6 +10,7 @@ import pytest
 from geofileops import fileops
 import geofileops as gfo
 from geofileops.util import _sqlite_util as sqlite_util
+from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
 from tests.test_helper import assert_geodataframe_equal
 
@@ -111,7 +112,8 @@ def test_create_table_as_sql_invalidparams(kwargs, expected_error):
 
 def test_execute_sql(tmp_path):
     test_path = test_helper.get_testfile(testfile="polygon-parcel", dst_dir=tmp_path)
-    assert gfo.has_spatial_index(test_path)
+    exp_spatial_index = GeofileInfo(test_path).default_spatial_index
+    assert gfo.has_spatial_index(test_path) is exp_spatial_index
     info_input = gfo.get_layerinfo(test_path)
     nb_deleted = 0
 

@@ -33,6 +33,7 @@ import shapely.geometry as sh_geom
 import geofileops as gfo
 from geofileops import fileops
 from geofileops.helpers._configoptions_helper import ConfigOptions
+
 from geofileops.helpers import _parameter_helper
 from geofileops.util import _general_util
 from geofileops.util import _geoops_sql
@@ -40,6 +41,7 @@ from geofileops.util import _geoseries_util
 from geofileops.util import _io_util
 from geofileops.util import _ogr_util
 from geofileops.util import _processing_util
+from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util._geometry_util import SimplifyAlgorithm
 from geofileops.util._geometry_util import BufferEndCapStyle, BufferJoinStyle
 
@@ -875,7 +877,8 @@ def _apply_geooperation_to_layer(
         # Round up and clean up
         # Now create spatial index and move to output location
         if tmp_output_path.exists():
-            gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
+            if GeofileInfo(tmp_output_path).default_spatial_index:
+                gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
             gfo.move(tmp_output_path, output_path)
         else:
             logger.debug("Result was empty")
@@ -1500,7 +1503,11 @@ def dissolve(
                     geometrycolumn="geom", input_layer=output_layer
                 )
 
-                create_spatial_index = True if where_post is None else False
+                create_spatial_index = (
+                    GeofileInfo(output_tmp2_final_path).default_spatial_index
+                    if where_post is None
+                    else False
+                )
                 output_geometrytype = (
                     input_layerinfo.geometrytype.to_singletype
                     if explodecollections
@@ -1538,7 +1545,6 @@ def dissolve(
                         force_output_geometrytype=output_geometrytype,
                         sql_stmt=sql_stmt,
                         sql_dialect="SQLITE",
-                        options={"LAYER_CREATION.SPATIAL_INDEX": True},
                     )
                     output_tmp2_final_path = output_tmp3_where_path
 
