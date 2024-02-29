@@ -3036,33 +3036,33 @@ def _prepare_processing_params(
     input2_path: Optional[Path] = None,
     input2_layer: Optional[str] = None,
 ) -> Optional[ProcessingParams]:
-    # Init
-    input1_layerinfo = gfo.get_layerinfo(
-        input1_path, input1_layer, raise_on_nogeom=False
-    )
-
     # Prepare input files for the calculation
     if convert_to_spatialite_based:
-        # Check if the input files are of the correct geofiletype
+        # The input files should be spatialite based, and should be of the same type:
+        # either both GPKG, or both SQLite.
         input1_info = _geofileinfo.get_geofileinfo(input1_path)
         input2_info = (
             None if input2_path is None else _geofileinfo.get_geofileinfo(input2_path)
         )
 
-        # If input files are of the same format + are spatialite compatible,
-        # just use them
+        # If input1 is spatialite based and compatible with input2, no conversion.
         if input1_info.is_spatialite_based and (
-            input2_info is None or input1_info.driver == input2_info.driver
+            input1_info.driver == "GPKG"
+            or input2_info is None
+            or input2_info.driver == input2_info.driver
         ):
-            if (
-                input1_info.driver == "GPKG"
-                and input1_layerinfo.geometrycolumn is not None
-            ):
-                # HasSpatialindex doesn't work for spatialite file
-                gfo.create_spatial_index(input1_path, input1_layer, exist_ok=True)
+            if input1_info.driver == "GPKG":
+                # HasSpatialindex doesn't work for spatialite files.
+                gfo.create_spatial_index(
+                    input1_path, input1_layer, exist_ok=True, no_geom_ok=True
+                )
         else:
-            # If not ok, copy the input layer to gpkg
-            input1_tmp_path = tempdir / f"{input1_path.stem}.gpkg"
+            # input1 is not spatialite compatible, so convert it.
+            # If input2 is "Sqlite", convert input1 to SQLite as well.
+            suffix = ".gpkg"
+            if input2_info is not None and input2_info.driver == "SQLite":
+                suffix = ".sqlite"
+            input1_tmp_path = tempdir / f"{input1_path.stem}{suffix}"
             gfo.copy_layer(
                 src=input1_path,
                 src_layer=input1_layer,
@@ -3071,24 +3071,33 @@ def _prepare_processing_params(
                 preserve_fid=True,
             )
             input1_path = input1_tmp_path
+            input1_info = _geofileinfo.get_geofileinfo(input1_path)
+            if input1_info.driver == "SQLite":
+                # In sqlite, the layer name is sometimes changed...
+                input1_layer = gfo.get_only_layer(input1_path)
 
+        # If input2 is spatialite_based and compatible with input1, no conversion.
         if input2_path is not None and input2_info is not None:
             if (
-                input2_info.driver == input1_info.driver
-                and input2_info.is_spatialite_based
+                input2_info.is_spatialite_based
+                and input2_info.driver == input1_info.driver
             ):
-                input2_layerinfo = gfo.get_layerinfo(
-                    input2_path, input2_layer, raise_on_nogeom=False
-                )
-                if (
-                    input2_info.driver == "GPKG"
-                    and input2_layerinfo.geometrycolumn is not None
-                ):
-                    # HasSpatialindex doesn't work for spatialite file
-                    gfo.create_spatial_index(input2_path, input2_layer, exist_ok=True)
+                if input2_info.driver == "GPKG":
+                    # HasSpatialindex doesn't work for spatialite files.
+                    gfo.create_spatial_index(
+                        input2_path, input2_layer, exist_ok=True, no_geom_ok=True
+                    )
             else:
-                # If not spatialite compatible, copy the input layer to gpkg
-                input2_tmp_path = tempdir / f"{input2_path.stem}.gpkg"
+                # input2 is not spatialite compatible, so convert it.
+                # If input1 is "Sqlite", convert input2 to SQLite as well.
+                suffix = ".gpkg"
+                if input1_info is not None and input1_info.driver == "SQLite":
+                    suffix = ".sqlite"
+                input2_tmp_path = tempdir / f"{input2_path.stem}{suffix}"
+
+                # Make sure the copy is taken to a separate file.
+                if input2_tmp_path.exists():
+                    input2_tmp_path = tempdir / f"{input2_path.stem}2{suffix}"
                 gfo.copy_layer(
                     src=input2_path,
                     src_layer=input2_layer,
@@ -3097,6 +3106,10 @@ def _prepare_processing_params(
                     preserve_fid=True,
                 )
                 input2_path = input2_tmp_path
+                input2_info = _geofileinfo.get_geofileinfo(input2_path)
+                if input2_info.driver == "SQLite":
+                    # In sqlite, the layer name is sometimes changed...
+                    input2_layer = gfo.get_only_layer(input2_path)
 
     # Prepare batches to process
     layer1_info = gfo.get_layerinfo(input1_path, input1_layer, raise_on_nogeom=False)

@@ -1,6 +1,8 @@
 import pytest
 
+import geofileops as gfo
 from geofileops.util import _geoops_sql
+from tests import test_helper
 
 
 @pytest.mark.parametrize(
@@ -47,3 +49,63 @@ def test_determine_nb_batches(
     )
     assert exp_nb_parallel == res_nb_parallel
     assert exp_nb_batches == res_nb_batches
+
+
+@pytest.mark.parametrize(
+    "input1_suffix, input2_suffix, output1_suffix, output2_suffix",
+    [
+        (".gpkg", None, ".gpkg", None),
+        (".gpkg", ".gpkg", ".gpkg", ".gpkg"),
+        (".gpkg", ".shp", ".gpkg", ".gpkg"),
+        (".gpkg", ".sqlite", ".gpkg", ".gpkg"),
+        (".shp", None, ".gpkg", None),
+        (".shp", ".gpkg", ".gpkg", ".gpkg"),
+        (".shp", ".sqlite", ".sqlite", ".sqlite"),
+        (".sqlite", None, ".sqlite", None),
+        (".sqlite", ".shp", ".sqlite", ".sqlite"),
+        (".sqlite", ".sqlite", ".sqlite", ".sqlite"),
+    ],
+)
+def test_prepare_processing_params_filetypes(
+    tmp_path, input1_suffix, input2_suffix, output1_suffix, output2_suffix
+):
+    input1_path = test_helper.get_testfile("polygon-parcel", suffix=input1_suffix)
+    input1_layer = gfo.get_only_layer(input1_path)
+    input2_path = None
+    input2_layer = None
+    if input2_suffix is not None:
+        input2_path = test_helper.get_testfile("polygon-parcel", suffix=input2_suffix)
+        input2_layer = gfo.get_only_layer(input2_path)
+
+    params = _geoops_sql._prepare_processing_params(
+        input1_path=input1_path,
+        input1_layer=input1_layer,
+        input2_path=input2_path,
+        input2_layer=input2_layer,
+        tempdir=tmp_path,
+        convert_to_spatialite_based=True,
+        nb_parallel=2,
+    )
+
+    assert params is not None
+    assert params.input1_path.suffix == output1_suffix
+    assert params.input1_path.exists()
+    assert params.input1_layer in gfo.listlayers(params.input1_path)
+
+    # If the file format hasn't changed, the file should not be copied
+    if input1_path.suffix == params.input1_path.suffix:
+        assert input1_path == params.input1_path
+
+    if input2_suffix is not None:
+        assert params.input2_path.exists()
+        assert params.input2_layer in gfo.listlayers(params.input2_path)
+        assert params.input2_path.suffix == output2_suffix
+        # If the file format hasn't changed, the file should not be copied
+        if input2_path.suffix == params.input2_path.suffix:
+            assert input2_path == params.input2_path
+        # If both input files were copied, they should have been copied to seperate
+        # files
+        if params.input1_path.parent == tmp_path and input2_suffix is not None:
+            assert params.input1_path != params.input2_path
+    else:
+        assert params.input2_path is None
