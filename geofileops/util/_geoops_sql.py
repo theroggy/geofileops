@@ -3505,10 +3505,10 @@ def dissolve_singlethread(
     # Now the sql query can be assembled
     sql_stmt = f"""
         SELECT {operation} AS geom
-            {groupby_columns_for_select_str}
-            {agg_columns_str}
-        FROM "{input_layer}" layer
-        GROUP BY {groupby_columns_for_groupby_str}
+              {groupby_columns_for_select_str}
+              {agg_columns_str}
+          FROM "{input_layer}" layer
+         GROUP BY {groupby_columns_for_groupby_str}
     """
 
     # If empty/null geometries don't need to be kept, filter them away
@@ -3531,7 +3531,7 @@ def dissolve_singlethread(
             SELECT * FROM
                 ( {sql_stmt}
                 )
-                WHERE {where_post}
+             WHERE {where_post}
         """
         # where_post has been applied already so set to None.
         where_post = None

@@ -272,6 +272,39 @@ def test_select_emptyresult(tmp_path, suffix):
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
 
 
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
+def test_select_equal_columns(tmp_path, suffix):
+    """Select that selects two columns with identical names."""
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+
+    # Now run test
+    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
+    sql_stmt = 'SELECT {geometrycolumn}, oidn, uidn AS oidn FROM "{input_layer}"'
+
+    gfo.select(input_path=input_path, output_path=output_path, sql_stmt=sql_stmt)
+
+    # Now check if the tmp file is correctly created
+    layerinfo_input = gfo.get_layerinfo(input_path)
+    layerinfo_output = gfo.get_layerinfo(output_path)
+    assert layerinfo_input.featurecount == layerinfo_output.featurecount
+    assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
+
+    assert len(layerinfo_output.columns) == 2
+    columns_output_upper = [col.upper() for col in layerinfo_output.columns]
+    assert "OIDN" in columns_output_upper
+    if suffix == ".gpkg":
+        assert "OIDN:1" in columns_output_upper
+    elif suffix == ".shp":
+        assert "OIDN_1" in columns_output_upper
+    else:
+        raise ValueError(f"Test doesn't support {suffix=}")
+
+    # Now check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None
+
+
 @pytest.mark.parametrize(
     "sql_stmt",
     [
