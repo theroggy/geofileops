@@ -33,6 +33,7 @@ import shapely.geometry as sh_geom
 import geofileops as gfo
 from geofileops import fileops
 from geofileops.helpers._configoptions_helper import ConfigOptions
+
 from geofileops.helpers import _parameter_helper
 from geofileops.util import _general_util
 from geofileops.util import _geoops_sql
@@ -40,6 +41,7 @@ from geofileops.util import _geoseries_util
 from geofileops.util import _io_util
 from geofileops.util import _ogr_util
 from geofileops.util import _processing_util
+from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util._geometry_util import SimplifyAlgorithm
 from geofileops.util._geometry_util import BufferEndCapStyle, BufferJoinStyle
 
@@ -709,12 +711,8 @@ def _apply_geooperation_to_layer(
         raise ValueError(f"{operation_name}: output_path must not equal input_path")
     if input_layer is None:
         input_layer = gfo.get_only_layer(input_path)
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
     if input_layer is None:
         input_layer = gfo.get_only_layer(input_path)
     if output_layer is None:
@@ -875,7 +873,8 @@ def _apply_geooperation_to_layer(
         # Round up and clean up
         # Now create spatial index and move to output location
         if tmp_output_path.exists():
-            gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
+            if GeofileInfo(tmp_output_path).default_spatial_index:
+                gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
             gfo.move(tmp_output_path, output_path)
         else:
             logger.debug("Result was empty")
@@ -903,6 +902,8 @@ def _apply_geooperation(
     force: bool = False,
 ) -> str:
     # Init
+    if not output_path.parent.exists():
+        raise ValueError(f"Output directory does not exist: {output_path.parent}")
     if output_path.exists():
         if force is False:
             message = f"Stop, output exists already {output_path}"
@@ -1020,7 +1021,7 @@ def dissolve(
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
-) -> dict:
+):
     """
     Function that applies a dissolve.
 
@@ -1032,10 +1033,8 @@ def dissolve(
     """
     # Init and validate input parameters
     # ----------------------------------
-    start_time = datetime.now()
     operation_name = f"{operation_prefix}dissolve"
     logger = logging.getLogger(f"geofileops.{operation_name}")
-    result_info = {}
 
     # Check input parameters
     if groupby_columns is not None and len(list(groupby_columns)) == 0:
@@ -1102,15 +1101,8 @@ def dissolve(
                 )
 
     # Now input parameters are checked, check if we need to calculate anyway
-    if output_path.exists():
-        if force is False:
-            result_info[
-                "message"
-            ] = f"Stop, output exists already {output_path} and force is false"
-            logger.info(result_info["message"])
-            return result_info
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     # Now start dissolving
     # --------------------
@@ -1500,7 +1492,11 @@ def dissolve(
                     geometrycolumn="geom", input_layer=output_layer
                 )
 
-                create_spatial_index = True if where_post is None else False
+                create_spatial_index = (
+                    GeofileInfo(output_tmp2_final_path).default_spatial_index
+                    if where_post is None
+                    else False
+                )
                 output_geometrytype = (
                     input_layerinfo.geometrytype.to_singletype
                     if explodecollections
@@ -1538,7 +1534,6 @@ def dissolve(
                         force_output_geometrytype=output_geometrytype,
                         sql_stmt=sql_stmt,
                         sql_dialect="SQLITE",
-                        options={"LAYER_CREATION.SPATIAL_INDEX": True},
                     )
                     output_tmp2_final_path = output_tmp3_where_path
 
@@ -1552,11 +1547,6 @@ def dissolve(
         raise NotImplementedError(
             f"Unsupported input geometrytype: {input_layerinfo.geometrytype}"
         )
-
-    # Return result info
-    result_info["message"] = f"Ready, took {datetime.now()-start_time}"
-    logger.info(result_info["message"])
-    return result_info
 
 
 def _dissolve_polygons_pass(

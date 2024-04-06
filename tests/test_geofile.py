@@ -14,6 +14,7 @@ import shapely.geometry as sh_geom
 import geofileops as gfo
 from geofileops import fileops
 from geofileops.util import _geofileinfo
+from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util import _geoseries_util
 from geofileops.util import _io_util
 from geofileops.util import _ogr_util
@@ -1159,10 +1160,11 @@ def test_spatial_index(tmp_path, suffix):
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix
     )
     layer = gfo.get_only_layer(test_path)
+    default_spatial_index = GeofileInfo(test_path).default_spatial_index
 
     # Check if spatial index present
     has_spatial_index = gfo.has_spatial_index(path=test_path, layer=layer)
-    assert has_spatial_index is True
+    assert has_spatial_index is default_spatial_index
 
     # Remove spatial index
     gfo.remove_spatial_index(path=test_path, layer=layer)

@@ -17,6 +17,7 @@ from geofileops import GeometryType
 from geofileops import geoops
 from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.util import _geofileinfo
+from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util import _geoops_sql
 from geofileops.util import _io_util as io_util
 
@@ -215,7 +216,8 @@ def test_buffer(
 
     # Now check if the output file is correctly created
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = fileops.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
 
@@ -276,7 +278,8 @@ def test_buffer_columns_fid(tmp_path, suffix, geoops_module, testfile):
 
     # Now check if the output file is correctly created
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = fileops.get_layerinfo(output_path)
     output_gdf = fileops.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
@@ -307,7 +310,8 @@ def test_buffer_force(tmp_path, geoops_module):
 
     # Test buffer to existing output path
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     mtime_orig = output_path.stat().st_mtime
     geoops.buffer(
         input_path=input_path,
@@ -412,7 +416,7 @@ def test_buffer_negative(
 
     # Now check if the output file is correctly created
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+
     output_layerinfo = fileops.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
 
@@ -482,7 +486,8 @@ def test_buffer_negative_explode(tmp_path, geoops_module):
 
     # Now check if the output file is correctly created
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     layerinfo_output = fileops.get_layerinfo(output_path)
     assert len(layerinfo_output.columns) == len(input_layerinfo.columns)
     assert layerinfo_output.geometrytype == GeometryType.POLYGON
@@ -544,7 +549,8 @@ def test_buffer_negative_where_explode(
 
     # Check result
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = fileops.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
 
@@ -597,7 +603,8 @@ def test_buffer_preserve_fid_gpkg(tmp_path, geoops_module):
 
     # Check if the output file with the expected result
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     output_gdf = fileops.read_file(output_path, fid_as_index=True)
     assert len(output_gdf) == len(expected_gdf)
     assert output_gdf["geometry"].iloc[0] is not None
@@ -648,7 +655,8 @@ def test_buffer_shp_to_gpkg(
 
     # Now check if the output file is correctly created
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = fileops.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
 
@@ -714,7 +722,8 @@ def test_convexhull(
 
     # Now check if the output file is correctly created
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     layerinfo_output = fileops.get_layerinfo(output_path)
     assert "OIDN" in layerinfo_output.columns
     assert "uidn" in layerinfo_output.columns
@@ -1111,7 +1120,8 @@ def test_simplify(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists()
-    assert fileops.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert fileops.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = fileops.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
 

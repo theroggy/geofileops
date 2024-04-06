@@ -15,6 +15,7 @@ import shapely.geometry as sh_geom
 import geofileops as gfo
 from geofileops import GeometryType
 from geofileops.util import _geofileinfo
+from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util import _geometry_util
 from geofileops.util import _geoops_gpd as geoops_gpd
 from tests import test_helper
@@ -87,7 +88,8 @@ def test_apply(
 
     # Now check if the output file is correctly created
     assert output_path.exists()
-    assert gfo.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert gfo.has_spatial_index(output_path) is exp_spatial_index
 
     # Read result for some more detailed checks
     output_gdf = gfo.read_file(output_path).sort_values("uidn").reset_index(drop=True)
@@ -174,7 +176,8 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
 
     # Now check if the output file is correctly created
     assert output_path.exists()
-    assert gfo.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert gfo.has_spatial_index(output_path) is exp_spatial_index
 
     # Read result for some more detailed checks
     output_gdf = gfo.read_file(output_path).sort_values("id").reset_index(drop=True)
@@ -311,7 +314,8 @@ def test_dissolve_linestrings(
 
     # Check if the result file is correctly created
     assert output_path.exists()
-    assert gfo.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert gfo.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.geometrytype in [
         GeometryType.LINESTRING,
@@ -587,7 +591,8 @@ def test_dissolve_polygons(
 
     # Now check if the tmp file is correctly created
     assert output_path.exists()
-    assert gfo.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert gfo.has_spatial_index(output_path) is exp_spatial_index
     assert gfo.isvalid(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == expected_featurecount
@@ -1136,7 +1141,8 @@ def test_simplify_lang(tmp_path, suffix, epsg, testfile, gridsize):
 
     # Check if the output file is correctly created
     assert output_path.exists()
-    assert gfo.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert gfo.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = gfo.get_layerinfo(output_path)
     expected_featurecount = input_layerinfo.featurecount
     if testfile == "polygon-parcel":
@@ -1196,7 +1202,8 @@ def test_simplify_vw(tmp_path, suffix, epsg, testfile, gridsize):
 
     # Check if the file is correctly created
     assert output_path.exists()
-    assert gfo.has_spatial_index(output_path)
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert gfo.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = gfo.get_layerinfo(output_path)
     expected_featurecount = input_layerinfo.featurecount
     if testfile == "polygon-parcel":

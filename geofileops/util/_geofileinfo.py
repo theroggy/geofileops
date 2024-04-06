@@ -31,6 +31,7 @@ class GeofileTypeInfo:
     suffixes: List[str]
     is_fid_zerobased: bool
     is_spatialite_based: bool
+    default_spatial_index: bool
     suffixes_extrafiles: List[str]
 
 
@@ -67,6 +68,7 @@ def _init_geofiletypes():
                 suffixes=suffixes,
                 is_fid_zerobased=ast.literal_eval(row["is_fid_zerobased"]),
                 is_spatialite_based=ast.literal_eval(row["is_spatialite_based"]),
+                default_spatial_index=ast.literal_eval(row["default_spatial_index"]),
                 suffixes_extrafiles=suffixes_extrafiles,
             )
 
@@ -214,6 +216,14 @@ class GeofileInfo:
             return False
         else:
             return True
+
+    @property
+    def default_spatial_index(self) -> bool:
+        """Returns True if this geofile can only have one layer."""
+        if self.geofiletype_info is not None:
+            return self.geofiletype_info.default_spatial_index
+        else:
+            return False
 
     @property
     def suffixes_extrafiles(self) -> List[str]:

@@ -25,14 +25,15 @@ from geofileops import fileops
 
 from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers import _parameter_helper
 from geofileops.fileops import _append_to_nolock
 from geofileops.util import _general_util
 from geofileops.util import _geofileinfo
+from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util import _geoops_gpd
 from geofileops.util import _io_util
 from geofileops.util import _ogr_sql_util
 from geofileops.util import _ogr_util
-from geofileops.helpers import _parameter_helper
 from geofileops.util import _processing_util
 from geofileops.util import _sqlite_util
 
@@ -387,10 +388,8 @@ def select(
 ):
     # Check if output exists already here, to avoid to much logging to be written
     logger = logging.getLogger(f"geofileops.{operation_prefix}select")
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
     logger.debug(f"  -> select to execute:\n{sql_stmt}")
 
     # If no output geometrytype is specified, use the geometrytype of the input layer
@@ -545,12 +544,8 @@ def _single_layer_vector_operation(
         output_layer = gfo.get_default_layer(output_path)
 
     # If output file exists already, either clean up or return...
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     # Determine if fid can be preserved
     preserve_fid = False
@@ -745,9 +740,11 @@ def _single_layer_vector_operation(
                 # If there is only one batch, it is faster to create the spatial index
                 # immediately. Otherwise no index needed, because partial files still
                 # need to be merged to one file later on.
-                create_spatial_index = False
-                if nb_batches == 1:
-                    create_spatial_index = True
+                create_spatial_index = (
+                    GeofileInfo(tmp_partial_output_path).default_spatial_index
+                    if nb_batches == 1
+                    else False
+                )
                 translate_info = _ogr_util.VectorTranslateInfo(
                     input_path=processing_params.batches[batch_id]["input1_path"],
                     output_path=tmp_partial_output_path,
@@ -838,7 +835,8 @@ def _single_layer_vector_operation(
         # Now create spatial index and move to output location
         if tmp_output_path.exists():
             if (
-                gfo.get_layerinfo(
+                GeofileInfo(tmp_output_path).default_spatial_index
+                and gfo.get_layerinfo(
                     path=tmp_output_path, layer=output_layer, raise_on_nogeom=False
                 ).geometrycolumn
                 is not None
@@ -889,7 +887,7 @@ def clip(
     batchsize: int = -1,
     force: bool = False,
     input_columns_prefix: str = "",
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
 ):
     # Init
     # In the query, important to only extract the geometry types that are expected
@@ -995,7 +993,7 @@ def erase(
     subdivide_coords: int = 2000,
     force: bool = False,
     input_columns_prefix: str = "",
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
     operation_prefix: str = "",
 ):
     # Because there might be extra preparation of the erase layer before going ahead
@@ -1017,12 +1015,8 @@ def erase(
     if erase_layer is None:
         erase_layer = gfo.get_only_layer(erase_path)
 
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     start_time = datetime.now()
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
@@ -1491,7 +1485,7 @@ def intersection(
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
     operation_prefix: str = "",
 ):
     # If we are doing a self overlay, we need to filter out rows with the same rowid.
@@ -2037,7 +2031,7 @@ def select_two_layers(
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
 ):
     # Go!
     return _two_layer_vector_operation(
@@ -2092,12 +2086,9 @@ def identity(
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
     logger = logging.getLogger("geofileops.identity")
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
@@ -2169,8 +2160,7 @@ def identity(
             # Output file should be in different format, so convert
             tmp_output_path = tempdir / output_path.name
             gfo.copy_layer(src=intersection_output_path, dst=tmp_output_path)
-        else:
-            # Create spatial index
+        elif GeofileInfo(tmp_output_path).default_spatial_index:
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
         # Now we are ready to move the result to the final spot...
@@ -2211,8 +2201,6 @@ def symmetric_difference(
     # we need to do some additional init + checks here...
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
-    if force is False and output_path.exists():
-        return
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
@@ -2222,6 +2210,9 @@ def symmetric_difference(
         f"Start, with input1: {input1_path}, "
         f"input2: {input2_path}, output: {output_path}"
     )
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     tempdir = _io_util.create_tempdir("geofileops/symmdiff")
     try:
         # First erase input2 from input1 to a temporary output file
@@ -2300,13 +2291,10 @@ def symmetric_difference(
             # Output file should be in diffent format, so convert
             tmp_output_path = tempdir / output_path.name
             gfo.copy_layer(src=erase1_output_path, dst=tmp_output_path)
-        else:
-            # Create spatial index
+        elif GeofileInfo(tmp_output_path).default_spatial_index:
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
         # Now we are ready to move the result to the final spot...
-        if output_path.exists():
-            gfo.remove(output_path)
         gfo.move(tmp_output_path, output_path)
 
     finally:
@@ -2346,12 +2334,9 @@ def union(
 
     logger = logging.getLogger("geofileops.union")
 
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
@@ -2455,8 +2440,7 @@ def union(
             # Output file should be in different format, so convert
             tmp_output_path = tempdir / output_path.name
             gfo.copy_layer(src=intersection_output_path, dst=tmp_output_path)
-        else:
-            # Create spatial index
+        elif GeofileInfo(tmp_output_path).default_spatial_index:
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
         # Now we are ready to move the result to the final spot...
@@ -2490,7 +2474,7 @@ def _two_layer_vector_operation(
     batchsize: int,
     force: bool,
     use_ogr: bool = False,
-    output_with_spatial_index: bool = True,
+    output_with_spatial_index: Optional[bool] = None,
 ):
     """
     Executes an operation that needs 2 input files.
@@ -2536,7 +2520,7 @@ def _two_layer_vector_operation(
             NOT supported. If False, sqlite3 is used directly.
             Defaults to False.
         output_with_spatial_index (bool, optional): True to create output file with
-            spatial index. Defaults to True.
+            spatial index. None to use the GDAL default. Defaults to None.
 
     Raises:
         ValueError: [description]
@@ -2561,12 +2545,11 @@ def _two_layer_vector_operation(
         raise ValueError(
             f"{operation_name}: if use_ogr True, input1_path should equal input2_path!"
         )
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
+    if output_with_spatial_index is None:
+        output_with_spatial_index = GeofileInfo(output_path).default_spatial_index
 
     # Check if spatialite is properly installed to execute this query
     _sqlite_util.spatialite_version_info()
@@ -2880,9 +2863,9 @@ def _two_layer_vector_operation(
                 else:
                     # If there is only one batch, it is faster to create the spatial
                     # index immediately
-                    create_spatial_index = False
-                    if nb_batches == 1 and output_with_spatial_index:
-                        create_spatial_index = True
+                    create_spatial_index = (
+                        True if nb_batches == 1 and output_with_spatial_index else False
+                    )
 
                     fileops._append_to_nolock(
                         src=tmp_partial_output_path,
@@ -3033,33 +3016,33 @@ def _prepare_processing_params(
     input2_path: Optional[Path] = None,
     input2_layer: Optional[str] = None,
 ) -> Optional[ProcessingParams]:
-    # Init
-    input1_layerinfo = gfo.get_layerinfo(
-        input1_path, input1_layer, raise_on_nogeom=False
-    )
-
     # Prepare input files for the calculation
     if convert_to_spatialite_based:
-        # Check if the input files are of the correct geofiletype
+        # The input files should be spatialite based, and should be of the same type:
+        # either both GPKG, or both SQLite.
         input1_info = _geofileinfo.get_geofileinfo(input1_path)
         input2_info = (
             None if input2_path is None else _geofileinfo.get_geofileinfo(input2_path)
         )
 
-        # If input files are of the same format + are spatialite compatible,
-        # just use them
+        # If input1 is spatialite based and compatible with input2, no conversion.
         if input1_info.is_spatialite_based and (
-            input2_info is None or input1_info.driver == input2_info.driver
+            input1_info.driver == "GPKG"
+            or input2_info is None
+            or input2_info.driver == input2_info.driver
         ):
-            if (
-                input1_info.driver == "GPKG"
-                and input1_layerinfo.geometrycolumn is not None
-            ):
-                # HasSpatialindex doesn't work for spatialite file
-                gfo.create_spatial_index(input1_path, input1_layer, exist_ok=True)
+            if input1_info.driver == "GPKG":
+                # HasSpatialindex doesn't work for spatialite files.
+                gfo.create_spatial_index(
+                    input1_path, input1_layer, exist_ok=True, no_geom_ok=True
+                )
         else:
-            # If not ok, copy the input layer to gpkg
-            input1_tmp_path = tempdir / f"{input1_path.stem}.gpkg"
+            # input1 is not spatialite compatible, so convert it.
+            # If input2 is "Sqlite", convert input1 to SQLite as well.
+            suffix = ".gpkg"
+            if input2_info is not None and input2_info.driver == "SQLite":
+                suffix = ".sqlite"
+            input1_tmp_path = tempdir / f"{input1_path.stem}{suffix}"
             gfo.copy_layer(
                 src=input1_path,
                 src_layer=input1_layer,
@@ -3068,24 +3051,33 @@ def _prepare_processing_params(
                 preserve_fid=True,
             )
             input1_path = input1_tmp_path
+            input1_info = _geofileinfo.get_geofileinfo(input1_path)
+            if input1_info.driver == "SQLite":
+                # In sqlite, the layer name is sometimes changed...
+                input1_layer = gfo.get_only_layer(input1_path)
 
+        # If input2 is spatialite_based and compatible with input1, no conversion.
         if input2_path is not None and input2_info is not None:
             if (
-                input2_info.driver == input1_info.driver
-                and input2_info.is_spatialite_based
+                input2_info.is_spatialite_based
+                and input2_info.driver == input1_info.driver
             ):
-                input2_layerinfo = gfo.get_layerinfo(
-                    input2_path, input2_layer, raise_on_nogeom=False
-                )
-                if (
-                    input2_info.driver == "GPKG"
-                    and input2_layerinfo.geometrycolumn is not None
-                ):
-                    # HasSpatialindex doesn't work for spatialite file
-                    gfo.create_spatial_index(input2_path, input2_layer, exist_ok=True)
+                if input2_info.driver == "GPKG":
+                    # HasSpatialindex doesn't work for spatialite files.
+                    gfo.create_spatial_index(
+                        input2_path, input2_layer, exist_ok=True, no_geom_ok=True
+                    )
             else:
-                # If not spatialite compatible, copy the input layer to gpkg
-                input2_tmp_path = tempdir / f"{input2_path.stem}.gpkg"
+                # input2 is not spatialite compatible, so convert it.
+                # If input1 is "Sqlite", convert input2 to SQLite as well.
+                suffix = ".gpkg"
+                if input1_info is not None and input1_info.driver == "SQLite":
+                    suffix = ".sqlite"
+                input2_tmp_path = tempdir / f"{input2_path.stem}{suffix}"
+
+                # Make sure the copy is taken to a separate file.
+                if input2_tmp_path.exists():
+                    input2_tmp_path = tempdir / f"{input2_path.stem}2{suffix}"
                 gfo.copy_layer(
                     src=input2_path,
                     src_layer=input2_layer,
@@ -3094,6 +3086,10 @@ def _prepare_processing_params(
                     preserve_fid=True,
                 )
                 input2_path = input2_tmp_path
+                input2_info = _geofileinfo.get_geofileinfo(input2_path)
+                if input2_info.driver == "SQLite":
+                    # In sqlite, the layer name is sometimes changed...
+                    input2_layer = gfo.get_only_layer(input2_path)
 
     # Prepare batches to process
     layer1_info = gfo.get_layerinfo(input1_path, input1_layer, raise_on_nogeom=False)
@@ -3452,12 +3448,8 @@ def dissolve_singlethread(
                 )
 
     # Check output path
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     # Now prepare the sql statement
     # Remark: calculating the area in the enclosing selects halves the processing time
@@ -3489,10 +3481,10 @@ def dissolve_singlethread(
     # Now the sql query can be assembled
     sql_stmt = f"""
         SELECT {operation} AS geom
-            {groupby_columns_for_select_str}
-            {agg_columns_str}
-        FROM "{input_layer}" layer
-        GROUP BY {groupby_columns_for_groupby_str}
+              {groupby_columns_for_select_str}
+              {agg_columns_str}
+          FROM "{input_layer}" layer
+         GROUP BY {groupby_columns_for_groupby_str}
     """
 
     # If empty/null geometries don't need to be kept, filter them away
@@ -3515,7 +3507,7 @@ def dissolve_singlethread(
             SELECT * FROM
                 ( {sql_stmt}
                 )
-                WHERE {where_post}
+             WHERE {where_post}
         """
         # where_post has been applied already so set to None.
         where_post = None
@@ -3534,11 +3526,11 @@ def dissolve_singlethread(
     # Now we can really start
     tempdir = _io_util.create_tempdir("geofileops/dissolve_singlethread")
     try:
-        create_spatial_index = True
         suffix = output_path.suffix
+        options = {}
         if where_post is not None:
             # where_post needs to be applied still, so no spatial index needed
-            create_spatial_index = False
+            options["LAYER_CREATION.SPATIAL_INDEX"] = False
             suffix = ".gpkg"
         tmp_output_path = tempdir / f"output_tmp{suffix}"
 
@@ -3550,7 +3542,7 @@ def dissolve_singlethread(
             sql_dialect="SQLITE",
             force_output_geometrytype=force_output_geometrytype,
             explodecollections=explodecollections,
-            options={"LAYER_CREATION.SPATIAL_INDEX": create_spatial_index},
+            options=options,
         )
 
         # We still need to apply the where_post filter
@@ -3571,7 +3563,6 @@ def dissolve_singlethread(
                 force_output_geometrytype=force_output_geometrytype,
                 sql_stmt=sql_stmt,
                 sql_dialect="SQLITE",
-                options={"LAYER_CREATION.SPATIAL_INDEX": True},
             )
             tmp_output_path = tmp_output_where_path
 
