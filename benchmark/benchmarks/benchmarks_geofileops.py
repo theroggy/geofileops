@@ -1,6 +1,7 @@
 """
 Module to benchmark geofileops operations.
 """
+# ruff: noqa: D103
 
 from datetime import datetime
 import logging
@@ -216,7 +217,9 @@ def clip(tmp_dir: Path) -> RunResult:
 
 
 def export_by_location_intersects(tmp_dir: Path) -> RunResult:
-    # Init-
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
     input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
     input2_path, _ = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
@@ -230,18 +233,58 @@ def export_by_location_intersects(tmp_dir: Path) -> RunResult:
         input_to_select_from_path=input1_path,
         input_to_compare_with_path=input2_path,
         output_path=output_path,
-        #spatial_relations_query="intersects is True",
+        # spatial_relations_query="intersects is True",
         nb_parallel=nb_parallel,
         force=True,
     )
     result = RunResult(
         package=_get_package(),
         package_version=_get_version(),
-        operation="export_by_location_intersects",
+        operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
         operation_descr=(
             "export_by_location_intersects between 2 agri parcel layers BEFL "
             "(2*~500.000 polygons)"
+        ),
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    logger.info(f"nb features in result: {gfo.get_layerinfo(output_path).featurecount}")
+    output_path.unlink()
+    return result
+
+
+def export_by_location_intersects_complexpoly(tmp_dir: Path) -> RunResult:
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
+    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input1_descr = testdata.TestFile.COMPLEX_POLYS.get_file(
+        tmp_dir, nb_points=300_000
+    )
+
+    # Go!
+    start_time = datetime.now()
+    output_path = (
+        tmp_dir
+        / f"{input1_path.stem}_export_inters_{input2_path.stem}_{_get_package()}.gpkg"
+    )
+    gfo.export_by_location(
+        input_to_select_from_path=input1_path,
+        input_to_compare_with_path=input2_path,
+        output_path=output_path,
+        nb_parallel=nb_parallel,
+        # subdivide_coords=0,
+        force=True,
+    )
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation=function_name,
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=(
+            f"{function_name} between agri parcels (~500k poly) and {input1_descr}"
         ),
         run_details={"nb_cpu": nb_parallel},
     )
@@ -272,9 +315,7 @@ def intersection(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="intersection",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(
-            "intersection between 2 agri parcel layers BEFL (2*~500.000 polygons)"
-        ),
+        operation_descr=("intersection between 2 agri parcel layers (2*~500k poly)"),
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -306,7 +347,7 @@ def intersection_complexpoly_agri(tmp_dir: Path) -> RunResult:
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
         operation_descr=(
-            f"{function_name} between {input1_descr} and agriparcels BEFL (~500k poly)"
+            f"{function_name} between {input1_descr} and agri parcels (~500k poly)"
         ),
         run_details={"nb_cpu": nb_parallel},
     )

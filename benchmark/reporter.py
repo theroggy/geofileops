@@ -4,7 +4,6 @@ Module to generate reports for benchmarks.
 
 import ast
 import math
-import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -21,6 +20,13 @@ A4_SHORT_SIDE = 8.27
 
 
 def generate_reports(results_path: Path, output_dir: Path):
+    """
+    Generate the benchmarking reports.
+
+    Args:
+        results_path (Path): the result path to find the results to report on.
+        output_dir (Path): directory to write the reports to.
+    """
     benchmark_df = pd.read_csv(results_path)
 
     def format_run_details(input: dict) -> str:
@@ -153,7 +159,6 @@ def save_chart(
     Raises:
         Exception: _description_
     """
-
     # Init
     # Check input
     non_numeric_columns = [

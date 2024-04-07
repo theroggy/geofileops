@@ -109,3 +109,27 @@ def test_prepare_processing_params_filetypes(
             assert params.input1_path != params.input2_path
     else:
         assert params.input2_path is None
+
+
+@pytest.mark.parametrize(
+    "desc, testfile, subdivide_coords, retval_None",
+    [
+        ("input not complex", "polygon-zone", 1000, True),
+        ("input poly+complex", "polygon-zone", 1, False),
+        ("input no poly", "linestring-watercourse", 1, True),
+    ],
+)
+def test_subdivide_layer(desc, tmp_path, testfile, subdivide_coords, retval_None):
+    path = test_helper.get_testfile(testfile)
+    result = _geoops_sql._subdivide_layer(
+        path=path,
+        layer=None,
+        output_dir=tmp_path,
+        subdivide_coords=subdivide_coords,
+        overlay_self=False,
+    )
+
+    if retval_None:
+        assert result is None
+    else:
+        assert result is not None

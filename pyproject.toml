@@ -139,8 +139,6 @@ ignore = [ # space before : (needed for how black formats slicing)
     "D212",
 ]
 exclude = [
-    "benchmarks/*",
-    "benchmark/*",
     "docs/*",
     "local_ignore/*",
     "versioneer.py",

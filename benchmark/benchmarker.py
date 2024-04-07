@@ -58,6 +58,9 @@ class RunResult:
         self.run_details = run_details
 
     def __repr__(self):
+        """
+        Format the result.
+        """
         return f"{self.__class__}({self.__dict__})"
 
 
@@ -65,6 +68,16 @@ def run_benchmarks(
     modules_to_run: Optional[List[str]] = None,
     functions_to_run: Optional[List[str]] = None,
 ):
+    """
+    Run all benchmarks specified.
+
+    Args:
+        modules_to_run (Optional[List[str]], optional): List of modules to run
+            the benchmarks from. If None, all benchmark modules found are used.
+            Defaults to None.
+        functions_to_run (Optional[List[str]], optional): List of benchmark functions to
+            be ran. If None, all benchmark functions are ran. Defaults to None.
+    """
     # Init logging
     logging.basicConfig(
         format="%(asctime)s.%(msecs)03d|%(levelname)s|%(name)s|%(message)s",
