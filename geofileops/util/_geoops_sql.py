@@ -388,10 +388,8 @@ def select(
 ):
     # Check if output exists already here, to avoid to much logging to be written
     logger = logging.getLogger(f"geofileops.{operation_prefix}select")
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
     logger.debug(f"  -> select to execute:\n{sql_stmt}")
 
     # If no output geometrytype is specified, use the geometrytype of the input layer
@@ -546,12 +544,8 @@ def _single_layer_vector_operation(
         output_layer = gfo.get_default_layer(output_path)
 
     # If output file exists already, either clean up or return...
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     # Determine if fid can be preserved
     preserve_fid = False
@@ -1021,12 +1015,8 @@ def erase(
     if erase_layer is None:
         erase_layer = gfo.get_only_layer(erase_path)
 
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     start_time = datetime.now()
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
@@ -2096,12 +2086,9 @@ def identity(
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
     logger = logging.getLogger("geofileops.identity")
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
@@ -2214,8 +2201,6 @@ def symmetric_difference(
     # we need to do some additional init + checks here...
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
-    if force is False and output_path.exists():
-        return
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
@@ -2225,6 +2210,9 @@ def symmetric_difference(
         f"Start, with input1: {input1_path}, "
         f"input2: {input2_path}, output: {output_path}"
     )
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     tempdir = _io_util.create_tempdir("geofileops/symmdiff")
     try:
         # First erase input2 from input1 to a temporary output file
@@ -2307,8 +2295,6 @@ def symmetric_difference(
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
         # Now we are ready to move the result to the final spot...
-        if output_path.exists():
-            gfo.remove(output_path)
         gfo.move(tmp_output_path, output_path)
 
     finally:
@@ -2348,12 +2334,9 @@ def union(
 
     logger = logging.getLogger("geofileops.union")
 
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
@@ -2562,12 +2545,9 @@ def _two_layer_vector_operation(
         raise ValueError(
             f"{operation_name}: if use_ogr True, input1_path should equal input2_path!"
         )
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     if output_with_spatial_index is None:
         output_with_spatial_index = GeofileInfo(output_path).default_spatial_index
 
@@ -3468,12 +3448,8 @@ def dissolve_singlethread(
                 )
 
     # Check output path
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     # Now prepare the sql statement
     # Remark: calculating the area in the enclosing selects halves the processing time

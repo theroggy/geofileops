@@ -29,19 +29,41 @@ logger = logging.getLogger(__name__)
 
 
 class TestFile(enum.Enum):
+    """
+    Class to create benchmarking test files.
+
+    Args:
+        enum (_type_): _description_
+
+    Raises:
+        ValueError: _description_
+        RuntimeError: _description_
+
+    Returns:
+        _type_: _description_
+    """
+
     AGRIPRC_2018 = (
         0,
-        "https://www.landbouwvlaanderen.be/bestanden/gis/Landbouwgebruikspercelen_2018_-_Definitief_(extractie_23-03-2022)_GPKG.zip",  # noqa: E501
+        "https://www.landbouwvlaanderen.be/bestanden/gis/Landbouwgebruikspercelen_2018_-_Definitief_(extractie_23-03-2022)_GPKG.zip",
         "agriprc_2018.gpkg",
     )
     AGRIPRC_2019 = (
         1,
-        "https://www.landbouwvlaanderen.be/bestanden/gis/Landbouwgebruikspercelen_2019_-_Definitief_(extractie_20-03-2020)_GPKG.zip",  # noqa: E501
+        "https://www.landbouwvlaanderen.be/bestanden/gis/Landbouwgebruikspercelen_2019_-_Definitief_(extractie_20-03-2020)_GPKG.zip",
         "agriprc_2019.gpkg",
     )
     COMPLEX_POLYS = (2, None, "complexpolys.gpkg")
 
     def __init__(self, value, url, filename):
+        """
+        Create a test file.
+
+        Args:
+            value (_type_): _description_
+            url (_type_): _description_
+            filename (_type_): _description_
+        """
         self._value_ = value
         self.url = url
         self.filename = filename
@@ -51,13 +73,13 @@ class TestFile(enum.Enum):
         Creates the test file.
 
         Args:
-            tmp_dir (Path): the directory to write the file to.
+            output_dir (Path): the directory to write the file to.
 
         Returns:
             _type_: The path to the file + a description of the test file.
         """
         if self.url is not None:
-            testfile_path = download_samplefile(
+            testfile_path = _download_samplefile(
                 url=self.url, dst_name=self.filename, dst_dir=output_dir
             )
             testfile_info = gfo.get_layerinfo(testfile_path)
@@ -136,7 +158,7 @@ def create_complex_poly(
     return poly_complex
 
 
-def download_samplefile(
+def _download_samplefile(
     url: str, dst_name: str, dst_dir: Optional[Path] = None
 ) -> Path:
     """
@@ -146,7 +168,8 @@ def download_samplefile(
     the file type as determined by the suffix of dst_name.
 
     Args:
-        url (str): the url of the file to download
+        url (str): the url of the file to download.
+        dst_name (str): the name of the destination file.
         dst_dir (Path): the dir to downloaded the sample file to.
             If it is None, a dir in the default tmp location will be
             used. Defaults to None.
@@ -155,7 +178,7 @@ def download_samplefile(
         Path: the path to the downloaded sample file.
     """
     # If the destination path is a directory, use the default file name
-    dst_path = prepare_dst_path(dst_name, dst_dir)
+    dst_path = _prepare_dst_path(dst_name, dst_dir)
     # If the sample file already exists, return
     if dst_path.exists():
         return dst_path
@@ -215,7 +238,7 @@ def download_samplefile(
     return dst_path
 
 
-def prepare_dst_path(dst_name: str, dst_dir: Optional[Path] = None):
+def _prepare_dst_path(dst_name: str, dst_dir: Optional[Path] = None):
     if dst_dir is None:
         return Path(tempfile.gettempdir()) / "geofileops_sampledata" / dst_name
     else:

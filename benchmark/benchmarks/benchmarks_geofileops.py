@@ -1,6 +1,7 @@
 """
 Module to benchmark geofileops operations.
 """
+# ruff: noqa: D103
 
 from datetime import datetime
 import logging
@@ -230,7 +231,7 @@ def export_by_location_intersects(tmp_dir: Path) -> RunResult:
         input_to_select_from_path=input1_path,
         input_to_compare_with_path=input2_path,
         output_path=output_path,
-        #spatial_relations_query="intersects is True",
+        # spatial_relations_query="intersects is True",
         nb_parallel=nb_parallel,
         force=True,
     )

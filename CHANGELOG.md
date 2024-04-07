@@ -33,6 +33,7 @@
   (#465, #469, #474)
 - Linting improvements: use mypy + use ruff-format instead of black for formatting
   (#478, #479)
+- If an output_dir doesn't exist yet, avoid processing being done before an error is raised... (#518)
 
 ### Bugs fixed
 

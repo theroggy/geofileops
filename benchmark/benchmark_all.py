@@ -1,3 +1,7 @@
+"""
+Run all benchmarks.
+"""
+
 from benchmark import benchmarker
 
 if __name__ == "__main__":

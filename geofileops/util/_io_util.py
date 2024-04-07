@@ -2,10 +2,12 @@
 Module containing some utilities regarding io.
 """
 
+import logging
 import os
 from pathlib import Path
 import tempfile
 from typing import Optional, Tuple
+import geofileops as gfo
 
 
 def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path:
@@ -130,3 +132,34 @@ def with_stem(path: Path, new_stem) -> Path:
     # Remark: from python 3.9 this is available on any Path, but to avoid
     # having to require 3.9 for this, this hack...
     return path.parent / f"{new_stem}{path.suffix}"
+
+
+def output_exists(path: Path, remove_if_exists: bool) -> bool:
+    """
+    Checks and returns whether the file specified exists.
+
+    If remove_if_exists is True, the file is removed and False is returned.
+
+    Args:
+        path (Path): Output file path to check.
+        remove_if_exists (bool): If True, remove the output file if it exists.
+
+    Raises:
+        ValueError: raised when the output directory does not exist.
+
+    Returns:
+        bool: True if the output file exists.
+              False if the file didn't exist or if it was removed
+              because `remove_if_exists` is True.
+    """
+    if not path.parent.exists():
+        raise ValueError(f"Output directory does not exist: {path.parent}")
+    if path.exists():
+        if remove_if_exists:
+            gfo.remove(path)
+            return False
+        else:
+            logging.info(msg=f"Stop, output exists already {path}", stacklevel=2)
+            return True
+
+    return False

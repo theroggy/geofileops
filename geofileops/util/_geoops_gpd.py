@@ -711,12 +711,8 @@ def _apply_geooperation_to_layer(
         raise ValueError(f"{operation_name}: output_path must not equal input_path")
     if input_layer is None:
         input_layer = gfo.get_only_layer(input_path)
-    if output_path.exists():
-        if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
     if input_layer is None:
         input_layer = gfo.get_only_layer(input_path)
     if output_layer is None:
@@ -906,6 +902,8 @@ def _apply_geooperation(
     force: bool = False,
 ) -> str:
     # Init
+    if not output_path.parent.exists():
+        raise ValueError(f"Output directory does not exist: {output_path.parent}")
     if output_path.exists():
         if force is False:
             message = f"Stop, output exists already {output_path}"
@@ -1023,7 +1021,7 @@ def dissolve(
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
-) -> dict:
+):
     """
     Function that applies a dissolve.
 
@@ -1035,10 +1033,8 @@ def dissolve(
     """
     # Init and validate input parameters
     # ----------------------------------
-    start_time = datetime.now()
     operation_name = f"{operation_prefix}dissolve"
     logger = logging.getLogger(f"geofileops.{operation_name}")
-    result_info = {}
 
     # Check input parameters
     if groupby_columns is not None and len(list(groupby_columns)) == 0:
@@ -1105,15 +1101,8 @@ def dissolve(
                 )
 
     # Now input parameters are checked, check if we need to calculate anyway
-    if output_path.exists():
-        if force is False:
-            result_info[
-                "message"
-            ] = f"Stop, output exists already {output_path} and force is false"
-            logger.info(result_info["message"])
-            return result_info
-        else:
-            gfo.remove(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     # Now start dissolving
     # --------------------
@@ -1558,11 +1547,6 @@ def dissolve(
         raise NotImplementedError(
             f"Unsupported input geometrytype: {input_layerinfo.geometrytype}"
         )
-
-    # Return result info
-    result_info["message"] = f"Ready, took {datetime.now()-start_time}"
-    logger.info(result_info["message"])
-    return result_info
 
 
 def _dissolve_polygons_pass(
