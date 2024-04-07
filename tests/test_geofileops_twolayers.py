@@ -351,10 +351,10 @@ def test_erase_subdivide_multipolygons(tmp_path, suffix):
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
-    "columns, gridsize, where_post, exp_featurecount",
+    "columns, gridsize, where_post, subdivide_coords, exp_featurecount",
     [
-        (["OIDN", "UIDN"], 0.0, "ST_Area(geom) > 2000", 25),
-        (None, 0.01, None, 27),
+        (["OIDN", "UIDN"], 0.0, "ST_Area(geom) > 2000", 0, 25),
+        (None, 0.01, None, 10, 27),
     ],
 )
 def test_export_by_location(
@@ -363,6 +363,7 @@ def test_export_by_location(
     columns,
     gridsize,
     where_post,
+    subdivide_coords,
     exp_featurecount,
 ):
     input_to_select_from_path = test_helper.get_testfile(
@@ -381,6 +382,7 @@ def test_export_by_location(
         input1_columns=columns,
         gridsize=gridsize,
         where_post=where_post,
+        subdivide_coords=subdivide_coords,
         batchsize=batchsize,
     )
 
@@ -400,13 +402,14 @@ def test_export_by_location(
 
 
 @pytest.mark.parametrize(
-    "query, area_inters_column_name, min_area_intersect, exp_featurecount",
+    "query, area_inters_column_name, min_area_intersect, subdivide_coords, "
+    "exp_featurecount",
     [
-        (None, None, None, 27),
-        (None, "area_custom", None, 27),
-        ("within is False", "area_custom", None, 39),
-        (None, None, 1000, 24),
-        ("within is False", None, 1000, 15),
+        (None, None, None, 10, 27),
+        (None, "area_custom", None, 0, 27),
+        ("within is False", "area_custom", None, 0, 39),
+        (None, None, 1000, 10, 24),
+        ("within is False", None, 1000, 0, 15),
     ],
 )
 def test_export_by_location_area(
@@ -414,6 +417,7 @@ def test_export_by_location_area(
     query,
     area_inters_column_name,
     min_area_intersect,
+    subdivide_coords,
     exp_featurecount,
 ):
     input_to_select_from_path = test_helper.get_testfile("polygon-parcel")
@@ -433,6 +437,7 @@ def test_export_by_location_area(
         area_inters_column_name=area_inters_column_name,
         min_area_intersect=min_area_intersect,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
         **kwargs,
     )
 
@@ -463,18 +468,60 @@ def test_export_by_location_area(
         assert len(output_gdf[output_gdf.area_custom.isna()]) == exp_nb_None
 
 
+def test_export_by_location_force(tmp_path):
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"output{input1_path.suffix}"
+    output_path.touch()
+
+    # Test with force False (the default): existing output file should stay the same
+    mtime_orig = output_path.stat().st_mtime
+    gfo.export_by_location(
+        input_to_select_from_path=input1_path,
+        input_to_compare_with_path=input2_path,
+        output_path=output_path,
+    )
+    assert output_path.stat().st_mtime == mtime_orig
+
+    # With force=True
+    gfo.export_by_location(
+        input_to_select_from_path=input1_path,
+        input_to_compare_with_path=input2_path,
+        output_path=output_path,
+        force=True,
+    )
+    assert output_path.stat().st_mtime != mtime_orig
+
+
 @pytest.mark.parametrize(
-    "query, exp_featurecount",
+    "kwargs, expected_error",
     [
-        ("intersects is True or intersects is False", 48),
-        ("intersects is True", 27),
-        ("within is True", 8),
-        ("intersects is False", 21),
-        ("within is False", 39),
-        ("disjoint is True", 21),
+        ({"subdivide_coords": -1}, "subdivide_coords < 0 is not allowed"),
     ],
 )
-def test_export_by_location_query(tmp_path, query, exp_featurecount):
+def test_export_by_location_invalid_params(kwargs, expected_error):
+    with pytest.raises(ValueError, match=expected_error):
+        gfo.export_by_location(
+            input_to_select_from_path="input.gpkg",
+            input_to_compare_with_path="input2.gpkg",
+            output_path="output.gpkg",
+            **kwargs,
+        )
+
+
+@pytest.mark.parametrize(
+    "query, subdivide_coords, exp_featurecount",
+    [
+        ("intersects is True or intersects is False", 0, 48),
+        ("intersects is True", 10, 27),
+        ("within is True", 0, 8),
+        ("intersects is False", 10, 21),
+        ("within is False", 10, 39),
+        ("disjoint is True", 0, 21),
+    ],
+)
+def test_export_by_location_query(tmp_path, query, subdivide_coords, exp_featurecount):
     input_to_select_from_path = test_helper.get_testfile("polygon-parcel")
     input_to_compare_with_path = test_helper.get_testfile("polygon-zone")
     output_path = tmp_path / f"{input_to_select_from_path.stem}-output.gpkg"
@@ -488,6 +535,7 @@ def test_export_by_location_query(tmp_path, query, exp_featurecount):
         output_path=str(output_path),
         spatial_relations_query=query,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
     )
 
     # Check if the output file is correctly created

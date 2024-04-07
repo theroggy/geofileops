@@ -9,7 +9,8 @@ def main():
     Run the benchmark function(s).
     """
     functions_to_run = [
-        "export_by_location_intersects",
+        "export_by_location_intersects_complexpoly",
+        # "export_by_location_intersects",
         # "join_by_location_intersects",
         # "clip",
         # "intersection",
