@@ -5,6 +5,7 @@ Tests for operations that are executed using a sql statement on two layers.
 from contextlib import nullcontext
 import math
 from pathlib import Path
+import sys
 from typing import Optional
 
 import geopandas as gpd
@@ -1822,7 +1823,15 @@ def test_split(tmp_path):
     "suffix, epsg, gridsize",
     [(".gpkg", 31370, 0.01), (".gpkg", 4326, 0.0), (".shp", 31370, 0.0)],
 )
-def test_symmetric_difference(tmp_path, suffix, epsg, gridsize):
+def test_symmetric_difference(tmp_path, request, suffix, epsg, gridsize):
+    if epsg == 4326 and sys.platform == "darwin":
+        request.node.add_marker(
+            pytest.mark.xfail(
+                reason="epsg 4326 gives precision issues on MacOS14 on arm64"
+            )
+        )
+
+    # Prepare test data
     input1_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input1_layerinfo = gfo.get_layerinfo(input1_path)
@@ -1927,6 +1936,7 @@ def test_symmetric_difference_self(tmp_path):
 )
 def test_union(
     tmp_path: Path,
+    request: pytest.FixtureRequest,
     suffix: str,
     epsg: int,
     gridsize: float,
@@ -1935,6 +1945,13 @@ def test_union(
     keep_fid: bool,
     exp_featurecount: int,
 ):
+    if epsg == 4326 and sys.platform == "darwin":
+        request.node.add_marker(
+            pytest.mark.xfail(
+                reason="epsg 4326 gives precision issues on MacOS14 on arm64"
+            )
+        )
+
     # Prepare test files
     input1_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix, epsg=epsg

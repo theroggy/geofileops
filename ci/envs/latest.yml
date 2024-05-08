@@ -6,7 +6,6 @@ dependencies:
   - pip
   # required
   - cloudpickle
-  - fiona
   - gdal >=3.6.3
   - geopandas-base >=0.12
   - libspatialite >=5.0

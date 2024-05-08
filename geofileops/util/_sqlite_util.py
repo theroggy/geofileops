@@ -12,8 +12,9 @@ import sqlite3
 import tempfile
 from typing import Dict, List, Optional, Union
 
+from pygeoops import GeometryType
+
 import geofileops as gfo
-from geofileops import GeometryType
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util._general_util import MissingRuntimeDependencyError
 from geofileops.util import _sqlite_userdefined as sqlite_userdefined

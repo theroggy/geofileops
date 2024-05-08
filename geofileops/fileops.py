@@ -25,7 +25,6 @@ from typing import (
 )
 import warnings
 
-import fiona
 import geopandas as gpd
 from geopandas.io import file as gpd_io_file
 import numpy as np
@@ -41,6 +40,7 @@ from geofileops.util import _geoseries_util
 from geofileops.util import _io_util
 from geofileops.util import _ogr_util
 from geofileops.util import _ogr_sql_util
+from geofileops._compat import PYOGRIO_GTE_07
 from geofileops.helpers._configoptions_helper import ConfigOptions
 
 if TYPE_CHECKING:
@@ -316,7 +316,7 @@ def get_layerinfo(
         )
         datasource_layer = datasource.GetLayer(layer)
 
-        # If the layer doesn't exist, return
+        # If the layer doesn't exist, raise
         if datasource_layer is None:
             raise ValueError(f"Layer {layer} not found in file: {path}")
 
@@ -382,27 +382,9 @@ def get_layerinfo(
                 crs = pyproj.CRS(spatialref.ExportToWkt())
 
                 # If spatial ref has no epsg, try to find corresponding one
-                crs_epsg = crs.to_epsg()
-                if crs_epsg is None:
-                    if crs.name in [
-                        "Belge 1972 / Belgian Lambert 72",
-                        "Belge_1972_Belgian_Lambert_72",
-                        "Belge_Lambert_1972",
-                        "BD72 / Belgian Lambert 72",
-                    ]:
-                        # Belgian Lambert in name, so assume 31370
-                        crs = pyproj.CRS.from_epsg(31370)
+                if crs.to_epsg() is None:
+                    crs = _crs_custom_match(crs, path)
 
-                        # If shapefile, add correct 31370 .prj file
-                        if driver == "ESRI Shapefile":
-                            prj_path = path.parent / f"{path.stem}.prj"
-                            if prj_path.exists():
-                                prj_rename_path = path.parent / f"{path.stem}_orig.prj"
-                                if not prj_rename_path.exists():
-                                    prj_path.rename(prj_rename_path)
-                                else:
-                                    prj_path.unlink()
-                                prj_path.write_text(PRJ_EPSG_31370)
         elif raise_on_nogeom:
             errors.append("Layer doesn't have a geometry column!")
 
@@ -1005,6 +987,7 @@ def read_file(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    **kwargs,
 ) -> gpd.GeoDataFrame:
     """
     Reads a file to a geopandas GeoDataframe.
@@ -1065,6 +1048,8 @@ def read_file(
         fid_as_index (bool, optional): If True, will use the FIDs of the features that
             were read as the index of the GeoDataFrame. May start at 0 or 1 depending on
             the driver. Defaults to False.
+        **kwargs: All additional parameters will be passed on to the io-engine used
+            ("pyogrio" or "fiona").
 
     Raises:
         ValueError: an invalid parameter value was passed.
@@ -1092,6 +1077,7 @@ def read_file(
         sql_dialect=sql_dialect,
         ignore_geometry=ignore_geometry,
         fid_as_index=fid_as_index,
+        **kwargs,
     )
 
     # No assert to keep backwards compatibility
@@ -1142,6 +1128,7 @@ def _read_file_base(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    **kwargs,
 ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """
     Reads a file to a pandas Dataframe.
@@ -1166,6 +1153,7 @@ def _read_file_base(
             sql_dialect=sql_dialect,
             ignore_geometry=ignore_geometry,
             fid_as_index=fid_as_index or fid_as_column,
+            **kwargs,
         )
     elif engine == "fiona":
         gdf = _read_file_base_fiona(
@@ -1179,6 +1167,7 @@ def _read_file_base(
             sql_dialect=sql_dialect,
             ignore_geometry=ignore_geometry,
             fid_as_index=fid_as_index or fid_as_column,
+            **kwargs,
         )
     else:
         raise ValueError(f"Unsupported engine: {engine}")
@@ -1203,6 +1192,7 @@ def _read_file_base_fiona(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    **kwargs,
 ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """
     Reads a file to a pandas Dataframe using fiona.
@@ -1266,6 +1256,7 @@ def _read_file_base_fiona(
         sql=sql_stmt,
         sql_dialect=sql_dialect,
         ignore_geometry=ignore_geometry,
+        **kwargs,
     )
 
     # Set the index to the backed-up fid
@@ -1286,6 +1277,8 @@ def _read_file_base_fiona(
     float_cols = list(result_gdf.select_dtypes(["float64"]).columns)
     if len(float_cols) > 0:
         # Check for all float columns found if they should be object columns instead
+        import fiona
+
         with fiona.open(path, layer=layer) as collection:
             assert collection.schema is not None
             properties = collection.schema["properties"]
@@ -1309,6 +1302,7 @@ def _read_file_base_pyogrio(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    **kwargs,
 ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
     """
     Reads a file to a pandas Dataframe using pyogrio.
@@ -1368,7 +1362,7 @@ def _read_file_base_pyogrio(
         sql_dialect=sql_dialect,
         read_geometry=not ignore_geometry,
         fid_as_index=fid_as_index,
-        # use_arrow=use_arrow,
+        **kwargs,
     )
 
     # Reorder columns + change casing so they are the same as columns parameter
@@ -1480,6 +1474,7 @@ def to_file(
     append_timeout_s: int = 600,
     index: Optional[bool] = None,
     create_spatial_index: Optional[bool] = None,
+    **kwargs,
 ):
     """
     Writes a pandas dataframe to file.
@@ -1518,6 +1513,8 @@ def to_file(
         create_spatial_index (bool, optional): True to force creation of spatial index,
             False to avoid creation. None leads to the default behaviour of gdal.
             Defaults to None.
+        **kwargs: All additional parameters will be passed on to the io-engine used
+            ("pyogrio" or "fiona").
 
     Raises:
         ValueError: an invalid parameter value was passed.
@@ -1549,19 +1546,26 @@ def to_file(
     if force_output_geometrytype is not None and force_output_geometrytype.is_multitype:
         force_multitype = True
 
-    # If there is no geometry column in the input, always use fiona, as pyogrio doesn't
-    # support that yet at time of writing.
-    if isinstance(gdf, gpd.GeoDataFrame) is False or (
-        isinstance(gdf, gpd.GeoDataFrame) and "geometry" not in gdf.columns
-    ):
-        engine = "fiona"
-        create_spatial_index = False
-    else:
-        engine = ConfigOptions.io_engine
+    engine = ConfigOptions.io_engine
 
-    # Now write with the correct engine
+    # pyogrio < 0.7 doesn't support writing without geometry, so in that case use fiona.
+    if not PYOGRIO_GTE_07:
+        if isinstance(gdf, gpd.GeoDataFrame) is False or (
+            isinstance(gdf, gpd.GeoDataFrame) and "geometry" not in gdf.columns
+        ):
+            # Give a clear error if fiona isn't installed.
+            try:
+                import fiona  # noqa: F401
+            except ImportError as ex:  # pragma: no cover
+                raise RuntimeError(
+                    "to write dataframes without geometry either pyogrio >= 0.7 "
+                    "(recommended) or fiona needs to be installed."
+                ) from ex
+
+            engine = "fiona"
+
+    # Write file with the correct engine
     if engine == "pyogrio":
-        assert isinstance(gdf, gpd.GeoDataFrame)
         return _to_file_pyogrio(
             gdf=gdf,
             path=path,
@@ -1572,6 +1576,7 @@ def to_file(
             append_timeout_s=append_timeout_s,
             index=index,
             create_spatial_index=create_spatial_index,
+            **kwargs,
         )
     elif engine == "fiona":
         return _to_file_fiona(
@@ -1584,6 +1589,7 @@ def to_file(
             append_timeout_s=append_timeout_s,
             index=index,
             create_spatial_index=create_spatial_index,
+            **kwargs,
         )
     else:
         raise ValueError(f"Unsupported engine: {engine}")
@@ -1599,6 +1605,7 @@ def _to_file_fiona(
     append_timeout_s: int = 600,
     index: Optional[bool] = None,
     create_spatial_index: Optional[bool] = None,
+    **kwargs,
 ):
     """
     Writes a pandas dataframe to file using fiona.
@@ -1631,6 +1638,7 @@ def _to_file_fiona(
 
         schema = gpd_io_file.infer_schema(gdf)
         schema["geometry"] = "None"
+        create_spatial_index = None
     elif (
         len(gdf) == 0
         and force_output_geometrytype is not None
@@ -1660,6 +1668,7 @@ def _to_file_fiona(
         append: bool = False,
         schema: Optional[dict] = None,
         create_spatial_index: Optional[bool] = None,
+        **kwargs,
     ):
         # Prepare args for to_file
         if append is True:
@@ -1670,7 +1679,6 @@ def _to_file_fiona(
         else:
             mode = "w"
 
-        kwargs: Dict[str, Any] = {}
         kwargs["engine"] = "fiona"
         kwargs["mode"] = mode
         drivername = _geofileinfo.get_driver(path)
@@ -1708,34 +1716,10 @@ def _to_file_fiona(
             append=append,
             schema=schema,
             create_spatial_index=create_spatial_index,
+            **kwargs,
         )
     else:
-        # Append is asked, check if the fiona driver supports appending. If
-        # not, write to temporary output file
-
-        # Remark: fiona pre-1.8.14 didn't support appending to geopackage. Once
-        # older versions becomes rare, dependency can be put to this version, and
-        # this code can be cleaned up...
         path_info = _geofileinfo.get_geofileinfo(path)
-        gdftemp_path = None
-        gdftemp_lockpath = None
-        if "a" not in fiona.supported_drivers[path_info.driver]:
-            # Get a unique temp file path. The file cannot be created yet, so
-            # only create a lock file to avoid other processes using the same
-            # temp file name
-            gdftemp_path, gdftemp_lockpath = _io_util.get_tempfile_locked(
-                base_filename="gdftemp", suffix=path.suffix, dirname="geofile_to_file"
-            )
-            write_to_file(
-                gdf,
-                path=gdftemp_path,
-                layer=layer,
-                index=index,
-                force_output_geometrytype=force_output_geometrytype,
-                force_multitype=force_multitype,
-                schema=schema,
-                create_spatial_index=create_spatial_index,
-            )
 
         # Files don't typically support having multiple processes writing
         # simultanously to them, so use lock file to synchronize access.
@@ -1745,31 +1729,18 @@ def _to_file_fiona(
         while not ready:
             if _io_util.create_file_atomic(lockfile) is True:
                 try:
-                    # If gdf wasn't written to temp file, use standard write-to-file
-                    if gdftemp_path is None:
-                        write_to_file(
-                            gdf=gdf,
-                            path=path,
-                            layer=layer,
-                            index=index,
-                            force_output_geometrytype=force_output_geometrytype,
-                            force_multitype=force_multitype,
-                            append=True,
-                            schema=schema,
-                            create_spatial_index=create_spatial_index,
-                        )
-                    else:
-                        # If gdf written to temp file, use append_to_nolock + cleanup
-                        _append_to_nolock(
-                            src=gdftemp_path,
-                            dst=path,
-                            dst_layer=layer,
-                            force_output_geometrytype=force_output_geometrytype,
-                            create_spatial_index=create_spatial_index,
-                        )
-                        remove(gdftemp_path)
-                        if gdftemp_lockpath is not None:
-                            gdftemp_lockpath.unlink()
+                    write_to_file(
+                        gdf=gdf,
+                        path=path,
+                        layer=layer,
+                        index=index,
+                        force_output_geometrytype=force_output_geometrytype,
+                        force_multitype=force_multitype,
+                        append=True,
+                        schema=schema,
+                        create_spatial_index=create_spatial_index,
+                        **kwargs,
+                    )
                 except Exception as ex:
                     # If sqlite output file locked, also retry
                     if path_info.is_spatialite_based and str(ex) not in [
@@ -1802,22 +1773,22 @@ def _to_file_pyogrio(
     append_timeout_s: int = 600,
     index: Optional[bool] = None,
     create_spatial_index: Optional[bool] = None,
+    **kwargs,
 ):
     """
     Writes a pandas dataframe to file using pyogrio.
-
-    Remark: this function only supports writing GeoDataFrames at the moment.
     """
-    # Prepare args for write_dataframe
-    kwargs: Dict[str, Any] = {}
-    kwargs["engine"] = "pyogrio"
-
     # Check upfront if append is going to work to give nice error
     if append is True and path.exists():
         kwargs["append"] = True
-        layerinfo = get_layerinfo(path, layer)
+        layerinfo = get_layerinfo(path, layer, raise_on_nogeom=False)
+
+        # Determine columns and compare them
         file_cols = [col.upper() for col in layerinfo.columns]
-        gdf_cols = [col.upper() for col in gdf.columns if col != gdf.geometry.name]
+        if layerinfo.geometrycolumn is not None:
+            gdf_cols = [col.upper() for col in gdf.columns if col != gdf.geometry.name]
+        else:
+            gdf_cols = [col.upper() for col in gdf.columns]
         if gdf_cols != file_cols:
             raise ValueError(
                 "destination layer doesn't have the same columns as gdf: "
@@ -1836,6 +1807,8 @@ def _to_file_pyogrio(
         kwargs["geometry_type"] = force_output_geometrytype
     if force_multitype:
         kwargs["promote_to_multi"] = True
+    if not path_info.is_singlelayer:
+        kwargs["layer"] = layer
 
     # Temp fix for bug in pyogrio 0.7.2 (https://github.com/geopandas/pyogrio/pull/324)
     # Logic based on geopandas.to_file
@@ -1843,26 +1816,114 @@ def _to_file_pyogrio(
         gdf = gdf.reset_index(drop=True)
 
     # Now we can write
-    if path_info.is_singlelayer:
-        gdf.to_file(str(path), **kwargs)
+    # If there is no geometry column in the input, never create a spatial index.
+    if isinstance(gdf, gpd.GeoDataFrame) is False or (
+        isinstance(gdf, gpd.GeoDataFrame) and "geometry" not in gdf.columns
+    ):
+        # If geometry column should be written, specifying SPATIAL INDEX is not allowed.
+        if "SPATIAL_INDEX" in kwargs:
+            del kwargs["SPATIAL_INDEX"]
+        pyogrio.write_dataframe(gdf, str(path), **kwargs)
     else:
-        gdf.to_file(str(path), layer=layer, **kwargs)
+        kwargs["engine"] = "pyogrio"
+        gdf.to_file(str(path), **kwargs)
 
 
-def get_crs(path: Union[str, "os.PathLike[Any]"]) -> pyproj.CRS:
+def get_crs(
+    path: Union[str, "os.PathLike[Any]"],
+    layer: Optional[str] = None,
+    min_confidence: int = 70,
+) -> Optional[pyproj.CRS]:
     """
     Get the CRS (projection) of the file.
 
     Args:
-        path (PathLike): Path to the file.
+        path (PathLike): path to the file.
+        layer (Optional[str]): layer name. If not specified, and there is only
+            one layer in the file, this layer is used. Otherwise exception.
+        min_confidence (int): a value between 0-100 where 100 is the most confident.
+            It is used to match the crs info found in the file to a crs defined by
+            EPSG.
 
     Returns:
-        pyproj.CRS: The projection of the file
+        pyproj.CRS: The projection of the file.
     """
-    # TODO: seems like support for multiple layers in the file isn't here yet???
-    with fiona.open(str(path), "r") as geofile:
-        assert geofile is not None
-        return pyproj.CRS(geofile.crs)
+    # Check input parameters
+    path = Path(path)
+    if layer is None:
+        layer = get_only_layer(path)
+
+    crs = None
+    try:
+        datasource = gdal.OpenEx(
+            str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
+        )
+        datasource_layer = datasource.GetLayer(layer)
+
+        # If the layer doesn't exist, raise
+        if datasource_layer is None:
+            raise ValueError(f"Layer {layer} not found in file: {path}")
+
+        # Get the crs
+        spatialref = datasource_layer.GetSpatialRef()
+        if spatialref is not None:
+            crs = pyproj.CRS(spatialref.ExportToWkt())
+
+            # If spatial ref has no epsg, try to find corresponding one
+            if crs.to_epsg(min_confidence=min_confidence) is None:
+                crs = _crs_custom_match(crs, path)
+
+    except ValueError:
+        raise
+    except Exception as ex:
+        ex.args = (f"get_crs error: {ex} for {path}.{layer}",)
+        raise
+    finally:
+        datasource = None
+
+    return crs
+
+
+def _crs_custom_match(crs: pyproj.CRS, path_to_fix: Optional[Path]) -> pyproj.CRS:
+    """
+    Custom matching of crs's not matched automatically, based on name.
+
+    If path_to_fix is specified, the corresponding .prj file located on the path will be
+    replaced by a conforming .prj file if a match is found.
+
+    Args:
+        crs (pyproj.CRS): the crs to find a match for.
+        path_to_fix (Optional[Path]): path to the geofile. If the file is a shapefile
+            and a crs is found, the prj file will be replaced by one of the crs found.
+
+    Returns:
+        pyproj.CRS: the crs found.
+    """
+    if crs.name in [
+        "Belge 1972 / Belgian Lambert 72",
+        "Belge_1972_Belgian_Lambert_72",
+        "Belge_Lambert_1972",
+        "BD72 / Belgian Lambert 72",
+    ]:
+        # Belgian Lambert in name, so assume 31370
+        crs = pyproj.CRS.from_epsg(31370)
+
+        # If path is specified and it is a shapefile, add correct 31370 .prj file
+        if path_to_fix is not None:
+            driver = _geofileinfo.get_driver(path_to_fix)
+            if driver == "ESRI Shapefile":
+                prj_path = path_to_fix.parent / f"{path_to_fix.stem}.prj"
+                if prj_path.exists():
+                    prj_rename_path = (
+                        path_to_fix.parent / f"{path_to_fix.stem}_orig.prj"
+                    )
+                    if not prj_rename_path.exists():
+                        prj_path.rename(prj_rename_path)
+                    else:
+                        prj_path.unlink()
+                    prj_path.write_text(PRJ_EPSG_31370)
+
+    return crs
 
 
 def is_geofile(path: Union[str, "os.PathLike[Any]"]) -> bool:

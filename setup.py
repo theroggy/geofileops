@@ -23,7 +23,6 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "cloudpickle",
-        "fiona",
         "gdal>=3.6",
         "geopandas>=0.12,<1",
         "numpy",
