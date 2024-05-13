@@ -16,7 +16,8 @@ import pickle
 import re
 import shutil
 import time
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Optional, Union
+from collections.abc import Iterable
 import warnings
 
 import cloudpickle
@@ -126,7 +127,7 @@ def _determine_nb_batches(
     nb_parallel: int = -1,
     batchsize: int = -1,
     parallelization_config: Optional[ParallelizationConfig] = None,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """
     Determines recommended parallelization params.
 
@@ -240,7 +241,7 @@ class ProcessingParams:
         self,
         nb_rows_to_process: int,
         nb_parallel: int,
-        batches: List[str],
+        batches: list[str],
         batchsize: int,
     ):
         self.nb_rows_to_process = nb_rows_to_process
@@ -272,7 +273,7 @@ def _prepare_processing_params(
     )
 
     # Prepare batches to process
-    batches: List[str] = []
+    batches: list[str] = []
     if nb_batches == 1:
         # If only one batch, no filtering is needed
         batches.append("")
@@ -373,7 +374,7 @@ def apply(
     only_geom_input: bool = True,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     gridsize: float = 0.0,
@@ -424,7 +425,7 @@ def buffer(
     single_sided: bool = False,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -476,7 +477,7 @@ def convexhull(
     output_path: Path,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -486,7 +487,7 @@ def convexhull(
     force: bool = False,
 ):
     # Init
-    operation_params: Dict[str, Any] = {}
+    operation_params: dict[str, Any] = {}
 
     # Go!
     return _apply_geooperation_to_layer(
@@ -513,7 +514,7 @@ def makevalid(
     output_path: Path,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[str, None, GeometryType] = None,
     gridsize: float = 0.0,
@@ -566,7 +567,7 @@ def simplify(
     lookahead: int = 8,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -608,7 +609,7 @@ def _apply_geooperation_to_layer(
     operation: GeoOperation,
     operation_params: dict,
     input_layer: Optional[str],  # = None
-    columns: Optional[List[str]],  # = None
+    columns: Optional[list[str]],  # = None
     output_layer: Optional[str],  # = None
     explodecollections: bool,  # = False
     force_output_geometrytype: Union[GeometryType, str, None],  # = None
@@ -767,7 +768,7 @@ def _apply_geooperation_to_layer(
             # Prepare output filename
             tmp_output_path = tmp_dir / output_path.name
 
-            batches: Dict[int, dict] = {}
+            batches: dict[int, dict] = {}
             future_to_batch_id = {}
 
             for batch_id, batch_filter in enumerate(processing_params.batches):
@@ -893,7 +894,7 @@ def _apply_geooperation(
     operation_params: dict,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     where=None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
@@ -1581,7 +1582,7 @@ def _dissolve_polygons_pass(
         # Prepare output filename
         tempdir = output_onborder_path.parent
 
-        batches: Dict[int, dict] = {}
+        batches: dict[int, dict] = {}
         nb_batches = len(tiles_gdf)
         nb_batches_done = 0
         future_to_batch_id = {}
@@ -1707,13 +1708,13 @@ def _dissolve_polygons(
     input_geometrytype: GeometryType,
     input_layer: Optional[str],
     output_layer: Optional[str],
-    bbox: Tuple[float, float, float, float],
+    bbox: tuple[float, float, float, float],
     tile_id: Optional[int],
     gridsize: float,
     keep_empty_geoms: bool,
 ) -> dict:
     # Init
-    perfinfo: Dict[str, float] = {}
+    perfinfo: dict[str, float] = {}
     start_time = datetime.now()
     return_info = {
         "input_path": input_path,
@@ -1733,7 +1734,7 @@ def _dissolve_polygons(
     agg_columns_needed = None
     while True:
         try:
-            columns_to_read: Set[str] = set()
+            columns_to_read: set[str] = set()
             info = gfo.get_layerinfo(input_path, input_layer)
             if groupby_columns is not None:
                 columns_to_read.update(groupby_columns)

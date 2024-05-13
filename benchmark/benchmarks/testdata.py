@@ -8,7 +8,7 @@ from pathlib import Path
 import pprint
 import shutil
 import tempfile
-from typing import Optional, Tuple
+from typing import Optional
 
 import geopandas as gpd
 import shapely
@@ -69,7 +69,7 @@ class TestFile(enum.Enum):
         self.url = url
         self.filename = filename
 
-    def get_file(self, output_dir: Path, nb_points: int = 20_000) -> Tuple[Path, str]:
+    def get_file(self, output_dir: Path, nb_points: int = 20_000) -> tuple[Path, str]:
         """
         Creates the test file.
 

@@ -5,7 +5,7 @@ Helper functions for all tests.
 import os
 from pathlib import Path
 import tempfile
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import geopandas as gpd
 import geopandas.testing as gpd_testing
@@ -40,7 +40,7 @@ def prepare_expected_result(
     gridsize: float = 0.0,
     where_post: Optional[str] = None,
     explodecollections=False,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
 ) -> gpd.GeoDataFrame:
     """Prepare expected data"""
     if keep_empty_geoms is None:

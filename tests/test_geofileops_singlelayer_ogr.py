@@ -2,6 +2,7 @@
 Tests for operations using only gdal.
 """
 
+import sys
 import pytest
 
 import geofileops as gfo
@@ -82,6 +83,9 @@ def test_export_by_bounds(tmp_path, suffix):
         assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 8]
 
 
+@pytest.mark.xfail(
+    sys.platform == "darwin", reason="warp has precision issues on MacOS14 on arm64"
+)
 def test_warp(tmp_path):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel")

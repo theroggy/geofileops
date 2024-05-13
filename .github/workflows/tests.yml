@@ -44,16 +44,16 @@ jobs:
         # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
         extra: ["nomkl"]
         include:
-          - env: minimal
+          - env: minimal-fiona
             os: ubuntu-latest
             dev: false
             python: "3.9"
-          - env: latest
-            os: macos-latest
+          - env: latest-fiona
+            os: windows-latest
             dev: false
             python: "3.11"
           - env: latest
-            os: windows-latest
+            os: macos-latest
             dev: false
             python: "3.11"
             

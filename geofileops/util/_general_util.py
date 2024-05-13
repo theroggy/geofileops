@@ -5,7 +5,8 @@ Module containing some general utilities.
 import datetime
 import logging
 import os
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Optional
+from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +44,10 @@ def align_casing(string_to_align: str, strings_to_align_to: Iterable) -> str:
 
 
 def align_casing_list(
-    strings_to_align: List[str],
+    strings_to_align: list[str],
     strings_to_align_to: Iterable,
     raise_on_missing: bool = True,
-) -> List[str]:
+) -> list[str]:
     """
     Search the string caseintensitive in a list of strings.
 
@@ -172,7 +173,7 @@ def formatbytes(bytes: float):
 
 
 def prepare_for_serialize(data: dict) -> dict:
-    prepared: Dict[str, Any] = {}
+    prepared: dict[str, Any] = {}
     for key, value in data.items():
         if isinstance(value, (dict)):
             prepared[key] = prepare_for_serialize(value)
@@ -195,8 +196,8 @@ class TempEnv:
         envs (Dict[str, Any]): dict with environment variables to set.
     """
 
-    def __init__(self, envs: Dict[str, Any]):
-        self._envs_backup: Dict[str, str] = {}
+    def __init__(self, envs: dict[str, Any]):
+        self._envs_backup: dict[str, str] = {}
         self._envs = envs
 
     def __enter__(self):

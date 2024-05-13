@@ -7,7 +7,8 @@ import os
 from pathlib import Path
 import tempfile
 from threading import Lock
-from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Union
+from collections.abc import Iterable
 
 from osgeo import gdal
 from osgeo import ogr
@@ -29,8 +30,8 @@ class GDALError(Exception):
     def __init__(
         self,
         message: str,
-        log_details: List[str] = [],
-        error_details: List[str] = [],
+        log_details: list[str] = [],
+        error_details: list[str] = [],
     ):
         self.message = message
         self.log_details = log_details
@@ -110,7 +111,7 @@ def get_drivers() -> dict:
     return drivers
 
 
-def read_cpl_log(path: Path) -> Tuple[List[str], List[str]]:
+def read_cpl_log(path: Path) -> tuple[list[str], list[str]]:
     """
     Reads a cpl_log file and returns a list with log lines and errors.
 
@@ -145,13 +146,13 @@ class VectorTranslateInfo:
         self,
         input_path: Path,
         output_path: Path,
-        input_layers: Union[List[str], str, None] = None,
+        input_layers: Union[list[str], str, None] = None,
         output_layer: Optional[str] = None,
         input_srs: Union[int, str, None] = None,
         output_srs: Union[int, str, None] = None,
         reproject: bool = False,
-        spatial_filter: Optional[Tuple[float, float, float, float]] = None,
-        clip_geometry: Optional[Union[Tuple[float, float, float, float], str]] = None,
+        spatial_filter: Optional[tuple[float, float, float, float]] = None,
+        clip_geometry: Optional[Union[tuple[float, float, float, float], str]] = None,
         sql_stmt: Optional[str] = None,
         sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
         where: Optional[str] = None,
@@ -220,13 +221,13 @@ def vector_translate_by_info(info: VectorTranslateInfo):
 def vector_translate(
     input_path: Union[Path, str],
     output_path: Path,
-    input_layers: Union[List[str], str, None] = None,
+    input_layers: Union[list[str], str, None] = None,
     output_layer: Optional[str] = None,
     input_srs: Union[int, str, None] = None,
     output_srs: Union[int, str, None] = None,
     reproject: bool = False,
-    spatial_filter: Optional[Tuple[float, float, float, float]] = None,
-    clip_geometry: Optional[Union[Tuple[float, float, float, float], str]] = None,
+    spatial_filter: Optional[tuple[float, float, float, float]] = None,
+    clip_geometry: Optional[Union[tuple[float, float, float, float], str]] = None,
     sql_stmt: Optional[str] = None,
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     where: Optional[str] = None,
@@ -621,7 +622,7 @@ def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> 
         "DESTINATION_OPEN",
         "CONFIG",
     ]
-    prepared_options: Dict[str, dict] = {
+    prepared_options: dict[str, dict] = {
         option_type: {} for option_type in option_types
     }
 

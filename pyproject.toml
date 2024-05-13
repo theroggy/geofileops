@@ -54,7 +54,7 @@ select = [
     "D",
 ]
 
-target-version = "py38"
+target-version = "py39"
 ignore = [ # space before : (needed for how black formats slicing)
     # "E203",  # not yet implemented
     # do not assign a lambda expression, use a def

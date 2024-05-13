@@ -10,10 +10,11 @@ import pprint
 import shutil
 import sqlite3
 import tempfile
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
+
+from pygeoops import GeometryType
 
 import geofileops as gfo
-from geofileops import GeometryType
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util._general_util import MissingRuntimeDependencyError
 from geofileops.util import _sqlite_userdefined as sqlite_userdefined
@@ -35,7 +36,7 @@ class EmptyResultError(Exception):
         super().__init__(self.message)
 
 
-def spatialite_version_info() -> Dict[str, str]:
+def spatialite_version_info() -> dict[str, str]:
     """
     Returns the versions of the spatialite modules.
 
@@ -133,7 +134,7 @@ def get_columns(
     empty_output_ok: bool = True,
     use_spatialite: bool = True,
     output_geometrytype: Optional[GeometryType] = None,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     # Create temp output db to be sure the output DB is writable, even though we only
     # create a temporary table.
     tmp_dir = Path(tempfile.mkdtemp(prefix="geofileops/get_columns_"))
@@ -596,7 +597,7 @@ def create_table_as_sql(
 
 
 def execute_sql(
-    path: Path, sql_stmt: Union[str, List[str]], use_spatialite: bool = True
+    path: Path, sql_stmt: Union[str, list[str]], use_spatialite: bool = True
 ):
     # Connect to database file
     conn = sqlite3.connect(path)

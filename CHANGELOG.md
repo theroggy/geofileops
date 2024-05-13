@@ -25,6 +25,7 @@
   complex polygon features in layer to compare with (#502, #519)
 - Improve handling of queries evaluating to True for disjoint features in
   `join_by_location` (#509)
+- Make fiona an optional depencency (#301)
 - Add configuration option GFO_REMOVE_TEMP_FILES that can be used to avoid temp files
   being removed for debugging purposes (#480)
 - Add a context manager, TempEnv, to set temporary env variables (#481)

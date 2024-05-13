@@ -3,7 +3,7 @@ Module containing utilities regarding operations on geoseries.
 """
 
 import logging
-from typing import List, Union
+from typing import Union
 import warnings
 
 import geopandas as gpd
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def get_geometrytypes(
     geoseries: gpd.GeoSeries, ignore_empty_geometries: bool = True
-) -> List[GeometryType]:
+) -> list[GeometryType]:
     """
     Determine the geometry types in the GeoDataFrame.
 
