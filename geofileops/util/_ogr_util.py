@@ -267,10 +267,6 @@ def vector_translate(
         input_srs = f"EPSG:{input_srs}"
 
     # Sql'ing, Filtering, clipping
-    if spatial_filter is not None:
-        args.extend(["-spat"])
-        bounds = [str(coord) for coord in spatial_filter]
-        args.extend(bounds)
     if sql_stmt is not None:
         # If sql_stmt starts with "\n" or "\t" for gpkg or with " " for a shp,
         # VectorTranslate outputs no or an invalid file if the statement doesn't return
