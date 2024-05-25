@@ -17,7 +17,7 @@ import pygeoops
 import shapely
 from shapely.geometry.base import BaseGeometry
 
-if gpd_compat.USE_PYGEOS:
+if hasattr(gpd_compat, "USE_PYGEOS") and gpd_compat.USE_PYGEOS:
     import pygeos as shapely2_or_pygeos
 else:
     import shapely as shapely2_or_pygeos
@@ -117,7 +117,7 @@ def _harmonize_to_multitype(
     geoseries: gpd.GeoSeries, dest_geometrytype: GeometryType
 ) -> gpd.GeoSeries:
     # Copy geoseries data to new array
-    if gpd_compat.USE_PYGEOS:
+    if hasattr(gpd_compat, "USE_PYGEOS") and gpd_compat.USE_PYGEOS:
         geometries_arr = geoseries.array.data.copy()
     else:
         geometries_arr = geoseries.copy()

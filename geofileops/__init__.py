@@ -9,10 +9,11 @@ import os
 # USE_PYGEOS to avoid further warnings
 import geopandas._compat as gpd_compat
 
-if gpd_compat.USE_PYGEOS:
-    os.environ["USE_PYGEOS"] = "1"
-else:
-    os.environ["USE_PYGEOS"] = "0"
+if hasattr(gpd_compat, "USE_PYGEOS"):
+    if gpd_compat.USE_PYGEOS:
+        os.environ["USE_PYGEOS"] = "1"
+    else:
+        os.environ["USE_PYGEOS"] = "0"
 
 from geofileops.fileops import *  # noqa: F403
 from geofileops.geoops import *  # noqa: F403
