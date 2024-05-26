@@ -20,7 +20,10 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/geofileops/geofileops",
     include_package_data=True,
-    packages=setuptools.find_packages(include=["geofileops", "geofileops.*"]),
+    packages=setuptools.find_packages(
+        exclude=("tests", "benchmark", "benchmark.*"),
+        include=("geofileops", "geofileops.*"),
+    ),
     install_requires=[
         "cloudpickle",
         "gdal>=3.6,<3.10",
