@@ -20,7 +20,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/geofileops/geofileops",
     include_package_data=True,
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(include=["geofileops", "geofileops.*"]),
     install_requires=[
         "cloudpickle",
         "gdal>=3.6,<3.10",
@@ -36,8 +36,12 @@ setuptools.setup(
     ],
     extras_require={"full": ["simplification"]},
     classifiers=[
-        "Programming Language :: Python :: 3",
+        "Intended Audience :: Science/Research",
+        "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3 :: Only",
+        "Topic :: Scientific/Engineering :: GIS",
     ],
     python_requires=">=3.9",
 )
