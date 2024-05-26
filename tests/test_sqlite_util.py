@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from geofileops import fileops
 import geofileops as gfo
+from geofileops import fileops
 from geofileops.util import _sqlite_util as sqlite_util
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper

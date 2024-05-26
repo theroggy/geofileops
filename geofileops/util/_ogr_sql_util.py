@@ -2,8 +2,8 @@
 Module with utilities to format sql statements meant for use with ogr.
 """
 
-from typing import Optional
 from collections.abc import Iterable
+from typing import Optional
 
 
 class ColumnFormatter:

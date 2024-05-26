@@ -5,8 +5,8 @@ Module containing some general utilities.
 import datetime
 import logging
 import os
-from typing import Any, Optional
 from collections.abc import Iterable
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 

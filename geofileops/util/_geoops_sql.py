@@ -2,41 +2,41 @@
 Module containing the implementation of Geofile operations using a sql statement.
 """
 
-from concurrent import futures
-from datetime import datetime
 import json
 import logging
 import logging.config
 import math
 import multiprocessing
-from pathlib import Path
 import shutil
 import string
-from typing import Literal, Optional, Union
-from collections.abc import Iterable
 import warnings
+from collections.abc import Iterable
+from concurrent import futures
+from datetime import datetime
+from pathlib import Path
+from typing import Literal, Optional, Union
 
 import pandas as pd
 import pygeoops
 import shapely
 
 import geofileops as gfo
-from geofileops import GeometryType, PrimitiveType
-from geofileops import fileops
-
+from geofileops import GeometryType, PrimitiveType, fileops
 from geofileops._compat import SPATIALITE_GTE_51
-from geofileops.helpers._configoptions_helper import ConfigOptions
-from geofileops.helpers import _parameter_helper
 from geofileops.fileops import _append_to_nolock
-from geofileops.util import _general_util
-from geofileops.util import _geofileinfo
+from geofileops.helpers import _parameter_helper
+from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.util import (
+    _general_util,
+    _geofileinfo,
+    _geoops_gpd,
+    _io_util,
+    _ogr_sql_util,
+    _ogr_util,
+    _processing_util,
+    _sqlite_util,
+)
 from geofileops.util._geofileinfo import GeofileInfo
-from geofileops.util import _geoops_gpd
-from geofileops.util import _io_util
-from geofileops.util import _ogr_sql_util
-from geofileops.util import _ogr_util
-from geofileops.util import _processing_util
-from geofileops.util import _sqlite_util
 
 logger = logging.getLogger(__name__)
 
@@ -3273,9 +3273,9 @@ def _prepare_processing_params(
                     f"AND {layer_alias_d}rowid <= {batch_info.end_rowid}) "
                 )
             else:
-                batches[batch_info.id][
-                    "batch_filter"
-                ] = f"AND {layer_alias_d}rowid >= {batch_info.start_rowid} "
+                batches[batch_info.id]["batch_filter"] = (
+                    f"AND {layer_alias_d}rowid >= {batch_info.start_rowid} "
+                )
 
     # No use starting more processes than the number of batches...
     if len(batches) < nb_parallel:

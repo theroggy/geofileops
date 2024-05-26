@@ -4,9 +4,10 @@ Module containing some utilities regarding io.
 
 import logging
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from typing import Optional
+
 import geofileops as gfo
 
 

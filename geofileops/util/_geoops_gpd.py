@@ -2,49 +2,52 @@
 Module containing the implementation of Geofile operations using GeoPandas.
 """
 
-from concurrent import futures
 import copy
-from datetime import datetime
 import enum
 import json
 import logging
 import logging.config
 import math
 import multiprocessing
-from pathlib import Path
 import pickle
 import re
 import shutil
 import time
-from typing import Any, Callable, Optional, Union
-from collections.abc import Iterable
 import warnings
+from collections.abc import Iterable
+from concurrent import futures
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Optional, Union
 
 import cloudpickle
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import pygeoops
 import psutil
-
-from pygeoops import GeometryType, PrimitiveType
+import pygeoops
 import shapely
 import shapely.geometry as sh_geom
+from pygeoops import GeometryType, PrimitiveType
 
 import geofileops as gfo
 from geofileops import fileops
-from geofileops.helpers._configoptions_helper import ConfigOptions
-
 from geofileops.helpers import _parameter_helper
-from geofileops.util import _general_util
-from geofileops.util import _geoops_sql
-from geofileops.util import _geoseries_util
-from geofileops.util import _io_util
-from geofileops.util import _ogr_util
-from geofileops.util import _processing_util
+from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.util import (
+    _general_util,
+    _geoops_sql,
+    _geoseries_util,
+    _io_util,
+    _ogr_util,
+    _processing_util,
+)
 from geofileops.util._geofileinfo import GeofileInfo
-from geofileops.util._geometry_util import SimplifyAlgorithm
-from geofileops.util._geometry_util import BufferEndCapStyle, BufferJoinStyle
+from geofileops.util._geometry_util import (
+    BufferEndCapStyle,
+    BufferJoinStyle,
+    SimplifyAlgorithm,
+)
 
 # Don't show this geopandas warning...
 warnings.filterwarnings("ignore", "GeoSeries.isna", UserWarning)
@@ -1597,14 +1600,14 @@ def _dissolve_polygons_pass(
             suffix = output_notonborder_path.suffix
             name = f"{output_notonborder_path.stem}_{batch_id}{suffix}"
             output_notonborder_tmp_partial_path = tempdir / name
-            batches[batch_id][
-                "output_notonborder_tmp_partial_path"
-            ] = output_notonborder_tmp_partial_path
+            batches[batch_id]["output_notonborder_tmp_partial_path"] = (
+                output_notonborder_tmp_partial_path
+            )
             name = f"{output_onborder_path.stem}_{batch_id}{suffix}"
             output_onborder_tmp_partial_path = tempdir / name
-            batches[batch_id][
-                "output_onborder_tmp_partial_path"
-            ] = output_onborder_tmp_partial_path
+            batches[batch_id]["output_onborder_tmp_partial_path"] = (
+                output_onborder_tmp_partial_path
+            )
 
             # Get tile_id if present
             tile_id = tile_row.tile_id if "tile_id" in tile_row._fields else None

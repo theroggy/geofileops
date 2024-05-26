@@ -1,9 +1,11 @@
 """
 Module containing utilities regarding processes.
 """
-from concurrent import futures
+
 import os
+from concurrent import futures
 from typing import Optional
+
 import psutil
 
 

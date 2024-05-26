@@ -34,6 +34,7 @@
 - If an output_dir doesn't exist yet, avoid processing being done before an error is
   raised. (#518)
 - Small changes to support geopandas 1.0 (#529)
+- Linting improvements: ruff version to 0.4.4 + apply import sorting (#531)
 
 ## 0.8.2 (2024-05-25)
 

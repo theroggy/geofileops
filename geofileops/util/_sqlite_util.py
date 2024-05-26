@@ -5,19 +5,19 @@ Module containing utilities regarding sqlite/spatialite files.
 import datetime
 import enum
 import logging
-from pathlib import Path
 import pprint
 import shutil
 import sqlite3
 import tempfile
+from pathlib import Path
 from typing import Optional, Union
 
 from pygeoops import GeometryType
 
 import geofileops as gfo
 from geofileops.helpers._configoptions_helper import ConfigOptions
-from geofileops.util._general_util import MissingRuntimeDependencyError
 from geofileops.util import _sqlite_userdefined as sqlite_userdefined
+from geofileops.util._general_util import MissingRuntimeDependencyError
 
 # Get a logger...
 logger = logging.getLogger(__name__)

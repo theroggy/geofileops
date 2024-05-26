@@ -4,17 +4,17 @@ Module to prepare test data for benchmarking geo operations.
 
 import enum
 import logging
-from pathlib import Path
 import pprint
 import shutil
 import tempfile
+import urllib.request
+import zipfile
+from pathlib import Path
 from typing import Optional
 
 import geopandas as gpd
 import shapely
 import shapely.affinity
-import urllib.request
-import zipfile
 
 import geofileops as gfo
 

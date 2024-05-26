@@ -2,8 +2,8 @@
 Tests for functionalities in sql_util.
 """
 
-from typing import Optional
 from collections.abc import Iterable
+from typing import Optional
 
 import pytest
 

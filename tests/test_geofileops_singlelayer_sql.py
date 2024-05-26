@@ -11,8 +11,7 @@ import geofileops as gfo
 from geofileops import GeometryType
 from geofileops.util import _geoops_sql as geoops_sql
 from tests import test_helper
-from tests.test_helper import EPSGS, SUFFIXES_GEOOPS
-from tests.test_helper import assert_geodataframe_equal
+from tests.test_helper import EPSGS, SUFFIXES_GEOOPS, assert_geodataframe_equal
 
 
 def test_delete_duplicate_geometries(tmp_path):

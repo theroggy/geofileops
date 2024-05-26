@@ -4,14 +4,13 @@ Module containing utilities regarding the usage of ogr/gdal functionalities.
 
 import logging
 import os
-from pathlib import Path
 import tempfile
+from collections.abc import Iterable
+from pathlib import Path
 from threading import Lock
 from typing import Literal, Optional, Union
-from collections.abc import Iterable
 
-from osgeo import gdal
-from osgeo import ogr
+from osgeo import gdal, ogr
 from pygeoops import GeometryType
 
 import geofileops as gfo

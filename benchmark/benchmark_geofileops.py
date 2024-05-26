@@ -1,6 +1,7 @@
 """
 Run the benchmarks specified.
 """
+
 from benchmark import benchmarker
 
 

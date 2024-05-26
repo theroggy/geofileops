@@ -4,9 +4,14 @@ ci:
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.1.13"
+    rev: "v0.4.4"
     hooks:
+      # Sort the imports first
+      - id: ruff
+        args: ["check", "--select", "I", "--fix"]
+      # Format the code
       - id: ruff-format
+      # Lint the code
       - id: ruff
         # args: [ --fix ]
   - repo: https://github.com/pre-commit/mirrors-mypy

@@ -3,18 +3,18 @@ Module containing utilities regarding operations on geoseries.
 """
 
 import logging
-from typing import Union
 import warnings
+from typing import Union
 
 import geopandas as gpd
 import geopandas._compat as gpd_compat
 import numpy as np
-from numpy.typing import NDArray
 import pandas as pd
-from pygeoops import GeometryType
-from pygeoops._general import _extract_0dim_ndarray
 import pygeoops
 import shapely
+from numpy.typing import NDArray
+from pygeoops import GeometryType
+from pygeoops._general import _extract_0dim_ndarray
 from shapely.geometry.base import BaseGeometry
 
 if hasattr(gpd_compat, "USE_PYGEOS") and gpd_compat.USE_PYGEOS:

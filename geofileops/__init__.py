@@ -2,8 +2,8 @@
 Library to make spatial operations on large geo files fast(er) and easy.
 """
 
-from pathlib import Path
 import os
+from pathlib import Path
 
 # Import geopandas here so the warning about pygeos <> shapely2 is given, but set
 # USE_PYGEOS to avoid further warnings

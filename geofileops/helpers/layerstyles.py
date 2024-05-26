@@ -2,13 +2,12 @@
 Module to save layer styles in Geopackage files.
 """
 
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 from typing import Optional
 
-from osgeo import gdal
-from osgeo import ogr
 import pandas as pd
+from osgeo import gdal, ogr
 
 from geofileops import fileops
 

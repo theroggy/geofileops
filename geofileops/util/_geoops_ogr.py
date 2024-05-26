@@ -1,5 +1,5 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional, Union
 
@@ -7,8 +7,7 @@ from pygeoops import GeometryType
 from shapely import wkt
 
 import geofileops as gfo
-from geofileops.util import _ogr_util
-from geofileops.util import _io_util
+from geofileops.util import _io_util, _ogr_util
 
 logger = logging.getLogger(__name__)
 

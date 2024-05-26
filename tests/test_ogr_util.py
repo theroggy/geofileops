@@ -4,8 +4,8 @@ Tests for functionalities in ogr_util.
 
 import os
 
-from osgeo import gdal
 import pytest
+from osgeo import gdal
 
 import geofileops as gfo
 from geofileops._compat import GDAL_GTE_38

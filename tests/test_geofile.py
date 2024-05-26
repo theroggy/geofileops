@@ -7,21 +7,17 @@ import shutil
 
 import geopandas as gpd
 import pandas as pd
-from pandas.testing import assert_frame_equal
-from pygeoops import GeometryType
 import pytest
 import shapely.geometry as sh_geom
+from pandas.testing import assert_frame_equal
+from pygeoops import GeometryType
 
 import geofileops as gfo
 from geofileops import fileops
-from geofileops.util import _geofileinfo
+from geofileops.util import _geofileinfo, _geoseries_util, _io_util, _ogr_util
 from geofileops.util._geofileinfo import GeofileInfo
-from geofileops.util import _geoseries_util
-from geofileops.util import _io_util
-from geofileops.util import _ogr_util
 from tests import test_helper
-from tests.test_helper import SUFFIXES_FILEOPS
-from tests.test_helper import assert_geodataframe_equal
+from tests.test_helper import SUFFIXES_FILEOPS, assert_geodataframe_equal
 
 try:
     import fiona  # noqa: F401

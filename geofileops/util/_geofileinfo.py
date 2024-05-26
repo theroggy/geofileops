@@ -4,10 +4,10 @@ Module with information about geofile types.
 
 import ast
 import csv
-from dataclasses import dataclass
 import enum
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Union
 
 from osgeo import gdal
 from osgeo_utils.auxiliary.util import GetOutputDriversFor

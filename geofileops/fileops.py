@@ -3,42 +3,44 @@ Module with helper functions for geo files.
 """
 
 import enum
-from datetime import date, datetime
 import filecmp
 import logging
-from pathlib import Path
 import pprint
 import shutil
 import string
 import tempfile
 import time
+import warnings
+from collections.abc import Iterable
+from datetime import date, datetime
+from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Literal,
     Optional,
     Union,
-    TYPE_CHECKING,
 )
-from collections.abc import Iterable
-import warnings
 
 import geopandas as gpd
-from geopandas.io import file as gpd_io_file
 import numpy as np
-from osgeo import gdal
 import pandas as pd
-from pandas.api.types import is_integer_dtype
-from pygeoops import GeometryType, PrimitiveType  # noqa: F401
 import pyogrio
 import pyproj
+from geopandas.io import file as gpd_io_file
+from osgeo import gdal
+from pandas.api.types import is_integer_dtype
+from pygeoops import GeometryType, PrimitiveType  # noqa: F401
 
-from geofileops.util import _geofileinfo
-from geofileops.util import _geoseries_util
-from geofileops.util import _io_util
-from geofileops.util import _ogr_util
-from geofileops.util import _ogr_sql_util
 from geofileops._compat import PYOGRIO_GTE_07
 from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.util import (
+    _geofileinfo,
+    _geoseries_util,
+    _io_util,
+    _ogr_sql_util,
+    _ogr_util,
+)
 
 if TYPE_CHECKING:
     import os

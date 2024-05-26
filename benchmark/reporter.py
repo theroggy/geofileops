@@ -4,9 +4,9 @@ Module to generate reports for benchmarks.
 
 import ast
 import math
-from pathlib import Path
 import shutil
 import tempfile
+from pathlib import Path
 from typing import Literal, Optional
 
 import matplotlib.pyplot as plt

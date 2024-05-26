@@ -2,9 +2,9 @@
 Tests for functionalities in ogr_util.
 """
 
-from packaging import version
 import pytest
 import shapely.geometry as sh_geom
+from packaging import version
 
 import geofileops as gfo
 from geofileops._compat import SPATIALITE_GTE_51

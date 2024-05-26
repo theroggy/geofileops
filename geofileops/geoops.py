@@ -2,25 +2,27 @@
 Module exposing all supported operations on geometries in geofiles.
 """
 
-from datetime import datetime
 import logging
 import logging.config
-from pathlib import Path
 import shutil
-from typing import Any, Callable, Literal, Optional, Union, TYPE_CHECKING
 import warnings
+from datetime import datetime
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Union
 
 from pygeoops import GeometryType
 
-from geofileops._compat import SPATIALITE_GTE_51
 from geofileops import fileops
+from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.helpers._configoptions_helper import ConfigOptions
-from geofileops.util import _geofileinfo
-from geofileops.util import _geoops_gpd
-from geofileops.util import _geoops_sql
-from geofileops.util import _geoops_ogr
-from geofileops.util import _io_util
-from geofileops.util import _sqlite_util
+from geofileops.util import (
+    _geofileinfo,
+    _geoops_gpd,
+    _geoops_ogr,
+    _geoops_sql,
+    _io_util,
+    _sqlite_util,
+)
 from geofileops.util._geometry_util import (
     BufferEndCapStyle,
     BufferJoinStyle,
