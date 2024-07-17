@@ -1749,15 +1749,20 @@ def _dissolve_polygons(
                     # are already in the json column
                     columns_to_read.add("__DISSOLVE_TOJSON")
                 else:
-                    # The first pass, so read all relevant columns to code
-                    # them in json
+                    # The first pass, so read all relevant columns to code them in json
                     if "json" in agg_columns:
-                        agg_columns_needed = agg_columns["json"]
+                        agg_columns_needed = list(agg_columns["json"])
                     elif "columns" in agg_columns:
                         agg_columns_needed = [
                             agg_column["column"]
                             for agg_column in agg_columns["columns"]
                         ]
+
+                        # Avoid reading/saving needed columns multiple times.
+                        # The order of the columns should always be the same in the json
+                        # to be able to filter distinct rows efficiently, so sort them,
+                        # as a set gives a different order from run to run.
+                        agg_columns_needed = sorted(set(agg_columns_needed))
                     if agg_columns_needed is not None:
                         columns_to_read.update(agg_columns_needed)
 
@@ -1769,10 +1774,17 @@ def _dissolve_polygons(
                 fid_as_index=fid_as_index,
             )
 
-            if agg_columns is not None:
-                input_gdf["fid_orig"] = input_gdf.index
-                if agg_columns_needed is not None:
-                    agg_columns_needed.append("fid_orig")
+            if agg_columns is not None and agg_columns_needed is not None:
+                # The fid should be added as well, but make name unique
+                fid_orig_column = "fid_orig"
+                for idx in range(99999):
+                    if idx != 0:
+                        fid_orig_column = f"fid_orig{idx}"
+                    if fid_orig_column not in agg_columns_needed:
+                        break
+
+                input_gdf[fid_orig_column] = input_gdf.index
+                agg_columns_needed.insert(0, fid_orig_column)
 
             break
         except Exception as ex:
@@ -1799,7 +1811,7 @@ def _dissolve_polygons(
     aggfunc: Union[str, dict, None] = None
     if agg_columns is not None:
         if "__DISSOLVE_TOJSON" not in input_gdf.columns:
-            # First pass -> put relevant columns in json field
+            # First pass -> put relevant columns in json field.
             aggfunc = {"to_json": agg_columns_needed}
         else:
             # Columns already coded in a json column, so merge json lists
@@ -2069,7 +2081,7 @@ def _dissolve(
     data = pd.DataFrame(df.drop(columns=df.geometry.name))
 
     if aggfunc is not None and isinstance(aggfunc, dict) and "to_json" in aggfunc:
-        agg_columns = list(set(aggfunc["to_json"]))
+        agg_columns = list(aggfunc["to_json"])
         agg_data = (
             data.groupby(**groupby_kwargs)
             .apply(lambda g: g[agg_columns].to_json(orient="records"))
