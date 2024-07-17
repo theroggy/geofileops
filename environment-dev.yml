@@ -24,6 +24,7 @@ dependencies:
   - pytest
   - pytest-cov
   # linting
+  - mypy
   - pandas-stubs
   - pre-commit
   - ruff
