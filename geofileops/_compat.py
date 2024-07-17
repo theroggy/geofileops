@@ -1,8 +1,7 @@
-from packaging import version
-
-from osgeo import gdal
 import pyogrio
 import shapely
+from osgeo import gdal
+from packaging import version
 
 from geofileops.util import _sqlite_util
 

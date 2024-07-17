@@ -3,6 +3,7 @@ Tests for operations using only gdal.
 """
 
 import sys
+
 import pytest
 
 import geofileops as gfo

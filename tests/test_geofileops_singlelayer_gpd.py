@@ -14,18 +14,17 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops.util import _geofileinfo
-from geofileops.util._geofileinfo import GeofileInfo
-from geofileops.util import _geometry_util
+from geofileops.util import _geofileinfo, _geometry_util
 from geofileops.util import _geoops_gpd as geoops_gpd
+from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
 from tests.test_helper import (
     EPSGS,
     SUFFIXES_GEOOPS,
     TESTFILES,
+    WHERE_AREA_GT_5000,
     WHERE_LENGTH_GT_1000,
     WHERE_LENGTH_GT_200000,
-    WHERE_AREA_GT_5000,
     assert_geodataframe_equal,
 )
 

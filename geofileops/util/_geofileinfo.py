@@ -4,10 +4,10 @@ Module with information about geofile types.
 
 import ast
 import csv
-from dataclasses import dataclass
 import enum
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Union
 
 from osgeo import gdal
 from osgeo_utils.auxiliary.util import GetOutputDriversFor
@@ -28,14 +28,14 @@ class GeofileTypeInfo:
 
     geofiletype: str
     ogrdriver: str
-    suffixes: List[str]
+    suffixes: list[str]
     is_fid_zerobased: bool
     is_spatialite_based: bool
     default_spatial_index: bool
-    suffixes_extrafiles: List[str]
+    suffixes_extrafiles: list[str]
 
 
-geofiletypes: Dict[str, GeofileTypeInfo] = {}
+geofiletypes: dict[str, GeofileTypeInfo] = {}
 
 
 def _init_geofiletypes():
@@ -149,7 +149,7 @@ class GeofileType(enum.Enum):
         return geofiletypes[self.name].ogrdriver
 
     @property
-    def suffixes_extrafiles(self) -> List[str]:
+    def suffixes_extrafiles(self) -> list[str]:
         """Returns a list of suffixes for the extra files for this GeofileType."""
         return geofiletypes[self.name].suffixes_extrafiles
 
@@ -226,7 +226,7 @@ class GeofileInfo:
             return False
 
     @property
-    def suffixes_extrafiles(self) -> List[str]:
+    def suffixes_extrafiles(self) -> list[str]:
         """Returns a list of suffixes for the extra files for this GeofileType."""
         if self.geofiletype_info is not None:
             return self.geofiletype_info.suffixes_extrafiles

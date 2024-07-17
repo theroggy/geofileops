@@ -3,10 +3,10 @@ Tests for functionalities in geoseries_util.
 """
 
 import geopandas as gpd
-from pygeoops import GeometryType
 import pytest
 import shapely
 import shapely.geometry as sh_geom
+from pygeoops import GeometryType
 
 import geofileops as gfo
 import geofileops._compat as compat

@@ -4,8 +4,8 @@ from typing import Optional
 
 import pygeoops
 import shapely
-from shapely.geometry.base import BaseGeometry
 import shapely.ops
+from shapely.geometry.base import BaseGeometry
 
 from geofileops.util import _geoseries_util
 

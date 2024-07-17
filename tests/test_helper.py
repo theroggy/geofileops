@@ -3,20 +3,17 @@ Helper functions for all tests.
 """
 
 import os
-from pathlib import Path
 import tempfile
-from typing import List, Optional, Union
+from pathlib import Path
+from typing import Optional, Union
 
 import geopandas as gpd
 import geopandas.testing as gpd_testing
-
 import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
-from geofileops.util import _geofileinfo
-from geofileops.util import geodataframe_util
-from geofileops.util import _geoseries_util
+from geofileops.util import _geofileinfo, _geoseries_util, geodataframe_util
 
 _data_dir = Path(__file__).parent.resolve() / "data"
 EPSGS = [31370, 4326]
@@ -40,7 +37,7 @@ def prepare_expected_result(
     gridsize: float = 0.0,
     where_post: Optional[str] = None,
     explodecollections=False,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
 ) -> gpd.GeoDataFrame:
     """Prepare expected data"""
     if keep_empty_geoms is None:

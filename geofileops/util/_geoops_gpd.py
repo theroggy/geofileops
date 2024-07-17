@@ -2,48 +2,52 @@
 Module containing the implementation of Geofile operations using GeoPandas.
 """
 
-from concurrent import futures
 import copy
-from datetime import datetime
 import enum
 import json
 import logging
 import logging.config
 import math
 import multiprocessing
-from pathlib import Path
 import pickle
 import re
 import shutil
 import time
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 import warnings
+from collections.abc import Iterable
+from concurrent import futures
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Optional, Union
 
 import cloudpickle
 import geopandas as gpd
 import numpy as np
 import pandas as pd
-import pygeoops
 import psutil
-
-from pygeoops import GeometryType, PrimitiveType
+import pygeoops
 import shapely
 import shapely.geometry as sh_geom
+from pygeoops import GeometryType, PrimitiveType
 
 import geofileops as gfo
 from geofileops import fileops
-from geofileops.helpers._configoptions_helper import ConfigOptions
-
 from geofileops.helpers import _parameter_helper
-from geofileops.util import _general_util
-from geofileops.util import _geoops_sql
-from geofileops.util import _geoseries_util
-from geofileops.util import _io_util
-from geofileops.util import _ogr_util
-from geofileops.util import _processing_util
+from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.util import (
+    _general_util,
+    _geoops_sql,
+    _geoseries_util,
+    _io_util,
+    _ogr_util,
+    _processing_util,
+)
 from geofileops.util._geofileinfo import GeofileInfo
-from geofileops.util._geometry_util import SimplifyAlgorithm
-from geofileops.util._geometry_util import BufferEndCapStyle, BufferJoinStyle
+from geofileops.util._geometry_util import (
+    BufferEndCapStyle,
+    BufferJoinStyle,
+    SimplifyAlgorithm,
+)
 
 # Don't show this geopandas warning...
 warnings.filterwarnings("ignore", "GeoSeries.isna", UserWarning)
@@ -126,7 +130,7 @@ def _determine_nb_batches(
     nb_parallel: int = -1,
     batchsize: int = -1,
     parallelization_config: Optional[ParallelizationConfig] = None,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """
     Determines recommended parallelization params.
 
@@ -240,7 +244,7 @@ class ProcessingParams:
         self,
         nb_rows_to_process: int,
         nb_parallel: int,
-        batches: List[str],
+        batches: list[str],
         batchsize: int,
     ):
         self.nb_rows_to_process = nb_rows_to_process
@@ -272,7 +276,7 @@ def _prepare_processing_params(
     )
 
     # Prepare batches to process
-    batches: List[str] = []
+    batches: list[str] = []
     if nb_batches == 1:
         # If only one batch, no filtering is needed
         batches.append("")
@@ -373,7 +377,7 @@ def apply(
     only_geom_input: bool = True,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[GeometryType, str, None] = None,
     gridsize: float = 0.0,
@@ -424,7 +428,7 @@ def buffer(
     single_sided: bool = False,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -476,7 +480,7 @@ def convexhull(
     output_path: Path,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -486,7 +490,7 @@ def convexhull(
     force: bool = False,
 ):
     # Init
-    operation_params: Dict[str, Any] = {}
+    operation_params: dict[str, Any] = {}
 
     # Go!
     return _apply_geooperation_to_layer(
@@ -513,7 +517,7 @@ def makevalid(
     output_path: Path,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[str, None, GeometryType] = None,
     gridsize: float = 0.0,
@@ -566,7 +570,7 @@ def simplify(
     lookahead: int = 8,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -608,7 +612,7 @@ def _apply_geooperation_to_layer(
     operation: GeoOperation,
     operation_params: dict,
     input_layer: Optional[str],  # = None
-    columns: Optional[List[str]],  # = None
+    columns: Optional[list[str]],  # = None
     output_layer: Optional[str],  # = None
     explodecollections: bool,  # = False
     force_output_geometrytype: Union[GeometryType, str, None],  # = None
@@ -767,7 +771,7 @@ def _apply_geooperation_to_layer(
             # Prepare output filename
             tmp_output_path = tmp_dir / output_path.name
 
-            batches: Dict[int, dict] = {}
+            batches: dict[int, dict] = {}
             future_to_batch_id = {}
 
             for batch_id, batch_filter in enumerate(processing_params.batches):
@@ -893,7 +897,7 @@ def _apply_geooperation(
     operation_params: dict,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     where=None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
@@ -1581,7 +1585,7 @@ def _dissolve_polygons_pass(
         # Prepare output filename
         tempdir = output_onborder_path.parent
 
-        batches: Dict[int, dict] = {}
+        batches: dict[int, dict] = {}
         nb_batches = len(tiles_gdf)
         nb_batches_done = 0
         future_to_batch_id = {}
@@ -1596,14 +1600,14 @@ def _dissolve_polygons_pass(
             suffix = output_notonborder_path.suffix
             name = f"{output_notonborder_path.stem}_{batch_id}{suffix}"
             output_notonborder_tmp_partial_path = tempdir / name
-            batches[batch_id][
-                "output_notonborder_tmp_partial_path"
-            ] = output_notonborder_tmp_partial_path
+            batches[batch_id]["output_notonborder_tmp_partial_path"] = (
+                output_notonborder_tmp_partial_path
+            )
             name = f"{output_onborder_path.stem}_{batch_id}{suffix}"
             output_onborder_tmp_partial_path = tempdir / name
-            batches[batch_id][
-                "output_onborder_tmp_partial_path"
-            ] = output_onborder_tmp_partial_path
+            batches[batch_id]["output_onborder_tmp_partial_path"] = (
+                output_onborder_tmp_partial_path
+            )
 
             # Get tile_id if present
             tile_id = tile_row.tile_id if "tile_id" in tile_row._fields else None
@@ -1707,13 +1711,13 @@ def _dissolve_polygons(
     input_geometrytype: GeometryType,
     input_layer: Optional[str],
     output_layer: Optional[str],
-    bbox: Tuple[float, float, float, float],
+    bbox: tuple[float, float, float, float],
     tile_id: Optional[int],
     gridsize: float,
     keep_empty_geoms: bool,
 ) -> dict:
     # Init
-    perfinfo: Dict[str, float] = {}
+    perfinfo: dict[str, float] = {}
     start_time = datetime.now()
     return_info = {
         "input_path": input_path,
@@ -1733,7 +1737,7 @@ def _dissolve_polygons(
     agg_columns_needed = None
     while True:
         try:
-            columns_to_read: Set[str] = set()
+            columns_to_read: set[str] = set()
             info = gfo.get_layerinfo(input_path, input_layer)
             if groupby_columns is not None:
                 columns_to_read.update(groupby_columns)

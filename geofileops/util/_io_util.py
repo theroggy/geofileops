@@ -4,9 +4,10 @@ Module containing some utilities regarding io.
 
 import logging
 import os
-from pathlib import Path
 import tempfile
-from typing import Optional, Tuple
+from pathlib import Path
+from typing import Optional
+
 import geofileops as gfo
 
 
@@ -56,7 +57,7 @@ def get_tempfile_locked(
     suffix: str = ".tmp",
     dirname: Optional[str] = None,
     tempdir: Optional[Path] = None,
-) -> Tuple[Path, Path]:
+) -> tuple[Path, Path]:
     """
     Formats a temp file path, and creates a corresponding lock file.
 

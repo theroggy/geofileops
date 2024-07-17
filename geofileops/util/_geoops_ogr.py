@@ -1,14 +1,13 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple, Union
+from typing import Literal, Optional, Union
 
 from pygeoops import GeometryType
 from shapely import wkt
 
 import geofileops as gfo
-from geofileops.util import _ogr_util
-from geofileops.util import _io_util
+from geofileops.util import _io_util, _ogr_util
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +15,10 @@ logger = logging.getLogger(__name__)
 def clip_by_geometry(
     input_path: Path,
     output_path: Path,
-    clip_geometry: Union[Tuple[float, float, float, float], str],
+    clip_geometry: Union[tuple[float, float, float, float], str],
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force: bool = False,
 ):
@@ -45,10 +44,10 @@ def clip_by_geometry(
 def export_by_bounds(
     input_path: Path,
     output_path: Path,
-    bounds: Tuple[float, float, float, float],
+    bounds: tuple[float, float, float, float],
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force: bool = False,
 ):
@@ -68,12 +67,12 @@ def export_by_bounds(
 def warp(
     input_path: Path,
     output_path: Path,
-    gcps: List[Tuple[float, float, float, float, Optional[float]]],
+    gcps: list[tuple[float, float, float, float, Optional[float]]],
     algorithm: str = "polynomial",
     order: Optional[int] = None,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force: bool = False,
 ):
@@ -105,8 +104,8 @@ def _run_ogr(
     input_srs: Union[int, str, None] = None,
     output_srs: Union[int, str, None] = None,
     reproject: bool = False,
-    spatial_filter: Optional[Tuple[float, float, float, float]] = None,
-    clip_geometry: Optional[Union[Tuple[float, float, float, float], str]] = None,
+    spatial_filter: Optional[tuple[float, float, float, float]] = None,
+    clip_geometry: Optional[Union[tuple[float, float, float, float], str]] = None,
     sql_stmt: Optional[str] = None,
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
     transaction_size: int = 65536,
@@ -115,7 +114,7 @@ def _run_ogr(
     explodecollections: bool = False,
     force_output_geometrytype: Optional[GeometryType] = None,
     options: dict = {},
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     warp: Optional[dict] = None,
     force: bool = False,
 ) -> bool:

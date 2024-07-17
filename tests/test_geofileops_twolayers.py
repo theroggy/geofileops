@@ -2,10 +2,10 @@
 Tests for operations that are executed using a sql statement on two layers.
 """
 
-from contextlib import nullcontext
 import math
-from pathlib import Path
 import sys
+from contextlib import nullcontext
+from pathlib import Path
 from typing import Optional
 
 import geopandas as gpd
@@ -18,11 +18,10 @@ import geofileops as gfo
 from geofileops import GeometryType
 from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.util import _geofileinfo
-from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util import _geoops_sql as geoops_sql
+from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
-from tests.test_helper import SUFFIXES_GEOOPS, TESTFILES
-from tests.test_helper import assert_geodataframe_equal
+from tests.test_helper import SUFFIXES_GEOOPS, TESTFILES, assert_geodataframe_equal
 
 
 @pytest.mark.parametrize("testfile", TESTFILES)

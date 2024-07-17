@@ -2,25 +2,21 @@
 Tests for operations that are executed using a sql statement on one layer.
 """
 
-from importlib import import_module
 import logging
 import math
-from typing import Any, List, Optional
+from importlib import import_module
+from typing import Any, Optional
 
 import geopandas as gpd
 import pytest
 import shapely
 from shapely import MultiPolygon, Polygon
 
-from geofileops import fileops
-from geofileops import GeometryType
-from geofileops import geoops
+from geofileops import GeometryType, fileops, geoops
 from geofileops._compat import SPATIALITE_GTE_51
-from geofileops.util import _geofileinfo
-from geofileops.util._geofileinfo import GeofileInfo
-from geofileops.util import _geoops_sql
+from geofileops.util import _geofileinfo, _geoops_sql
 from geofileops.util import _io_util as io_util
-
+from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
 from tests.test_helper import (
     EPSGS,
@@ -28,8 +24,8 @@ from tests.test_helper import (
     SUFFIXES_GEOOPS,
     TESTFILES,
     WHERE_AREA_GT_400,
+    assert_geodataframe_equal,
 )
-from tests.test_helper import assert_geodataframe_equal
 
 # Init gfo module
 current_geoops_module = "unknown"
@@ -54,11 +50,11 @@ def set_geoops_module(geoops_module: str):
 
 
 def basic_combinations_to_test(
-    geoops_modules: List[str] = GEOOPS_MODULES,
-    testfiles: List[str] = TESTFILES,
-    epsgs: List[int] = EPSGS,
-    suffixes: List[str] = SUFFIXES_GEOOPS,
-) -> List[Any]:
+    geoops_modules: list[str] = GEOOPS_MODULES,
+    testfiles: list[str] = TESTFILES,
+    epsgs: list[int] = EPSGS,
+    suffixes: list[str] = SUFFIXES_GEOOPS,
+) -> list[Any]:
     """
     Return sensible combinations of parameters to be used in tests for following params:
         suffix, epsg, geoops_module, testfile, empty_input, gridsize, where_post

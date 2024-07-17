@@ -7,21 +7,17 @@ import shutil
 
 import geopandas as gpd
 import pandas as pd
-from pandas.testing import assert_frame_equal
-from pygeoops import GeometryType
 import pytest
 import shapely.geometry as sh_geom
+from pandas.testing import assert_frame_equal
+from pygeoops import GeometryType
 
 import geofileops as gfo
 from geofileops import fileops
-from geofileops.util import _geofileinfo
+from geofileops.util import _geofileinfo, _geoseries_util, _io_util, _ogr_util
 from geofileops.util._geofileinfo import GeofileInfo
-from geofileops.util import _geoseries_util
-from geofileops.util import _io_util
-from geofileops.util import _ogr_util
 from tests import test_helper
-from tests.test_helper import SUFFIXES_FILEOPS
-from tests.test_helper import assert_geodataframe_equal
+from tests.test_helper import SUFFIXES_FILEOPS, assert_geodataframe_equal
 
 try:
     import fiona  # noqa: F401
@@ -828,8 +824,8 @@ def test_read_file(suffix, dimensions, engine_setter):
     # Check result
     assert isinstance(read_gdf, pd.DataFrame)
     assert len(read_gdf) == 48
-    if engine_setter == "pyogrio" and suffix == ".csv":
-        # With pyogrio, if .csv file without geometry column, ps.DataFrame as result
+    if suffix == ".csv":
+        # No geometry column, so pd.DataFrame as result
         assert len(read_gdf.columns) == 11
     else:
         assert len(read_gdf.columns) == 12
@@ -888,7 +884,7 @@ def test_read_file_columns_geometry(tmp_path, suffix, columns, geometry, engine_
     else:
         raise ValueError(f"Invalid value for geometry: {geometry}")
 
-    if ignore_geometry or (engine_setter == "pyogrio" and src_info.driver == "CSV"):
+    if ignore_geometry or src_info.driver == "CSV":
         expect_geometry = False
     else:
         expect_geometry = True
@@ -924,8 +920,8 @@ def test_read_file_invalid_params(tmp_path, engine_setter):
 def test_read_file_fid_as_index(suffix, engine_setter):
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
-    if suffix == ".csv" and engine_setter == "pyogrio":
-        # pyogrio returns no geometry column if no geometry available in file
+    if suffix == ".csv":
+        # if no geometry column available in file, a pd.DataFrame is returned
         exp_columns = 11
     else:
         exp_columns = 12
@@ -1279,13 +1275,19 @@ def test_to_file(tmp_path, suffix, dimensions, engine_setter):
     assert read_gdf.loc[read_gdf["UIDN"] == uidn]["LBLHFDTLT"].item() == "Silomaïs"
 
     assert len(read_gdf) == len(written_gdf)
-    if engine_setter == "pyogrio" and suffix == ".csv":
-        # pyogrio returns a pd.Dataframe if no geometry column
+    if suffix == ".csv":
+        # if no geometry column, a pd.Dataframe is returned
         assert_frame_equal(written_gdf, read_gdf)
     else:
-        if engine_setter == "fiona" and suffix == ".gpkg":
-            # Fiona doesn't seem to write EMPTY geom to gpkg, but writes None.
-            read_gdf.loc[46, "geometry"] = None
+        if engine_setter == "fiona":
+            if suffix == ".gpkg":
+                # Fiona doesn't seem to write EMPTY geom to gpkg, but writes None.
+                read_gdf.loc[46, "geometry"] = None
+            elif suffix == ".shp":
+                # The data column is written as string with fiona.
+                written_gdf["DATUM"] = pd.to_datetime(written_gdf["DATUM"]).astype(
+                    "datetime64[ms]"
+                )
 
         assert_geodataframe_equal(written_gdf, read_gdf)
 

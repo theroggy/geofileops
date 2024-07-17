@@ -4,17 +4,17 @@ Module to prepare test data for benchmarking geo operations.
 
 import enum
 import logging
-from pathlib import Path
 import pprint
 import shutil
 import tempfile
-from typing import Optional, Tuple
+import urllib.request
+import zipfile
+from pathlib import Path
+from typing import Optional
 
 import geopandas as gpd
 import shapely
 import shapely.affinity
-import urllib.request
-import zipfile
 
 import geofileops as gfo
 
@@ -69,7 +69,7 @@ class TestFile(enum.Enum):
         self.url = url
         self.filename = filename
 
-    def get_file(self, output_dir: Path, nb_points: int = 20_000) -> Tuple[Path, str]:
+    def get_file(self, output_dir: Path, nb_points: int = 20_000) -> tuple[Path, str]:
         """
         Creates the test file.
 

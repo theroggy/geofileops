@@ -2,40 +2,41 @@
 Module containing the implementation of Geofile operations using a sql statement.
 """
 
-from concurrent import futures
-from datetime import datetime
 import json
 import logging
 import logging.config
 import math
 import multiprocessing
-from pathlib import Path
 import shutil
 import string
-from typing import Dict, Iterable, List, Literal, Optional, Tuple, Union
 import warnings
+from collections.abc import Iterable
+from concurrent import futures
+from datetime import datetime
+from pathlib import Path
+from typing import Literal, Optional, Union
 
 import pandas as pd
 import pygeoops
 import shapely
 
 import geofileops as gfo
-from geofileops import GeometryType, PrimitiveType
-from geofileops import fileops
-
+from geofileops import GeometryType, PrimitiveType, fileops
 from geofileops._compat import SPATIALITE_GTE_51
-from geofileops.helpers._configoptions_helper import ConfigOptions
-from geofileops.helpers import _parameter_helper
 from geofileops.fileops import _append_to_nolock
-from geofileops.util import _general_util
-from geofileops.util import _geofileinfo
+from geofileops.helpers import _parameter_helper
+from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.util import (
+    _general_util,
+    _geofileinfo,
+    _geoops_gpd,
+    _io_util,
+    _ogr_sql_util,
+    _ogr_util,
+    _processing_util,
+    _sqlite_util,
+)
 from geofileops.util._geofileinfo import GeofileInfo
-from geofileops.util import _geoops_gpd
-from geofileops.util import _io_util
-from geofileops.util import _ogr_sql_util
-from geofileops.util import _ogr_util
-from geofileops.util import _processing_util
-from geofileops.util import _sqlite_util
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ def buffer(
     quadrantsegments: int = 5,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -114,7 +115,7 @@ def convexhull(
     output_path: Path,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -163,7 +164,7 @@ def delete_duplicate_geometries(
     output_path: Path,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
@@ -210,7 +211,7 @@ def isvalid(
     output_path: Path,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     validate_attribute_data: bool = False,
     nb_parallel: int = -1,
@@ -284,7 +285,7 @@ def makevalid(
     output_path: Path,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Union[str, None, GeometryType] = None,
     gridsize: float = 0.0,
@@ -376,7 +377,7 @@ def select(
     sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = "SQLITE",
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     force_output_geometrytype: Optional[GeometryType] = None,
     gridsize: float = 0.0,
@@ -433,7 +434,7 @@ def simplify(
     tolerance: float,
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
-    columns: Optional[List[str]] = None,
+    columns: Optional[list[str]] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
@@ -484,7 +485,7 @@ def _single_layer_vector_operation(
     operation_name: str,
     input_layer: Optional[str],
     output_layer: Optional[str],
-    columns: Optional[List[str]],
+    columns: Optional[list[str]],
     explodecollections: bool,
     force_output_geometrytype: Optional[GeometryType],
     gridsize: float,
@@ -720,7 +721,7 @@ def _single_layer_vector_operation(
             max_workers=processing_params.nb_parallel,
             initializer=_processing_util.initialize_worker(),
         ) as calculate_pool:
-            batches: Dict[int, dict] = {}
+            batches: dict[int, dict] = {}
             future_to_batch_id = {}
             for batch_id in processing_params.batches:
                 batches[batch_id] = {}
@@ -877,7 +878,7 @@ def clip(
     clip_path: Path,
     output_path: Path,
     input_layer: Optional[str] = None,
-    input_columns: Optional[List[str]] = None,
+    input_columns: Optional[list[str]] = None,
     clip_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
@@ -982,7 +983,7 @@ def erase(
     output_path: Path,
     overlay_self: bool,
     input_layer: Optional[str] = None,
-    input_columns: Optional[List[str]] = None,
+    input_columns: Optional[list[str]] = None,
     erase_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
@@ -1262,7 +1263,7 @@ def export_by_location(
     min_area_intersect: Optional[float] = None,
     area_inters_column_name: Optional[str] = None,
     input_layer: Optional[str] = None,
-    input_columns: Optional[List[str]] = None,
+    input_columns: Optional[list[str]] = None,
     input_to_compare_with_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
@@ -1484,7 +1485,7 @@ def export_by_distance(
     output_path: Path,
     max_distance: float,
     input1_layer: Optional[str] = None,
-    input1_columns: Optional[List[str]] = None,
+    input1_columns: Optional[list[str]] = None,
     input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     gridsize: float = 0.0,
@@ -1550,10 +1551,10 @@ def intersection(
     output_path: Path,
     overlay_self: bool,
     input1_layer: Optional[str] = None,
-    input1_columns: Optional[List[str]] = None,
+    input1_columns: Optional[list[str]] = None,
     input1_columns_prefix: str = "l1_",
     input2_layer: Optional[str] = None,
-    input2_columns: Optional[List[str]] = None,
+    input2_columns: Optional[list[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
@@ -1669,10 +1670,10 @@ def join_by_location(
     min_area_intersect: Optional[float] = None,
     area_inters_column_name: Optional[str] = None,
     input1_layer: Optional[str] = None,
-    input1_columns: Optional[List[str]] = None,
+    input1_columns: Optional[list[str]] = None,
     input1_columns_prefix: str = "l1_",
     input2_layer: Optional[str] = None,
-    input2_columns: Optional[List[str]] = None,
+    input2_columns: Optional[list[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
@@ -1809,7 +1810,7 @@ def _prepare_filter_by_location_fields(
     geom2: str = "layer2.{input2_geometrycolumn}",
     subquery_alias: str = "sub_filter",
     avoid_disjoint: bool = False,
-) -> Tuple[str, str, bool]:
+) -> tuple[str, str, bool]:
     """
     Prepare the fields needed to prepare a select to filter by location.
 
@@ -1959,10 +1960,10 @@ def join_nearest(
     distance: Optional[float],
     expand: Optional[bool],
     input1_layer: Optional[str] = None,
-    input1_columns: Optional[List[str]] = None,
+    input1_columns: Optional[list[str]] = None,
     input1_columns_prefix: str = "l1_",
     input2_layer: Optional[str] = None,
-    input2_columns: Optional[List[str]] = None,
+    input2_columns: Optional[list[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
@@ -2094,10 +2095,10 @@ def select_two_layers(
     output_path: Path,
     sql_stmt: str,
     input1_layer: Optional[str] = None,
-    input1_columns: Optional[List[str]] = None,
+    input1_columns: Optional[list[str]] = None,
     input1_columns_prefix: str = "l1_",
     input2_layer: Optional[str] = None,
-    input2_columns: Optional[List[str]] = None,
+    input2_columns: Optional[list[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     force_output_geometrytype: Optional[GeometryType] = None,
@@ -2141,10 +2142,10 @@ def identity(
     output_path: Path,
     overlay_self: bool,
     input1_layer: Optional[str] = None,
-    input1_columns: Optional[List[str]] = None,
+    input1_columns: Optional[list[str]] = None,
     input1_columns_prefix: str = "l1_",
     input2_layer: Optional[str] = None,
-    input2_columns: Optional[List[str]] = None,
+    input2_columns: Optional[list[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
@@ -2256,10 +2257,10 @@ def symmetric_difference(
     output_path: Path,
     overlay_self: bool,
     input1_layer: Optional[str] = None,
-    input1_columns: Optional[List[str]] = None,
+    input1_columns: Optional[list[str]] = None,
     input1_columns_prefix: str = "l1_",
     input2_layer: Optional[str] = None,
-    input2_columns: Optional[List[str]] = None,
+    input2_columns: Optional[list[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
@@ -2387,10 +2388,10 @@ def union(
     output_path: Path,
     overlay_self: bool,
     input1_layer: Optional[str] = None,
-    input1_columns: Optional[List[str]] = None,
+    input1_columns: Optional[list[str]] = None,
     input1_columns_prefix: str = "l1_",
     input2_layer: Optional[str] = None,
-    input2_columns: Optional[List[str]] = None,
+    input2_columns: Optional[list[str]] = None,
     input2_columns_prefix: str = "l2_",
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
@@ -2537,10 +2538,10 @@ def _two_layer_vector_operation(
     sql_template: str,
     operation_name: str,
     input1_layer: Optional[str],
-    input1_columns: Optional[List[str]],
+    input1_columns: Optional[list[str]],
     input1_columns_prefix: str,
     input2_layer: Optional[str],
-    input2_columns: Optional[List[str]],
+    input2_columns: Optional[list[str]],
     input2_columns_prefix: str,
     output_layer: Optional[str],
     explodecollections: bool,
@@ -2842,7 +2843,7 @@ def _two_layer_vector_operation(
             initializer=_processing_util.initialize_worker(),
         ) as calculate_pool:
             # Start looping
-            batches: Dict[int, dict] = {}
+            batches: dict[int, dict] = {}
             future_to_batch_id = {}
             for batch_id in processing_params.batches:
                 batches[batch_id] = {}
@@ -3186,7 +3187,7 @@ def _prepare_processing_params(
     )
 
     # Check number of batches + appoint nb rows to batches
-    batches: Dict[int, dict] = {}
+    batches: dict[int, dict] = {}
     if nb_batches == 1:
         # If only one batch, no filtering is needed
         batches[0] = {}
@@ -3272,9 +3273,9 @@ def _prepare_processing_params(
                     f"AND {layer_alias_d}rowid <= {batch_info.end_rowid}) "
                 )
             else:
-                batches[batch_info.id][
-                    "batch_filter"
-                ] = f"AND {layer_alias_d}rowid >= {batch_info.start_rowid} "
+                batches[batch_info.id]["batch_filter"] = (
+                    f"AND {layer_alias_d}rowid >= {batch_info.start_rowid} "
+                )
 
     # No use starting more processes than the number of batches...
     if len(batches) < nb_parallel:
@@ -3299,7 +3300,7 @@ def _determine_nb_batches(
     batchsize: int,
     is_twolayer_operation: bool,
     cpu_count: Optional[int] = None,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """
     Determine an optimal number of batches and parallel workers.
 

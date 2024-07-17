@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## 0.9.0 (???)
+## 0.9.0 (2024-05-26)
 
 ### Deprecations and compatibility notes
 
@@ -31,11 +31,20 @@
 - Add a context manager, TempEnv, to set temporary env variables (#481)
 - Don't copy both input files if only one is not spatialite based in two layer
   operations (#247)
+- If an output_dir doesn't exist yet, avoid processing being done before an error is
+  raised. (#518)
+- Small changes to support geopandas 1.0 (#529)
+- Linting improvements: ruff version to 0.4.4 + apply import sorting (#531)
+
+## 0.8.2 (2024-05-25)
+
+### Improvements
+
+- Small changes to support gdal 3.9 (#528)
 - Several improvements to documentation: new FAQ, improved user guide,...
   (#465, #469, #474)
 - Linting improvements: use mypy + use ruff-format instead of black for formatting
   (#478, #479)
-- If an output_dir doesn't exist yet, avoid processing being done before an error is raised... (#518)
 
 ### Bugs fixed
 

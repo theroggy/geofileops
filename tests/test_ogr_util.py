@@ -4,8 +4,8 @@ Tests for functionalities in ogr_util.
 
 import os
 
-from osgeo import gdal
 import pytest
+from osgeo import gdal
 
 import geofileops as gfo
 from geofileops._compat import GDAL_GTE_38
@@ -155,7 +155,7 @@ def test_vector_translate_input_nolayer(tmp_path):
     gfo.execute_sql(input_path, sql_stmt=f'DROP TABLE "{layer}"')
 
     with pytest.raises(
-        Exception, match="Error .* not recognized as a supported file format"
+        Exception, match="Error .* not recognized as .*a supported file format"
     ):
         _ogr_util.vector_translate(str(input_path), output_path)
 

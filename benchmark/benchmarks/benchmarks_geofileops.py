@@ -3,17 +3,16 @@ Module to benchmark geofileops operations.
 """
 # ruff: noqa: D103
 
-from datetime import datetime
+import inspect
 import logging
 import multiprocessing
-import inspect
+from datetime import datetime
 from pathlib import Path
 
+import geofileops as gfo
 from benchmark.benchmarker import RunResult
 from benchmark.benchmarks import testdata
-import geofileops as gfo
-from geofileops.util import _geoops_sql
-from geofileops.util import _geoops_gpd
+from geofileops.util import _geoops_gpd, _geoops_sql
 
 logger = logging.getLogger(__name__)
 nb_parallel = min(multiprocessing.cpu_count(), 12)

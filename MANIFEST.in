@@ -7,3 +7,6 @@ include geofileops/version.txt
 
 # Include the py.types so e.g. mypy knows geofileops is typed
 include geofileops/py.typed
+
+# For whatever reason, this is needed to avoid tests being included
+recursive-exclude tests *
