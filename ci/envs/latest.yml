@@ -18,8 +18,8 @@ dependencies:
   - pyogrio >=0.5
   - pyproj
   - shapely >=2,<2.1
+  # optional
+  - simplification
   # testing
   - pytest
   - pytest-cov
-  - pip:
-    - simplification

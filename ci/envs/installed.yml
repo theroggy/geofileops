@@ -6,7 +6,7 @@ dependencies:
   - pip
   # required
   - geofileops
+  # optional
+  - simplification
   # testing
   - pytest
-  - pip:
-    - simplification

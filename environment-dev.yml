@@ -19,18 +19,18 @@ dependencies:
   - pyproj
   - shapely >=2,<2.1
   # optional
-  # - fiona  # Not needed anymore except if pyogio < 0.7 is used. 
+  # - fiona  # Not needed anymore except if pyogio < 0.7 is used.
+  - simplification
   # testing
   - pytest
   - pytest-cov
   # linting
+  - mypy
   - pandas-stubs
   - pre-commit
-  - ruff
+  - ruff ==0.5.2
   - types-pillow
   # docs
   - pydata-sphinx-theme
   - pip:
     - sphinx-automodapi==0.13
-    # optional
-    - simplification

@@ -683,6 +683,6 @@ class set_config_options:
     def __exit__(self, type, value, traceback):
         # Remove config options that were set
         # TODO: delete loop + uncomment if SetConfigOptions() is supported
-        for name, value in self.config_options.items():
+        for name, _ in self.config_options.items():
             gdal.SetConfigOption(name, None)
         # gdal.SetConfigOptions(self.config_options_backup)

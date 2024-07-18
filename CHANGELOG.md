@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.9.1 (2024-07-18)
+
+### Bugs fixed
+
+- For `dissolve`, `agg_columns` aggregations sometimes give wrong results (#541)
+
 ## 0.9.0 (2024-05-26)
 
 ### Deprecations and compatibility notes

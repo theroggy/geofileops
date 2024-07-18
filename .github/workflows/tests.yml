@@ -48,10 +48,6 @@ jobs:
             os: ubuntu-latest
             dev: false
             python: "3.9"
-          - env: latest-dev
-            os: ubuntu-latest
-            dev: false
-            python: "3.11"
           - env: latest-fiona
             os: windows-latest
             dev: false

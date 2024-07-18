@@ -1029,11 +1029,52 @@ def dissolve(
     """
     Function that applies a dissolve.
 
-    More detailed documentation in module geoops!
+    End user documentation can be found in module geoops!
 
     Remark: keep_empty_geoms is not implemented because this is not so easy because
     (for polygon dissolve) the batches are location based, and null/empty geometries
     don't have a location. It could be implemented, but as long as nobody needs it...
+
+    The attribute data aggregation logic is a bit more complex to be able to process
+    per tile and in multiple passed for large datasets:
+      - Note that a geometry that lies on the edge of 2 (or more) tiles will be split up
+        on the tile boundary(ies) and each part will be further treated in the
+        respective tile.
+      - To be able to correctly perform attribute aggregations, they can only be
+        determined after all tiles and passes have been finished, as the information
+        from multiple tiles over multiple passes might have to be combined.
+      - Hence, all needed data (columns and values) is stored in intermediate/temporary
+        results so it can be all combined at the end.
+      - In practice, during the first calculation pass, all relevant columns and values
+        as well as the original fid of the geometries are serialized as a JSON string
+        for each input geometry. When a geometry is dissolved with another geometry in
+        this pass, their json strings are concatenated to a list. This way, all data is
+        retained. An example of a JSON string list for 2 dissolved geometries:
+            [{"fid_orig": 1, "area": 10.0}, {"fid_orig": 2, "area": 5.0}]
+      - When geometries are merged in a following dissolve pass, the lists of JSON
+        strings will be concatenated so all data is always retained. If a geometry was
+        on the border of 2 tiles, this can result in multiple identical JSON strings. In
+        the following example, fid_orig 1 was on the border of 2 tiles and was dissolved
+        again in a following pass, leading to the following JSON string list:
+            [
+                {"fid_orig": 1, "area": 10.0},
+                {"fid_orig": 1, "area": 10.0},
+                {"fid_orig": 2, "area": 5.0},
+            ]
+      - When all passes are done, meaning everything is glued together and all attribute
+        JSON strings are combined in one big list for each final geometry, the attribute
+        aggregations can be performed.
+      - When an original geometry was on the boundary of 2 (or more) tiles in the first
+        pass, like in the example above, the aggregation has to ignore the resulting
+        duplicate atttribute JSON strings. Otherwise a e.g. "SUM" aggregate will
+        double-count values.
+      - The `fid_orig` with the original `fid` from the source file is included for this
+        reason. The `fid_orig` and all attributes of such split geometries will be the
+        same. The `fid_orig` of other geometries that were actually dissolved will
+        always be different. Hence, a simple "distinct" on the JSON strings will result
+        in the correct list of JSON strings that should be used to base the agregations
+        on. The only caveat is that the order of the columns in the JSON strings always
+        needs to be the same.
     """
     # Init and validate input parameters
     # ----------------------------------
@@ -1749,15 +1790,20 @@ def _dissolve_polygons(
                     # are already in the json column
                     columns_to_read.add("__DISSOLVE_TOJSON")
                 else:
-                    # The first pass, so read all relevant columns to code
-                    # them in json
+                    # The first pass, so read all relevant columns to code them in json
                     if "json" in agg_columns:
-                        agg_columns_needed = agg_columns["json"]
+                        agg_columns_needed = list(agg_columns["json"])
                     elif "columns" in agg_columns:
                         agg_columns_needed = [
                             agg_column["column"]
                             for agg_column in agg_columns["columns"]
                         ]
+
+                        # Avoid reading/saving needed columns multiple times.
+                        # The order of the columns should always be the same in the json
+                        # to be able to filter distinct rows efficiently, so sort them,
+                        # as a set gives a different order from run to run.
+                        agg_columns_needed = sorted(set(agg_columns_needed))
                     if agg_columns_needed is not None:
                         columns_to_read.update(agg_columns_needed)
 
@@ -1769,10 +1815,17 @@ def _dissolve_polygons(
                 fid_as_index=fid_as_index,
             )
 
-            if agg_columns is not None:
-                input_gdf["fid_orig"] = input_gdf.index
-                if agg_columns_needed is not None:
-                    agg_columns_needed.append("fid_orig")
+            if agg_columns is not None and agg_columns_needed is not None:
+                # The fid should be added as well, but make name unique
+                fid_orig_column = "fid_orig"
+                for idx in range(99999):
+                    if idx != 0:
+                        fid_orig_column = f"fid_orig{idx}"
+                    if fid_orig_column not in agg_columns_needed:
+                        break
+
+                input_gdf[fid_orig_column] = input_gdf.index
+                agg_columns_needed.insert(0, fid_orig_column)
 
             break
         except Exception as ex:
@@ -1799,7 +1852,7 @@ def _dissolve_polygons(
     aggfunc: Union[str, dict, None] = None
     if agg_columns is not None:
         if "__DISSOLVE_TOJSON" not in input_gdf.columns:
-            # First pass -> put relevant columns in json field
+            # First pass -> put relevant columns in json field.
             aggfunc = {"to_json": agg_columns_needed}
         else:
             # Columns already coded in a json column, so merge json lists
@@ -2069,7 +2122,7 @@ def _dissolve(
     data = pd.DataFrame(df.drop(columns=df.geometry.name))
 
     if aggfunc is not None and isinstance(aggfunc, dict) and "to_json" in aggfunc:
-        agg_columns = list(set(aggfunc["to_json"]))
+        agg_columns = list(aggfunc["to_json"])
         agg_data = (
             data.groupby(**groupby_kwargs)
             .apply(lambda g: g[agg_columns].to_json(orient="records"))
