@@ -519,7 +519,7 @@ def test_dissolve_invalid_params(tmp_path, sql_singlethread, invalid_params, exp
         elif invalid_param == "output_path":
             output_path = invalid_params[invalid_param]
         else:
-            ValueError(f"unsupported invalid_param: {invalid_param}")
+            raise ValueError(f"unsupported invalid_param: {invalid_param}")
 
     # Run test
     with pytest.raises(ValueError, match=exp_match):

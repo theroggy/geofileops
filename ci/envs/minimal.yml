@@ -18,9 +18,8 @@ dependencies:
   - pyogrio =0.7  # 0.7.0 released 2023-10-25
   - pyproj =3.6  # released 2023-03-28
   - shapely >=2,<2.1  # released 2022-12-12
+  # optional
+  - simplification
   # testing
   - pytest
   - pytest-cov
-  - pip:
-    # optional
-    - simplification

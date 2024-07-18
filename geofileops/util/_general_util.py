@@ -212,11 +212,11 @@ class TempEnv:
 
     def __exit__(self, type, value, traceback):
         # Set variables that were backed up back to original value
-        for name, value in self._envs_backup.items():
+        for name, env_value in self._envs_backup.items():
             # Recover backed up value
-            os.environ[name] = value
+            os.environ[name] = env_value
         # For variables without backup, remove them
-        for name, value in self._envs.items():
+        for name, _ in self._envs.items():
             if name not in self._envs_backup:
                 if name in os.environ:
                     del os.environ[name]
