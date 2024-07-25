@@ -7,16 +7,14 @@ class classproperty(property):
 
 
 class ConfigOptions:
-    """
-    Class to access the geofileops runtime configuration options.
+    """Class to access the geofileops runtime configuration options.
 
     They are read from environement variables.
     """
 
     @classproperty
     def remove_temp_files(cls) -> bool:
-        """
-        Configuration options to cleanup temp files or not.
+        """Configuration options to cleanup temp files or not.
 
         Returns:
             bool: True to remove temp files. Defaults to True.
@@ -29,8 +27,7 @@ class ConfigOptions:
 
 
 def get_bool(key: str, default: bool) -> bool:
-    """
-    Get the value for the environment variable ``key`` as a bool.
+    """Get the value for the environment variable ``key`` as a bool.
 
     Supported values (case insensitive):
        - True: "1", "YES", "TRUE"

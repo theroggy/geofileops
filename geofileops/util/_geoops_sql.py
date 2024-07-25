@@ -1,6 +1,4 @@
-"""
-Module containing the implementation of Geofile operations using a sql statement.
-"""
+"""Module containing the implementation of Geofile operations using a sql statement."""
 
 import json
 import logging
@@ -496,8 +494,7 @@ def _single_layer_vector_operation(
     batchsize: int,
     force: bool,
 ):
-    """
-    Execute a sql query template on the input layer.
+    """Execute a sql query template on the input layer.
 
     Args:
         input_path (Path): _description_
@@ -1164,8 +1161,7 @@ def _subdivide_layer(
     nb_parallel: int = -1,
     batchsize: int = -1,
 ) -> Optional[Path]:
-    """
-    Subdivide a layer if applicable.
+    """Subdivide a layer if applicable.
 
     Args:
         path (Path): path to the input file.
@@ -1811,8 +1807,7 @@ def _prepare_filter_by_location_fields(
     subquery_alias: str = "sub_filter",
     avoid_disjoint: bool = False,
 ) -> tuple[str, str, bool]:
-    """
-    Prepare the fields needed to prepare a select to filter by location.
+    """Prepare the fields needed to prepare a select to filter by location.
 
     Args:
         query (str): the spatial relations query that should be filtered on.
@@ -2555,8 +2550,7 @@ def _two_layer_vector_operation(
     output_with_spatial_index: Optional[bool] = None,
     tmp_dir: Optional[Path] = None,
 ):
-    """
-    Executes an operation that needs 2 input files.
+    """Executes an operation that needs 2 input files.
 
     Args:
         input1_path (str): the file to export features from
@@ -3301,8 +3295,7 @@ def _determine_nb_batches(
     is_twolayer_operation: bool,
     cpu_count: Optional[int] = None,
 ) -> tuple[int, int]:
-    """
-    Determine an optimal number of batches and parallel workers.
+    """Determine an optimal number of batches and parallel workers.
 
     Args:
         nb_rows_input_layer (int): number of input rows
@@ -3395,9 +3388,7 @@ def dissolve_singlethread(
     output_layer: Optional[str] = None,
     force: bool = False,
 ):
-    """
-    Remark: this is not a parallelized version!!!
-    """
+    """Remark: this is not a parallelized version!!!"""
     # Init
     logger = logging.getLogger("geofileops.dissolve")
     start_time = datetime.now()

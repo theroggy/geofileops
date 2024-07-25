@@ -1,6 +1,4 @@
-"""
-Module containing utilities regarding low level vector operations.
-"""
+"""Module containing utilities regarding low level vector operations."""
 
 import enum
 import logging
@@ -10,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class BufferJoinStyle(enum.Enum):
-    """
-    Enumeration of the available buffer styles for intermediate points.
+    """Enumeration of the available buffer styles for intermediate points.
 
     Relevant for the end points of a line or polygon geometry.
     """
@@ -22,8 +19,7 @@ class BufferJoinStyle(enum.Enum):
 
 
 class BufferEndCapStyle(enum.Enum):
-    """
-    Enumeration of the possible end point buffer styles.
+    """Enumeration of the possible end point buffer styles.
 
     Relevant for the end points of a line or point geometry.
     """
@@ -34,9 +30,7 @@ class BufferEndCapStyle(enum.Enum):
 
 
 class SimplifyAlgorithm(enum.Enum):
-    """
-    Enumeration of the supported simplification algorythms.
-    """
+    """Enumeration of the supported simplification algorythms."""
 
     RAMER_DOUGLAS_PEUCKER = "rdp"
     LANG = "lang"

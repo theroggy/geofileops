@@ -1,14 +1,11 @@
-"""
-Module with utilities to format sql statements meant for use with ogr.
-"""
+"""Module with utilities to format sql statements meant for use with ogr."""
 
 from collections.abc import Iterable
 from typing import Optional
 
 
 class ColumnFormatter:
-    """
-    Format strings with the columns for use in sql statements.
+    """Format strings with the columns for use in sql statements.
 
     There are some specific hacks that are related to specific behaviours of ogr, mainly
     regarding the handling of the special "fid" column.
@@ -24,8 +21,7 @@ class ColumnFormatter:
         table_alias: str = "",
         column_alias_prefix: str = "",
     ):
-        """
-        Format strings with column names for use in sql statements.
+        """Format strings with column names for use in sql statements.
 
         Args:
             columns_asked (Optional[List[str]]): the column names to read from the
@@ -88,8 +84,7 @@ class ColumnFormatter:
         return columns_prefixed
 
     def _fix_fid_columns(self, columns: list[str]) -> list[str]:
-        """
-        Fix the fid columns.
+        """Fix the fid columns.
 
         Useful if the "fid" special column needs some extra treatment:
             - if the fid_column name as reported by gdal is "", this means that the file

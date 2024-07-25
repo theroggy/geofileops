@@ -1,6 +1,4 @@
-"""
-Module exposing all supported operations on geometries in geofiles.
-"""
+"""Module exposing all supported operations on geometries in geofiles."""
 
 import logging
 import logging.config
@@ -47,8 +45,7 @@ def dissolve_within_distance(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Dissolve geometries that are within the distance specified.
+    """Dissolve geometries that are within the distance specified.
 
     The output layer will contain the dissolved geometries where all gaps between the
     input geometries up to ``distance`` are closed.
@@ -399,8 +396,7 @@ def apply(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Apply a python lambda function on the geometry column of the input file.
+    """Apply a python lambda function on the geometry column of the input file.
 
     The result is written to the output file specified.
 
@@ -521,8 +517,7 @@ def buffer(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Applies a buffer operation on geometry column of the input file.
+    """Applies a buffer operation on geometry column of the input file.
 
     The result is written to the output file specified.
 
@@ -730,8 +725,7 @@ def clip_by_geometry(
     explodecollections: bool = False,
     force: bool = False,
 ):
-    """
-    Clip all geometries in the imput file by the geometry provided.
+    """Clip all geometries in the imput file by the geometry provided.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -782,8 +776,7 @@ def convexhull(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Applies a convexhull operation on the input file.
+    """Applies a convexhull operation on the input file.
 
     The result is written to the output file specified.
 
@@ -855,8 +848,7 @@ def delete_duplicate_geometries(
     where_post: Optional[str] = None,
     force: bool = False,
 ):
-    """
-    Copy all rows to the output file, except for duplicate geometries.
+    """Copy all rows to the output file, except for duplicate geometries.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -919,8 +911,7 @@ def dissolve(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Applies a dissolve operation on the input file.
+    """Applies a dissolve operation on the input file.
 
     If columns are specified with ``groupby_columns``, the data is first grouped
     on those columns before the geometries are merged.
@@ -1108,8 +1099,7 @@ def export_by_bounds(
     explodecollections: bool = False,
     force: bool = False,
 ):
-    """
-    Export the rows that intersect with the bounds specified.
+    """Export the rows that intersect with the bounds specified.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -1158,8 +1148,7 @@ def isvalid(
     batchsize: int = -1,
     force: bool = False,
 ) -> bool:
-    """
-    Checks for all geometries in the geofile if they are valid.
+    """Checks for all geometries in the geofile if they are valid.
 
     The results are written to the output file.
 
@@ -1240,8 +1229,7 @@ def makevalid(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Makes all geometries in the input file valid.
+    """Makes all geometries in the input file valid.
 
     Writes the result to the output path.
 
@@ -1369,8 +1357,7 @@ def warp(
     explodecollections: bool = False,
     force: bool = False,
 ):
-    """
-    Warp all input features to the output file according to the gcps specified.
+    """Warp all input features to the output file according to the gcps specified.
 
     Alternative names:
         - rubbersheet, rubbersheeting
@@ -1432,8 +1419,7 @@ def select(
     batchsize: int = -1,
     force: bool = False,
 ):
-    '''
-    Execute a SELECT SQL statement on the input file.
+    '''Execute a SELECT SQL statement on the input file.
 
     The ``sql_stmt`` must be in SQLite dialect and can contain placeholders that will be
     replaced automatically. More details can be found in the notes and examples below.
@@ -1597,8 +1583,7 @@ def simplify(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Applies a simplify operation on geometry column of the input file.
+    """Applies a simplify operation on geometry column of the input file.
 
     The result is written to the output file specified.
 
@@ -1715,8 +1700,7 @@ def clip(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Clip the input layer with the clip layer.
+    """Clip the input layer with the clip layer.
 
     The resulting layer will contain the parts of the geometries in the
     input layer that overlap with the dissolved geometries in the clip layer.
@@ -1814,8 +1798,7 @@ def erase(
     subdivide_coords: int = 2000,
     force: bool = False,
 ):
-    """
-    Erase all features in the erase layer from the features in the input layer.
+    """Erase all features in the erase layer from the features in the input layer.
 
     Notes:
         - Every row in the input layer will result in maximum one row in the
@@ -1925,8 +1908,7 @@ def export_by_location(
     subdivide_coords: int = 7500,
     force: bool = False,
 ):
-    """
-    Exports all features filtered by the specified spatial query.
+    """Exports all features filtered by the specified spatial query.
 
     All features in ``input_to_select_from_path`` that comply to the
     ``spatial_relations_query`` compared with the features in
@@ -2037,8 +2019,7 @@ def export_by_distance(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    Exports all features within the distance specified.
+    """Exports all features within the distance specified.
 
     Features in ``input_to_select_from_path`` that are within the distance specified of
     any features in ``input_to_compare_with_path``.
@@ -2120,8 +2101,7 @@ def identity(
     subdivide_coords: int = 2000,
     force: bool = False,
 ):
-    r"""
-    Calculates the pairwise identity of the two input layers.
+    r"""Calculates the pairwise identity of the two input layers.
 
     The result is the equivalent of the intersection between the two layers + layer 1
     erased with layer 2.
@@ -2237,9 +2217,7 @@ def split(
     subdivide_coords: int = 2000,
     force: bool = False,
 ):
-    """
-    DEPRECATED: please use identity.
-    """
+    """DEPRECATED: please use identity."""
     warnings.warn(
         "split() is deprecated because it was renamed to identity(). "
         "Will be removed in a future version",
@@ -2287,9 +2265,7 @@ def intersect(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """
-    DEPRECATED: please use intersection.
-    """
+    """DEPRECATED: please use intersection."""
     warnings.warn(  # pragma: no cover
         "intersect() is deprecated because it was renamed intersection(). "
         "Will be removed in a future version",
@@ -2333,8 +2309,7 @@ def intersection(
     batchsize: int = -1,
     force: bool = False,
 ):
-    r"""
-    Calculates the pairwise intersection of the two input layers.
+    r"""Calculates the pairwise intersection of the two input layers.
 
     Notes:
         - The result will contain the attribute columns from both input layers. The
@@ -2447,8 +2422,7 @@ def join_by_location(
     batchsize: int = -1,
     force: bool = False,
 ):
-    r"""
-    Joins all features in input1 with all features in input2.
+    r"""Joins all features in input1 with all features in input2.
 
     The output will contain the geometries of input1. The ``spatial_relations_query``
     and ``min_area_intersect`` parameters will determine which geometries of input1 will
@@ -2575,8 +2549,7 @@ def join_nearest(
     batchsize: int = -1,
     force: bool = False,
 ):
-    r"""
-    Joins features of ``input1`` with the ``nb_nearest`` closest features of ``input2``.
+    r"""Joins features of ``input1`` with the ``nb_nearest`` ones in ``input2``.
 
     In addition to the columns requested via the ``input*_columns`` parameters, the
     following columns will be in the output file as well:
@@ -2680,8 +2653,7 @@ def select_two_layers(
     batchsize: int = -1,
     force: bool = False,
 ):
-    r'''
-    Execute a SELECT SQL statement on the input files.
+    r'''Execute a SELECT SQL statement on the input files.
 
     The ``sql_stmt`` must be in SQLite dialect and can contain placeholders that will be
     replaced automatically. More details can be found in the notes and examples below.
@@ -2910,8 +2882,7 @@ def symmetric_difference(
     subdivide_coords: int = 2000,
     force: bool = False,
 ):
-    r"""
-    Calculates the pairwise symmetric difference of the two input layers.
+    r"""Calculates the pairwise symmetric difference of the two input layers.
 
     The result will be a layer containing features from both the input and overlay
     layers but with the overlapping areas between the two layers removed.
@@ -3035,8 +3006,7 @@ def union(
     subdivide_coords: int = 2000,
     force: bool = False,
 ):
-    r"""
-    Calculates the pairwise union of the two input layers.
+    r"""Calculates the pairwise union of the two input layers.
 
     Union needs to be interpreted here as such: the output layer will contain the
     combination of all of the following operations:

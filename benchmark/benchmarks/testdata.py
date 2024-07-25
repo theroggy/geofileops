@@ -1,6 +1,4 @@
-"""
-Module to prepare test data for benchmarking geo operations.
-"""
+"""Module to prepare test data for benchmarking geo operations."""
 
 import enum
 import logging
@@ -30,8 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class TestFile(enum.Enum):
-    """
-    Class to create benchmarking test files.
+    """Class to create benchmarking test files.
 
     Args:
         enum (_type_): _description_
@@ -57,8 +54,7 @@ class TestFile(enum.Enum):
     COMPLEX_POLYS = (2, None, "complexpolys.gpkg")
 
     def __init__(self, value, url, filename):
-        """
-        Create a test file.
+        """Create a test file.
 
         Args:
             value (_type_): _description_
@@ -70,8 +66,7 @@ class TestFile(enum.Enum):
         self.filename = filename
 
     def get_file(self, output_dir: Path, nb_points: int = 20_000) -> tuple[Path, str]:
-        """
-        Creates the test file.
+        """Creates the test file.
 
         Args:
             output_dir (Path): the directory to write the file to.
@@ -279,8 +274,7 @@ def _create_complex_poly(
 def _download_samplefile(
     url: str, dst_name: str, dst_dir: Optional[Path] = None
 ) -> Path:
-    """
-    Download a sample file to dest_path.
+    """Download a sample file to dest_path.
 
     If it is zipped, it will be unzipped. If needed, it will be converted to
     the file type as determined by the suffix of dst_name.

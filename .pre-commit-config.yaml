@@ -6,9 +6,6 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: "v0.5.2"
     hooks:
-      # Sort the imports first
-      - id: ruff
-        args: ["check", "--select", "I", "--fix"]
       # Format the code
       - id: ruff-format
       # Lint the code

@@ -1,6 +1,4 @@
-"""
-Module containing the implementation of Geofile operations using GeoPandas.
-"""
+"""Module containing the implementation of Geofile operations using GeoPandas."""
 
 import copy
 import enum
@@ -56,8 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 class ParallelizationConfig:
-    """
-    Heuristics for geopandas based geo operations.
+    """Heuristics for geopandas based geo operations.
 
     Heuristics meant to be able to optimize the parallelisation parameters for
     geopandas based geo operation.
@@ -73,8 +70,7 @@ class ParallelizationConfig:
         bytes_usable: Optional[int] = None,
         cpu_count: int = -1,
     ):
-        """
-        Heuristics for geopandas based geo operations.
+        """Heuristics for geopandas based geo operations.
 
         Heuristics meant to be able to optimize the parallelisation parameters for
         geopandas based geo operation.
@@ -131,8 +127,7 @@ def _determine_nb_batches(
     batchsize: int = -1,
     parallelization_config: Optional[ParallelizationConfig] = None,
 ) -> tuple[int, int]:
-    """
-    Determines recommended parallelization params.
+    """Determines recommended parallelization params.
 
     Args:
         nb_rows_total (int): The total number of rows that will be processed
@@ -624,8 +619,7 @@ def _apply_geooperation_to_layer(
     force: bool,  # = False
     parallelization_config: Optional[ParallelizationConfig] = None,
 ):
-    """
-    Applies a geo operation on a layer.
+    """Applies a geo operation on a layer.
 
     The operation to apply can be one of the the following:
       - BUFFER: apply a buffer. Operation parameters:
@@ -1026,8 +1020,7 @@ def dissolve(
     force: bool = False,
     operation_prefix: str = "",
 ):
-    """
-    Function that applies a dissolve.
+    """Function that applies a dissolve.
 
     End user documentation can be found in module geoops!
 
@@ -2030,8 +2023,7 @@ def _dissolve(
     observed=False,
     dropna=True,
 ) -> gpd.GeoDataFrame:
-    """
-    Dissolve geometries within `groupby` into single observation.
+    """Dissolve geometries within `groupby` into single observation.
 
     This is accomplished by applying the `unary_union` method
     to all geometries within a groupself.

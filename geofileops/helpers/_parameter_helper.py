@@ -1,5 +1,4 @@
-"""
-Module with some helpers functions to validate, parse,... parameters.
+"""Module with some helpers functions to validate, parse,... parameters.
 
 Mainly used for parameters with a complex structure that are typically reused in
 different functions in geofileops.
@@ -7,8 +6,7 @@ different functions in geofileops.
 
 
 def validate_agg_columns(agg_columns: dict):
-    """
-    Validates if the agg_columns parameter is properly formed.
+    """Validates if the agg_columns parameter is properly formed.
 
     If an problem is found, an error is raised.
 
