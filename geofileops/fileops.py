@@ -742,6 +742,22 @@ def rename_column(
         if not datasource_layer.TestCapability(gdal.ogr.OLCAlterFieldDefn):
             raise ValueError(f"rename_column not supported for {path}")
 
+        # If the column name only differs in case, we need to rename it first to a
+        # temporary column name to avoid an error.
+        if column_name.lower() == new_column_name.lower():
+            columns_lower = {column.lower() for column in info.columns}
+            for index in range(9999):
+                temp_column_name = f"tmp_{index}"
+                if temp_column_name not in columns_lower:
+                    break
+            sql_stmt = (
+                f'ALTER TABLE "{layer}" '
+                f'RENAME COLUMN "{column_name}" TO "{temp_column_name}"'
+            )
+            result = datasource.ExecuteSQL(sql_stmt)
+            datasource.ReleaseResultSet(result)
+            column_name = f"{temp_column_name}"
+
         # Rename column
         sql_stmt = (
             f'ALTER TABLE "{layer}" '

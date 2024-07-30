@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.10 (????-??-??)
+
+### Improvements
+
+- Add support for renaming column with only difference in casing (#549)
+
 ## 0.9.1 (2024-07-18)
 
 ### Bugs fixed

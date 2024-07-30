@@ -1077,6 +1077,13 @@ def test_rename_column(tmp_path, suffix):
     assert "OPPERVL" not in result_layerinfo.columns
     assert "area" in result_layerinfo.columns
 
+    # Rename column with different casing
+    gfo.add_column(str(test_path), "TMP_0", "TEXT")
+    gfo.rename_column(str(test_path), "area", "AREA")
+    result_layerinfo = gfo.get_layerinfo(test_path, raise_on_nogeom=raise_on_nogeom)
+    assert "area" not in result_layerinfo.columns
+    assert "AREA" in result_layerinfo.columns
+
 
 def test_rename_column_unsupported(tmp_path):
     path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path, suffix=".shp")
