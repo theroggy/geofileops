@@ -1,6 +1,4 @@
-"""
-Module for benchmarking.
-"""
+"""Module for benchmarking."""
 
 import datetime
 import importlib
@@ -37,8 +35,7 @@ class RunResult:
         secs_taken: float,
         run_details: Optional[dict] = None,
     ):
-        """
-        Constructor for a RunResult.
+        """Constructor for a RunResult.
 
         Args:
             package (str): Package being benchmarked.
@@ -58,9 +55,7 @@ class RunResult:
         self.run_details = run_details
 
     def __repr__(self):
-        """
-        Format the result.
-        """
+        """Format the result."""
         return f"{self.__class__}({self.__dict__})"
 
 
@@ -68,8 +63,7 @@ def run_benchmarks(
     modules_to_run: Optional[list[str]] = None,
     functions_to_run: Optional[list[str]] = None,
 ):
-    """
-    Run all benchmarks specified.
+    """Run all benchmarks specified.
 
     Args:
         modules_to_run (Optional[List[str]], optional): List of modules to run

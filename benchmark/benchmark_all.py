@@ -1,6 +1,4 @@
-"""
-Run all benchmarks.
-"""
+"""Run all benchmarks."""
 
 from benchmark import benchmarker
 

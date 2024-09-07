@@ -1,6 +1,4 @@
-"""
-Module containing utilities regarding operations on geoseries.
-"""
+"""Module containing utilities regarding operations on geoseries."""
 
 import logging
 
@@ -20,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def sort_values(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """
-    Sort the values in the GeoDataFrame by the values in all columns.
+    """Sort the values in the GeoDataFrame by the values in all columns.
 
     For the geometry column, it is first converted to it's WKT.
 

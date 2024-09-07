@@ -1,6 +1,4 @@
-"""
-Module containing utilities regarding sqlite/spatialite files.
-"""
+"""Module containing utilities regarding sqlite/spatialite files."""
 
 import datetime
 import enum
@@ -24,8 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmptyResultError(Exception):
-    """
-    Exception raised when the SQL statement disn't return any rows.
+    """Exception raised when the SQL statement disn't return any rows.
 
     Attributes:
         message (str): Exception message
@@ -37,8 +34,7 @@ class EmptyResultError(Exception):
 
 
 def spatialite_version_info() -> dict[str, str]:
-    """
-    Returns the versions of the spatialite modules.
+    """Returns the versions of the spatialite modules.
 
     Versions returned: spatialite_version, geos_version.
 
@@ -293,8 +289,7 @@ def create_table_as_sql(
     column_datatypes: Optional[dict] = None,
     profile: SqliteProfile = SqliteProfile.DEFAULT,
 ):
-    """
-    Execute sql statement and save the result in the output file.
+    """Execute sql statement and save the result in the output file.
 
     Args:
         input1_path (Path): the path to the 1st input file.
@@ -673,8 +668,7 @@ def test_data_integrity(path: Path, use_spatialite: bool = True):
 
 
 def load_spatialite(conn):
-    """
-    Load mod_spatialite for an existing sqlite connection.
+    """Load mod_spatialite for an existing sqlite connection.
 
     Args:
         conn ([type]): Sqlite connection

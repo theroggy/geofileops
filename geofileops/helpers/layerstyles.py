@@ -1,6 +1,4 @@
-"""
-Module to save layer styles in Geopackage files.
-"""
+"""Module to save layer styles in Geopackage files."""
 
 import sqlite3
 from pathlib import Path
@@ -18,8 +16,7 @@ ogr.UseExceptions()
 def get_layerstyles(
     path: Path, layer: Optional[str] = None, name: Optional[str] = None
 ) -> pd.DataFrame:
-    """
-    Get the layer styles saved in the geofile.
+    """Get the layer styles saved in the geofile.
 
     Only styles saved according to the QGIS Geopackage styling extension are read:
     https://github.com/pka/qgpkg/blob/master/qgis_geopackage_extension.md
@@ -55,8 +52,7 @@ def add_layerstyle(
     owner: str = "",
     ui: str = "",
 ):
-    """
-    Add the layer style to the geofile.
+    """Add the layer style to the geofile.
 
     Remark: at the time of writing, QGIS only uses the qml field to interprete the
     style, so this field is mandatory and sld is not.
@@ -120,8 +116,7 @@ def add_layerstyle(
 
 
 def remove_layerstyle(path: Path, id: int):
-    """
-    Remove a layer style.
+    """Remove a layer style.
 
     Only styles saved according to the QGIS Geopackage styling extension are removed:
     https://github.com/pka/qgpkg/blob/master/qgis_geopackage_extension.md
@@ -145,8 +140,7 @@ def remove_layerstyle(path: Path, id: int):
 
 
 def _has_layerstyles_table(path: Path) -> bool:
-    """
-    Check if the layer_styles table exists for the geo file specified.
+    """Check if the layer_styles table exists for the geo file specified.
 
     Args:
         path (Path): the path to the geofile.
@@ -171,8 +165,7 @@ def _has_layerstyles_table(path: Path) -> bool:
 
 
 def _init_layerstyles(path: Path, exist_ok: bool = False):
-    """
-    Create a layer_styles attribute table to store style information in the QGIS way.
+    """Create a layer_styles attribute table to store style information in the QGIS way.
 
     The table is created according to the QGIS Geopackage styling extension:
     https://github.com/pka/qgpkg/blob/master/qgis_geopackage_extension.md

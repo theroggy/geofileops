@@ -1,6 +1,4 @@
-"""
-Module containing utilities regarding the usage of ogr/gdal functionalities.
-"""
+"""Module containing utilities regarding the usage of ogr/gdal functionalities."""
 
 import logging
 import os
@@ -111,8 +109,7 @@ def get_drivers() -> dict:
 
 
 def read_cpl_log(path: Path) -> tuple[list[str], list[str]]:
-    """
-    Reads a cpl_log file and returns a list with log lines and errors.
+    """Reads a cpl_log file and returns a list with log lines and errors.
 
     Args:
         path (Path): the file path to the cpl_log file.
@@ -246,6 +243,10 @@ def vector_translate(
     args = []
     if isinstance(input_path, str):
         input_path = Path(input_path)
+    if isinstance(columns, str):
+        # If a string is passed, convert to list
+        columns = [columns]
+
     gdal_options = _prepare_gdal_options(options, split_by_option_type=True)
 
     # Input file parameters
@@ -585,8 +586,7 @@ def vector_translate(
 
 
 def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> dict:
-    """
-    Prepares the options so they are ready to pass on to gdal.
+    """Prepares the options so they are ready to pass on to gdal.
 
         - Uppercase the option key
         - Check if the option types are on of the supported ones:
@@ -656,8 +656,7 @@ def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> 
 
 
 class set_config_options:
-    """
-    Context manager to set config options.
+    """Context manager to set config options.
 
     Args:
         config_options (dict): dict with config options to set.

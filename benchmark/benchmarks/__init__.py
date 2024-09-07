@@ -1,3 +1,1 @@
-"""
-Module with the implemantion of all benchmarking functions.
-"""
+"""Module with the implemantion of all benchmarking functions."""

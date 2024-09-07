@@ -237,7 +237,13 @@ def test_buffer(
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
-def test_buffer_columns_fid(tmp_path, suffix, geoops_module, testfile):
+@pytest.mark.parametrize(
+    "columns, exp_columns",
+    [(["LblHfdTlt", "fid"], ["LblHfdTlt", "fid_1"]), ("LblHfdTlt", ["LblHfdTlt"])],
+)
+def test_buffer_columns_fid(
+    tmp_path, suffix, geoops_module, testfile, columns, exp_columns
+):
     """Buffer basics are available both in the gpd and sql implementations."""
     # Prepare test data
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
@@ -253,7 +259,7 @@ def test_buffer_columns_fid(tmp_path, suffix, geoops_module, testfile):
         input_path=input_path,
         output_path=output_path,
         distance=1,
-        columns=["LblHfdTlt", "fid"],
+        columns=columns,
         explodecollections=True,
         keep_empty_geoms=False,
         nb_parallel=2,
@@ -279,8 +285,9 @@ def test_buffer_columns_fid(tmp_path, suffix, geoops_module, testfile):
     output_layerinfo = fileops.get_layerinfo(output_path)
     output_gdf = fileops.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
-    assert list(output_layerinfo.columns) == ["LblHfdTlt", "fid_1"]
-    assert len(output_gdf[output_gdf.fid_1 == multi_fid]) == 2
+    assert list(output_layerinfo.columns) == exp_columns
+    if "fid" in columns:
+        assert len(output_gdf[output_gdf.fid_1 == multi_fid]) == 2
 
 
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)

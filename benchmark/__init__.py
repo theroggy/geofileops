@@ -1,3 +1,1 @@
-"""
-Benchmark package.
-"""
+"""Benchmark package."""

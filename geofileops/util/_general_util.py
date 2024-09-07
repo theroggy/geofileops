@@ -1,6 +1,4 @@
-"""
-Module containing some general utilities.
-"""
+"""Module containing some general utilities."""
 
 import datetime
 import logging
@@ -12,8 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class MissingRuntimeDependencyError(Exception):
-    """
-    Exception raised when an unsupported SQL statement is passed.
+    """Exception raised when an unsupported SQL statement is passed.
 
     Attributes:
         message (str): Exception message
@@ -25,8 +22,7 @@ class MissingRuntimeDependencyError(Exception):
 
 
 def align_casing(string_to_align: str, strings_to_align_to: Iterable) -> str:
-    """
-    Search a string case-insentive in a list of string to align its casing.
+    """Search a string case-insentive in a list of string to align its casing.
 
     If the string is not found in strings_to_align_to, a ValueError is thrown.
 
@@ -48,8 +44,7 @@ def align_casing_list(
     strings_to_align_to: Iterable,
     raise_on_missing: bool = True,
 ) -> list[str]:
-    """
-    Search the string caseintensitive in a list of strings.
+    """Search the string caseintensitive in a list of strings.
 
     Args:
         strings_to_align (List[str]): strings to align the casing of to
@@ -151,9 +146,7 @@ def format_progress(
 
 
 def formatbytes(bytes: float):
-    """
-    Return the given bytes as a human friendly KB, MB, GB, or TB string.
-    """
+    """Return the given bytes as a human friendly KB, MB, GB, or TB string."""
     bytes_float = float(bytes)
     KB = float(1024)
     MB = float(KB**2)  # 1,048,576
@@ -186,8 +179,7 @@ def prepare_for_serialize(data: dict) -> dict:
 
 
 class TempEnv:
-    """
-    Context manager to temporarily set/change environment variables.
+    """Context manager to temporarily set/change environment variables.
 
     Existing values for variables are backed up and reset when the scope is left,
     variables that didn't exist before are deleted again.

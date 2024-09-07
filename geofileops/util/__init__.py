@@ -1,3 +1,1 @@
-"""
-Sub-package containing general utility modules that could be reused in other software.
-"""
+"""Sub-package containing general-purpose utility modules."""

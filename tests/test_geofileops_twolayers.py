@@ -984,7 +984,13 @@ def test_intersection_self(tmp_path):
 
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
-def test_intersection_columns_fid(tmp_path, testfile, suffix):
+@pytest.mark.parametrize(
+    "input1_columns, input2_columns",
+    [(["lblhfdtlt", "fid"], ["naam", "FiD"]), ("lblhfdtlt", "naam")],
+)
+def test_intersection_columns_fid(
+    tmp_path, testfile, suffix, input1_columns, input2_columns
+):
     input1_path = test_helper.get_testfile(testfile, suffix=suffix)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
     input1_layerinfo = gfo.get_layerinfo(input1_path)
@@ -995,8 +1001,6 @@ def test_intersection_columns_fid(tmp_path, testfile, suffix):
         tmp_path / f"{input1_path.stem}_intersection_{input2_path.stem}{suffix}"
     )
     # Also check if fid casing is preserved in output
-    input1_columns = ["lblhfdtlt", "fid"]
-    input2_columns = ["naam", "FiD"]
     gfo.intersection(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -1007,24 +1011,30 @@ def test_intersection_columns_fid(tmp_path, testfile, suffix):
         batchsize=batchsize,
     )
 
-    # Check if the tmp file is correctly created
+    # Check if the result file is correctly created
     assert output_path.exists()
     exp_spatial_index = GeofileInfo(output_path).default_spatial_index
     assert gfo.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = gfo.get_layerinfo(output_path)
-    assert len(output_layerinfo.columns) == len(input1_columns) + len(input2_columns)
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
     assert output_layerinfo.featurecount == 30
+
+    exp_nb_columns = len(input1_columns) if isinstance(input1_columns, list) else 1
+    exp_nb_columns += len(input2_columns) if isinstance(input2_columns, list) else 1
+    assert len(output_layerinfo.columns) == exp_nb_columns
 
     # Check the contents of the result file
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
-    assert "l1_fid" in output_gdf.columns
-    assert "l2_FiD" in output_gdf.columns
-    if _geofileinfo.get_geofileinfo(input2_path).is_fid_zerobased:
-        assert sorted(output_gdf.l2_FiD.unique().tolist()) == [0, 1, 2, 3, 4]
-    else:
-        assert sorted(output_gdf.l2_FiD.unique().tolist()) == [1, 2, 3, 4, 5]
+
+    if "fid" in input1_columns:
+        assert "l1_fid" in output_gdf.columns
+    if "fid" in input2_columns:
+        assert "l2_FiD" in output_gdf.columns
+        if _geofileinfo.get_geofileinfo(input2_path).is_fid_zerobased:
+            assert sorted(output_gdf.l2_FiD.unique().tolist()) == [0, 1, 2, 3, 4]
+        else:
+            assert sorted(output_gdf.l2_FiD.unique().tolist()) == [1, 2, 3, 4, 5]
 
 
 @pytest.mark.parametrize(
@@ -1764,8 +1774,7 @@ def test_select_two_layers_select_star_fids_unique(tmp_path, suffix):
     assert output_path.exists()
     output_layerinfo = gfo.get_layerinfo(output_path)
     # 1 attribute column expected: layer2.fid is aliased
-    exp_nb_columns = 1
-    assert len(output_layerinfo.columns) == exp_nb_columns
+    assert len(output_layerinfo.columns) == 1
 
 
 def test_split(tmp_path):
@@ -1986,7 +1995,7 @@ def test_union(
         batchsize=batchsize,
     )
 
-    # Check if the tmp file is correctly created
+    # Check if the output file is correctly created
     assert output_path.exists()
     exp_spatial_index = GeofileInfo(output_path).default_spatial_index
     assert gfo.has_spatial_index(output_path) is exp_spatial_index

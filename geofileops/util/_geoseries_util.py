@@ -1,6 +1,4 @@
-"""
-Module containing utilities regarding operations on geoseries.
-"""
+"""Module containing utilities regarding operations on geoseries."""
 
 import logging
 import warnings
@@ -29,8 +27,7 @@ logger = logging.getLogger(__name__)
 def get_geometrytypes(
     geoseries: gpd.GeoSeries, ignore_empty_geometries: bool = True
 ) -> list[GeometryType]:
-    """
-    Determine the geometry types in the GeoDataFrame.
+    """Determine the geometry types in the GeoDataFrame.
 
     Args:
         geoseries (gpd.GeoSeries): input geoseries.
@@ -60,8 +57,7 @@ def get_geometrytypes(
 def harmonize_geometrytypes(
     geoseries: gpd.GeoSeries, force_multitype: bool = False
 ) -> gpd.GeoSeries:
-    """
-    Tries to harmonize the geometries in the geoseries to one type.
+    """Tries to harmonize the geometries in the geoseries to one type.
 
     Eg. if Polygons and MultiPolygons are present in the geoseries, all
     geometries are converted to MultiPolygons.
@@ -173,8 +169,7 @@ def set_precision(
     mode: str = "valid_output",
     raise_on_topoerror: bool = True,
 ) -> Union[BaseGeometry, NDArray[BaseGeometry], None]:
-    """
-    Returns geometry with the precision set to a precision grid size.
+    """Returns geometry with the precision set to a precision grid size.
 
     By default, geometries use double precision coordinates (grid_size = 0).
 

@@ -19,8 +19,7 @@ def gfo_difference_collection(
     keep_geom_type: int = 0,
     subdivide_coords: int = 2000,
 ) -> Optional[bytes]:
-    """
-    Applies the difference of geom_to_subtract on geom.
+    """Applies the difference of geom_to_subtract on geom.
 
     If the input geometry has many points, they can be subdivided in smaller parts
     to potentially speed up processing as controlled by parameter `subdivide_coords`.
@@ -99,8 +98,7 @@ def gfo_difference_collection(
 
 
 def gfo_reduceprecision(geom_wkb: bytes, gridsize: int) -> Optional[bytes]:
-    """
-    Reduces the precision of the geometry to the gridsize specified.
+    """Reduces the precision of the geometry to the gridsize specified.
 
     If reducing the precison leads to a topologyerror, retries after applying make_valid
     and returns the input if it still fails.
@@ -164,8 +162,7 @@ def gfo_split(
     geom_wkb: bytes,
     blade_wkb: bytes,
 ) -> Optional[bytes]:
-    """
-    Applies a split in the geom using the blade specified.
+    """Applies a split in the geom using the blade specified.
 
     Args:
         geom_wkb (bytes): geometry to substract geom_to_subtract_wkb from in wkb format.
@@ -221,8 +218,7 @@ def gfo_split(
 
 
 def gfo_subdivide(geom_wkb: bytes, coords: int = 2000):
-    """
-    Divide the input geometry to smaller parts using rectilinear lines.
+    """Divide the input geometry to smaller parts using rectilinear lines.
 
     Args:
         geom_wkb (geometry): the geometry to subdivide in wkb format.

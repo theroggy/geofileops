@@ -1,6 +1,4 @@
-"""
-Module to generate reports for benchmarks.
-"""
+"""Module to generate reports for benchmarks."""
 
 import ast
 import math
@@ -20,8 +18,7 @@ A4_SHORT_SIDE = 8.27
 
 
 def generate_reports(results_path: Path, output_dir: Path):
-    """
-    Generate the benchmarking reports.
+    """Generate the benchmarking reports.
 
     Args:
         results_path (Path): the result path to find the results to report on.
@@ -132,8 +129,7 @@ def save_chart(
     gridlines: Optional[Literal["both", "x", "y"]] = None,
     linestyle: Optional[str] = None,
 ):
-    """
-    Render and save a chart.
+    """Render and save a chart.
 
     Args:
         df (pd.DataFrame): _description_

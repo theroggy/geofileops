@@ -1,6 +1,4 @@
-"""
-Module to benchmark geofileops operations.
-"""
+"""Module to benchmark geofileops operations."""
 # ruff: noqa: D103
 
 import inspect

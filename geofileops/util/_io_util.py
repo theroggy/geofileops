@@ -1,6 +1,4 @@
-"""
-Module containing some utilities regarding io.
-"""
+"""Module containing some utilities regarding io."""
 
 import logging
 import os
@@ -12,8 +10,7 @@ import geofileops as gfo
 
 
 def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path:
-    """
-    Creates a new tempdir in the default temp location.
+    """Creates a new tempdir in the default temp location.
 
     Remark: the temp dir won't be cleaned up automatically!
 
@@ -58,8 +55,7 @@ def get_tempfile_locked(
     dirname: Optional[str] = None,
     tempdir: Optional[Path] = None,
 ) -> tuple[Path, Path]:
-    """
-    Formats a temp file path, and creates a corresponding lock file.
+    """Formats a temp file path, and creates a corresponding lock file.
 
     This way you can treat it immediately as being locked.
 
@@ -110,8 +106,7 @@ def get_tempfile_locked(
 
 
 def create_file_atomic(filename) -> bool:
-    """
-    Create a lock file in an atomic way, so it is threadsafe.
+    """Create a lock file in an atomic way, so it is threadsafe.
 
     Returns True if the file was created by this thread, False if the file existed
     already.
@@ -136,8 +131,7 @@ def with_stem(path: Path, new_stem) -> Path:
 
 
 def output_exists(path: Path, remove_if_exists: bool) -> bool:
-    """
-    Checks and returns whether the file specified exists.
+    """Checks and returns whether the file specified exists.
 
     If remove_if_exists is True, the file is removed and False is returned.
 

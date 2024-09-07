@@ -1,6 +1,4 @@
-"""
-Module containing utilities regarding processes.
-"""
+"""Module containing utilities regarding processes."""
 
 import os
 from concurrent import futures
@@ -10,8 +8,7 @@ import psutil
 
 
 class PooledExecutorFactory:
-    """
-    Context manager to create an Executor.
+    """Context manager to create an Executor.
 
     Args:
         threadpool (bool, optional): True to get a ThreadPoolExecutor,
@@ -57,8 +54,7 @@ def initialize_worker():
 
 
 def getprocessnice() -> int:
-    """
-    Get the niceness of the current process.
+    """Get the niceness of the current process.
 
     The nice value can (typically) range from 19, which gives all other
     processes priority, to -20, which means that this process will take
@@ -79,8 +75,7 @@ def getprocessnice() -> int:
 
 
 def setprocessnice(nice_value: int):
-    """
-    Set the niceness of the current process.
+    """Set the niceness of the current process.
 
     The nice value can (typically) range from 19, which gives all other
     processes priority, to -20, which means that this process will take

@@ -1,6 +1,4 @@
-"""
-Setup file to package geofileops.
-"""
+"""Setup file to package geofileops."""
 
 import setuptools
 
