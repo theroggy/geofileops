@@ -244,15 +244,16 @@ def test_copy_layer(tmp_path, dimensions, suffix_input, suffix_output):
 
 
 @pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
-def test_copy_layer_columns(tmp_path, suffix):
+@pytest.mark.parametrize("columns", [["OIDN", "UIDN"], "OIDN"])
+def test_copy_layer_columns(tmp_path, suffix, columns):
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
     # Test
     dst = tmp_path / f"output{suffix}"
-    gfo.copy_layer(src, dst, columns=["OIDN", "UIDN"])
+    gfo.copy_layer(src, dst, columns=columns)
     copy_gdf = gfo.read_file(dst)
-    input_gdf = gfo.read_file(src, columns=["OIDN", "UIDN"])
+    input_gdf = gfo.read_file(src, columns=columns)
     assert_geodataframe_equal(input_gdf, copy_gdf)
 
 
@@ -839,9 +840,10 @@ def test_read_file(suffix, dimensions, engine_setter):
     "columns, geometry",
     [
         ([], "YES"),
-        (["OIDN", "uidn", "HFDTLT", "lblhfdtlt", "GEWASGROEP", "lengte"], "YES"),
-        (["OIDN", "uidn", "HFDTLT", "lblhfdtlt", "GEWASGROEP", "lengte"], "NO"),
-        (["OIDN", "uidn", "HFDTLT", "lblhfdtlt", "GEWASGROEP", "lengte"], "IGNORE"),
+        ("OIDN", "YES"),
+        (["OIDN", "GEWASGROEP", "lengte"], "YES"),
+        (["OIDN", "GEWASGROEP", "lengte"], "NO"),
+        (["OIDN", "GEWASGROEP", "lengte"], "IGNORE"),
     ],
 )
 def test_read_file_columns_geometry(tmp_path, suffix, columns, geometry, engine_setter):
@@ -889,9 +891,9 @@ def test_read_file_columns_geometry(tmp_path, suffix, columns, geometry, engine_
     else:
         expect_geometry = True
 
-    exp_columns = columns
+    exp_columns = list(columns) if isinstance(columns, list) else [columns]
     if expect_geometry:
-        exp_columns = columns + ["geometry"]
+        exp_columns += ["geometry"]
 
     if columns == [] and not expect_geometry:
         exp_featurecount = 0

@@ -1123,6 +1123,9 @@ def _read_file_base(
     """Reads a file to a pandas Dataframe."""
     # Check if the fid column needs to be read as column via the columns parameter
     fid_as_column = False
+    if isinstance(columns, str):
+        # If a string is passed, convert to list
+        columns = [columns]
     if columns is not None:
         if "fid" in [column.lower() for column in columns]:
             fid_as_column = True
@@ -2274,6 +2277,10 @@ def _append_to_nolock(
     options: dict = {},
 ):
     # Check/clean input params
+    if isinstance(columns, str):
+        # If a string is passed, convert to list
+        columns = [columns]
+
     options = _ogr_util._prepare_gdal_options(options)
     if (
         create_spatial_index is not None

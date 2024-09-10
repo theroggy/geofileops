@@ -717,6 +717,9 @@ def _apply_geooperation_to_layer(
         output_layer = gfo.get_default_layer(output_path)
     if isinstance(force_output_geometrytype, GeometryType):
         force_output_geometrytype = force_output_geometrytype.name
+    if isinstance(columns, str):
+        # If a string is passed, convert to list
+        columns = [columns]
 
     # Check if we want to preserve the fid in the output
     preserve_fid = False

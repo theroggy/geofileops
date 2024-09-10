@@ -101,7 +101,8 @@ def test_dissolve_linestrings(
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("epsg", EPSGS)
-def test_dissolve_linestrings_groupby(tmp_path, suffix, epsg):
+@pytest.mark.parametrize("groupby_columns", [["NiScoDe"], "NiScoDe"])
+def test_dissolve_linestrings_groupby(tmp_path, suffix, epsg, groupby_columns):
     # Prepare test data
     input_path = test_helper.get_testfile(
         "linestring-watercourse", suffix=suffix, epsg=epsg
@@ -116,7 +117,6 @@ def test_dissolve_linestrings_groupby(tmp_path, suffix, epsg):
         output_basepath.parent
         / f"{output_basepath.stem}_groupby_noexpl{output_basepath.suffix}"
     )
-    groupby_columns = ["NiScoDe"]
     gfo.dissolve(
         input_path=str(input_path),
         output_path=str(output_path),
@@ -281,6 +281,7 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
     "expected_featurecount",
     [
         (".gpkg", 31370, False, ["GEWASgroep"], True, 0.0, "", 26),
+        (".gpkg", 31370, False, "GEWASgroep", True, 0.0, "", 26),
         (".gpkg", 31370, False, ["GEWASgroep"], True, 0.01, "", 25),
         (".gpkg", 31370, False, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg", 31370, True, ["GEWASGROEP"], False, 0.0, "", 6),
@@ -346,7 +347,10 @@ def test_dissolve_polygons(
     assert gfo.isvalid(output_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == expected_featurecount
-    if groupby is True:
+
+    if groupby_columns is not None and isinstance(groupby_columns, str):
+        groupby_columns = [groupby_columns]
+    if groupby:
         # No groupby -> normally no columns.
         # Shapefile needs at least one column, if no columns: fid
         if suffix == ".shp":

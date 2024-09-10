@@ -534,6 +534,9 @@ def _single_layer_vector_operation(
         raise ValueError(f"{operation_name}: output_path must not equal input_path")
     if where_post is not None and where_post == "":
         where_post = None
+    if isinstance(columns, str):
+        # If a string is passed, convert to list
+        columns = [columns]
 
     # Check/get layer names
     if input_layer is None:
@@ -2608,6 +2611,13 @@ def _two_layer_vector_operation(
     """  # noqa: E501
     # Init
     logger = logging.getLogger(f"geofileops.{operation_name}")
+
+    if isinstance(input1_columns, str):
+        # If a string is passed, convert to list
+        input1_columns = [input1_columns]
+    if isinstance(input2_columns, str):
+        # If a string is passed, convert to list
+        input2_columns = [input2_columns]
 
     if not input1_path.exists():
         raise ValueError(f"{operation_name}: input1_path doesn't exist: {input1_path}")
