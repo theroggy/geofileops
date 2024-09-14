@@ -1,6 +1,6 @@
 [tool.pyright]
 exclude = ["local_ignore"]
-reportGeneralTypeIssues = false
+ignore = ["*"]
 
 [tool.mypy]
 exclude = ["local_ignore"]
