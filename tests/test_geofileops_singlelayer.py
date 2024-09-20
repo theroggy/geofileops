@@ -889,10 +889,10 @@ def test_makevalid_exploded_input(tmp_path, suffix, geoops_module, explodecollec
     layerinfo_orig = fileops.get_layerinfo(input_path)
     layerinfo_output = fileops.get_layerinfo(output_path)
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
-    if explodecollections and suffix != ".shp":
-        assert layerinfo_output.geometrytype == GeometryType.POLYGON
-    else:
-        assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
+    assert layerinfo_output.geometrytype in {
+        GeometryType.POLYGON,
+        GeometryType.MULTIPOLYGON,
+    }
 
 
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)

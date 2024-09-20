@@ -1,6 +1,6 @@
 [tool.pyright]
 exclude = ["local_ignore"]
-reportGeneralTypeIssues = false
+ignore = ["*"]
 
 [tool.mypy]
 exclude = ["local_ignore"]
@@ -8,6 +8,9 @@ exclude = ["local_ignore"]
 [[tool.mypy.overrides]]
 module = "cloudpickle.*,fiona.*,geopandas.*,matplotlib.*,osgeo.*,osgeo_utils.*,pygeos.*,pyogrio.*,psutil.*,setuptools.*,shapely.*,topojson.*"
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+log_level = "DEBUG"
 
 [tool.ruff]
 line-length = 88

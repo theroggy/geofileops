@@ -1039,6 +1039,7 @@ def erase(
         overlay_self=overlay_self,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
+        operation_prefix=f"{operation_name}/",
     )
     if erase_subdivided_path is not None:
         erase_path = erase_subdivided_path
@@ -1163,6 +1164,7 @@ def _subdivide_layer(
     overlay_self: bool,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    operation_prefix: str = "",
 ) -> Optional[Path]:
     """Subdivide a layer if applicable.
 
@@ -1175,6 +1177,7 @@ def _subdivide_layer(
         overlay_self (bool): _description_
         nb_parallel (int, optional): _description_. Defaults to -1.
         batchsize (int, optional): _description_. Defaults to -1.
+        operation_prefix (str, optional): Prefix to use in logging,... Defaults to "".
 
     Returns:
         Optional[Path]: path to the result or None if it didn't need subdivision.
@@ -1196,7 +1199,8 @@ def _subdivide_layer(
          LIMIT 1
     """
     logger.info(
-        f"Check if complex geometries in erase layer (> {subdivide_coords} coords)"
+        f"Check if complex geometries in {path.name}/{layer} (> {subdivide_coords} "
+        "coords)"
     )
     complexgeom_df = gfo.read_file(path, sql_stmt=complexgeom_sql, sql_dialect="SQLITE")
     if len(complexgeom_df) <= 0:
@@ -1238,7 +1242,7 @@ def _subdivide_layer(
         output_path=subdidided_path,
         output_layer=layer,
         func=lambda geom: subdivide(geom, num_coords_max=subdivide_coords),
-        operation_name="erase/subdivide",
+        operation_name=f"{operation_prefix}subdivide",
         columns=columns,
         explodecollections=True,
         nb_parallel=nb_parallel,
@@ -1309,6 +1313,7 @@ def export_by_location(
         overlay_self=False,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
+        operation_prefix=f"{operation_name}/",
     )
     if input_to_compare_with_subdivided_path is not None:
         input_to_compare_with_path = input_to_compare_with_subdivided_path

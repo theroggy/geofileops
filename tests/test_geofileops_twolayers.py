@@ -300,7 +300,7 @@ def test_erase_subdivide_multipolygons(tmp_path, suffix):
 
     # Prepare erase test data: should be multipolygons for good test coverage
     zone_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
-    zones_gdf = gfo.read_file(zone_path)
+    zones_gdf = gfo.read_file(zone_path).explode(ignore_index=True)
 
     erase_geometries = [
         {"desc": "erase1", "geometry": zones_gdf.geometry[4]},

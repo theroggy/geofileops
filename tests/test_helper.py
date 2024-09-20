@@ -165,7 +165,7 @@ def get_testfile(
             f"geofiletype: {dst_info.driver}"
         )
 
-    # Convert all layers found
+    # Copy all layers found
     for src_layer in layers:
         # Single layer files have stem as layername
         dst_layer = prepared_path.stem if dst_info.is_singlelayer else src_layer
