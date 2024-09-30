@@ -54,50 +54,27 @@ class GDALError(Exception):
             return super().__str__()
 
 
-ogrtype_to_geometrytype = {
-    ogr.wkbNone: None,
-    ogr.wkbUnknown: GeometryType.GEOMETRY,
-    ogr.wkbPoint: GeometryType.POINT,
-    ogr.wkbLineString: GeometryType.LINESTRING,
-    ogr.wkbPolygon: GeometryType.POLYGON,
-    ogr.wkbTriangle: GeometryType.TRIANGLE,
-    ogr.wkbMultiPoint: GeometryType.MULTIPOINT,
-    ogr.wkbMultiLineString: GeometryType.MULTILINESTRING,
-    ogr.wkbMultiPolygon: GeometryType.MULTIPOLYGON,
-    ogr.wkbGeometryCollection: GeometryType.GEOMETRYCOLLECTION,
-    ogr.wkbPolyhedralSurface: GeometryType.POLYHEDRALSURFACE,
-    ogr.wkbTIN: GeometryType.TIN,
-    ogr.wkbPoint25D: GeometryType.POINTZ,
-    ogr.wkbLineString25D: GeometryType.LINESTRINGZ,
-    ogr.wkbPolygon25D: GeometryType.POLYGONZ,
-    ogr.wkbTriangleZ: GeometryType.TRIANGLEZ,
-    ogr.wkbMultiPoint25D: GeometryType.MULTIPOINTZ,
-    ogr.wkbMultiLineString25D: GeometryType.MULTILINESTRINGZ,
-    ogr.wkbMultiPolygon25D: GeometryType.MULTIPOLYGONZ,
-    ogr.wkbGeometryCollection25D: GeometryType.GEOMETRYCOLLECTIONZ,
-    ogr.wkbPolyhedralSurfaceZ: GeometryType.POLYHEDRALSURFACEZ,
-    ogr.wkbTINZ: GeometryType.TINZ,
-    ogr.wkbPointM: GeometryType.POINTM,
-    ogr.wkbLineStringM: GeometryType.LINESTRINGM,
-    ogr.wkbPolygonM: GeometryType.POLYGONM,
-    ogr.wkbTriangleM: GeometryType.TRIANGLEM,
-    ogr.wkbMultiPointM: GeometryType.MULTIPOINTM,
-    ogr.wkbMultiLineStringM: GeometryType.MULTILINESTRINGM,
-    ogr.wkbMultiPolygonM: GeometryType.MULTIPOLYGONM,
-    ogr.wkbGeometryCollectionM: GeometryType.GEOMETRYCOLLECTIONM,
-    ogr.wkbPolyhedralSurfaceM: GeometryType.POLYHEDRALSURFACEM,
-    ogr.wkbTINM: GeometryType.TINM,
-    ogr.wkbPointZM: GeometryType.POINTZM,
-    ogr.wkbLineStringZM: GeometryType.LINESTRINGZM,
-    ogr.wkbPolygonZM: GeometryType.POLYGONZM,
-    ogr.wkbTriangleZM: GeometryType.TRIANGLEZM,
-    ogr.wkbMultiPointZM: GeometryType.MULTIPOINTZM,
-    ogr.wkbMultiLineStringZM: GeometryType.MULTILINESTRINGZM,
-    ogr.wkbMultiPolygonZM: GeometryType.MULTIPOLYGONZM,
-    ogr.wkbGeometryCollectionZM: GeometryType.GEOMETRYCOLLECTIONZM,
-    ogr.wkbPolyhedralSurfaceZM: GeometryType.POLYHEDRALSURFACEZM,
-    ogr.wkbTINZM: GeometryType.TINZM,
-}
+def ogrtype_to_name(ogrtype: Optional[int]) -> str:
+    if ogrtype is None:
+        return "NONE"
+    else:
+        geometrytypename = ogr.GeometryTypeToName(ogrtype).replace(" ", "").upper()
+
+    if geometrytypename == "NONE":
+        return geometrytypename
+
+    if geometrytypename == "UNKNOWN(ANY)":
+        return "GEOMETRY"
+
+    if geometrytypename.startswith("3D"):
+        geometrytypename = geometrytypename[2:]
+        geometrytypename = f"{geometrytypename}Z"
+
+    if geometrytypename.startswith("MEASURED"):
+        geometrytypename = geometrytypename[8:]
+        geometrytypename = f"{geometrytypename}M"
+
+    return geometrytypename
 
 
 def get_drivers() -> dict:

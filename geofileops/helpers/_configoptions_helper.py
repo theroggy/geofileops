@@ -13,17 +13,47 @@ class ConfigOptions:
     """
 
     @classproperty
+    def on_data_error(cls) -> str:
+        """The preferred action when a data error occurs.
+
+        Supported values (case insensitive):
+            - "raise": raise an exception.
+            - "warn": log a warning and continue.
+
+        Note that the "warn" option is only very selectively supported: in many cases,
+        an exception will still be raised.
+
+        Returns:
+            str: the preferred action when a data error occurs. Defaults to "raise".
+        """
+        value = os.environ.get("GFO_ON_DATA_ERROR")
+
+        if value is None:
+            return "raise"
+
+        value_cleaned = value.strip().lower()
+        supported_values = ["raise", "warn"]
+        if value_cleaned not in supported_values:
+            raise ValueError(
+                f"invalid value for configoption <GFO_ON_DATA_ERROR>: {value}, should "
+                f"be one of {supported_values}"
+            )
+
+        return value_cleaned
+
+    @classproperty
+    def io_engine(cls):
+        """The IO engine to use."""
+        return os.environ.get("GFO_IO_ENGINE", default="pyogrio").strip().lower()
+
+    @classproperty
     def remove_temp_files(cls) -> bool:
-        """Configuration options to cleanup temp files or not.
+        """Should temporary files be removed or not.
 
         Returns:
             bool: True to remove temp files. Defaults to True.
         """
         return get_bool("GFO_REMOVE_TEMP_FILES", default=True)
-
-    @classproperty
-    def io_engine(cls):
-        return os.environ.get("GFO_IO_ENGINE", default="pyogrio").strip().lower()
 
 
 def get_bool(key: str, default: bool) -> bool:

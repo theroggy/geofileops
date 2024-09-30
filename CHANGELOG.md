@@ -5,8 +5,11 @@
 ### Improvements
 
 - Add support for renaming column with only difference in casing (#549)
-- Improve handling of string passed for columns parameter in e.g. copy_layer (#523)
-  Single string is also supported and is treated that there is only one column to be retained
+- Add support to pass a single string for all `column` type parameters if a single
+  column should be retained (#523)
+- Enable "CURVE" geometrytype files to be processed in the general file and
+  layer operations (#558)
+- Add configuration option to only warn on dissolve errors (#561)
 
 ## 0.9.1 (2024-07-18)
 

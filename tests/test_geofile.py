@@ -4,6 +4,7 @@ Tests for functionalities in geofileops.general.
 
 import os
 import shutil
+from itertools import product
 
 import geopandas as gpd
 import pandas as pd
@@ -167,7 +168,8 @@ def test_append_different_columns(tmp_path, suffix):
     assert len(src_info.columns) == len(res_info.columns) + 1
 
 
-def test_append_shp_laundered_columns(tmp_path):
+@pytest.mark.parametrize("testfile", ["polygon-parcel", "curvepolygon"])
+def test_append_shp_laundered_columns(tmp_path, testfile):
     # GDAL doesn't seem to handle appending to a shapefile where column laundering is
     # needed very well: all laundered columns get NULL values instead of the actual
     # values.
@@ -175,9 +177,7 @@ def test_append_shp_laundered_columns(tmp_path):
     # statement so gdal doesn't need to do laundering.
     # Start from a gpkg test file, because that can have long column names that need
     # laundering.
-    src_path = test_helper.get_testfile(
-        "polygon-parcel", dst_dir=tmp_path, suffix=".gpkg"
-    )
+    src_path = test_helper.get_testfile(testfile, dst_dir=tmp_path, suffix=".gpkg")
     gfo.add_column(
         src_path, name="extra_long_columnname", type="TEXT", expression="'TEST VALUE'"
     )
@@ -214,14 +214,16 @@ def test_cmp(tmp_path, suffix):
     assert gfo.cmp(src2, dst) is False
 
 
-@pytest.mark.parametrize("suffix_input", SUFFIXES_FILEOPS)
-@pytest.mark.parametrize("suffix_output", SUFFIXES_FILEOPS)
-@pytest.mark.parametrize("dimensions", [None, "XYZ"])
-def test_copy_layer(tmp_path, dimensions, suffix_input, suffix_output):
+@pytest.mark.parametrize(
+    "testfile, suffix_input, suffix_output, dimensions",
+    [
+        *product(["polygon-parcel"], SUFFIXES_FILEOPS, SUFFIXES_FILEOPS, [None, "XYZ"]),
+        ["curvepolygon", ".gpkg", ".gpkg", None],
+    ],
+)
+def test_copy_layer(tmp_path, testfile, dimensions, suffix_input, suffix_output):
     # Prepare test data
-    src = test_helper.get_testfile(
-        "polygon-parcel", suffix=suffix_input, dimensions=dimensions
-    )
+    src = test_helper.get_testfile(testfile, suffix=suffix_input, dimensions=dimensions)
     if suffix_input == ".csv" or suffix_output == ".csv":
         raise_on_nogeom = False
     else:
@@ -241,6 +243,11 @@ def test_copy_layer(tmp_path, dimensions, suffix_input, suffix_output):
     dst_layerinfo = gfo.get_layerinfo(dst, raise_on_nogeom=raise_on_nogeom)
     assert src_layerinfo.featurecount == dst_layerinfo.featurecount
     assert len(src_layerinfo.columns) == len(dst_layerinfo.columns)
+    if not (
+        (suffix_input != ".csv" and suffix_output == ".csv")
+        or (suffix_input == ".shp" and suffix_output == ".gpkg")
+    ):
+        assert src_layerinfo.geometrytypename == dst_layerinfo.geometrytypename
 
 
 @pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
@@ -613,6 +620,18 @@ def test_get_layerinfo(suffix, dimensions):
         layerinfo = gfo.get_layerinfo(not_existing_path)
 
 
+@pytest.mark.xfail
+def test_get_layerinfo_curve():
+    """Don't get this test to pass when running all tests.
+
+    If it is ran on its own, it is fine?"""
+    src = test_helper.get_testfile("curvepolygon")
+
+    # Test
+    layerinfo = gfo.get_layerinfo(str(src))
+    assert layerinfo.geometrytypename == "MULTISURFACE"
+
+
 def test_get_layerinfo_nogeom(tmp_path):
     """
     Test correct behaviour of get_layerinfo if file doesn't have a geometry column.
@@ -909,6 +928,20 @@ def test_read_file_columns_geometry(tmp_path, suffix, columns, geometry, engine_
         assert isinstance(read_gdf, gpd.GeoDataFrame)
     assert list(read_gdf.columns) == exp_columns
     assert len(read_gdf) == exp_featurecount
+
+
+def test_read_file_curve():
+    """Test reading a curve file.
+
+    The geometry type is automatically converted to a linear one in read_file.
+    """
+    # Prepare test data
+    src = test_helper.get_testfile("curvepolygon")
+
+    # Test
+    read_gdf = gfo.read_file(src)
+    assert isinstance(read_gdf, gpd.GeoDataFrame)
+    assert isinstance(read_gdf.geometry[0], sh_geom.MultiPolygon)
 
 
 def test_read_file_invalid_params(tmp_path, engine_setter):

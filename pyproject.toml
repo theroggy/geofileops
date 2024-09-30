@@ -9,6 +9,9 @@ exclude = ["local_ignore"]
 module = "cloudpickle.*,fiona.*,geopandas.*,matplotlib.*,osgeo.*,osgeo_utils.*,pygeos.*,pyogrio.*,psutil.*,setuptools.*,shapely.*,topojson.*"
 ignore_missing_imports = true
 
+[tool.pytest.ini_options]
+log_level = "DEBUG"
+
 [tool.ruff]
 line-length = 88
 target-version = "py39"

@@ -46,6 +46,10 @@ variables:
 
 - `GFO_IO_ENGINE`: the IO engine to use when reading and writing GeoDataFrames. Valid
   options are "pyogrio" and "fiona". Defaults to "pyogrio".
+- `GFO_ON_DATA_ERROR`: the action to take when a data error occurs while processing a
+  tile during dissolve. Data errors are e.g. invalid geometries encountered/created
+  during processing. Valid options are "raise" and "warn". The "warn" option will lead
+  to the data OF THE ENTIRE TILE being "dropped", so use with care! Defaults to "raise".
 - `GFO_REMOVE_TEMP_FILES`: whether to remove temp files being created after use, e.g. 
   for debugging purposes. Valid values are e.g. "TRUE" or "FALSE". Defaults to True.
 
@@ -57,5 +61,5 @@ option temporarily:
     import geofileops as gfo
 
     if __name__ == "__main__":
-        with gfo.TempEnv("GFO_REMOVE_TEMP_FILES", "False"):
+        with gfo.TempEnv({"GFO_REMOVE_TEMP_FILES", "False"}):
             gfo. ...
