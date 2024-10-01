@@ -1853,7 +1853,7 @@ def _prepare_filter_by_location_fields(
         spatial_relation=f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION"'
     )
 
-    # Determine of the spatial_relations_query returns True for disjoint features
+    # Determine if the spatial_relations_query returns True for disjoint features
     spatial_relation_column_disjoint = spatial_relation_column.format(
         input1="ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))')",
         input2="ST_GeomFromText('POLYGON((5 0, 5 1, 6 1, 6 0, 5 0))')",

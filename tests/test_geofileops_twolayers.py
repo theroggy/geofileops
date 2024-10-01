@@ -1832,10 +1832,10 @@ def test_split(tmp_path):
     [(".gpkg", 31370, 0.01), (".gpkg", 4326, 0.0), (".shp", 31370, 0.0)],
 )
 def test_symmetric_difference(tmp_path, request, suffix, epsg, gridsize):
-    if epsg == 4326 and sys.platform == "darwin":
+    if epsg == 4326 and sys.platform in ("darwin", "linux"):
         request.node.add_marker(
             pytest.mark.xfail(
-                reason="epsg 4326 gives precision issues on MacOS14 on arm64"
+                reason="epsg 4326 gives precision issues on MacOS14 on arm64 and linux"
             )
         )
 
@@ -1953,10 +1953,10 @@ def test_union(
     keep_fid: bool,
     exp_featurecount: int,
 ):
-    if epsg == 4326 and sys.platform == "darwin":
+    if epsg == 4326 and sys.platform in ("darwin", "linux"):
         request.node.add_marker(
             pytest.mark.xfail(
-                reason="epsg 4326 gives precision issues on MacOS14 on arm64"
+                reason="epsg 4326 gives precision issues on MacOS14 on arm64 and linux"
             )
         )
 

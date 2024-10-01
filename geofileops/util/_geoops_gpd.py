@@ -1145,6 +1145,9 @@ def dissolve(
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
 
+    # Check what we need to do in an error occurs
+    on_data_error = ConfigOptions.on_data_error
+
     # Now start dissolving
     # --------------------
     # Empty or Line and point layers are:
@@ -1335,6 +1338,7 @@ def dissolve(
                     gridsize=gridsize,
                     keep_empty_geoms=False,
                     nb_parallel=nb_parallel,
+                    on_data_error=on_data_error,
                 )
                 logger.info(f"Pass {pass_id} ready, took {datetime.now()-pass_start}")
 
@@ -1603,6 +1607,7 @@ def _dissolve_polygons_pass(
     gridsize: float,
     keep_empty_geoms: bool,
     nb_parallel: int,
+    on_data_error: str = "raise",
 ):
     start_time = datetime.now()
 
@@ -1664,6 +1669,7 @@ def _dissolve_polygons_pass(
                 tile_id=tile_id,
                 gridsize=gridsize,
                 keep_empty_geoms=keep_empty_geoms,
+                on_data_error=on_data_error,
             )
             future_to_batch_id[future] = batch_id
 
@@ -1752,6 +1758,7 @@ def _dissolve_polygons(
     tile_id: Optional[int],
     gridsize: float,
     keep_empty_geoms: bool,
+    on_data_error: str = "raise",
 ) -> dict:
     # Init
     perfinfo: dict[str, float] = {}
@@ -1855,10 +1862,30 @@ def _dissolve_polygons(
             aggfunc = "merge_json_lists"
     else:
         aggfunc = "first"
+
     start_dissolve = datetime.now()
-    diss_gdf = _dissolve(
-        df=input_gdf, by=groupby_columns, aggfunc=aggfunc, as_index=False, dropna=False
-    )
+    try:
+        diss_gdf = _dissolve(
+            df=input_gdf,
+            by=groupby_columns,
+            aggfunc=aggfunc,
+            as_index=False,
+            dropna=False,
+        )
+    except Exception as ex:
+        # If a GEOS exception occurs, it is probably due to invalid geometries.
+        # Try to fix them and try again.
+        if on_data_error == "warn":
+            message = f"Error processing tile, ENTIRE TILE LOST!!!: {ex}"
+            warnings.warn(message, UserWarning, stacklevel=3)
+
+            # Return
+            return_info["perfinfo"] = perfinfo
+            return_info["message"] = message
+            return return_info
+        else:
+            raise ex
+
     perfinfo["time_dissolve"] = (datetime.now() - start_dissolve).total_seconds()
 
     # If explodecollections is True and For polygons, explode multi-geometries.

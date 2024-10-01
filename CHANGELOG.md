@@ -9,6 +9,7 @@
   column should be retained (#523)
 - Enable "CURVE" geometrytype files to be processed in the general file and
   layer operations (#558)
+- Add configuration option to only warn on dissolve errors (#561)
 
 ## 0.9.1 (2024-07-18)
 
