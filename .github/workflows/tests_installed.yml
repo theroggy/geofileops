@@ -43,7 +43,7 @@ jobs:
             ci
             tests
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           micromamba-version: "1.5.1-0"
           environment-file: ci/envs/${{ matrix.env }}.yml
