@@ -625,8 +625,8 @@ def test_buffer_shp_to_gpkg(
     """
     Buffer from shapefile to gpkg.
 
-    Test added because this gave a unique constraint on fid's, because for each partial
-    file the fid started again with 0.
+    Test added because this gave a unique constraint error on fid's, because for each
+    partial file the fid started again with 0.
     """
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=".shp")

@@ -751,6 +751,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
             {"column": "hfdtlt", "agg": "min", "as": "tlt_min"},
             {"column": "hfdtlt", "agg": "sum", "as": "tlt_sum"},
             {"column": "fid", "agg": "concat", "as": "fid_concat"},
+            {"column": "lblhfdtlt", "agg": "concat", "as": "lblhfdtlt"},
         ]
     }
     groupby_columns = ["GEWASgroep"]
@@ -779,6 +780,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     assert input_gdf.crs == output_gdf.crs
     assert len(output_gdf) == output_layerinfo.featurecount
     assert output_gdf["geometry"][0] is not None
+    assert "lblhfdtlt" in output_gdf.columns
 
     # Check agg_columns results
     grasland_idx = output_gdf[output_gdf["GEWASgroep"] == "Grasland"].index.to_list()[0]
