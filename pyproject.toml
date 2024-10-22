@@ -12,6 +12,16 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 log_level = "DEBUG"
 
+# Some filters that apply to warnings that can be ignored for any test.
+filterwarnings = [
+    "ignore: The output driver does not natively support DateTime type",
+    "ignore: Field .* create as date field, though DateTime requested",
+    "ignore: Geometry is in a geographic CRS",
+    "ignore: Normalized/laundered field name",
+    "ignore: Non-conformant content for record 0 in column",
+    "ignore: Non-conformant content for record 1 in column",
+]
+
 [tool.ruff]
 line-length = 88
 target-version = "py39"

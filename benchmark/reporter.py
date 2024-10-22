@@ -199,7 +199,7 @@ def save_chart(
 
         label_above_line = True
         for index, row in enumerate(df.itertuples()):
-            for row_fieldname, row_fieldvalue in row._asdict().items():
+            for row_fieldname, row_fieldvalue in row._asdict().items():  # type: ignore
                 if row_fieldname != "Index":
                     if max_y_value is None or row_fieldvalue > max_y_value:
                         max_y_value = row_fieldvalue

@@ -1243,7 +1243,7 @@ def _read_file_base_fiona(
         layer=layer,
         bbox=bbox,
         rows=rows,
-        include_fields=columns_list,
+        columns=columns_list,
         where=where,
         sql=sql_stmt,
         sql_dialect=sql_dialect,

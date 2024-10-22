@@ -2219,8 +2219,8 @@ def split(
 ):
     """DEPRECATED: please use identity."""
     warnings.warn(
-        "split() is deprecated because it was renamed to identity(). "
-        "Will be removed in a future version",
+        "split is deprecated because it was renamed to identity. "
+        "Will be removed in a future version.",
         FutureWarning,
         stacklevel=2,
     )

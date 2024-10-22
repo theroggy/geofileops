@@ -707,6 +707,7 @@ def test_dissolve_polygons_tiles_empty(tmp_path, suffix, nb_parallel):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
+@pytest.mark.filterwarnings("ignore: .* field lbl_conc has been truncated to 254")
 def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
@@ -751,6 +752,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
             {"column": "hfdtlt", "agg": "min", "as": "tlt_min"},
             {"column": "hfdtlt", "agg": "sum", "as": "tlt_sum"},
             {"column": "fid", "agg": "concat", "as": "fid_concat"},
+            {"column": "lblhfdtlt", "agg": "concat", "as": "lblhfdtlt"},
         ]
     }
     groupby_columns = ["GEWASgroep"]
@@ -779,6 +781,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     assert input_gdf.crs == output_gdf.crs
     assert len(output_gdf) == output_layerinfo.featurecount
     assert output_gdf["geometry"][0] is not None
+    assert "lblhfdtlt" in output_gdf.columns
 
     # Check agg_columns results
     grasland_idx = output_gdf[output_gdf["GEWASgroep"] == "Grasland"].index.to_list()[0]

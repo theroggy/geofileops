@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pytest
 import shapely
@@ -628,6 +629,9 @@ def test_identity(tmp_path, suffix, epsg, gridsize):
     exp_gdf = input1_gdf.overlay(input2_gdf, how="identity", keep_geom_type=True)
     renames = dict(zip(exp_gdf.columns, output_gdf.columns))
     exp_gdf = exp_gdf.rename(columns=renames)
+    # For text columns, gfo gives None rather than np.nan for missing values.
+    for column in exp_gdf.select_dtypes(include="O").columns:
+        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     # Remove rows where geometry is empty or None
@@ -1777,6 +1781,9 @@ def test_select_two_layers_select_star_fids_unique(tmp_path, suffix):
     assert len(output_layerinfo.columns) == 1
 
 
+@pytest.mark.filterwarnings(
+    "ignore: split is deprecated because it was renamed to identity"
+)
 def test_split(tmp_path):
     """Is deprecated, but keep minimal test."""
     # Prepare test data
@@ -1807,18 +1814,20 @@ def test_split(tmp_path):
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
     # Check the contents of the result file
-    output_gfo_gdf = gfo.read_file(output_path)
-    assert output_gfo_gdf["geometry"][0] is not None
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
-    output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="identity", keep_geom_type=True)
-    renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
-    output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
-
+    exp_gdf = input1_gdf.overlay(input2_gdf, how="identity", keep_geom_type=True)
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    exp_gdf = exp_gdf.rename(columns=renames)
+    # For text columns, gfo gives None rather than np.nan for missing values.
+    for column in exp_gdf.select_dtypes(include="O").columns:
+        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     # OIDN is float vs int? -> check_column_type=False
     assert_geodataframe_equal(
-        output_gfo_gdf,
-        output_gpd_gdf,
+        output_gdf,
+        exp_gdf,
         promote_to_multi=True,
         sort_values=True,
         check_less_precise=True,
@@ -1870,6 +1879,9 @@ def test_symmetric_difference(tmp_path, request, suffix, epsg, gridsize):
     )
     renames = dict(zip(exp_gdf.columns, output_gdf.columns))
     exp_gdf = exp_gdf.rename(columns=renames)
+    # For text columns, gfo gives None rather than np.nan for missing values.
+    for column in exp_gdf.select_dtypes(include="O").columns:
+        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     # Remove rows where geometry is empty or None
@@ -2013,8 +2025,8 @@ def test_union(
     assert output_layerinfo.featurecount == exp_featurecount
 
     # Check the contents of the result file
-    output_gfo_gdf = gfo.read_file(output_path)
-    assert output_gfo_gdf["geometry"][0] is not None
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None
 
     # Prepare expected result
     input1_gdf = gfo.read_file(input1_path, fid_as_index=keep_fid)
@@ -2022,23 +2034,24 @@ def test_union(
     if keep_fid:
         input1_gdf["l1_fid"] = input1_gdf.index
         input2_gdf["l2_fid"] = input2_gdf.index
-    output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = dict(zip(output_gpd_gdf.columns, output_gfo_gdf.columns))
-    output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
-    output_gpd_gdf["l1_DATUM"] = pd.to_datetime(output_gpd_gdf["l1_DATUM"])
+    exp_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    exp_gdf = exp_gdf.rename(columns=renames)
+    # For text columns, gfo gives None rather than np.nan for missing values.
+    for column in exp_gdf.select_dtypes(include="O").columns:
+        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    exp_gdf["l1_DATUM"] = pd.to_datetime(exp_gdf["l1_DATUM"])
     if gridsize != 0.0:
-        output_gpd_gdf.geometry = shapely.set_precision(
-            output_gpd_gdf.geometry, grid_size=gridsize
-        )
+        exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     if explodecollections:
-        output_gpd_gdf = output_gpd_gdf.explode(ignore_index=True)
+        exp_gdf = exp_gdf.explode(ignore_index=True)
     if where_post is not None:
-        output_gpd_gdf = output_gpd_gdf[output_gpd_gdf.geometry.area > 1000]
+        exp_gdf = exp_gdf[exp_gdf.geometry.area > 1000]
 
     # Compare result with expected result
     assert_geodataframe_equal(
-        output_gfo_gdf,
-        output_gpd_gdf,
+        output_gdf,
+        exp_gdf,
         promote_to_multi=True,
         sort_values=True,
         check_less_precise=True,
@@ -2085,14 +2098,20 @@ def test_union_circles(tmp_path, suffix, epsg):
     # Check the contents of the result file
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
+
+    # Prepare expected result
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
-    output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = dict(zip(output_gpd_gdf.columns, output_gdf.columns))
-    output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
+    exp_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    exp_gdf = exp_gdf.rename(columns=renames)
+    # For text columns, gfo gives None rather than np.nan for missing values.
+    for column in exp_gdf.select_dtypes(include="O").columns:
+        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+
     assert_geodataframe_equal(
         output_gdf,
-        output_gpd_gdf,
+        exp_gdf,
         promote_to_multi=True,
         sort_values=True,
         check_less_precise=True,
@@ -2137,14 +2156,20 @@ def test_union_circles(tmp_path, suffix, epsg):
     # Check the contents of the result file
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
+
+    # Prepare expected result
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
-    output_gpd_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = dict(zip(output_gpd_gdf.columns, output_gdf.columns))
-    output_gpd_gdf = output_gpd_gdf.rename(columns=renames)
+    exp_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    exp_gdf = exp_gdf.rename(columns=renames)
+    # For text columns, gfo gives None rather than np.nan for missing values.
+    for column in exp_gdf.select_dtypes(include="O").columns:
+        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+
     assert_geodataframe_equal(
         output_gdf,
-        output_gpd_gdf,
+        exp_gdf,
         promote_to_multi=True,
         sort_values=True,
         check_less_precise=True,

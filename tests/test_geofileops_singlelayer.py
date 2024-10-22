@@ -625,8 +625,8 @@ def test_buffer_shp_to_gpkg(
     """
     Buffer from shapefile to gpkg.
 
-    Test added because this gave a unique constraint on fid's, because for each partial
-    file the fid started again with 0.
+    Test added because this gave a unique constraint error on fid's, because for each
+    partial file the fid started again with 0.
     """
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=".shp")
@@ -746,6 +746,9 @@ def test_convexhull(
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("input_empty", [True, False])
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
+@pytest.mark.filterwarnings(
+    "ignore: The default date converter is deprecated as of Python 3.12"
+)
 def test_makevalid(tmp_path, suffix, input_empty, geoops_module):
     # Prepare test data
     input_path = test_helper.get_testfile(

@@ -72,6 +72,9 @@ def test_dissolve_singlethread_output_exists(tmp_path):
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("epsg", EPSGS)
+@pytest.mark.filterwarnings(
+    "ignore: The default date converter is deprecated as of Python 3.12"
+)
 def test_isvalid(tmp_path, suffix, epsg):
     # Prepare test data
     input_path = test_helper.get_testfile(

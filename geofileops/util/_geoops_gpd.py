@@ -30,6 +30,7 @@ from pygeoops import GeometryType, PrimitiveType
 
 import geofileops as gfo
 from geofileops import fileops
+from geofileops._compat import GEOPANDAS_GTE_10, PANDAS_GTE_22
 from geofileops.helpers import _parameter_helper
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
@@ -2146,7 +2147,7 @@ def _dissolve(
     if aggfunc is not None and isinstance(aggfunc, dict) and "to_json" in aggfunc:
         agg_columns = list(aggfunc["to_json"])
         agg_data = (
-            data.groupby(**groupby_kwargs)
+            data.groupby(**groupby_kwargs)[agg_columns]
             .apply(lambda g: g[agg_columns].to_json(orient="records"))
             .to_frame(name="__DISSOLVE_TOJSON")
         )
@@ -2175,9 +2176,12 @@ def _dissolve(
             # Return as json string
             return json.dumps(json_distinct)
 
+        # Starting from pandas 2.2, include_groups=False should be passed to avoid
+        # warnings
+        kwargs = {"include_groups": False} if PANDAS_GTE_22 else {}
         agg_data = (
             data.groupby(**groupby_kwargs)
-            .apply(lambda g: group_flatten_json_list(g))
+            .apply(lambda g: group_flatten_json_list(g), **kwargs)
             .to_frame(name="__DISSOLVE_TOJSON")
         )
     else:
@@ -2195,7 +2199,11 @@ def _dissolve(
 
     # Process spatial component
     def merge_geometries(block):
-        merged_geom = block.unary_union
+        if GEOPANDAS_GTE_10:
+            merged_geom = block.union_all()
+        else:
+            merged_geom = block.unary_union
+
         return merged_geom
 
     g = df.groupby(group_keys=False, **groupby_kwargs)[df.geometry.name].agg(

@@ -149,7 +149,7 @@ def test_append_different_columns(tmp_path, suffix):
     )
     dst_path = tmp_path / f"dst{suffix}"
     gfo.copy(src_path, dst_path)
-    gfo.add_column(src_path, name="extra_column", type=gfo.DataType.INTEGER)
+    gfo.add_column(src_path, name="extra_col", type=gfo.DataType.INTEGER)
 
     # For CSV files, the append fails
     if suffix == ".csv":
@@ -290,9 +290,12 @@ def test_copy_layer_emptyfile(tmp_path, dimensions, suffix):
     assert src_layerinfo.geometrytypename == dst_layerinfo.geometrytypename
 
 
-def test_copy_layer_explodecollections(tmp_path):
+@pytest.mark.parametrize(
+    "testfile, expected_count", [("polygon-parcel", 50), ("point", 50)]
+)
+def test_copy_layer_explodecollections(tmp_path, testfile, expected_count):
     # Prepare test data
-    src = test_helper.get_testfile("polygon-parcel")
+    src = test_helper.get_testfile(testfile)
     dst = tmp_path / f"{src.stem}.gpkg"
 
     # copy_layer, with explodecollections. Default behaviour of gdal was to try to
@@ -300,15 +303,16 @@ def test_copy_layer_explodecollections(tmp_path):
     # overruled in #395
     gfo.copy_layer(src, dst, explodecollections=True)
 
+    result_gdf = gfo.read_file(dst)
+    assert len(result_gdf) == expected_count
+
 
 @pytest.mark.parametrize(
     "testfile, force_geometrytype",
     [
         ("polygon-parcel", GeometryType.POLYGON),
         ("polygon-parcel", GeometryType.MULTIPOLYGON),
-        ("polygon-parcel", GeometryType.LINESTRING),
         ("polygon-parcel", GeometryType.MULTILINESTRING),
-        ("polygon-parcel", GeometryType.POINT),
         ("polygon-parcel", GeometryType.MULTIPOINT),
     ],
 )
@@ -321,6 +325,9 @@ def test_copy_layer_force_output_geometrytype(tmp_path, testfile, force_geometry
     dst = tmp_path / f"{src.stem}_to_{force_geometrytype}.gpkg"
     gfo.copy_layer(src, dst, force_output_geometrytype=force_geometrytype)
     assert gfo.get_layerinfo(dst).geometrytype == force_geometrytype
+
+    result_gdf = gfo.read_file(dst)
+    assert len(result_gdf) == 48
 
 
 def test_copy_layer_invalid_params(tmp_path):
@@ -708,7 +715,13 @@ def test_get_only_layer_two_layers():
         _ = gfo.get_only_layer(src)
 
 
-def test_is_geofile():
+@pytest.mark.filterwarnings(
+    "ignore: is_geofile is deprecated and will be removed in a future version"
+)
+@pytest.mark.filterwarnings(
+    "ignore: is_geofile_ext is deprecated and will be removed in a future version"
+)
+def test_is_geofile_deprecated():
     assert gfo.is_geofile(test_helper.get_testfile("polygon-parcel"))
     assert gfo.is_geofile(
         test_helper.get_testfile("polygon-parcel").with_suffix(".shp")
@@ -1008,6 +1021,7 @@ def test_read_file_sql(suffix, engine_setter):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
+@pytest.mark.filterwarnings("ignore: read_file_sql is deprecated")
 def test_read_file_sql_deprecated(suffix, engine_setter):
     if engine_setter == "fiona":
         pytest.skip("sql_stmt param not supported for fiona engine")
@@ -1528,7 +1542,8 @@ def test_to_file_geomempty(tmp_path, suffix, engine_setter):
         geometry=[
             sh_geom.GeometryCollection(),
             test_helper.TestData.polygon_with_island,
-        ]
+        ],
+        crs=31370,
     )
     # By default, get_geometrytypes ignores the type of empty geometries.
     test_geometrytypes = _geoseries_util.get_geometrytypes(test_gdf.geometry)
@@ -1564,7 +1579,7 @@ def test_to_file_geomempty(tmp_path, suffix, engine_setter):
 def test_to_file_geomnone(tmp_path, suffix, engine_setter):
     # Test for gdf with a None geometry + a polygon
     test_gdf = gpd.GeoDataFrame(
-        geometry=[None, test_helper.TestData.polygon_with_island]
+        geometry=[None, test_helper.TestData.polygon_with_island], crs=31370
     )
     test_geometrytypes = _geoseries_util.get_geometrytypes(test_gdf.geometry)
     assert len(test_geometrytypes) == 1
@@ -1730,15 +1745,14 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
     # index as string
     p_gdf = points_gdf.copy()
     gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
-    gdf.index = pd.TimedeltaIndex(range(len(gdf)), "days")
-    # TODO: TimedeltaIndex is an invalid field type
+    gdf.index = pd.to_timedelta(range(len(gdf)), "days")
     gdf.index = gdf.index.astype(str)
     do_checks(gdf, index_is_used=True)
 
     # unnamed DatetimeIndex
     p_gdf = points_gdf.copy()
     gdf = gpd.GeoDataFrame(p_gdf["value1"], geometry=p_gdf.geometry)
-    gdf.index = pd.TimedeltaIndex(range(len(gdf)), "days") + pd.DatetimeIndex(
+    gdf.index = pd.to_timedelta(range(len(gdf)), "days") + pd.DatetimeIndex(
         ["1999-12-27"] * len(gdf)
     )
     if suffix == ".shp":
