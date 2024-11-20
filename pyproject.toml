@@ -11,6 +11,9 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 log_level = "DEBUG"
+# Write all logging and warnings immediately. Useful for debugging.
+# log_cli = true
+# addopts = "-p no:warnings"
 
 # Some filters that apply to warnings that can be ignored for any test.
 filterwarnings = [

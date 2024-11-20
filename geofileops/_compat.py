@@ -18,3 +18,4 @@ spatialite_version = spatialite_version_info["spatialite_version"]
 SPATIALITE_GTE_51 = version.parse(spatialite_version) >= version.parse("5.1")
 
 GDAL_GTE_38 = version.parse(gdal.__version__) >= version.parse("3.8")
+GDAL_STE_310 = version.parse(gdal.__version__) <= version.parse("3.10")

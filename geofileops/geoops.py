@@ -107,9 +107,7 @@ def dissolve_within_distance(
         # First dissolve the input.
         #
         # Note: this reduces the complexity of operations to be executed later on.
-        # Note2: this already applies the gridsize, which needs to be applied anyway to
-        # avoid issues when determining the addedpieces_1neighbour later on.
-        # Note2: don' apply gridsize yet
+        # Note2: don't apply gridsize yet
         logger.info(f"Start, with input file {input_path}")
         step = 1
         logger.info(f"Step {step} of {nb_steps}")
@@ -342,6 +340,7 @@ def dissolve_within_distance(
             output_path=parts_to_add_filtered_path,
             sql_stmt=sql_stmt,
             input2_layer=input_layer,
+            explodecollections=True,
             gridsize=0.0,
             nb_parallel=nb_parallel,
             batchsize=batchsize,

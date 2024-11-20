@@ -9,6 +9,7 @@
   column should be retained (#523)
 - Enable "CURVE" geometrytype files to be processed in the general file and
   layer operations (#558)
+- Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
 - Add configuration option to only warn on dissolve errors (#561)
 
 ## 0.9.1 (2024-07-18)

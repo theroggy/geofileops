@@ -2273,7 +2273,7 @@ def _append_to_nolock(
     reproject: bool = False,
     explodecollections: bool = False,
     create_spatial_index: Optional[bool] = None,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    force_output_geometrytype: Union[GeometryType, str, Iterable[str], None] = None,
     transaction_size: int = 50000,
     preserve_fid: Optional[bool] = None,
     dst_dimensions: Optional[str] = None,

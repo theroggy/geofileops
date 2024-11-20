@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional, Union
@@ -27,6 +28,15 @@ def clip_by_geometry(
         geom = wkt.loads(clip_geometry)
         spatial_filter = tuple(geom.bounds)
 
+    force_output_geometrytype = None
+    if not explodecollections:
+        input_layer_info = gfo.get_layerinfo(input_path, input_layer)
+        if input_layer_info.geometrytype is not GeometryType.POINT:
+            # If explodecollections is False and the input type is not point, force the
+            # output type to multi, because clip can cause eg. polygons to be split to
+            # multipolygons.
+            force_output_geometrytype = "PROMOTE_TO_MULTI"
+
     _run_ogr(
         operation="clip_by_geometry",
         input_path=input_path,
@@ -37,6 +47,7 @@ def clip_by_geometry(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
+        force_output_geometrytype=force_output_geometrytype,
         force=force,
     )
 
@@ -112,7 +123,7 @@ def _run_ogr(
     append: bool = False,
     update: bool = False,
     explodecollections: bool = False,
-    force_output_geometrytype: Optional[GeometryType] = None,
+    force_output_geometrytype: Union[GeometryType, str, Iterable[str], None] = None,
     options: dict = {},
     columns: Optional[list[str]] = None,
     warp: Optional[dict] = None,

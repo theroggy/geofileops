@@ -413,6 +413,7 @@ def test_export_by_location(
         ("within is False", None, 1000, 0, 15),
     ],
 )
+@pytest.mark.filterwarnings("ignore:.*Field format '' not supported.*")
 def test_export_by_location_area(
     tmp_path,
     query,
@@ -1395,6 +1396,7 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("input_nogeom", ["input1", "input2", "both"])
+@pytest.mark.filterwarnings("ignore:.*Field format '' not supported.*")
 def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
     # Prepare test file with geom
     input_geom_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)

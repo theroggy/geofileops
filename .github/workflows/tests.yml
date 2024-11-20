@@ -74,5 +74,5 @@ jobs:
         run: |
           pytest --color=yes --cov=geofileops --cov-append --cov-report term-missing --cov-report xml tests/
 
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
       
