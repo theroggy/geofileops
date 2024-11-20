@@ -1023,10 +1023,13 @@ def erase(
     input_layer_info = gfo.get_layerinfo(input_path, input_layer)
     primitivetypeid = input_layer_info.geometrytype.to_primitivetype.value
 
-    # If explodecollections is False and the input type is not point, force the output
-    # type to multi, because erase can cause eg. polygons to be split to multipolygons.
     force_output_geometrytype = input_layer_info.geometrytype
-    if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
+    if explodecollections:
+        force_output_geometrytype = force_output_geometrytype.to_singletype
+    elif force_output_geometrytype is not GeometryType.POINT:
+        # If explodecollections is False and the input type is not point, force the
+        # output type to multi, because erase can cause eg. polygons to be split to
+        # multipolygons.
         force_output_geometrytype = force_output_geometrytype.to_multitype
 
     # Subdivide the erase layer if applicable to speed up further processing.

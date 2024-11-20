@@ -707,6 +707,7 @@ def test_dissolve_polygons_tiles_empty(tmp_path, suffix, nb_parallel):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
+@pytest.mark.filterwarnings("ignore: .* field lbl_conc has been truncated to 254")
 def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)

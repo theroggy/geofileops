@@ -746,6 +746,9 @@ def test_convexhull(
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("input_empty", [True, False])
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
+@pytest.mark.filterwarnings(
+    "ignore: The default date converter is deprecated as of Python 3.12"
+)
 def test_makevalid(tmp_path, suffix, input_empty, geoops_module):
     # Prepare test data
     input_path = test_helper.get_testfile(
