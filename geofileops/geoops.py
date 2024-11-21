@@ -77,10 +77,10 @@ def dissolve_within_distance(
         close_internal_gaps (bool, optional): also close gaps, strips or holes in the
             input geometries that are narrower than the ``distance`` specified. E.g.
             small holes, narrow strips starting at the boundary,... Defaults to False.
-        input_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         nb_parallel (int, optional): the number of parallel processes to use.
             Defaults to -1: use all available CPUs.
         batchsize (int, optional): indicative number of rows to process per
@@ -409,10 +409,10 @@ def apply(
         only_geom_input (bool, optional): If True, only the geometry
             column is available. If False, the entire row is input.
             Remark: when False, the operation is 50% slower. Defaults to True.
-        input_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -552,10 +552,10 @@ def buffer(
             if distance is negative, the left side, if distance is positive,
             the right hand side. Only relevant for line geometries.
             Defaults to False.
-        input_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -734,10 +734,10 @@ def clip_by_geometry(
         output_path (PathLike): the file to write the result to
         clip_geometry (Union[Tuple[float, float, float, float], str]): the bounds
             or WKT geometry to clip with.
-        input_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -785,10 +785,10 @@ def convexhull(
     Args:
         input_path (PathLike): the input file
         output_path (PathLike): the file to write the result to
-        input_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -855,10 +855,10 @@ def delete_duplicate_geometries(
     Args:
         input_path (PathLike): the input file
         output_path (PathLike): the file to write the result to
-        input_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -1031,10 +1031,10 @@ def dissolve(
             Can be used to avoid huge geometries being created if the input
             geometries are very interconnected.
             Defaults to 1 (= the output is not tiled).
-        input_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
@@ -1107,10 +1107,10 @@ def export_by_bounds(
         input_path (PathLike): the input file
         output_path (PathLike): the file to write the result to
         bounds (Tuple[float, float, float, float]): the bounds to filter on.
-        input_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -1161,10 +1161,10 @@ def isvalid(
             input file. Defaults to None.
         only_invalid (bool, optional): if True, only put invalid results in the
             output file. Deprecated: always treated as True.
-        input_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -1242,10 +1242,10 @@ def makevalid(
     Args:
         input_path (PathLike): The input file.
         output_path (PathLike): The file to write the result to.
-        input_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -1373,10 +1373,10 @@ def warp(
             Defaults to "polynomial".
         order (int, optional): if algorithm is "polynomial", the order of the
             polynomial to use for warping.
-        input_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -1431,10 +1431,10 @@ def select(
         sql_stmt (str): the SELECT SQL statement to execute
         sql_dialect (str, optional): the SQL dialect to use. If None, the default SQL
             dialect of the underlying source is used. Defaults to "SQLITE".
-        input_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain, if
             {columns_to_select_str} is used. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
@@ -1606,10 +1606,10 @@ def simplify(
                 * **"vw"**: Visvalingam Whyatt: tolerance is an area.
 
         lookahead (int, optional): used for Lang algorithms. Defaults to 8.
-        input_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
-        output_layer (str, optional): input layer name. Optional if the input
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         columns (List[str], optional): list of columns to retain. If None, all standard
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
@@ -1726,16 +1726,16 @@ def clip(
         input_path (PathLike): The file to clip.
         clip_path (PathLike): The file with the geometries to clip with.
         output_path (PathLike): the file to write the result to
-        input_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
         input_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
             that the "fid" will be aliased eg. to "fid_1". Defaults to None.
-        clip_layer (str, optional): clip layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): output layer name. Optional if the
-            file only contains one layer.
+        clip_layer (str, optional): clip layer name. If None, ``clip_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
@@ -1821,16 +1821,16 @@ def erase(
             of) features in this layer that don't have any intersections with other
             features in this layer.
         output_path (PathLike): the file to write the result to.
-        input_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
         input_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
             that the "fid" will be aliased eg. to "fid_1". Defaults to None.
-        erase_layer (str, optional): erase layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): output layer name. Optional if the
-            file only contains one layer.
+        erase_layer (str, optional): erase layer name. If None, ``erase_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
@@ -1939,17 +1939,19 @@ def export_by_location(
             Defaults to None.
         area_inters_column_name (str, optional): column name of the intersect
             area. If None, no area column is added. Defaults to None.
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input1_layer (str, optional): 1st input layer name. If None,
+            ``input_to_select_from_path`` should only contain one layer.
+            Defaults to None.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
             that the "fid" will be aliased eg. to "fid_1". Defaults to None.
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input2_layer (str, optional): 2nd input layer name. If None,
+            ``input_to_compare_with_path`` should contain only one layer.
+            Defaults to None.
         input2_columns (List[str], optional): NA.
-        output_layer (str, optional): output layer name. Optional if the
-            file only contains one layer.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
@@ -2028,16 +2030,18 @@ def export_by_distance(
         input_to_compare_with_path (PathLike): the 2nd input file
         output_path (PathLike): the file to write the result to
         max_distance (float): maximum distance
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
+        input1_layer (str, optional): 1st input layer name. If None,
+            ``input_to_select_from_path`` should contain only one layer.
+            Defaults to None.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
             that the "fid" will be aliased eg. to "fid_1". Defaults to None.
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer.
-        output_layer (str, optional): output layer name. Optional if the
-            file only contains one layer.
+        input2_layer (str, optional): 2nd input layer name. If None,
+            ``input_to_compare_with_path`` should contain only one layer.
+            Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
@@ -2118,8 +2122,8 @@ def identity(
             layer is used for both inputs but interactions between the same rows in this
             layer will be ignored.
         output_path (PathLike): the file to write the result to
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input1_layer (str, optional): 1st input layer name. If None, ``input1_path``
+            should contain only one layer. Defaults to None.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
@@ -2127,8 +2131,8 @@ def identity(
             to "fid_1". Defaults to None.
         input1_columns_prefix (str, optional): prefix to use in the column aliases.
             Defaults to "l1\_".
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input2_layer (str, optional): 2nd input layer name. If None, ``input2_path``
+            should contain only one layer. Defaults to None.
         input2_columns (List[str], optional): columns to select. If None is specified,
             all columns are selected. As explained for ``input1_columns``, it is also
             possible to specify "fid". Defaults to None.
@@ -2327,8 +2331,8 @@ def intersection(
             for both inputs but intersections between the same rows in this layer will
             be omitted from the result.
         output_path (PathLike): the file to write the result to
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input1_layer (str, optional): 1st input layer name. If None, ``input1_path``
+            should contain only one layer. Defaults to None.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
@@ -2336,8 +2340,8 @@ def intersection(
             to "fid_1". Defaults to None.
         input1_columns_prefix (str, optional): prefix to use in the column aliases.
             Defaults to "l1\_".
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input2_layer (str, optional): 2nd input layer name. If None, ``input2_path``
+            should contain only one layer. Defaults to None.
         input2_columns (List[str], optional): columns to select. If None is specified,
             all columns are selected. As explained for ``input1_columns``, it is also
             possible to specify "fid". Defaults to None.
@@ -2462,8 +2466,8 @@ def join_by_location(
             to match. Defaults to None.
         area_inters_column_name (str, optional): column name of the intersect
             area. If None no area column is added. Defaults to None.
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input1_layer (str, optional): 1st input layer name. If None, ``input1_path``
+            should contain only one layer. Defaults to None.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
@@ -2471,15 +2475,15 @@ def join_by_location(
             to "fid_1". Defaults to None.
         input1_columns_prefix (str, optional): prefix to use in the column aliases.
             Defaults to "l1\_".
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input2_layer (str, optional): 2nd input layer name. If None, ``input2_path``
+            should contain only one layer. Defaults to None.
         input2_columns (List[str], optional): columns to select. If None is specified,
             all columns are selected. As explained for input1_columns, it is also
             possible to specify "fid". Defaults to None.
         input2_columns_prefix (str, optional): prefix to use in the column aliases.
             Defaults to "l2\_".
-        output_layer (str, optional): output layer name. If None, the output_path stem
-            is used. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
@@ -2582,8 +2586,8 @@ def join_nearest(
         expand (bool): True to keep searching till ``nb_nearest`` items are found. If
             False, only items found within ``distance`` are returned (False is only
             supported if spatialite version >= 5.1 is used).
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input1_layer (str, optional): 1st input layer name. If None, ``input1_path``
+            should contain only one layer. Defaults to None.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
@@ -2591,8 +2595,8 @@ def join_nearest(
             to "fid_1". Defaults to None.
         input1_columns_prefix (str, optional): prefix to use in the column aliases.
             Defaults to "l1\_".
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input2_layer (str, optional): 2nd input layer name. If None, ``input2_path``
+            should contain only one layer. Defaults to None.
         input2_columns (List[str], optional): columns to select. If None is specified,
             all columns are selected. As explained for ``input1_columns``, it is also
             possible to specify "fid". Defaults to None.
@@ -2665,8 +2669,8 @@ def select_two_layers(
         output_path (PathLike): the file to write the result to.
         sql_stmt (str): the SELECT SQL statement to be executed. Must be in SQLite
             dialect.
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input1_layer (str, optional): 1st input layer name. If None, ``input1_path``
+            should contain only one layer. Defaults to None.
         input1_columns (List[str], optional): list of columns to retain if one of the
             {layer1\_columns_...} placeholders is used in ``sql_stmt``. If None, all
             standard columns are retained. In addition to standard columns, it is also
@@ -2675,8 +2679,8 @@ def select_two_layers(
             to "fid_1". Defaults to None.
         input1_columns_prefix (str, optional): prefix to use in the column aliases.
             Defaults to "l1\_".
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input2_layer (str, optional): 2nd input layer name. If None, ``input2_path``
+            should contain only one layer. Defaults to None.
         input2_columns (List[str], optional): list of columns to retain if one of the
             {layer2\_columns_...} placeholders is used in ``sql_stmt``. If None is
             specified, all columns are selected. As explained for ``input1_columns``, it
@@ -2904,8 +2908,8 @@ def symmetric_difference(
           for both inputs but interactions between the same rows in this layer will be
           ignored.
         output_path (PathLike): the file to write the result to
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input1_layer (str, optional): 1st input layer name. If None, ``input1_path``
+            should contain only one layer. Defaults to None.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
@@ -2913,8 +2917,8 @@ def symmetric_difference(
             "fid_1". Defaults to None.
         input1_columns_prefix (str, optional): prefix to use in the column aliases.
             Defaults to "l1\_".
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input2_layer (str, optional): 2nd input layer name. If None, ``input2_path``
+            should contain only one layer. Defaults to None.
         input2_columns (List[str], optional): columns to select. If None is specified,
             all columns are selected. As explained for input1_columns, it is also
             possible to specify "fid". Defaults to None.
@@ -3032,8 +3036,8 @@ def union(
             layer is used for both inputs but interactions between the same rows in this
             layer will be ignored.
         output_path (PathLike): the file to write the result to
-        input1_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input1_layer (str, optional): 1st input layer name. If None, ``input1_path``
+            should contain only one layer. Defaults to None.
         input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
@@ -3041,8 +3045,8 @@ def union(
             to "fid_1". Defaults to None.
         input1_columns_prefix (str, optional): prefix to use in the column aliases.
             Defaults to "l1\_".
-        input2_layer (str, optional): input layer name. Optional if the
-            file only contains one layer. Defaults to None.
+        input2_layer (str, optional): 2nd input layer name. If None, ``input2_path``
+            should contain only one layer. Defaults to None.
         input2_columns (List[str], optional): columns to select. If None is specified,
             all columns are selected. As explained for ``input1_columns``, it is also
             possible to specify "fid". Defaults to None.
