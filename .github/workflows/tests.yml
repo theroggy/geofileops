@@ -8,6 +8,12 @@ on:
     branches: [ main, v0.** ]
   pull_request:
     branches: [ main, v0.** ]
+    paths-ignore:
+      - "docs/**"
+      - "benchmark/**"
+      - ".github/workflows/tests_installed.yml"
+      - "*.md"
+      - "*.yml"
   schedule:
     - cron: "0 0 * * *"
 
