@@ -7,7 +7,8 @@ on:
   #pull_request:
   #  branches: [ main, v0.** ]
   schedule:
-    - cron: "0 0 * * *"
+    # every Monday to Friday at 5:40 AM
+    - cron: "40 5 * * 1-5"
   push:
     paths:
       - ".github/workflows/tests_installed.yml"

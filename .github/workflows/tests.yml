@@ -15,7 +15,8 @@ on:
       - "*.md"
       - "*.yml"
   schedule:
-    - cron: "0 0 * * *"
+    # every Wednesday at 3:40 AM
+    - cron: "40 3 * * 3"
 
 concurrency: 
   group: ${{ github.workflow }}-${{ github.ref }}
