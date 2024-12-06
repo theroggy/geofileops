@@ -8,8 +8,15 @@ on:
     branches: [ main, v0.** ]
   pull_request:
     branches: [ main, v0.** ]
+    paths-ignore:
+      - "docs/**"
+      - "benchmark/**"
+      - ".github/workflows/tests_installed.yml"
+      - "*.md"
+      - "*.yml"
   schedule:
-    - cron: "0 0 * * *"
+    # every Wednesday at 3:40 AM
+    - cron: "40 3 * * 3"
 
 concurrency: 
   group: ${{ github.workflow }}-${{ github.ref }}

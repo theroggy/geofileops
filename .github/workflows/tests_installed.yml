@@ -7,7 +7,14 @@ on:
   #pull_request:
   #  branches: [ main, v0.** ]
   schedule:
-    - cron: "0 0 * * *"
+    # every Monday to Friday at 5:40 AM
+    - cron: "40 5 * * 1-5"
+  push:
+    paths:
+      - ".github/workflows/tests_installed.yml"
+  pull_request:
+    paths: 
+      - ".github/workflows/tests_installed.yml"
 
 concurrency: 
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,7 +36,7 @@ jobs:
         python: ["3.11"]
         env: ["installed"]
         include:
-          - checkout_ref: "v0.9.1"
+          - checkout_ref: "v0.9.x"
             # nomkl: openblas instead of mkl saves 600 MB. Linux OK, but 50% slower on Windows and OSX!
             install_extra_args: >-
               nomkl
