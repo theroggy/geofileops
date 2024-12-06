@@ -95,14 +95,14 @@ class GeofileType(enum.Enum):
 
         def get_geofiletype_for_suffix(suffix: str):
             suffix_lower = suffix.lower()
-            for geofiletype in geofiletypes:
-                if suffix_lower in geofiletypes[geofiletype].suffixes:
+            for geofiletype, geofiletype_info in geofiletypes.items():
+                if suffix_lower in geofiletype_info.suffixes:
                     return GeofileType[geofiletype]
             raise ValueError(f"Unknown extension {suffix}")
 
         def get_geofiletype_for_ogrdriver(ogrdriver: str):
-            for geofiletype in geofiletypes:
-                driver = geofiletypes[geofiletype].ogrdriver
+            for geofiletype, geofiletype_info in geofiletypes.items():
+                driver = geofiletype_info.ogrdriver
                 if driver is not None and driver == ogrdriver:
                     return GeofileType[geofiletype]
             raise ValueError(f"Unknown ogr driver {ogrdriver}")

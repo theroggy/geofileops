@@ -80,15 +80,14 @@ def test_dissolve_linestrings(
             assert output_layerinfo.featurecount == 13
         else:
             raise ValueError(f"check for where_post {where_post} not implemented")
+    elif where_post is None or where_post == "":
+        assert output_layerinfo.featurecount == 1
+    elif where_post == WHERE_LENGTH_GT_200000:
+        assert output_layerinfo.featurecount == 0
+        # Output empty, so nothing more to check
+        return
     else:
-        if where_post is None or where_post == "":
-            assert output_layerinfo.featurecount == 1
-        elif where_post == WHERE_LENGTH_GT_200000:
-            assert output_layerinfo.featurecount == 0
-            # Output empty, so nothing more to check
-            return
-        else:
-            raise ValueError(f"check for where_post {where_post} not implemented")
+        raise ValueError(f"check for where_post {where_post} not implemented")
 
     # Check the contents of the result file
     input_gdf = gfo.read_file(input_path)

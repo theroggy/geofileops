@@ -346,11 +346,10 @@ def vector_translate(
         if explodecollections:
             # If explodecollections is specified, explicitly disable fid to avoid errors
             args.append("-unsetFid")
+    elif preserve_fid:
+        args.append("-preserve_fid")
     else:
-        if preserve_fid:
-            args.append("-preserve_fid")
-        else:
-            args.append("-unsetFid")
+        args.append("-unsetFid")
 
     # Output layer creation options are only applicable if a new layer will be
     # created
@@ -563,7 +562,7 @@ def vector_translate(
         # Raise
         raise GDALError(
             message, log_details=log_lines, error_details=log_errors
-        ).with_traceback(ex.__traceback__)
+        ).with_traceback(ex.__traceback__) from None
 
     finally:
         output_ds = None
@@ -586,7 +585,7 @@ def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> 
     """Prepares the options so they are ready to pass on to gdal.
 
         - Uppercase the option key
-        - Check if the option types are on of the supported ones:
+        - Check if the option types are one of the supported ones:
 
             - LAYER_CREATION: layer creation option (lco)
             - DATASET_CREATION: dataset creation option (dsco)
@@ -645,9 +644,9 @@ def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> 
         result = prepared_options
     else:
         result = {}
-        for option_type in prepared_options:
-            for option_name, value in prepared_options[option_type].items():
-                result[f"{option_type}.{option_name}"] = value
+        for option_type_key, option_type_value in prepared_options.items():
+            for option_name, value in option_type_value.items():
+                result[f"{option_type_key}.{option_name}"] = value
 
     return result
 

@@ -177,16 +177,14 @@ def _determine_nb_batches(
         logger.debug(f"Nb_parallel reduced to {nb_parallel} to reduce memory usage")
 
     # Having more workers than rows doesn't make sense
-    if nb_parallel > nb_rows_total:
-        nb_parallel = nb_rows_total
+    nb_parallel = min(nb_parallel, nb_rows_total)
 
     # If batchsize is specified, use it to determine number of batches.
     if batchsize > 0:
         nb_batches = math.ceil(nb_rows_total / batchsize)
 
         # No use to have more workers than number of batches
-        if nb_parallel > nb_batches:
-            nb_parallel = nb_batches
+        nb_parallel = min(nb_parallel, nb_batches)
 
         return (nb_parallel, nb_batches)
 
@@ -205,8 +203,7 @@ def _determine_nb_batches(
         nb_batches = math.ceil(nb_batches / nb_parallel) * nb_parallel
 
     # Having more workers than batches isn't logical...
-    if nb_parallel > nb_batches:
-        nb_parallel = nb_batches
+    nb_parallel = min(nb_parallel, nb_batches)
 
     # Finally, make sure there are enough batches to avoid memory issues:
     #   = total memory usage for all rows /
@@ -343,8 +340,7 @@ def _prepare_processing_params(
                 batches.append(f"{fid_column} >= {batch_info.start_fid} ")
 
     # No use starting more processes than the number of batches...
-    if len(batches) < nb_parallel:
-        nb_parallel = len(batches)
+    nb_parallel = min(len(batches), nb_parallel)
 
     returnvalue = ProcessingParams(
         nb_rows_to_process=input_info.featurecount,
@@ -2028,9 +2024,9 @@ def _dissolve_polygons(
     # Collect perfinfo
     total_perf_time = 0.0
     perfstring = ""
-    for perfcode in perfinfo:
-        total_perf_time += perfinfo[perfcode]
-        perfstring += f"{perfcode}: {perfinfo[perfcode]:.2f}, "
+    for perfcode, perfvalue in perfinfo.items():
+        total_perf_time += perfvalue
+        perfstring += f"{perfcode}: {perfvalue:.2f}, "
     return_info["total_time"] = (datetime.now() - start_time).total_seconds()
     perfinfo["unaccounted"] = (
         return_info["total_time"] - total_perf_time  # type: ignore[operator]

@@ -230,37 +230,34 @@ def get_columns(
                     else:
                         output_geometrytype = GeometryType["GEOMETRY"]
                 columns[columnname] = output_geometrytype.name
-            else:
-                # If PRAGMA TABLE_INFO doesn't specify the datatype, determine based
-                # on data.
-                if columntype is None or columntype == "":
-                    sql = f'SELECT typeof("{columnname}") FROM tmp;'
+            elif columntype is None or columntype == "":
+                sql = f'SELECT typeof("{columnname}") FROM tmp;'
+                result = conn.execute(sql).fetchall()
+                if len(result) > 0 and result[0][0] is not None:
+                    columns[columnname] = result[0][0]
+                else:
+                    # If unknown, take the most general types
+                    columns[columnname] = "NUMERIC"
+            elif columntype == "NUM":
+                # PRAGMA TABLE_INFO sometimes returns 'NUM', but apparently this
+                # cannot be used in "CREATE TABLE".
+                if tmpdata is None:
+                    columns[columnname] = "NUMERIC"
+                elif isinstance(tmpdata[column_index], datetime.date):
+                    columns[columnname] = "DATE"
+                elif isinstance(tmpdata[column_index], datetime.datetime):
+                    columns[columnname] = "DATETIME"
+                elif isinstance(tmpdata[column_index], str):
+                    sql = f'SELECT datetime("{columnname}") FROM tmp;'
                     result = conn.execute(sql).fetchall()
                     if len(result) > 0 and result[0][0] is not None:
-                        columns[columnname] = result[0][0]
-                    else:
-                        # If unknown, take the most general types
-                        columns[columnname] = "NUMERIC"
-                elif columntype == "NUM":
-                    # PRAGMA TABLE_INFO sometimes returns 'NUM', but apparently this
-                    # cannot be used in "CREATE TABLE".
-                    if tmpdata is None:
-                        columns[columnname] = "NUMERIC"
-                    elif isinstance(tmpdata[column_index], datetime.date):
-                        columns[columnname] = "DATE"
-                    elif isinstance(tmpdata[column_index], datetime.datetime):
                         columns[columnname] = "DATETIME"
-                    elif isinstance(tmpdata[column_index], str):
-                        sql = f'SELECT datetime("{columnname}") FROM tmp;'
-                        result = conn.execute(sql).fetchall()
-                        if len(result) > 0 and result[0][0] is not None:
-                            columns[columnname] = "DATETIME"
-                        else:
-                            columns[columnname] = "NUMERIC"
                     else:
                         columns[columnname] = "NUMERIC"
                 else:
-                    columns[columnname] = columntype
+                    columns[columnname] = "NUMERIC"
+            else:
+                columns[columnname] = columntype
 
     except Exception as ex:
         conn.rollback()

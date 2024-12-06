@@ -1996,9 +1996,8 @@ def join_nearest(
         if expand is None:
             raise ValueError("expand is mandatory with spatialite >= 5.1")
         expand_int = 1 if expand else False
-    else:
-        if expand is not None and not expand:
-            raise ValueError("expand=False is not supported with spatialite < 5.1")
+    elif expand is not None and not expand:
+        raise ValueError("expand=False is not supported with spatialite < 5.1")
 
     # Prepare input files
     # To use knn index, the input layers need to be in sqlite file format
@@ -3290,8 +3289,7 @@ def _prepare_processing_params(
                 )
 
     # No use starting more processes than the number of batches...
-    if len(batches) < nb_parallel:
-        nb_parallel = len(batches)
+    nb_parallel = min(len(batches), nb_parallel)
 
     returnvalue = ProcessingParams(
         input1_path=input1_path,
@@ -3384,11 +3382,9 @@ def _determine_nb_batches(
         nb_batches = 1
 
     # If more batches than rows, limit nb batches
-    if nb_batches > nb_rows_input_layer:
-        nb_batches = nb_rows_input_layer
+    nb_batches = min(nb_batches, nb_rows_input_layer)
     # If more parallel than number of batches, limit nb_parallel
-    if nb_parallel > nb_batches:
-        nb_parallel = nb_batches
+    nb_parallel = min(nb_parallel, nb_batches)
 
     return (nb_parallel, nb_batches)
 

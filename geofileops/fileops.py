@@ -1530,7 +1530,7 @@ def to_file(
         except Exception:
             raise ValueError(
                 f"Unsupported force_output_geometrytype: {force_output_geometrytype}"
-            )
+            ) from None
     if force_output_geometrytype is not None and force_output_geometrytype.is_multitype:
         force_multitype = True
 
