@@ -7,6 +7,7 @@ import pprint
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional, Union
 
@@ -125,16 +126,19 @@ def create_new_spatialdb(path: Path, crs_epsg: Optional[int] = None):
 
 def get_columns(
     sql_stmt: str,
-    input1_path: Path,
-    input2_path: Optional[Path] = None,
+    input_path: Union[Path, list[Path]],
     empty_output_ok: bool = True,
     use_spatialite: bool = True,
     output_geometrytype: Optional[GeometryType] = None,
 ) -> dict[str, str]:
     # Create temp output db to be sure the output DB is writable, even though we only
     # create a temporary table.
+    if isinstance(input_path, (str, Path)):
+        input_path = [input_path]
+    assert isinstance(input_path, Iterable)
+
     tmp_dir = Path(tempfile.mkdtemp(prefix="geofileops/get_columns_"))
-    tmp_path = tmp_dir / f"temp{input1_path.suffix}"
+    tmp_path = tmp_dir / f"temp{input_path[0].suffix}"
     create_new_spatialdb(path=tmp_path)
 
     sql = None
@@ -147,27 +151,27 @@ def get_columns(
                 sql = "SELECT EnableGpkgMode();"
                 conn.execute(sql)
 
-        # Attach to input1
-        input1_databasename = "input1"
-        sql = f"ATTACH DATABASE ? AS {input1_databasename}"
-        dbSpec = (str(input1_path),)
-        conn.execute(sql, dbSpec)
+            # Attach to all input databases
+            db_path_to_placeholder: dict[Path, str] = {}
+            db_placeholder_to_value: dict[str, str] = {}
+            for index, path in enumerate(input_path):
+                db_placeholder = f"input{index + 1}_databasename"
+                if path in db_path_to_placeholder:
+                    db_placeholder_to_value[db_placeholder] = db_placeholder_to_value[
+                        db_path_to_placeholder[path]
+                    ]
+                    continue
 
-        # If input2 isn't the same database input1, attach to it
-        input2_databasename = None
-        if input2_path is not None:
-            if input2_path == input1_path:
-                input2_databasename = input1_databasename
-            else:
-                input2_databasename = "input2"
-                sql = f"ATTACH DATABASE ? AS {input2_databasename}"
-                dbSpec = (str(input2_path),)
+                input_databasename = f"input{index + 1}"
+                sql = f"ATTACH DATABASE ? AS {input_databasename}"
+                dbSpec = (str(path),)
                 conn.execute(sql, dbSpec)
+                db_path_to_placeholder[path] = db_placeholder
+                db_placeholder_to_value[db_placeholder] = input_databasename
 
         # Prepare sql statement for execute
         sql_stmt_prepared = sql_stmt.format(
-            input1_databasename=input1_databasename,
-            input2_databasename=input2_databasename,
+            **db_placeholder_to_value,
             batch_filter="",
         )
 
@@ -271,14 +275,12 @@ def get_columns(
 
 
 def create_table_as_sql(
-    input1_path: Path,
-    input1_layer: str,
-    input2_path: Path,
-    input2_layer: str,
+    input_path: Union[Path, list[Path]],
     output_path: Path,
     sql_stmt: str,
     output_layer: str,
     output_geometrytype: Optional[GeometryType],
+    output_crs: int,
     append: bool = False,
     update: bool = False,
     create_spatial_index: bool = True,
@@ -289,14 +291,12 @@ def create_table_as_sql(
     """Execute sql statement and save the result in the output file.
 
     Args:
-        input1_path (Path): the path to the 1st input file.
-        input1_layer (str): the layer/table to select from in het 1st input file
-        input2_path (Path): the path to the 2nd input file.
-        input2_layer (str): the layer/table to select from in het 2nd input file
+        input_path (Path or list): the path(s) to the input file(s).
         output_path (Path): the path where the output file needs to be created/appended.
         sql_stmt (str): SELECT statement to run on the input files.
         output_layer (str): layer/table name to use.
         output_geometrytype (Optional[GeometryType]): geometry type of the output.
+        output_crs (int): epsg code of crs of the output file.
         append (bool, optional): True to append to an existing file. Defaults to False.
         update (bool, optional): True to append to an existing layer. Defaults to False.
         create_spatial_index (bool, optional): True to create a spatial index on the
@@ -321,42 +321,22 @@ def create_table_as_sql(
     # Check input parameters
     if append is True or update is True:
         raise ValueError("append=True nor update=True are implemented.")
-    output_suffix_lower = output_path.suffix.lower()
-    if output_suffix_lower != input1_path.suffix.lower():
-        raise ValueError("output_path and both input paths must have the same suffix!")
-    if input2_path is not None and output_suffix_lower != input2_path.suffix.lower():
-        raise ValueError("output_path and both input paths must have the same suffix!")
 
-    # Check if crs are the same in the input layers + use it (if there is one)
-    input1_info = gfo.get_layerinfo(input1_path, input1_layer, raise_on_nogeom=False)
-    input2_info = None
-    if input2_path is not None:
-        input2_info = gfo.get_layerinfo(
-            input2_path, input2_layer, raise_on_nogeom=False
-        )
-    crs_epsg = -1
-    if input1_info.crs is not None:
-        crs_epsg1 = input1_info.crs.to_epsg()
-        if crs_epsg1 is not None:
-            crs_epsg = crs_epsg1
-        # If input 2 also has a crs, check if it is the same.
-        if (
-            input2_info is not None
-            and input2_info.crs is not None
-            and crs_epsg1 != input2_info.crs.to_epsg()
-        ):
-            logger.warning(
-                "input1 layer doesn't have the same crs as input2 layer: "
-                f"{input1_info.crs} vs {input2_info.crs}"
+    # All input files and the output file must have the same suffix.
+    if isinstance(input_path, (str, Path)):
+        input_path = [input_path]
+    assert isinstance(input_path, Iterable)
+
+    output_suffix_lower = output_path.suffix.lower()
+    for path in input_path:
+        if output_suffix_lower != path.suffix.lower():
+            raise ValueError(
+                "output_path and all input paths must have the same suffix!"
             )
-    elif input2_info is not None and input2_info.crs is not None:
-        crs_epsg2 = input2_info.crs.to_epsg()
-        if crs_epsg2 is not None:
-            crs_epsg = crs_epsg2
 
     # If output file doesn't exist yet, create and init it
     if not output_path.exists():
-        create_new_spatialdb(path=output_path, crs_epsg=crs_epsg)
+        create_new_spatialdb(path=output_path, crs_epsg=output_crs)
 
     sql = None
     conn = sqlite3.connect(output_path, detect_types=sqlite3.PARSE_DECLTYPES, uri=True)
@@ -390,26 +370,23 @@ def create_table_as_sql(
             sql = f"PRAGMA soft_heap_limit={1024*1024*1024};"
             conn.execute(sql)
 
-            # If attach to input1
-            input1_databasename = "input1"
-            sql = f"ATTACH DATABASE ? AS {input1_databasename}"
-            dbSpec = (str(input1_path),)
-            # input1_uri = f"file:{input1_path}?immutable=1"
-            # dbSpec = (str(input1_uri),)
-            conn.execute(sql, dbSpec)
+            # Attach to all input databases
+            db_path_to_placeholder: dict[Path, str] = {}
+            db_placeholder_to_value: dict[str, str] = {}
+            for index, path in enumerate(input_path):
+                db_placeholder = f"input{index+1}_databasename"
+                if path in db_path_to_placeholder:
+                    db_placeholder_to_value[db_placeholder] = db_placeholder_to_value[
+                        db_path_to_placeholder[path]
+                    ]
+                    continue
 
-            # If input2 isn't the same database input1, attach to it
-            input2_databasename = None
-            if input2_path is not None:
-                if input2_path == input1_path:
-                    input2_databasename = input1_databasename
-                else:
-                    input2_databasename = "input2"
-                    sql = f"ATTACH DATABASE ? AS {input2_databasename}"
-                    dbSpec = (str(input2_path),)
-                    # input2_uri = f"file:{input1_path}?immutable=1"
-                    # dbSpec = (str(input2_uri),)
-                    conn.execute(sql, dbSpec)
+                input_databasename = f"input{index + 1}"
+                sql = f"ATTACH DATABASE ? AS {input_databasename}"
+                dbSpec = (str(path),)
+                conn.execute(sql, dbSpec)
+                db_path_to_placeholder[path] = db_placeholder
+                db_placeholder_to_value[db_placeholder] = input_databasename
 
             # Use the sqlite profile specified
             if profile is SqliteProfile.SPEED:
@@ -421,8 +398,7 @@ def create_table_as_sql(
                 # it doesn't hurt and maybe on other platforms...
                 for databasename in [
                     output_databasename,
-                    input1_databasename,
-                    input2_databasename,
+                    *db_placeholder_to_value.values(),
                 ]:
                     conn.execute(f"PRAGMA {databasename}.journal_mode=OFF;")
 
@@ -435,8 +411,7 @@ def create_table_as_sql(
             if column_types is None:
                 column_types = get_columns(
                     sql_stmt=sql_stmt,
-                    input1_path=input1_path,
-                    input2_path=input2_path,
+                    input_path=input_path,
                     empty_output_ok=empty_output_ok,
                     use_spatialite=True,
                     output_geometrytype=output_geometrytype,
@@ -447,10 +422,7 @@ def create_table_as_sql(
                 output_geometrytype = GeometryType(column_types["geom"])
 
             # Prepare sql statement
-            sql_stmt = sql_stmt.format(
-                input1_databasename=input1_databasename,
-                input2_databasename=input2_databasename,
-            )
+            sql_stmt = sql_stmt.format(**db_placeholder_to_value)
 
             # Now we can create the table
             # Create output table using the gpkgAddGeometryColumn() function
@@ -500,7 +472,7 @@ def create_table_as_sql(
                         table_name, data_type, identifier, description, last_change,
                         min_x, min_y, max_x, max_y, srs_id)
                     VALUES ('{output_layer}', '{data_type}', NULL, '', DATETIME(),
-                        NULL, NULL, NULL, NULL, {to_string_for_sql(crs_epsg)});
+                        NULL, NULL, NULL, NULL, {to_string_for_sql(output_crs)});
                 """
                 conn.execute(sql)
 
@@ -511,7 +483,7 @@ def create_table_as_sql(
                         INSERT INTO {output_databasename}.gpkg_geometry_columns (
                             table_name, column_name, geometry_type_name, srs_id, z, m)
                         VALUES ('{output_layer}', 'geom', '{output_geometrytype.name}',
-                            {to_string_for_sql(crs_epsg)}, 0, 0);
+                            {to_string_for_sql(output_crs)}, 0, 0);
                     """
                     conn.execute(sql)
 
@@ -526,8 +498,8 @@ def create_table_as_sql(
                     sql = f"""
                         SELECT RecoverGeometryColumn(
                           '{output_layer}', 'geom',
-                          {to_string_for_sql(crs_epsg)}, '{output_geometrytype.name}');
-                    """
+                          {to_string_for_sql(output_crs)}, '{output_geometrytype.name}');
+                    """  # noqa: E501
                     conn.execute(sql)
 
             # Insert data using the sql statement specified

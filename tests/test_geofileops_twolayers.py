@@ -1042,6 +1042,20 @@ def test_intersection_columns_fid(
             assert sorted(output_gdf.l2_FiD.unique().tolist()) == [1, 2, 3, 4, 5]
 
 
+def test_intersection_different_crs(tmp_path):
+    # Prepare test data
+    input1_path = test_helper.get_testfile("polygon-parcel", suffix=".gpkg")
+    input2_path = test_helper.get_testfile("polygon-parcel", suffix=".gpkg", epsg=4326)
+    output_path = tmp_path / "output.gpkg"
+
+    with pytest.warns(match="input1 layer doesn't have the same crs as input2 layer"):
+        gfo.intersection(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=output_path,
+        )
+
+
 @pytest.mark.parametrize(
     "suffix, explodecollections, where_post, exp_featurecount",
     [

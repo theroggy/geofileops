@@ -44,13 +44,11 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
             """
 
     sqlite_util.create_table_as_sql(
-        input1_path=input1_path,
-        input1_layer="parcels",
-        input2_path=input2_path,
-        input2_layer="zones",
+        input_path=[input1_path, input2_path],
         output_path=output_path,
         output_layer=output_path.stem,
         output_geometrytype=gfo.GeometryType.MULTIPOLYGON,
+        output_crs=31370,
         sql_stmt=sql_stmt,
         profile=sqlite_util.SqliteProfile.SPEED,
         create_spatial_index=create_spatial_index,
@@ -74,29 +72,26 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
         ({"append": True}, "append=True nor update=True are implemented."),
         ({"update": True}, "append=True nor update=True are implemented."),
         (
-            {"input1_path": Path("input1.sqlite")},
-            "output_path and both input paths must have the same suffix!",
+            {"input_path": [Path("input1.sqlite"), Path("input2.gpkg")]},
+            "output_path and all input paths must have the same suffix!",
         ),
         (
-            {"input2_path": Path("input2.sqlite")},
-            "output_path and both input paths must have the same suffix!",
+            {"input_path": [Path("input1.gpkg"), Path("input2.sqlite")]},
+            "output_path and all input paths must have the same suffix!",
         ),
         (
-            {"output_path": Path("output.sqlite")},
-            "output_path and both input paths must have the same suffix!",
+            {
+                "input_path": [Path("input1.gpkg"), Path("input2.gpkg")],
+                "output_path": Path("output.sqlite"),
+            },
+            "output_path and all input paths must have the same suffix!",
         ),
     ],
 )
 def test_create_table_as_sql_invalidparams(kwargs, expected_error):
     # Set default values for kwargs that are not specified:
-    if "input1_path" not in kwargs:
-        kwargs["input1_path"] = Path("input1.gpkg")
-    if "input1_layer" not in kwargs:
-        kwargs["input1_layer"] = "input1_layer"
-    if "input2_path" not in kwargs:
-        kwargs["input2_path"] = Path("input2.gpkg")
-    if "input2_layer" not in kwargs:
-        kwargs["input2_layer"] = "input2_layer"
+    if "input_path" not in kwargs:
+        kwargs["input_path"] = [Path("input1.gpkg"), Path("input2.gpkg")]
     if "output_path" not in kwargs:
         kwargs["output_path"] = Path("output.gpkg")
     if "output_layer" not in kwargs:
@@ -105,6 +100,8 @@ def test_create_table_as_sql_invalidparams(kwargs, expected_error):
         kwargs["sql_stmt"] = "SELECTje"
     if "output_geometrytype" not in kwargs:
         kwargs["output_geometrytype"] = None
+    if "output_crs" not in kwargs:
+        kwargs["output_crs"] = -1
 
     with pytest.raises(ValueError, match=expected_error):
         sqlite_util.create_table_as_sql(**kwargs)
@@ -153,7 +150,7 @@ def test_get_columns():
 
     # Run test
     columns = sqlite_util.get_columns(
-        sql_stmt=sql_stmt, input1_path=input1_path, input2_path=input2_path
+        sql_stmt=sql_stmt, input_path=[input1_path, input2_path]
     )
 
     assert len(columns) == 5
@@ -177,13 +174,11 @@ def test_create_table_as_sql_single_input(tmp_path):
           FROM "parcels" layer
     """
     sqlite_util.create_table_as_sql(
-        input1_path=input_path,
-        input1_layer="parcels",
-        input2_path=None,
-        input2_layer=None,
+        input_path=input_path,
         output_path=output_path,
         output_layer=None,
         output_geometrytype=None,
+        output_crs=31370,
         sql_stmt=sql_stmt,
     )
 
