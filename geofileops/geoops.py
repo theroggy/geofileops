@@ -395,7 +395,7 @@ def apply(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """Apply a python lambda function on the geometry column of the input file.
+    """Apply a python function on the geometry column of the input file.
 
     The result is written to the output file specified.
 
@@ -482,6 +482,108 @@ def apply(
         output_path=Path(output_path),
         func=func,
         only_geom_input=only_geom_input,
+        input_layer=input_layer,
+        output_layer=output_layer,
+        columns=columns,
+        explodecollections=explodecollections,
+        force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        force=force,
+    )
+
+
+def apply_vectorized(
+    input_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
+    func: Callable[[Any], Any],
+    input_layer: Optional[str] = None,
+    output_layer: Optional[str] = None,
+    columns: Optional[list[str]] = None,
+    explodecollections: bool = False,
+    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    gridsize: float = 0.0,
+    keep_empty_geoms: bool = False,
+    where_post: Optional[str] = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
+    force: bool = False,
+):
+    """Apply a vectorized python function on the geometry column of the input file.
+
+    The result is written to the output file specified.
+
+    It is not possible to use the contents of other columns in the input file in the
+    python function. If you need this, use ``gfo.apply`` instead.
+
+    If ``explodecollections`` is False and the input and output file type is GeoPackage,
+    the fid will be preserved. In other cases this will typically not be the case.
+
+    Args:
+        input_path (PathLike): the input file
+        output_path (PathLike): the file to write the result to
+        func (Callable): vectorized lambda function to apply to the geometry column.
+            Vectorized means here that the function should accept a shapely geometry
+            array as input and will return a shapely geometry for each item in the input
+            array.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
+        columns (List[str], optional): list of columns to retain. If None, all standard
+            columns are retained. In addition to standard columns, it is also possible
+            to specify "fid", a unique index available in all input files. Note that the
+            "fid" will be aliased eg. to "fid_1". Defaults to None.
+        explodecollections (bool, optional): True to output only simple geometries.
+            Defaults to False.
+        force_output_geometrytype (GeometryType, optional): The output geometry type to
+            force. If None, a best-effort guess is made and will always result in a
+            multi-type. Defaults to None.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
+        keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
+            in the output. Defaults to False.
+        where_post (str, optional): SQL filter to apply after all other processing,
+            including e.g. ``explodecollections``. It should be in sqlite syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
+        nb_parallel (int, optional): the number of parallel processes to use.
+            Defaults to -1: use all available CPUs.
+        batchsize (int, optional): indicative number of rows to process per
+            batch. A smaller batch size, possibly in combination with a
+            smaller ``nb_parallel``, will reduce the memory usage.
+            Defaults to -1: (try to) determine optimal size automatically.
+        force (bool, optional): overwrite existing output file(s).
+            Defaults to False.
+
+    Examples:
+        This example shows the usage of ``gfo.apply_vectorized``:
+
+        .. code-block:: python
+
+            import geofileops as gfo
+
+            gfo.apply_vectorized(
+                input_path=...,
+                output_path=...,
+                func=lambda geom: pygeoops.centerline(geom, densify_distance=0),
+            )
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
+    logger = logging.getLogger("geofileops.apply_vectorized")
+    logger.info(f"Start on {input_path}")
+
+    return _geoops_gpd.apply_vectorized(
+        input_path=Path(input_path),
+        output_path=Path(output_path),
+        func=func,
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
@@ -1861,7 +1963,7 @@ def erase(
     logger = logging.getLogger("geofileops.erase")
     logger.info(f"Start, on {input_path} with {erase_path} to {output_path}")
 
-    # In erase_path is None, we are doing a self-overlay
+    # If erase_path is None, we are doing a self-overlay
     overlay_self = False
     if erase_path is None:
         if erase_layer is not None:

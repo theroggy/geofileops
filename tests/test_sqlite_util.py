@@ -42,9 +42,12 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
                AND ST_Intersects(layer1.geom, layer2.geometry) = 1
                AND ST_Touches(layer1.geom, layer2.geometry) = 0
             """
+    sql_stmt = sql_stmt.format(
+        input1_databasename="input1_db", input2_databasename="input2_db"
+    )
 
     sqlite_util.create_table_as_sql(
-        input_path=[input1_path, input2_path],
+        input_databases={"input1_db": input1_path, "input2_db": input2_path},
         output_path=output_path,
         output_layer=output_path.stem,
         output_geometrytype=gfo.GeometryType.MULTIPOLYGON,
@@ -72,26 +75,36 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
         ({"append": True}, "append=True nor update=True are implemented."),
         ({"update": True}, "append=True nor update=True are implemented."),
         (
-            {"input_path": [Path("input1.sqlite"), Path("input2.gpkg")]},
-            "output_path and all input paths must have the same suffix!",
-        ),
-        (
-            {"input_path": [Path("input1.gpkg"), Path("input2.sqlite")]},
+            {
+                "input_databases": {
+                    "input1": Path("input1.sqlite"),
+                    "input2": Path("input2.gpkg"),
+                }
+            },
             "output_path and all input paths must have the same suffix!",
         ),
         (
             {
-                "input_path": [Path("input1.gpkg"), Path("input2.gpkg")],
-                "output_path": Path("output.sqlite"),
+                "input_databases": {
+                    "input1": Path("input1.gpkg"),
+                    "input2": Path("input2.sqlite"),
+                }
             },
+            "output_path and all input paths must have the same suffix!",
+        ),
+        (
+            {"output_path": Path("output.sqlite")},
             "output_path and all input paths must have the same suffix!",
         ),
     ],
 )
 def test_create_table_as_sql_invalidparams(kwargs, expected_error):
     # Set default values for kwargs that are not specified:
-    if "input_path" not in kwargs:
-        kwargs["input_path"] = [Path("input1.gpkg"), Path("input2.gpkg")]
+    if "input_databases" not in kwargs:
+        kwargs["input_databases"] = {
+            "input1_db": Path("input1.gpkg"),
+            "input2_db": Path("input2.gpkg"),
+        }
     if "output_path" not in kwargs:
         kwargs["output_path"] = Path("output.gpkg")
     if "output_layer" not in kwargs:
@@ -139,8 +152,8 @@ def test_get_columns():
     # was a bug (https://github.com/geofileops/geofileops/pull/477).
     sql_stmt = f"""
         SELECT layer1.OIDN, layer1.UIDN, layer1.datum, layer2.naam, 'test' AS naam
-          FROM {{input1_databasename}}."{input1_info.name}" layer1
-          CROSS JOIN {{input2_databasename}}."{input2_info.name}" layer2
+          FROM input1_db."{input1_info.name}" layer1
+          CROSS JOIN input2_db."{input2_info.name}" layer2
          WHERE 1=1
     """
 
@@ -150,7 +163,8 @@ def test_get_columns():
 
     # Run test
     columns = sqlite_util.get_columns(
-        sql_stmt=sql_stmt, input_path=[input1_path, input2_path]
+        sql_stmt=sql_stmt,
+        input_databases={"input1_db": input1_path, "input2_db": input2_path},
     )
 
     assert len(columns) == 5
@@ -174,7 +188,7 @@ def test_create_table_as_sql_single_input(tmp_path):
           FROM "parcels" layer
     """
     sqlite_util.create_table_as_sql(
-        input_path=input_path,
+        input_databases={"input": input_path},
         output_path=output_path,
         output_layer=None,
         output_geometrytype=None,

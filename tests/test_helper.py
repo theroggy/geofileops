@@ -280,6 +280,8 @@ def assert_geodataframe_equal(
     promote_to_multi=False,
     sort_columns=False,
     sort_values=False,
+    simplify: Optional[float] = None,
+    check_geom_gridsize: float = 0.0,
     output_dir: Optional[Path] = None,
 ):
     """
@@ -303,6 +305,8 @@ def assert_geodataframe_equal(
         If True, check that all the geom types are equal.
     check_geom_empty_vs_None : bool, default True
         If False, ignore differences between empty and None geometries.
+    check_geom_equals : bool, default True
+        If False, ignore differences between geometries.
     check_crs: bool, default True
         If `check_frame_type` is True, then also check that the
         crs matches.
@@ -333,6 +337,10 @@ def assert_geodataframe_equal(
         right = right.copy()
         right.loc[right.geometry.is_empty, ["geometry"]] = None
 
+    if simplify is not None:
+        left.geometry = left.geometry.simplify(simplify)
+        right.geometry = right.geometry.simplify(simplify)
+
     if promote_to_multi:
         left.geometry = _geoseries_util.harmonize_geometrytypes(
             left.geometry, force_multitype=True
@@ -360,6 +368,14 @@ def assert_geodataframe_equal(
         gfo.to_file(left, output_path, create_spatial_index=None)
         output_path = output_dir / "right.geojson"
         gfo.to_file(right, output_path, create_spatial_index=None)
+
+    if check_geom_gridsize > 0.0:
+        # The symmetric difference should result in all empty geometries
+        symdiff = shapely.symmetric_difference(
+            left.geometry, right.geometry, grid_size=check_geom_gridsize
+        )
+        assert all(symdiff.is_empty)
+        right.geometry = left.geometry
 
     gpd_testing.assert_geodataframe_equal(
         left=left,

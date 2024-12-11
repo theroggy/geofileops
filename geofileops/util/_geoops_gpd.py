@@ -359,6 +359,7 @@ class GeoOperation(enum.Enum):
     BUFFER = "buffer"
     CONVEXHULL = "convexhull"
     APPLY = "apply"
+    APPLY_VECTORIZED = "apply_vectorized"
 
 
 def apply(
@@ -393,6 +394,50 @@ def apply(
         input_path=input_path,
         output_path=output_path,
         operation=GeoOperation.APPLY,
+        operation_params=operation_params,
+        input_layer=input_layer,
+        output_layer=output_layer,
+        columns=columns,
+        explodecollections=explodecollections,
+        force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        force=force,
+        parallelization_config=parallelization_config,
+    )
+
+
+def apply_vectorized(
+    input_path: Path,
+    output_path: Path,
+    func: Callable[[Any], Any],
+    operation_name: Optional[str] = None,
+    input_layer: Optional[str] = None,
+    output_layer: Optional[str] = None,
+    columns: Optional[list[str]] = None,
+    explodecollections: bool = False,
+    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    gridsize: float = 0.0,
+    keep_empty_geoms: bool = False,
+    where_post: Optional[str] = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
+    force: bool = False,
+    parallelization_config: Optional[ParallelizationConfig] = None,
+):
+    # Init
+    operation_params = {"pickled_func": cloudpickle.dumps(func)}
+    if operation_name is not None:
+        operation_params["operation_name"] = operation_name
+
+    # Go!
+    return _apply_geooperation_to_layer(
+        input_path=input_path,
+        output_path=output_path,
+        operation=GeoOperation.APPLY_VECTORIZED,
         operation_params=operation_params,
         input_layer=input_layer,
         output_layer=output_layer,
@@ -945,6 +990,9 @@ def _apply_geooperation(
                 data_gdf.geometry = data_gdf.geometry.apply(func)
             else:
                 data_gdf.geometry = data_gdf.apply(func, axis=1)
+        elif operation is GeoOperation.APPLY_VECTORIZED:
+            func = pickle.loads(operation_params["pickled_func"])
+            data_gdf.geometry = func(data_gdf.geometry)
         else:
             raise ValueError(f"operation not supported: {operation}")
 

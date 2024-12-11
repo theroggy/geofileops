@@ -16,6 +16,7 @@ Geometry tools
    :toctree: api/
 
    apply
+   apply_vectorized
    buffer
    clip_by_geometry
    convexhull

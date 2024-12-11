@@ -4,12 +4,15 @@
 
 ### Improvements
 
+- Add function `apply_vectorized` to apply a vectorized function on a geometry column
+  (#588)
 - Add support for renaming column with only difference in casing (#549)
 - Add support to pass a single string for all `column` type parameters if a single
   column should be retained (#523)
 - Enable "CURVE" geometrytype files to be processed in the general file and
   layer operations (#558)
 - Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
+- Improve performance of erase for very complex input geometries (#585)
 - Add configuration option to only warn on dissolve errors (#561)
 
 ## 0.9.1 (2024-07-18)
