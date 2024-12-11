@@ -5,7 +5,7 @@
 ### Improvements
 
 - Add function `apply_vectorized` to apply a vectorized function on a geometry column
-  (#588)
+  and use it internally where possible (#588, #594)
 - Add support for renaming column with only difference in casing (#549)
 - Add support to pass a single string for all `column` type parameters if a single
   column should be retained (#523)

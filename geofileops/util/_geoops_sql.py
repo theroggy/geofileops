@@ -1324,16 +1324,30 @@ def _subdivide_layer(
         #     to handle nested collections well.
         return shapely.geometrycollections(result)
 
+    def subdivide_vectorized(geom, num_coords_max):
+        if geom is None:
+            return None
+
+        if not hasattr(geom, "__len__"):
+            return subdivide(geom, num_coords_max)
+
+        to_subdivide = shapely.get_num_coordinates(geom) > num_coords_max
+        geom[to_subdivide] = np.array(
+            [subdivide(g, num_coords_max=num_coords_max) for g in geom[to_subdivide]]
+        )
+
+        return geom
+
     # Keep the fid column if needed
     columns = ["fid"] if keep_fid else []
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    _geoops_gpd.apply(
+    _geoops_gpd.apply_vectorized(
         input_path=path,
         input_layer=layer,
         output_path=output_path,
         output_layer=layer,
-        func=lambda geom: subdivide(geom, num_coords_max=subdivide_coords),
+        func=lambda geom: subdivide_vectorized(geom, num_coords_max=subdivide_coords),
         operation_name=f"{operation_prefix}subdivide",
         columns=columns,
         explodecollections=True,
