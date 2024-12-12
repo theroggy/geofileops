@@ -177,16 +177,14 @@ def _determine_nb_batches(
         logger.debug(f"Nb_parallel reduced to {nb_parallel} to reduce memory usage")
 
     # Having more workers than rows doesn't make sense
-    if nb_parallel > nb_rows_total:
-        nb_parallel = nb_rows_total
+    nb_parallel = min(nb_parallel, nb_rows_total)
 
     # If batchsize is specified, use it to determine number of batches.
     if batchsize > 0:
         nb_batches = math.ceil(nb_rows_total / batchsize)
 
         # No use to have more workers than number of batches
-        if nb_parallel > nb_batches:
-            nb_parallel = nb_batches
+        nb_parallel = min(nb_parallel, nb_batches)
 
         return (nb_parallel, nb_batches)
 
@@ -205,8 +203,7 @@ def _determine_nb_batches(
         nb_batches = math.ceil(nb_batches / nb_parallel) * nb_parallel
 
     # Having more workers than batches isn't logical...
-    if nb_parallel > nb_batches:
-        nb_parallel = nb_batches
+    nb_parallel = min(nb_parallel, nb_batches)
 
     # Finally, make sure there are enough batches to avoid memory issues:
     #   = total memory usage for all rows /
@@ -343,8 +340,7 @@ def _prepare_processing_params(
                 batches.append(f"{fid_column} >= {batch_info.start_fid} ")
 
     # No use starting more processes than the number of batches...
-    if len(batches) < nb_parallel:
-        nb_parallel = len(batches)
+    nb_parallel = min(len(batches), nb_parallel)
 
     returnvalue = ProcessingParams(
         nb_rows_to_process=input_info.featurecount,
@@ -363,6 +359,7 @@ class GeoOperation(enum.Enum):
     BUFFER = "buffer"
     CONVEXHULL = "convexhull"
     APPLY = "apply"
+    APPLY_VECTORIZED = "apply_vectorized"
 
 
 def apply(
@@ -397,6 +394,50 @@ def apply(
         input_path=input_path,
         output_path=output_path,
         operation=GeoOperation.APPLY,
+        operation_params=operation_params,
+        input_layer=input_layer,
+        output_layer=output_layer,
+        columns=columns,
+        explodecollections=explodecollections,
+        force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        force=force,
+        parallelization_config=parallelization_config,
+    )
+
+
+def apply_vectorized(
+    input_path: Path,
+    output_path: Path,
+    func: Callable[[Any], Any],
+    operation_name: Optional[str] = None,
+    input_layer: Optional[str] = None,
+    output_layer: Optional[str] = None,
+    columns: Optional[list[str]] = None,
+    explodecollections: bool = False,
+    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    gridsize: float = 0.0,
+    keep_empty_geoms: bool = False,
+    where_post: Optional[str] = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
+    force: bool = False,
+    parallelization_config: Optional[ParallelizationConfig] = None,
+):
+    # Init
+    operation_params = {"pickled_func": cloudpickle.dumps(func)}
+    if operation_name is not None:
+        operation_params["operation_name"] = operation_name
+
+    # Go!
+    return _apply_geooperation_to_layer(
+        input_path=input_path,
+        output_path=output_path,
+        operation=GeoOperation.APPLY_VECTORIZED,
         operation_params=operation_params,
         input_layer=input_layer,
         output_layer=output_layer,
@@ -949,6 +990,9 @@ def _apply_geooperation(
                 data_gdf.geometry = data_gdf.geometry.apply(func)
             else:
                 data_gdf.geometry = data_gdf.apply(func, axis=1)
+        elif operation is GeoOperation.APPLY_VECTORIZED:
+            func = pickle.loads(operation_params["pickled_func"])
+            data_gdf.geometry = func(data_gdf.geometry)
         else:
             raise ValueError(f"operation not supported: {operation}")
 
@@ -2028,9 +2072,9 @@ def _dissolve_polygons(
     # Collect perfinfo
     total_perf_time = 0.0
     perfstring = ""
-    for perfcode in perfinfo:
-        total_perf_time += perfinfo[perfcode]
-        perfstring += f"{perfcode}: {perfinfo[perfcode]:.2f}, "
+    for perfcode, perfvalue in perfinfo.items():
+        total_perf_time += perfvalue
+        perfstring += f"{perfcode}: {perfvalue:.2f}, "
     return_info["total_time"] = (datetime.now() - start_time).total_seconds()
     perfinfo["unaccounted"] = (
         return_info["total_time"] - total_perf_time  # type: ignore[operator]

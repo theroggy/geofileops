@@ -200,9 +200,9 @@ def dissolve_within_distance(
         # temporary boundariesstep += 1
         logger.info(f"Step {step} of {nb_steps}")
         parts_to_add_path = tempdir / "200_parts_to_add.gpkg"
-        _geoops_sql.erase(
-            input_path=bufp_diss_bufm_path,
-            erase_path=diss_path,
+        _geoops_sql.difference(
+            input1_path=bufp_diss_bufm_path,
+            input2_path=diss_path,
             output_path=parts_to_add_path,
             overlay_self=False,
             explodecollections=True,
@@ -249,7 +249,7 @@ def dissolve_within_distance(
             #   - if > 1 neighbour, seems OK.
             #
             # For all pieces that don't comply to the above, the following parameters
-            # indicate that they need to be selected to erase them:
+            # indicate that they need to be selected to difference them:
             #   - pieces can be very narrow slivers. E.g. alongside a long boundary with
             #     a small bend, probably due to rounding side effects in the +/- buffer.
             #   - pieces can be spikes. E.g. when a "road" of ~ 'distance' width is not
@@ -395,7 +395,7 @@ def apply(
     batchsize: int = -1,
     force: bool = False,
 ):
-    """Apply a python lambda function on the geometry column of the input file.
+    """Apply a python function on the geometry column of the input file.
 
     The result is written to the output file specified.
 
@@ -482,6 +482,108 @@ def apply(
         output_path=Path(output_path),
         func=func,
         only_geom_input=only_geom_input,
+        input_layer=input_layer,
+        output_layer=output_layer,
+        columns=columns,
+        explodecollections=explodecollections,
+        force_output_geometrytype=force_output_geometrytype,
+        gridsize=gridsize,
+        keep_empty_geoms=keep_empty_geoms,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        force=force,
+    )
+
+
+def apply_vectorized(
+    input_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
+    func: Callable[[Any], Any],
+    input_layer: Optional[str] = None,
+    output_layer: Optional[str] = None,
+    columns: Optional[list[str]] = None,
+    explodecollections: bool = False,
+    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    gridsize: float = 0.0,
+    keep_empty_geoms: bool = False,
+    where_post: Optional[str] = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
+    force: bool = False,
+):
+    """Apply a vectorized python function on the geometry column of the input file.
+
+    The result is written to the output file specified.
+
+    It is not possible to use the contents of other columns in the input file in the
+    python function. If you need this, use ``gfo.apply`` instead.
+
+    If ``explodecollections`` is False and the input and output file type is GeoPackage,
+    the fid will be preserved. In other cases this will typically not be the case.
+
+    Args:
+        input_path (PathLike): the input file
+        output_path (PathLike): the file to write the result to
+        func (Callable): vectorized lambda function to apply to the geometry column.
+            Vectorized means here that the function should accept a shapely geometry
+            array as input and will return a shapely geometry for each item in the input
+            array.
+        input_layer (str, optional): input layer name. If None, ``input_path`` should
+            contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
+        columns (List[str], optional): list of columns to retain. If None, all standard
+            columns are retained. In addition to standard columns, it is also possible
+            to specify "fid", a unique index available in all input files. Note that the
+            "fid" will be aliased eg. to "fid_1". Defaults to None.
+        explodecollections (bool, optional): True to output only simple geometries.
+            Defaults to False.
+        force_output_geometrytype (GeometryType, optional): The output geometry type to
+            force. If None, a best-effort guess is made and will always result in a
+            multi-type. Defaults to None.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
+        keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
+            in the output. Defaults to False.
+        where_post (str, optional): SQL filter to apply after all other processing,
+            including e.g. ``explodecollections``. It should be in sqlite syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
+        nb_parallel (int, optional): the number of parallel processes to use.
+            Defaults to -1: use all available CPUs.
+        batchsize (int, optional): indicative number of rows to process per
+            batch. A smaller batch size, possibly in combination with a
+            smaller ``nb_parallel``, will reduce the memory usage.
+            Defaults to -1: (try to) determine optimal size automatically.
+        force (bool, optional): overwrite existing output file(s).
+            Defaults to False.
+
+    Examples:
+        This example shows the usage of ``gfo.apply_vectorized``:
+
+        .. code-block:: python
+
+            import geofileops as gfo
+
+            gfo.apply_vectorized(
+                input_path=...,
+                output_path=...,
+                func=lambda geom: pygeoops.centerline(geom, densify_distance=0),
+            )
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
+    logger = logging.getLogger("geofileops.apply_vectorized")
+    logger.info(f"Start on {input_path}")
+
+    return _geoops_gpd.apply_vectorized(
+        input_path=Path(input_path),
+        output_path=Path(output_path),
+        func=func,
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
@@ -1781,13 +1883,13 @@ def clip(
     )
 
 
-def erase(
-    input_path: Union[str, "os.PathLike[Any]"],
-    erase_path: Union[str, "os.PathLike[Any]", None],
+def difference(
+    input1_path: Union[str, "os.PathLike[Any]"],
+    input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
-    input_layer: Optional[str] = None,
-    input_columns: Optional[list[str]] = None,
-    erase_layer: Optional[str] = None,
+    input1_layer: Optional[str] = None,
+    input1_columns: Optional[list[str]] = None,
+    input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
@@ -1797,37 +1899,37 @@ def erase(
     subdivide_coords: int = 2000,
     force: bool = False,
 ):
-    """Erase all features in the erase layer from the features in the input layer.
+    """Calculate the difference of the input1 layer and input2 layer.
 
     Notes:
         - Every row in the input layer will result in maximum one row in the
           output layer.
-        - The output will contain the columns from the input layer, no columns from the
-          erase layer. The attribute values wont't be changed, so columns like area,...
+        - The output will contain the columns from the 1st no columns from the 2nd
+          layer. The attribute values wont't be changed, so columns like area,...
           will have to be recalculated manually.
-        - If ``erase_path`` is None, the 1st input layer is used for both inputs but
+        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
           interactions between the same rows in this layer will be ignored. The output
           will be the (pieces of) features in this layer that don't have any
           intersections with other features in this layer.
 
     Alternative names:
-        - QGIS: difference
+        - ArcMap: erase
 
     Args:
-        input_path (PathLike): The file to erase from.
-        erase_path (PathLike, optional): The file with the geometries to erase with. If
-            None, the 1st input layer is used for both inputs but interactions between
-            the same rows in this layer will be ignored. The output will be the (pieces
-            of) features in this layer that don't have any intersections with other
-            features in this layer.
+        input1_path (PathLike): The file to remove/difference from.
+        input2_path (PathLike, optional): The file with the geometries to remove from
+            input1. If None, the 1st input layer is used for both inputs but interactions
+            between the same rows in this layer will be ignored. The output will be the
+            (pieces of) features in this layer that don't have any intersections with
+            other features in this layer.
         output_path (PathLike): the file to write the result to.
-        input_layer (str, optional): input layer name. If None, ``input_path`` should
+        input1_layer (str, optional): input layer name. If None, ``input1_path`` should
             contain only one layer. Defaults to None.
-        input_columns (List[str], optional): list of columns to retain. If None, all
+        input1_columns (List[str], optional): list of columns to retain. If None, all
             standard columns are retained. In addition to standard columns, it is also
             possible to specify "fid", a unique index available in all input files. Note
             that the "fid" will be aliased eg. to "fid_1". Defaults to None.
-        erase_layer (str, optional): erase layer name. If None, ``erase_path`` should
+        input2_layer (str, optional): input2 layer name. If None, ``input2_path`` should
             contain only one layer. Defaults to None.
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
@@ -1858,26 +1960,67 @@ def erase(
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
 
     """  # noqa: E501
-    logger = logging.getLogger("geofileops.erase")
-    logger.info(f"Start, on {input_path} with {erase_path} to {output_path}")
+    logger = logging.getLogger("geofileops.difference")
+    logger.info(f"Start, on {input1_path} with {input2_path} to {output_path}")
 
-    # In erase_path is None, we are doing a self-overlay
+    # If input2_path is None, we are doing a self-overlay
     overlay_self = False
-    if erase_path is None:
-        if erase_layer is not None:
-            raise ValueError("erase_layer must be None if erase_path is None")
-        erase_path = input_path
-        erase_layer = input_layer
+    if input2_path is None:
+        if input2_layer is not None:
+            raise ValueError("input2_layer must be None if input2_path is None")
+        input2_path = input1_path
+        input2_layer = input1_layer
         overlay_self = True
 
-    return _geoops_sql.erase(
-        input_path=Path(input_path),
-        erase_path=Path(erase_path),
+    return _geoops_sql.difference(
+        input1_path=Path(input1_path),
+        input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=overlay_self,
-        input_layer=input_layer,
-        input_columns=input_columns,
-        erase_layer=erase_layer,
+        input_layer=input1_layer,
+        input1_columns=input1_columns,
+        input2_layer=input2_layer,
+        output_layer=output_layer,
+        explodecollections=explodecollections,
+        gridsize=gridsize,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
+        force=force,
+    )
+
+
+def erase(
+    input_path: Union[str, "os.PathLike[Any]"],
+    erase_path: Union[str, "os.PathLike[Any]", None],
+    output_path: Union[str, "os.PathLike[Any]"],
+    input_layer: Optional[str] = None,
+    input_columns: Optional[list[str]] = None,
+    erase_layer: Optional[str] = None,
+    output_layer: Optional[str] = None,
+    explodecollections: bool = False,
+    gridsize: float = 0.0,
+    where_post: Optional[str] = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
+    subdivide_coords: int = 2000,
+    force: bool = False,
+):
+    """DEPRECATED: please use difference."""
+    warnings.warn(  # pragma: no cover
+        "erase is deprecated because it was renamed to difference. "
+        "Will be removed in a (distant) future version",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return difference(
+        input1_path=input_path,
+        input2_path=erase_path,
+        output_path=output_path,
+        input1_layer=input_layer,
+        input1_columns=input_columns,
+        input2_layer=erase_layer,
         output_layer=output_layer,
         explodecollections=explodecollections,
         gridsize=gridsize,
@@ -2107,7 +2250,7 @@ def identity(
     r"""Calculates the pairwise identity of the two input layers.
 
     The result is the equivalent of the intersection between the two layers + layer 1
-    erased with layer 2.
+    differenced with layer 2.
 
     Notes:
         - The result will contain the attribute columns from both input layers. The
@@ -2270,7 +2413,7 @@ def intersect(
 ):
     """DEPRECATED: please use intersection."""
     warnings.warn(  # pragma: no cover
-        "intersect() is deprecated because it was renamed intersection(). "
+        "intersect is deprecated because it was renamed intersection. "
         "Will be removed in a future version",
         FutureWarning,
         stacklevel=2,

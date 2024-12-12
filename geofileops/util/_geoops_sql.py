@@ -14,9 +14,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, Optional, Union
 
+import numpy as np
 import pandas as pd
 import pygeoops
 import shapely
+import shapely.geometry.base
 
 import geofileops as gfo
 from geofileops import GeometryType, PrimitiveType, fileops
@@ -562,9 +564,11 @@ def _single_layer_vector_operation(
     try:
         # If gridsize != 0.0 or if geom_selected is None we need an sqlite file to be
         # able to determine the columns later on.
-        convert_to_spatialite_based = (
-            True if gridsize != 0.0 or geom_selected is None else False
-        )
+        if gridsize != 0.0 or geom_selected is None:
+            input_path, input_layer, _, _ = _convert_to_spatialite_based(
+                input1_path=input_path, input1_layer=input_layer, tempdir=tempdir
+            )
+
         processing_params = _prepare_processing_params(
             input1_path=input_path,
             input1_layer=input_layer,
@@ -572,16 +576,14 @@ def _single_layer_vector_operation(
             tempdir=tempdir,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
-            convert_to_spatialite_based=convert_to_spatialite_based,
         )
         # If None is returned, just stop.
         if processing_params is None or processing_params.batches is None:
             return
 
         # Get layer info of the input layer to use
-        assert processing_params.input1_path is not None
         input_layerinfo = gfo.get_layerinfo(
-            processing_params.input1_path, input_layer, raise_on_nogeom=False
+            input_path, input_layer, raise_on_nogeom=False
         )
 
         # If multiple batches, there should be a batch_filter placeholder sql_template
@@ -614,7 +616,7 @@ def _single_layer_vector_operation(
         sql_template = sql_template.format(
             geometrycolumn=input_layerinfo.geometrycolumn,
             columns_to_select_str=columns_to_select_str,
-            input_layer=processing_params.input1_layer,
+            input_layer=input_layer,
             batch_filter="{batch_filter}",
         )
 
@@ -628,7 +630,7 @@ def _single_layer_vector_operation(
                 sql_tmp = sql_template.format(batch_filter="")
                 cols = _sqlite_util.get_columns(
                     sql_stmt=sql_tmp,
-                    input1_path=processing_params.input1_path,
+                    input_databases={"input_db": input_path},
                 )
                 geom_selected = input_layerinfo.geometrycolumn in cols
 
@@ -647,7 +649,7 @@ def _single_layer_vector_operation(
             # Get all columns of the sql_template
             sql_tmp = sql_template.format(batch_filter="")
             cols = _sqlite_util.get_columns(
-                sql_stmt=sql_tmp, input1_path=processing_params.input1_path
+                sql_stmt=sql_tmp, input_databases={"input_db": input_path}
             )
             attributes = [
                 col for col in cols if col.lower() != input_layerinfo.geometrycolumn
@@ -896,7 +898,7 @@ def clip(
     primitivetypeid = input_layer_info.geometrytype.to_primitivetype.value
 
     # If explodecollections is False and the input type is not point, force the output
-    # type to multi, because erase clip cause eg. polygons to be split to multipolygons.
+    # type to multi, because clip can cause eg. polygons to be split to multipolygons.
     force_output_geometrytype = input_layer_info.geometrytype
     if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
         force_output_geometrytype = force_output_geometrytype.to_multitype
@@ -977,14 +979,14 @@ def clip(
     )
 
 
-def erase(
-    input_path: Path,
-    erase_path: Path,
+def difference(
+    input1_path: Path,
+    input2_path: Path,
     output_path: Path,
     overlay_self: bool,
     input_layer: Optional[str] = None,
-    input_columns: Optional[list[str]] = None,
-    erase_layer: Optional[str] = None,
+    input1_columns: Optional[list[str]] = None,
+    input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
@@ -997,30 +999,25 @@ def erase(
     output_with_spatial_index: Optional[bool] = None,
     operation_prefix: str = "",
 ):
-    # Because there might be extra preparation of the erase layer before going ahead
+    # Because there might be extra preparation of the input2 layer before going ahead
     # with the real calculation, do some additional init + checks here...
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
 
-    operation_name = f"{operation_prefix}erase"
+    operation_name = f"{operation_prefix}difference"
     logger = logging.getLogger(f"geofileops.{operation_name}")
-
-    # If we are doing a self overlay, we need to filter out rows with the same rowid.
-    where_clause_self = "1=1"
-    if overlay_self:
-        where_clause_self = "layer1.rowid <> layer2_sub.rowid"
 
     # Get layer names
     if input_layer is None:
-        input_layer = gfo.get_only_layer(input_path)
-    if erase_layer is None:
-        erase_layer = gfo.get_only_layer(erase_path)
+        input_layer = gfo.get_only_layer(input1_path)
+    if input2_layer is None:
+        input2_layer = gfo.get_only_layer(input2_path)
 
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
 
     start_time = datetime.now()
-    input_layer_info = gfo.get_layerinfo(input_path, input_layer)
+    input_layer_info = gfo.get_layerinfo(input1_path, input_layer)
     primitivetypeid = input_layer_info.geometrytype.to_primitivetype.value
 
     force_output_geometrytype = input_layer_info.geometrytype
@@ -1028,28 +1025,54 @@ def erase(
         force_output_geometrytype = force_output_geometrytype.to_singletype
     elif force_output_geometrytype is not GeometryType.POINT:
         # If explodecollections is False and the input type is not point, force the
-        # output type to multi, because erase can cause eg. polygons to be split to
+        # output type to multi, because difference can cause eg. polygons to be split to
         # multipolygons.
         force_output_geometrytype = force_output_geometrytype.to_multitype
 
-    # Subdivide the erase layer if applicable to speed up further processing.
-    tmp_dir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-    erase_subdivided_path = _subdivide_layer(
-        path=erase_path,
-        layer=erase_layer,
-        output_dir=tmp_dir / "subdivided",
+    # Subdivide the input layer if needed to speed up further processing.
+    # Save the original fid column in a new fid_1 column, we will need it to filter on
+    # it later on.
+    tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
+    input1_subdivided_path = _subdivide_layer(
+        path=input1_path,
+        layer=input_layer,
+        output_path=tempdir / "subdivided/input_layer.gpkg",
         subdivide_coords=subdivide_coords,
-        overlay_self=overlay_self,
+        keep_fid=True,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         operation_prefix=f"{operation_name}/",
     )
-    if erase_subdivided_path is not None:
-        erase_path = erase_subdivided_path
 
-        # _subdivide_layer will save the original fid column in a new fid_1 column
-        if overlay_self:
-            where_clause_self = "layer1.rowid <> layer2_sub.fid_1"
+    where_clause_self = "1=1"
+    if overlay_self:
+        # If we are doing a self overlay, we need to filter out rows with the same rowid
+        if input1_subdivided_path is None:
+            where_clause_self = "layer1.rowid <> layer2_sub.rowid"
+        else:
+            # Filter out the same rowids using the original fids!
+            where_clause_self = "layer1_subdiv.fid_1 <> layer2_sub.fid_1"
+
+        # For overlay self, both subdivided layers are equal
+        input2_subdivided_path = input1_subdivided_path
+
+    else:
+        # Subdivide the input2 layer if needed to speed up further processing.
+        # No self overlay, so no original fid column for the input2 layer needed.
+        input2_subdivided_path = _subdivide_layer(
+            path=input2_path,
+            layer=input2_layer,
+            output_path=tempdir / "subdivided/input2_layer.gpkg",
+            subdivide_coords=subdivide_coords,
+            keep_fid=False,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            operation_prefix=f"{operation_name}/",
+        )
+
+    # If the input2 layer was subdivided
+    if input2_subdivided_path is not None:
+        input2_path = input2_subdivided_path
 
     # Prepare sql template for this operation
     # - WHERE geom IS NOT NULL to avoid rows with a NULL geom, they give issues in
@@ -1071,76 +1094,119 @@ def erase(
     # - ST_difference(geometry , NULL) gives NULL as result -> handle explicitly
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
+    input1_subdiv_layer_rtree = "rtree_{input1_layer}_{input1_subdiv_geometrycolumn}"
 
-    sql_template = f"""
-        SELECT * FROM (
-          SELECT IFNULL(
-                   ( SELECT IFNULL(
-                               IIF({subdivide_coords} <= 0
-                                      OR ST_NPoints(layer1.{{input1_geometrycolumn}})
-                                             < {subdivide_coords},
-                                   IIF(ST_Union(layer2_sub.{{input2_geometrycolumn}})
-                                            IS NULL,
+    if input1_subdivided_path is None:
+        # The input layer was not subdivided
+        sql_template = f"""
+            SELECT * FROM (
+              SELECT IFNULL(
+                       ( SELECT IFNULL(
+                                   IIF(COUNT(layer2_sub.rowid) = 0,
                                        layer1.{{input1_geometrycolumn}},
                                        ST_CollectionExtract(
                                           ST_difference(
                                              layer1.{{input1_geometrycolumn}},
-                                             ST_Union(
-                                                layer2_sub.{{input2_geometrycolumn}})
+                                             ST_Union(layer2_sub.{{input2_geometrycolumn}})
                                           ),
                                           {primitivetypeid}
                                        )
                                    ),
-                                   ST_GeomFromWKB(GFO_Difference_Collection(
-                                      ST_AsBinary(layer1.{{input1_geometrycolumn}}),
-                                      ST_AsBinary(ST_Collect(
-                                         layer2_sub.{{input2_geometrycolumn}}
-                                      )),
-                                      1,
-                                      {subdivide_coords}
-                                   ))
-                               ),
-                               'DIFF_EMPTY'
-                            ) AS diff_geom
-                       FROM {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-                       JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
-                       JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                         ON layer2_sub.rowid = layer2tree.id
-                      WHERE {where_clause_self}
-                        AND layer1tree.id = layer1.rowid
-                        AND layer1tree.minx <= layer2tree.maxx
-                        AND layer1tree.maxx >= layer2tree.minx
-                        AND layer1tree.miny <= layer2tree.maxy
-                        AND layer1tree.maxy >= layer2tree.miny
-                        AND ST_intersects(layer1.{{input1_geometrycolumn}},
-                                          layer2_sub.{{input2_geometrycolumn}}) = 1
-                      LIMIT -1 OFFSET 0
-                   ),
-                   layer1.{{input1_geometrycolumn}}
-                 ) AS geom
-                {{layer1_columns_prefix_alias_str}}
-                {{layer2_columns_prefix_alias_null_str}}
-            FROM {{input1_databasename}}."{{input1_layer}}" layer1
-           WHERE 1=1
-             {{batch_filter}}
-           LIMIT -1 OFFSET 0
-          )
-         WHERE geom IS NOT NULL
-           AND geom <> 'DIFF_EMPTY'
-           AND ST_IsEmpty(geom) = 0
-    """
+                                   'DIFF_EMPTY'
+                                ) AS diff_geom
+                           FROM {{input1_databasename}}."{input1_layer_rtree}" layer1tree
+                           JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
+                           JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                             ON layer2_sub.rowid = layer2tree.id
+                          WHERE {where_clause_self}
+                            AND layer1tree.id = layer1.rowid
+                            AND layer1tree.minx <= layer2tree.maxx
+                            AND layer1tree.maxx >= layer2tree.minx
+                            AND layer1tree.miny <= layer2tree.maxy
+                            AND layer1tree.maxy >= layer2tree.miny
+                            AND ST_intersects(layer1.{{input1_geometrycolumn}},
+                                              layer2_sub.{{input2_geometrycolumn}}) = 1
+                          LIMIT -1 OFFSET 0
+                       ),
+                       layer1.{{input1_geometrycolumn}}
+                     ) AS geom
+                    {{layer1_columns_prefix_alias_str}}
+                    {{layer2_columns_prefix_alias_null_str}}
+                FROM {{input1_databasename}}."{{input1_layer}}" layer1
+               WHERE 1=1
+                 {{batch_filter}}
+               LIMIT -1 OFFSET 0
+              )
+             WHERE geom IS NOT NULL
+               AND geom <> 'DIFF_EMPTY'
+               AND ST_IsEmpty(geom) = 0
+        """  # noqa: E501
+    else:
+        # The input layer was subdivided, so the result needs to be unioned and joined
+        # with the original input layer to get the original columns.
+        sql_template = f"""
+            SELECT differenced.geom
+                  {{layer1_columns_prefix_alias_str}}
+                  {{layer2_columns_prefix_alias_null_str}}
+              FROM (
+                SELECT fid_1, ST_Union(geom) AS geom FROM (
+                  SELECT fid_1
+                        ,IFNULL(
+                           ( SELECT IFNULL(
+                                       IIF(COUNT(layer2_sub.rowid) = 0,
+                                           layer1_subdiv.{{input1_subdiv_geometrycolumn}},
+                                           ST_CollectionExtract(
+                                              ST_difference(
+                                                 layer1_subdiv.{{input1_subdiv_geometrycolumn}},
+                                                 ST_Union(layer2_sub.{{input2_geometrycolumn}})
+                                              ),
+                                              {primitivetypeid}
+                                           )
+                                       ),
+                                       'DIFF_EMPTY'
+                                    ) AS diff_geom
+                               FROM {{input1_subdiv_databasename}}."{input1_subdiv_layer_rtree}" layer1tree
+                               JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
+                               JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                                 ON layer2_sub.rowid = layer2tree.id
+                              WHERE {where_clause_self}
+                                AND layer1tree.id = layer1_subdiv.rowid
+                                AND layer1tree.minx <= layer2tree.maxx
+                                AND layer1tree.maxx >= layer2tree.minx
+                                AND layer1tree.miny <= layer2tree.maxy
+                                AND layer1tree.maxy >= layer2tree.miny
+                                AND ST_intersects(layer1_subdiv.{{input1_subdiv_geometrycolumn}},
+                                                  layer2_sub.{{input2_geometrycolumn}}) = 1
+                              LIMIT -1 OFFSET 0
+                           ),
+                           layer1_subdiv.{{input1_subdiv_geometrycolumn}}
+                         ) AS geom
+                    FROM {{input1_subdiv_databasename}}."{{input1_layer}}" layer1_subdiv
+                   WHERE 1=1
+                     {{batch_filter}}
+                   LIMIT -1 OFFSET 0
+                  )
+                 WHERE geom IS NOT NULL
+                   AND geom <> 'DIFF_EMPTY'
+                   AND ST_IsEmpty(geom) = 0
+                 GROUP BY fid_1
+                ) differenced
+                JOIN {{input1_databasename}}."{{input1_layer}}" layer1
+                     ON layer1.fid = differenced.fid_1
+        """  # noqa: E501
 
     # Go!
     _two_layer_vector_operation(
-        input1_path=input_path,
-        input2_path=erase_path,
+        input1_path=input1_path,
+        input1_subdivided_path=input1_subdivided_path,
+        input2_path=input2_path,
         output_path=output_path,
         sql_template=sql_template,
         operation_name=operation_name,
         input1_layer=input_layer,
-        input1_columns=input_columns,
+        input1_columns=input1_columns,
         input1_columns_prefix=input_columns_prefix,
-        input2_layer=erase_layer,
+        input2_layer=input2_layer,
         input2_columns=[],
         input2_columns_prefix="",
         output_layer=output_layer,
@@ -1152,32 +1218,32 @@ def erase(
         batchsize=batchsize,
         force=force,
         output_with_spatial_index=output_with_spatial_index,
-        tmp_dir=tmp_dir,
+        tmp_dir=tempdir,
     )
 
     # Print time taken
-    logger.info(f"Ready, full erase took {datetime.now()-start_time}")
+    logger.info(f"Ready, full difference took {datetime.now()-start_time}")
 
 
 def _subdivide_layer(
     path: Path,
     layer: Optional[str],
-    output_dir: Path,
+    output_path: Path,
     subdivide_coords: int,
-    overlay_self: bool,
+    keep_fid: bool,
     nb_parallel: int = -1,
     batchsize: int = -1,
     operation_prefix: str = "",
 ) -> Optional[Path]:
-    """Subdivide a layer if applicable.
+    """Subdivide a layer if needed.
 
     Args:
         path (Path): path to the input file.
-        layer (str): layer in the file to be subdivided
-        output_dir (Path): the dir to create the subdivided file in. If the directory
-            specified doesn't exist yet, it is created.
-        subdivide_coords (int): number of coordinates to aim for
-        overlay_self (bool): _description_
+        layer (str): layer in the file to be subdivided.
+        output_path (Path): the path to create the subdivided file in. If the directory
+            doesn't exist yet, it is created.
+        subdivide_coords (int): number of coordinates to aim for.
+        keep_fid (bool): True to retain the fid column in the output file.
         nb_parallel (int, optional): _description_. Defaults to -1.
         batchsize (int, optional): _description_. Defaults to -1.
         operation_prefix (str, optional): Prefix to use in logging,... Defaults to "".
@@ -1215,7 +1281,35 @@ def _subdivide_layer(
     # seem to work.
     # Check out commits in https://github.com/geofileops/geofileops/pull/433
     def subdivide(geom, num_coords_max):
-        result = pygeoops.subdivide(geom, num_coords_max=num_coords_max)
+        if geom is None or geom.is_empty:
+            return geom
+
+        if isinstance(geom, shapely.geometry.base.BaseMultipartGeometry):
+            # Simple single geometry
+            result = shapely.get_parts(
+                pygeoops.subdivide(geom, num_coords_max=num_coords_max)
+            )
+        else:
+            geom = shapely.get_parts(geom)
+            if len(geom) == 1:
+                # There was only one geometry in the multigeometry
+                result = shapely.get_parts(
+                    pygeoops.subdivide(geom[0], num_coords_max=num_coords_max)
+                )
+            else:
+                to_subdivide = shapely.get_num_coordinates(geom) > num_coords_max
+                if np.any(to_subdivide):
+                    subdivided = np.concatenate(
+                        [
+                            shapely.get_parts(
+                                pygeoops.subdivide(g, num_coords_max=num_coords_max)
+                            )
+                            for g in geom[to_subdivide]
+                        ]
+                    )
+                    result = np.concatenate([subdivided, geom[~to_subdivide]])
+                else:
+                    result = geom
 
         if result is None:
             return None
@@ -1228,23 +1322,32 @@ def _subdivide_layer(
         #   - they will be exploded anyway by spatialite.ST_Collect
         #   - spatialite.ST_AsBinary and/or spatialite.ST_GeomFromWkb don't seem
         #     to handle nested collections well.
-        return shapely.GeometryCollection(shapely.get_parts(result).tolist())
+        return shapely.geometrycollections(result)
 
-    # If we are self-erasing the layer, we need to retain the fid to be able to
-    # know which row the subdivided geometries belonged to originally.
-    if overlay_self:
-        columns = ["fid"]
-    else:
-        columns = []
+    def subdivide_vectorized(geom, num_coords_max):
+        if geom is None:
+            return None
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    subdidided_path = output_dir / f"{path.stem}_subdivided.gpkg"
-    _geoops_gpd.apply(
+        if not hasattr(geom, "__len__"):
+            return subdivide(geom, num_coords_max)
+
+        to_subdivide = shapely.get_num_coordinates(geom) > num_coords_max
+        geom[to_subdivide] = np.array(
+            [subdivide(g, num_coords_max=num_coords_max) for g in geom[to_subdivide]]
+        )
+
+        return geom
+
+    # Keep the fid column if needed
+    columns = ["fid"] if keep_fid else []
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    _geoops_gpd.apply_vectorized(
         input_path=path,
         input_layer=layer,
-        output_path=subdidided_path,
+        output_path=output_path,
         output_layer=layer,
-        func=lambda geom: subdivide(geom, num_coords_max=subdivide_coords),
+        func=lambda geom: subdivide_vectorized(geom, num_coords_max=subdivide_coords),
         operation_name=f"{operation_prefix}subdivide",
         columns=columns,
         explodecollections=True,
@@ -1254,11 +1357,11 @@ def _subdivide_layer(
             bytes_per_row=2000, max_rows_per_batch=50000
         ),
     )
-    if overlay_self:
+    if keep_fid:
         sql_create_index = f'CREATE INDEX "IDX_{layer}_fid_1" ON "{layer}"(fid_1)'
-        fileops.execute_sql(subdidided_path, sql_stmt=sql_create_index)
+        fileops.execute_sql(output_path, sql_stmt=sql_create_index)
 
-    return subdidided_path
+    return output_path
 
 
 def export_by_location(
@@ -1279,7 +1382,7 @@ def export_by_location(
     subdivide_coords: int = 10000,
     force: bool = False,
 ):
-    # Because there might be extra preparation of the erase layer before going ahead
+    # Because there might be extra preparation of the 2nd layer before going ahead
     # with the real calculation, do some additional init + checks here...
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
@@ -1306,14 +1409,14 @@ def export_by_location(
         true_for_disjoint,
     ) = _prepare_filter_by_location_fields(spatial_relations_query)
 
-    # Subdivide the erase layer if applicable to speed up further processing.
+    # Subdivide the 2nd layer if applicable to speed up further processing.
     tmp_dir = _io_util.create_tempdir(f"geofileops/{operation_name}")
     input_to_compare_with_subdivided_path = _subdivide_layer(
         path=input_to_compare_with_path,
         layer=input_to_compare_with_layer,
-        output_dir=tmp_dir / "subdivided",
+        output_path=tmp_dir / "subdivided/input_to_compare_with_layer.gpkg",
         subdivide_coords=subdivide_coords,
-        overlay_self=False,
+        keep_fid=False,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         operation_prefix=f"{operation_name}/",
@@ -1996,9 +2099,8 @@ def join_nearest(
         if expand is None:
             raise ValueError("expand is mandatory with spatialite >= 5.1")
         expand_int = 1 if expand else False
-    else:
-        if expand is not None and not expand:
-            raise ValueError("expand=False is not supported with spatialite < 5.1")
+    elif expand is not None and not expand:
+        raise ValueError("expand=False is not supported with spatialite < 5.1")
 
     # Prepare input files
     # To use knn index, the input layers need to be in sqlite file format
@@ -2163,7 +2265,7 @@ def identity(
     force: bool = False,
 ):
     # An identity is the combination of the results of an "intersection" of input1 and
-    # input2 and an erase of input2 with input1.
+    # input2 and an difference of input2 with input1.
 
     # Because the calculations of the intermediate results will be towards temp files,
     # we need to do some additional init + checks here...
@@ -2204,18 +2306,18 @@ def identity(
             operation_prefix="identity/",
         )
 
-        # Now erase input1 from input2 to another temporary output gfo...
-        logger.info("Step 2 of 3: erase")
-        erase_output_path = tempdir / "erase_output.gpkg"
-        erase(
-            input_path=input1_path,
-            erase_path=input2_path,
-            output_path=erase_output_path,
+        # Now difference input1 from input2 to another temporary output gfo...
+        logger.info("Step 2 of 3: difference")
+        difference_output_path = tempdir / "difference_output.gpkg"
+        difference(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=difference_output_path,
             overlay_self=overlay_self,
             input_layer=input1_layer,
-            input_columns=input1_columns,
+            input1_columns=input1_columns,
             input_columns_prefix=input1_columns_prefix,
-            erase_layer=input2_layer,
+            input2_layer=input2_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2232,7 +2334,7 @@ def identity(
         logger.info("Step 3 of 3: finalize")
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
-            src=erase_output_path,
+            src=difference_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
@@ -2277,11 +2379,11 @@ def symmetric_difference(
     subdivide_coords: int = 2000,
     force: bool = False,
 ):
-    # A symmetric difference can be simulated by doing an "erase" of input1
-    # and input2 and then append the result of an erase of input2 with
+    # A symmetric difference can be simulated by doing an difference of input1
+    # and input2 and then append the result of an difference of input2 with
     # input1...
 
-    # Because both erase calculations will be towards temp files,
+    # Because both difference calculations will be towards temp files,
     # we need to do some additional init + checks here...
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
@@ -2299,18 +2401,18 @@ def symmetric_difference(
 
     tempdir = _io_util.create_tempdir("geofileops/symmdiff")
     try:
-        # First erase input2 from input1 to a temporary output file
-        logger.info("Step 1 of 3: erase 1")
-        erase1_output_path = tempdir / "layer1_erase_layer2_output.gpkg"
-        erase(
-            input_path=input1_path,
-            erase_path=input2_path,
-            output_path=erase1_output_path,
+        # First difference input2 from input1 to a temporary output file
+        logger.info("Step 1 of 3: difference 1")
+        diff1_output_path = tempdir / "layer1_diff_layer2_output.gpkg"
+        difference(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=diff1_output_path,
             overlay_self=overlay_self,
             input_layer=input1_layer,
-            input_columns=input1_columns,
+            input1_columns=input1_columns,
             input_columns_prefix=input1_columns_prefix,
-            erase_layer=input2_layer,
+            input2_layer=input2_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2330,23 +2432,23 @@ def symmetric_difference(
             )
             for column in columns_to_add:
                 gfo.add_column(
-                    erase1_output_path,
+                    diff1_output_path,
                     name=f"{input2_columns_prefix}{column}",
                     type=input2_info.columns[column].gdal_type,
                 )
 
-        # Now erase input1 from input2 to another temporary output file
-        logger.info("Step 2 of 3: erase 2")
-        erase2_output_path = tempdir / "layer2_erase_layer1_output.gpkg"
-        erase(
-            input_path=input2_path,
-            erase_path=input1_path,
-            output_path=erase2_output_path,
+        # Now difference input1 from input2 to another temporary output file
+        logger.info("Step 2 of 3: difference 2")
+        diff2_output_path = tempdir / "layer2_diff_layer1_output.gpkg"
+        difference(
+            input1_path=input2_path,
+            input2_path=input1_path,
+            output_path=diff2_output_path,
             overlay_self=overlay_self,
             input_layer=input2_layer,
-            input_columns=input2_columns,
+            input1_columns=input2_columns,
             input_columns_prefix=input2_columns_prefix,
-            erase_layer=input1_layer,
+            input2_layer=input1_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2363,18 +2465,18 @@ def symmetric_difference(
         logger.info("Step 3 of 3: finalize")
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
-            src=erase2_output_path,
-            dst=erase1_output_path,
+            src=diff2_output_path,
+            dst=diff1_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
         )
 
         # Convert or add spatial index
-        tmp_output_path = erase1_output_path
-        if erase1_output_path.suffix != output_path.suffix:
+        tmp_output_path = diff1_output_path
+        if diff1_output_path.suffix != output_path.suffix:
             # Output file should be in diffent format, so convert
             tmp_output_path = tempdir / output_path.name
-            gfo.copy_layer(src=erase1_output_path, dst=tmp_output_path)
+            gfo.copy_layer(src=diff1_output_path, dst=tmp_output_path)
         elif GeofileInfo(tmp_output_path).default_spatial_index:
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
@@ -2409,7 +2511,8 @@ def union(
     force: bool = False,
 ):
     # A union is the combination of the results of an intersection of input1 and input2,
-    # the result of an erase of input2 with input1 and the erase of input1 with input2.
+    # the result of an difference of input2 with input1 and the difference of input1
+    # with input2.
 
     # Because the calculations of the intermediate results will be towards temp files,
     # we need to do some additional init + checks here...
@@ -2452,18 +2555,18 @@ def union(
             operation_prefix="union/",
         )
 
-        # Erase input1 from input2 to another temporary output gfo.
-        logger.info("Step 2 of 4: erase input 1 from input 2")
-        erase1_output_path = tempdir / "erase_input1_from_input2_output.gpkg"
-        erase(
-            input_path=input2_path,
-            erase_path=input1_path,
-            output_path=erase1_output_path,
+        # Difference input1 from input2 to another temporary output gfo.
+        logger.info("Step 2 of 4: difference of input 1 from input 2")
+        diff1_output_path = tempdir / "diff_input1_from_input2_output.gpkg"
+        difference(
+            input1_path=input2_path,
+            input2_path=input1_path,
+            output_path=diff1_output_path,
             overlay_self=overlay_self,
             input_layer=input2_layer,
-            input_columns=input2_columns,
+            input1_columns=input2_columns,
             input_columns_prefix=input2_columns_prefix,
-            erase_layer=input1_layer,
+            input2_layer=input1_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2477,26 +2580,26 @@ def union(
         )
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
-            src=erase1_output_path,
+            src=diff1_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
         )
-        gfo.remove(erase1_output_path)
+        gfo.remove(diff1_output_path)
 
-        # Erase input1 from input2 to and add to temporary output file.
-        logger.info("Step 3 of 4: erase input 2 from input 1")
-        erase2_output_path = tempdir / "erase_input2_from_input1_output.gpkg"
+        # Difference input1 from input2 to and add to temporary output file.
+        logger.info("Step 3 of 4: difference input 2 from input 1")
+        diff2_output_path = tempdir / "diff_input2_from_input1_output.gpkg"
 
-        erase(
-            input_path=input1_path,
-            erase_path=input2_path,
-            output_path=erase2_output_path,
+        difference(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=diff2_output_path,
             overlay_self=overlay_self,
             input_layer=input1_layer,
-            input_columns=input1_columns,
+            input1_columns=input1_columns,
             input_columns_prefix=input1_columns_prefix,
-            erase_layer=input2_layer,
+            input2_layer=input2_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2509,12 +2612,12 @@ def union(
             operation_prefix="union/",
         )
         _append_to_nolock(
-            src=erase2_output_path,
+            src=diff2_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
         )
-        gfo.remove(erase2_output_path)
+        gfo.remove(diff2_output_path)
 
         # Convert or add spatial index
         logger.info("Step 4 of 4: finalize")
@@ -2557,6 +2660,8 @@ def _two_layer_vector_operation(
     nb_parallel: int,
     batchsize: int,
     force: bool,
+    input1_subdivided_path: Optional[Path] = None,
+    input2_subdivided_path: Optional[Path] = None,
     use_ogr: bool = False,
     output_with_spatial_index: Optional[bool] = None,
     tmp_dir: Optional[Path] = None,
@@ -2599,6 +2704,8 @@ def _two_layer_vector_operation(
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): [description]. Defaults to False.
+        input1_subdivided_path (Path, optional): [description]
+        input2_subdivided_path (Path, optional): [description]
         use_ogr (bool, optional): If True, ogr is used to do the processing,
             In this case different input files (input1_path, input2_path) are
             NOT supported. If False, sqlite3 is used directly.
@@ -2635,7 +2742,7 @@ def _two_layer_vector_operation(
         raise ValueError(
             f"{operation_name}: output_path must not equal one of input paths"
         )
-    if use_ogr is True and input1_path != input2_path:
+    if use_ogr and input1_path != input2_path:
         raise ValueError(
             f"{operation_name}: if use_ogr True, input1_path should equal input2_path!"
         )
@@ -2659,6 +2766,9 @@ def _two_layer_vector_operation(
     if tmp_dir is None:
         tmp_dir = _io_util.create_tempdir(f"geofileops/{operation_name}")
 
+    # Check if crs are the same in the input layers + use it (if there is one)
+    output_crs = _check_crs(input1_path, input1_layer, input2_path, input2_layer)
+
     # Prepare output filename
     tmp_output_path = tmp_dir / output_path.name
     tmp_output_path.parent.mkdir(exist_ok=True, parents=True)
@@ -2668,16 +2778,34 @@ def _two_layer_vector_operation(
         # Prepare tmp files/batches
         # -------------------------
         logger.debug(f"Prepare input (params), tempdir: {tmp_dir}")
+        input1_path, input1_layer, input2_path, input2_layer = (
+            _convert_to_spatialite_based(  # type: ignore[assignment]
+                input1_path=input1_path,
+                input1_layer=input1_layer,
+                tempdir=tmp_dir,
+                input2_path=input2_path,
+                input2_layer=input2_layer,
+            )
+        )
+
+        if input1_subdivided_path is not None:
+            input1_layer_alias = "layer1_subdiv"
+            filter_column = "fid_1"
+        else:
+            input1_layer_alias = "layer1"
+            filter_column = "rowid"
+
         processing_params = _prepare_processing_params(
             input1_path=input1_path,
+            input1_subdivided_path=input1_subdivided_path,
             input1_layer=input1_layer,
-            input1_layer_alias="layer1",
+            input1_layer_alias=input1_layer_alias,
+            filter_column=filter_column,
             input2_path=input2_path,
             input2_layer=input2_layer,
             tempdir=tmp_dir,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
-            convert_to_spatialite_based=True,
         )
         if processing_params is None or processing_params.batches is None:
             return
@@ -2711,59 +2839,78 @@ def _two_layer_vector_operation(
         # Prepare column names,... to format the select
         # ---------------------------------------------
         # Format column strings for use in select
-        assert processing_params.input1_path is not None
-        input1_tmp_layerinfo = gfo.get_layerinfo(
-            processing_params.input1_path,
-            processing_params.input1_layer,
-            raise_on_nogeom=False,
+        input1_layerinfo = gfo.get_layerinfo(
+            input1_path, input1_layer, raise_on_nogeom=False
         )
         input1_col_strs = _ogr_sql_util.ColumnFormatter(
             columns_asked=input1_columns,
-            columns_in_layer=input1_tmp_layerinfo.columns,
-            fid_column=input1_tmp_layerinfo.fid_column,
+            columns_in_layer=input1_layerinfo.columns,
+            fid_column=input1_layerinfo.fid_column,
             table_alias="layer1",
             column_alias_prefix=input1_columns_prefix,
         )
-        assert processing_params.input2_path is not None
-        input2_tmp_layerinfo = gfo.get_layerinfo(
-            processing_params.input2_path,
-            processing_params.input2_layer,
+        assert input2_path is not None
+        input2_layerinfo = gfo.get_layerinfo(
+            input2_path,
+            input2_layer,
             raise_on_nogeom=False,
         )
         input2_col_strs = _ogr_sql_util.ColumnFormatter(
             columns_asked=input2_columns,
-            columns_in_layer=input2_tmp_layerinfo.columns,
-            fid_column=input2_tmp_layerinfo.fid_column,
+            columns_in_layer=input2_layerinfo.columns,
+            fid_column=input2_layerinfo.fid_column,
             table_alias="layer2",
             column_alias_prefix=input2_columns_prefix,
         )
 
+        input1_subdiv_geometrycolumn = None
+        if input1_subdivided_path is not None:
+            input1_subdiv_info = gfo.get_layerinfo(input1_subdivided_path)
+            input1_subdiv_geometrycolumn = input1_subdiv_info.geometrycolumn
+
+        input2_subdiv_geometrycolumn = None
+        if input2_subdivided_path is not None:
+            input2_subdiv_info = gfo.get_layerinfo(input2_subdivided_path)
+            input2_subdiv_geometrycolumn = input2_subdiv_info.geometrycolumn
+
         # Check input crs'es
-        if input1_tmp_layerinfo.crs != input2_tmp_layerinfo.crs:
+        if input1_layerinfo.crs != input2_layerinfo.crs:
             logger.warning(
                 f"input1 has a different crs than input2: \n\tinput1: "
-                f"{input1_tmp_layerinfo.crs} \n\tinput2: {input2_tmp_layerinfo.crs}"
+                f"{input1_layerinfo.crs} \n\tinput2: {input2_layerinfo.crs}"
             )
+
+        # Prepare the database names to fill out in the sql_template
+        input_db_placeholders, input_db_names = _prepare_input_db_names(
+            {
+                "input1_databasename": input1_path,
+                "input2_databasename": input2_path,
+                "input1_subdiv_databasename": input1_subdivided_path,
+                "input2_subdiv_databasename": input2_subdivided_path,
+            },
+            use_ogr=use_ogr,
+        )
 
         # Fill out sql_template as much as possible already
         # -------------------------------------------------
         # Keep input1_tmp_layer and input2_tmp_layer for backwards compatibility
         sql_template = sql_template.format(
-            input1_databasename="{input1_databasename}",
-            input2_databasename="{input2_databasename}",
+            **input_db_placeholders,
             layer1_columns_from_subselect_str=input1_col_strs.from_subselect(),
             layer1_columns_prefix_alias_str=input1_col_strs.prefixed_aliased(),
             layer1_columns_prefix_str=input1_col_strs.prefixed(),
-            input1_layer=processing_params.input1_layer,
-            input1_tmp_layer=processing_params.input1_layer,
-            input1_geometrycolumn=input1_tmp_layerinfo.geometrycolumn,
+            input1_layer=input1_layer,
+            input1_tmp_layer=input1_layer,
+            input1_geometrycolumn=input1_layerinfo.geometrycolumn,
+            input1_subdiv_geometrycolumn=input1_subdiv_geometrycolumn,
             layer2_columns_from_subselect_str=input2_col_strs.from_subselect(),
             layer2_columns_prefix_alias_str=input2_col_strs.prefixed_aliased(),
             layer2_columns_prefix_str=input2_col_strs.prefixed(),
             layer2_columns_prefix_alias_null_str=input2_col_strs.null_aliased(),
-            input2_layer=processing_params.input2_layer,
-            input2_tmp_layer=processing_params.input2_layer,
-            input2_geometrycolumn=input2_tmp_layerinfo.geometrycolumn,
+            input2_layer=input2_layer,
+            input2_tmp_layer=input2_layer,
+            input2_geometrycolumn=input2_layerinfo.geometrycolumn,
+            input2_subdiv_geometrycolumn=input2_subdiv_geometrycolumn,
             batch_filter="{batch_filter}",
         )
 
@@ -2771,14 +2918,11 @@ def _two_layer_vector_operation(
         column_datatypes = None
         # Use first batch_filter to improve performance
         sql_stmt = sql_template.format(
-            input1_databasename="{input1_databasename}",
-            input2_databasename="{input2_databasename}",
-            batch_filter=processing_params.batches[0]["batch_filter"],
+            batch_filter=processing_params.batches[0]["batch_filter"]
         )
+
         column_datatypes = _sqlite_util.get_columns(
-            sql_stmt=sql_stmt,
-            input1_path=processing_params.input1_path,
-            input2_path=processing_params.input2_path,
+            sql_stmt=sql_stmt, input_databases=input_db_names
         )
 
         # Apply gridsize if it is specified
@@ -2842,9 +2986,7 @@ def _two_layer_vector_operation(
         # Calculate
         # ---------
         # Processing in threads is 2x faster for small datasets (on Windows)
-        calculate_in_threads = (
-            True if input1_tmp_layerinfo.featurecount <= 100 else False
-        )
+        calculate_in_threads = True if input1_layerinfo.featurecount <= 100 else False
         logger.info(
             f"Start processing ({processing_params.nb_parallel} "
             f"parallel workers, batch size: {processing_params.batchsize})"
@@ -2870,6 +3012,8 @@ def _two_layer_vector_operation(
                 sql_stmt = sql_template.format(
                     input1_databasename="{input1_databasename}",
                     input2_databasename="{input2_databasename}",
+                    input3_databasename="{input3_databasename}",
+                    input4_databasename="{input4_databasename}",
                     batch_filter=processing_params.batches[batch_id]["batch_filter"],
                 )
                 batches[batch_id]["sqlite_stmt"] = sql_stmt
@@ -2895,16 +3039,14 @@ def _two_layer_vector_operation(
 
                 # Remark: this temp file doesn't need spatial index
                 future = calculate_pool.submit(
-                    calculate_two_layers,
-                    input1_path=processing_params.batches[batch_id]["input1_path"],
-                    input1_layer=processing_params.batches[batch_id]["input1_layer"],
-                    input2_path=processing_params.batches[batch_id]["input2_path"],
-                    input2_layer=processing_params.batches[batch_id]["input2_layer"],
+                    _calculate_two_layers,
+                    input_databases=input_db_names,
                     output_path=tmp_partial_output_path,
                     sql_stmt=sql_stmt,
                     output_layer=output_layer,
                     explodecollections=explodecollections_now,
                     force_output_geometrytype=output_geometrytype_now,
+                    output_crs=output_crs,
                     use_ogr=use_ogr,
                     create_spatial_index=False,
                     column_datatypes=column_datatypes,
@@ -3009,40 +3151,98 @@ def _two_layer_vector_operation(
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def calculate_two_layers(
-    input1_path: Path,
-    input1_layer: str,
-    input2_path: Path,
-    input2_layer: str,
+def _prepare_input_db_names(
+    input_paths: dict[str, Optional[Path]], use_ogr: bool
+) -> tuple[dict, dict]:
+    placeholders_to_name: dict[str, Optional[str]] = {}
+    names_to_path: dict[str, Path] = {}
+    for index, (placeholder, path) in enumerate(input_paths.items()):
+        # If path is already in input_databases, reuse the db_name
+        db_name = None
+        for name, cur_path in names_to_path.items():
+            if cur_path == path:
+                db_name = name
+                break
+
+        if db_name is None and path is not None:
+            if use_ogr:
+                # use_ogr needs main as dbname
+                db_name = "main"
+            else:
+                db_name = f"input{index + 1}"
+
+        placeholders_to_name[placeholder] = db_name
+        if db_name is not None and path is not None:
+            names_to_path[db_name] = path
+
+    return placeholders_to_name, names_to_path
+
+
+def _check_crs(
+    input1_path: Path, input1_layer: str, input2_path: Path, input2_layer: str
+) -> int:
+    input1_info = gfo.get_layerinfo(input1_path, input1_layer, raise_on_nogeom=False)
+    input2_info = None
+    if input2_path is not None:
+        input2_info = gfo.get_layerinfo(
+            input2_path, input2_layer, raise_on_nogeom=False
+        )
+    crs_epsg = -1
+    if input1_info.crs is not None:
+        crs_epsg1 = input1_info.crs.to_epsg()
+        if crs_epsg1 is not None:
+            crs_epsg = crs_epsg1
+        # If input 2 also has a crs, check if it is the same.
+        if (
+            input2_info is not None
+            and input2_info.crs is not None
+            and crs_epsg1 != input2_info.crs.to_epsg()
+        ):
+            warnings.warn(
+                "input1 layer doesn't have the same crs as input2 layer: "
+                f"{input1_info.crs} vs {input2_info.crs}",
+                stacklevel=5,
+            )
+    elif input2_info is not None and input2_info.crs is not None:
+        crs_epsg2 = input2_info.crs.to_epsg()
+        if crs_epsg2 is not None:
+            crs_epsg = crs_epsg2
+
+    return crs_epsg
+
+
+def _calculate_two_layers(
+    input_databases: dict[str, Path],
     output_path: Path,
     sql_stmt: str,
     output_layer: str,
     explodecollections: bool,
     force_output_geometrytype: Optional[GeometryType],
+    output_crs: int,
     create_spatial_index: bool,
     column_datatypes: dict,
     use_ogr: bool,
 ):
-    if use_ogr is False:
+    if not use_ogr:
         # If explodecollections, write first to tmp file, then apply explodecollections
         # to the final output file.
         output_tmp_path = output_path
         if explodecollections:
             output_name = f"{output_path.stem}_tmp{output_path.suffix}"
             output_tmp_path = output_path.parent / output_name
+
         _sqlite_util.create_table_as_sql(
-            input1_path=input1_path,
-            input1_layer=input1_layer,
-            input2_path=input2_path,
-            input2_layer=input2_layer,
+            input_databases=input_databases,
             output_path=output_tmp_path,
             sql_stmt=sql_stmt,
             output_layer=output_layer,
             output_geometrytype=force_output_geometrytype,
+            output_crs=output_crs,
             create_spatial_index=create_spatial_index,
             profile=_sqlite_util.SqliteProfile.SPEED,
             column_datatypes=column_datatypes,
         )
+
         if explodecollections:
             _ogr_util.vector_translate(
                 input_path=output_tmp_path,
@@ -3057,15 +3257,12 @@ def calculate_two_layers(
             gfo.remove(output_tmp_path)
     else:
         # Use ogr to run the query
-        #   * input2 path (= using attach) doesn't seem to work
-        #   * ogr doesn't fill out database names, so do it now
-        sql_stmt = sql_stmt.format(
-            input1_databasename="main",
-            input2_databasename="main",
-        )
+        #   * input2 path (= using attach) doesn't seem to work at time of writing
+        if len(input_databases) != 1:
+            raise ValueError("use_ogr=True only supports one input file")
 
         _ogr_util.vector_translate(
-            input_path=input1_path,
+            input_path=next(iter(input_databases.values())),
             output_path=output_path,
             sql_stmt=sql_stmt,
             output_layer=output_layer,
@@ -3078,18 +3275,10 @@ def calculate_two_layers(
 class ProcessingParams:
     def __init__(
         self,
-        input1_path: Path,
-        input1_layer: str,
-        input2_path: Optional[Path],
-        input2_layer: Optional[str],
         nb_parallel: int,
         batches: dict,
         batchsize: int,
     ):
-        self.input1_path = input1_path
-        self.input1_layer = input1_layer
-        self.input2_path = input2_path
-        self.input2_layer = input2_layer
         self.nb_parallel = nb_parallel
         self.batches = batches
         self.batchsize = batchsize
@@ -3100,94 +3289,105 @@ class ProcessingParams:
             file.write(json.dumps(prepared, indent=4, sort_keys=True))
 
 
+def _convert_to_spatialite_based(
+    input1_path: Path,
+    input1_layer: str,
+    tempdir: Path,
+    input2_path: Optional[Path] = None,
+    input2_layer: Optional[str] = None,
+) -> tuple[Path, str, Optional[Path], Optional[str]]:
+    """Prepare input files for the calculation.
+
+    The input files should be spatialite based, and should be of the same type: either
+    both GPKG, or both SQLite.
+    """
+    input1_info = _geofileinfo.get_geofileinfo(input1_path)
+    input2_info = (
+        None if input2_path is None else _geofileinfo.get_geofileinfo(input2_path)
+    )
+
+    # If input1 is spatialite based and compatible with input2, no conversion.
+    if input1_info.is_spatialite_based and (
+        input1_info.driver == "GPKG"
+        or input2_info is None
+        or input2_info.driver == input2_info.driver
+    ):
+        if input1_info.driver == "GPKG":
+            # HasSpatialindex doesn't work for spatialite files.
+            gfo.create_spatial_index(
+                input1_path, input1_layer, exist_ok=True, no_geom_ok=True
+            )
+    else:
+        # input1 is not spatialite compatible, so convert it.
+        # If input2 is "Sqlite", convert input1 to SQLite as well.
+        suffix = ".gpkg"
+        if input2_info is not None and input2_info.driver == "SQLite":
+            suffix = ".sqlite"
+        input1_tmp_path = tempdir / f"{input1_path.stem}{suffix}"
+        gfo.copy_layer(
+            src=input1_path,
+            src_layer=input1_layer,
+            dst=input1_tmp_path,
+            dst_layer=input1_layer,
+            preserve_fid=True,
+        )
+        input1_path = input1_tmp_path
+        input1_info = _geofileinfo.get_geofileinfo(input1_path)
+        if input1_info.driver == "SQLite":
+            # In sqlite, the layer name is sometimes changed...
+            input1_layer = gfo.get_only_layer(input1_path)
+
+    # If input2 is spatialite_based and compatible with input1, no conversion.
+    if input2_path is not None and input2_info is not None:
+        if input2_info.is_spatialite_based and input2_info.driver == input1_info.driver:
+            if input2_info.driver == "GPKG":
+                # HasSpatialindex doesn't work for spatialite files.
+                gfo.create_spatial_index(
+                    input2_path, input2_layer, exist_ok=True, no_geom_ok=True
+                )
+        else:
+            # input2 is not spatialite compatible, so convert it.
+            # If input1 is "Sqlite", convert input2 to SQLite as well.
+            suffix = ".gpkg"
+            if input1_info is not None and input1_info.driver == "SQLite":
+                suffix = ".sqlite"
+            input2_tmp_path = tempdir / f"{input2_path.stem}{suffix}"
+
+            # Make sure the copy is taken to a separate file.
+            if input2_tmp_path.exists():
+                input2_tmp_path = tempdir / f"{input2_path.stem}2{suffix}"
+            gfo.copy_layer(
+                src=input2_path,
+                src_layer=input2_layer,
+                dst=input2_tmp_path,
+                dst_layer=input2_layer,
+                preserve_fid=True,
+            )
+            input2_path = input2_tmp_path
+            input2_info = _geofileinfo.get_geofileinfo(input2_path)
+            if input2_info.driver == "SQLite":
+                # In sqlite, the layer name is sometimes changed...
+                input2_layer = gfo.get_only_layer(input2_path)
+
+    return input1_path, input1_layer, input2_path, input2_layer
+
+
 def _prepare_processing_params(
     input1_path: Path,
     input1_layer: str,
     tempdir: Path,
-    convert_to_spatialite_based: bool,
     nb_parallel: int,
     batchsize: int = -1,
     input1_layer_alias: Optional[str] = None,
+    filter_column: str = "rowid",
+    input1_subdivided_path: Optional[Path] = None,
     input2_path: Optional[Path] = None,
     input2_layer: Optional[str] = None,
 ) -> Optional[ProcessingParams]:
-    # Prepare input files for the calculation
-    if convert_to_spatialite_based:
-        # The input files should be spatialite based, and should be of the same type:
-        # either both GPKG, or both SQLite.
-        input1_info = _geofileinfo.get_geofileinfo(input1_path)
-        input2_info = (
-            None if input2_path is None else _geofileinfo.get_geofileinfo(input2_path)
-        )
-
-        # If input1 is spatialite based and compatible with input2, no conversion.
-        if input1_info.is_spatialite_based and (
-            input1_info.driver == "GPKG"
-            or input2_info is None
-            or input2_info.driver == input2_info.driver
-        ):
-            if input1_info.driver == "GPKG":
-                # HasSpatialindex doesn't work for spatialite files.
-                gfo.create_spatial_index(
-                    input1_path, input1_layer, exist_ok=True, no_geom_ok=True
-                )
-        else:
-            # input1 is not spatialite compatible, so convert it.
-            # If input2 is "Sqlite", convert input1 to SQLite as well.
-            suffix = ".gpkg"
-            if input2_info is not None and input2_info.driver == "SQLite":
-                suffix = ".sqlite"
-            input1_tmp_path = tempdir / f"{input1_path.stem}{suffix}"
-            gfo.copy_layer(
-                src=input1_path,
-                src_layer=input1_layer,
-                dst=input1_tmp_path,
-                dst_layer=input1_layer,
-                preserve_fid=True,
-            )
-            input1_path = input1_tmp_path
-            input1_info = _geofileinfo.get_geofileinfo(input1_path)
-            if input1_info.driver == "SQLite":
-                # In sqlite, the layer name is sometimes changed...
-                input1_layer = gfo.get_only_layer(input1_path)
-
-        # If input2 is spatialite_based and compatible with input1, no conversion.
-        if input2_path is not None and input2_info is not None:
-            if (
-                input2_info.is_spatialite_based
-                and input2_info.driver == input1_info.driver
-            ):
-                if input2_info.driver == "GPKG":
-                    # HasSpatialindex doesn't work for spatialite files.
-                    gfo.create_spatial_index(
-                        input2_path, input2_layer, exist_ok=True, no_geom_ok=True
-                    )
-            else:
-                # input2 is not spatialite compatible, so convert it.
-                # If input1 is "Sqlite", convert input2 to SQLite as well.
-                suffix = ".gpkg"
-                if input1_info is not None and input1_info.driver == "SQLite":
-                    suffix = ".sqlite"
-                input2_tmp_path = tempdir / f"{input2_path.stem}{suffix}"
-
-                # Make sure the copy is taken to a separate file.
-                if input2_tmp_path.exists():
-                    input2_tmp_path = tempdir / f"{input2_path.stem}2{suffix}"
-                gfo.copy_layer(
-                    src=input2_path,
-                    src_layer=input2_layer,
-                    dst=input2_tmp_path,
-                    dst_layer=input2_layer,
-                    preserve_fid=True,
-                )
-                input2_path = input2_tmp_path
-                input2_info = _geofileinfo.get_geofileinfo(input2_path)
-                if input2_info.driver == "SQLite":
-                    # In sqlite, the layer name is sometimes changed...
-                    input2_layer = gfo.get_only_layer(input2_path)
-
     # Prepare batches to process
-    layer1_info = gfo.get_layerinfo(input1_path, input1_layer, raise_on_nogeom=False)
+    layer1_info = gfo.get_layerinfo(
+        input1_subdivided_path or input1_path, input1_layer, raise_on_nogeom=False
+    )
     nb_rows_input_layer = layer1_info.featurecount
 
     # Determine optimal number of batches
@@ -3208,96 +3408,101 @@ def _prepare_processing_params(
         batches[0]["input2_path"] = input2_path
         batches[0]["input2_layer"] = input2_layer
         batches[0]["batch_filter"] = ""
-    else:
-        # Determine the min_rowid and max_rowid
-        # Remark: SELECT MIN(rowid), MAX(rowid) FROM ... is a lot slower than UNION ALL!
-        sql_stmt = f"""
-            SELECT MIN(rowid) minmax_rowid FROM "{layer1_info.name}"
-            UNION ALL
-            SELECT MAX(rowid) minmax_rowid FROM "{layer1_info.name}"
-        """
-        batch_info_df = gfo.read_file(
-            path=input1_path, sql_stmt=sql_stmt, sql_dialect="SQLITE"
-        )
-        min_rowid = pd.to_numeric(batch_info_df["minmax_rowid"][0]).item()
-        max_rowid = pd.to_numeric(batch_info_df["minmax_rowid"][1]).item()
 
-        # Determine the exact batches to use
-        if ((max_rowid - min_rowid) / nb_rows_input_layer) < 1.1:
-            # If the rowid's are quite consecutive, use an imperfect, but
-            # fast distribution in batches
-            batch_info_list = []
-            nb_rows_per_batch = round(nb_rows_input_layer / nb_batches)
-            start_rowid = min_rowid
-            offset_per_batch = round((max_rowid - min_rowid) / nb_batches)
-            for batch_id in range(nb_batches):
-                if batch_id < (nb_batches - 1):
-                    # End rowid for this batch is the next start_rowid - 1
-                    end_rowid = start_rowid + offset_per_batch - 1
-                else:
-                    # For the last batch, take the max_rowid so no rowid's are
-                    # 'lost' due to rounding errors
-                    end_rowid = max_rowid
-                batch_info_list.append(
-                    (batch_id, nb_rows_per_batch, start_rowid, end_rowid)
-                )
-                start_rowid += offset_per_batch
-            batch_info_df = pd.DataFrame(
-                batch_info_list, columns=["id", "nb_rows", "start_rowid", "end_rowid"]
-            )
-        else:
-            # The rowids are not consecutive, so determine the optimal rowid
-            # ranges for each batch so each batch has same number of elements
-            # Remark: - this might take some seconds for larger datasets!
-            #         - (batch_id - 1) AS id to make the id zero-based
+    else:
+        if input1_subdivided_path is not None:
+            # input1 is subdivided, so determine batches based on the fid_1
+            nb_rows_per_batch = round(nb_rows_input_layer / (nb_batches))
+            # Remark: ROW_NUMBER() is one-based!
             sql_stmt = f"""
-                SELECT (batch_id - 1) AS id
-                      ,COUNT(*) AS nb_rows
-                      ,MIN(rowid) AS start_rowid
-                      ,MAX(rowid) AS end_rowid
-                  FROM
-                    ( SELECT rowid
-                            ,NTILE({nb_batches}) OVER (ORDER BY rowid) batch_id
-                        FROM "{layer1_info.name}"
+                SELECT DISTINCT fid_1 AS start_id FROM (
+                    SELECT ROW_NUMBER() OVER (ORDER BY fid_1) AS rownumber, *
+                      FROM "{layer1_info.name}"
                     )
-                 GROUP BY batch_id;
+                 WHERE (rownumber = 1 OR rownumber % {nb_rows_per_batch} = 0)
             """
-            batch_info_df = gfo.read_file(path=input1_path, sql_stmt=sql_stmt)
+            batch_info_df = gfo.read_file(
+                path=input1_subdivided_path, sql_stmt=sql_stmt, sql_dialect="SQLITE"
+            )
+
+            batch_info_df.reset_index(names=["batch_id"], inplace=True)
+            nb_batches = len(batch_info_df)
+
+        else:
+            # Determine the min_rowid and max_rowid
+            # Remark: SELECT MIN(rowid), MAX(rowid) ... is a lot slower than UNION ALL!
+            sql_stmt = f"""
+                SELECT MIN(rowid) minmax_rowid FROM "{layer1_info.name}"
+                UNION ALL
+                SELECT MAX(rowid) minmax_rowid FROM "{layer1_info.name}"
+            """
+            batch_info_df = gfo.read_file(
+                path=input1_path, sql_stmt=sql_stmt, sql_dialect="SQLITE"
+            )
+            min_rowid = pd.to_numeric(batch_info_df["minmax_rowid"][0]).item()
+            max_rowid = pd.to_numeric(batch_info_df["minmax_rowid"][1]).item()
+
+            # Determine the exact batches to use
+            if ((max_rowid - min_rowid) / nb_rows_input_layer) < 1.1:
+                # If the rowid's are quite consecutive, use an imperfect, but
+                # fast distribution in batches
+                batch_info_list = []
+                start_id = min_rowid
+                offset_per_batch = round((max_rowid - min_rowid) / nb_batches)
+                for batch_id in range(nb_batches):
+                    batch_info_list.append((batch_id, start_id))
+                    start_id += offset_per_batch
+
+                batch_info_df = pd.DataFrame(
+                    batch_info_list, columns=["batch_id", "start_id"]
+                )
+            else:
+                # The rowids are not consecutive, so determine the optimal rowid
+                # ranges for each batch so each batch has same number of elements
+                # Remark: - this might take some seconds for larger datasets!
+                #         - (batch_id - 1) AS id to make the id zero-based
+                sql_stmt = f"""
+                    SELECT (batch_id - 1) AS batch_id
+                        ,MIN(rowid) AS start_id
+                    FROM
+                        ( SELECT rowid
+                                ,NTILE({nb_batches}) OVER (ORDER BY rowid) batch_id
+                            FROM "{layer1_info.name}"
+                        )
+                    GROUP BY batch_id;
+                """
+                batch_info_df = gfo.read_file(path=input1_path, sql_stmt=sql_stmt)
 
         # Prepare the layer alias to use in the batch filter
         layer_alias_d = ""
         if input1_layer_alias is not None:
             layer_alias_d = f"{input1_layer_alias}."
 
-        # Now loop over all batch ranges to build up the necessary filters
-        for batch_info in batch_info_df.itertuples():
-            # Fill out the batch properties
-            batches[batch_info.id] = {}
-            batches[batch_info.id]["input1_path"] = input1_path
-            batches[batch_info.id]["input1_layer"] = input1_layer
-            batches[batch_info.id]["input2_path"] = input2_path
-            batches[batch_info.id]["input2_layer"] = input2_layer
+        # The end_id is the start_id of the next batch - 1
+        batch_info_df["end_id"] = batch_info_df["start_id"].shift(-1) - 1
 
+        # Now loop over all batch ranges to build up the necessary filters
+        for batch_id, start_id, end_id in batch_info_df.itertuples(index=False):
             # The batch filter
-            if batch_info.id < nb_batches - 1:
-                batches[batch_info.id]["batch_filter"] = (
-                    f"AND ({layer_alias_d}rowid >= {batch_info.start_rowid} "
-                    f"AND {layer_alias_d}rowid <= {batch_info.end_rowid}) "
-                )
-            else:
-                batches[batch_info.id]["batch_filter"] = (
-                    f"AND {layer_alias_d}rowid >= {batch_info.start_rowid} "
-                )
+            batch_filter = f"{layer_alias_d}{filter_column} >= {int(start_id)}"
+            if not np.isnan(end_id).item():
+                # There is an end_id specified, so add it to the filter
+                batch_filter += f" AND {layer_alias_d}{filter_column} <= {int(end_id)}"
+            batch_filter = f"AND ({batch_filter}) "
+
+            # Fill out the batch properties
+            batches[batch_id] = {
+                "input1_path": input1_path,
+                "input1_layer": input1_layer,
+                "input2_path": input2_path,
+                "input2_layer": input2_layer,
+                "batch_filter": batch_filter,
+            }
 
     # No use starting more processes than the number of batches...
-    if len(batches) < nb_parallel:
-        nb_parallel = len(batches)
+    nb_parallel = min(len(batches), nb_parallel)
 
     returnvalue = ProcessingParams(
-        input1_path=input1_path,
-        input1_layer=input1_layer,
-        input2_path=input2_path,
-        input2_layer=input2_layer,
         nb_parallel=nb_parallel,
         batches=batches,
         batchsize=int(nb_rows_input_layer / len(batches)),
@@ -3384,11 +3589,9 @@ def _determine_nb_batches(
         nb_batches = 1
 
     # If more batches than rows, limit nb batches
-    if nb_batches > nb_rows_input_layer:
-        nb_batches = nb_rows_input_layer
+    nb_batches = min(nb_batches, nb_rows_input_layer)
     # If more parallel than number of batches, limit nb_parallel
-    if nb_parallel > nb_batches:
-        nb_parallel = nb_batches
+    nb_parallel = min(nb_parallel, nb_batches)
 
     return (nb_parallel, nb_batches)
 

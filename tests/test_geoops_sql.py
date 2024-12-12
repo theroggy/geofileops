@@ -66,7 +66,7 @@ def test_determine_nb_batches(
         (".sqlite", ".sqlite", ".sqlite", ".sqlite"),
     ],
 )
-def test_prepare_processing_params_filetypes(
+def test_convert_to_spatialite_based(
     tmp_path, input1_suffix, input2_suffix, output1_suffix, output2_suffix
 ):
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=input1_suffix)
@@ -77,38 +77,37 @@ def test_prepare_processing_params_filetypes(
         input2_path = test_helper.get_testfile("polygon-parcel", suffix=input2_suffix)
         input2_layer = gfo.get_only_layer(input2_path)
 
-    params = _geoops_sql._prepare_processing_params(
-        input1_path=input1_path,
-        input1_layer=input1_layer,
-        input2_path=input2_path,
-        input2_layer=input2_layer,
-        tempdir=tmp_path,
-        convert_to_spatialite_based=True,
-        nb_parallel=2,
+    input1_out_path, input1_out_layer, input2_out_path, input2_out_layer = (
+        _geoops_sql._convert_to_spatialite_based(  # type: ignore[assignment]
+            input1_path=input1_path,
+            input1_layer=input1_layer,
+            tempdir=tmp_path,
+            input2_path=input2_path,
+            input2_layer=input2_layer,
+        )
     )
 
-    assert params is not None
-    assert params.input1_path.suffix == output1_suffix
-    assert params.input1_path.exists()
-    assert params.input1_layer in gfo.listlayers(params.input1_path)
+    assert input1_out_path.suffix == output1_suffix
+    assert input1_out_path.exists()
+    assert input1_out_layer in gfo.listlayers(input1_out_path)
 
     # If the file format hasn't changed, the file should not be copied
-    if input1_path.suffix == params.input1_path.suffix:
-        assert input1_path == params.input1_path
+    if input1_path.suffix == input1_out_path.suffix:
+        assert input1_path == input1_out_path
 
     if input2_suffix is not None:
-        assert params.input2_path.exists()
-        assert params.input2_layer in gfo.listlayers(params.input2_path)
-        assert params.input2_path.suffix == output2_suffix
+        assert input2_out_path.exists()
+        assert input2_out_layer in gfo.listlayers(input2_out_path)
+        assert input2_out_path.suffix == output2_suffix
         # If the file format hasn't changed, the file should not be copied
-        if input2_path.suffix == params.input2_path.suffix:
-            assert input2_path == params.input2_path
+        if input2_out_path.suffix == input2_path.suffix:
+            assert input2_out_path == input2_path
         # If both input files were copied, they should have been copied to seperate
         # files
-        if params.input1_path.parent == tmp_path and input2_suffix is not None:
-            assert params.input1_path != params.input2_path
+        if input1_out_path.parent == tmp_path and input2_suffix is not None:
+            assert input1_out_path != input2_out_path
     else:
-        assert params.input2_path is None
+        assert input2_out_path is None
 
 
 @pytest.mark.parametrize(
@@ -124,9 +123,9 @@ def test_subdivide_layer(desc, tmp_path, testfile, subdivide_coords, retval_None
     result = _geoops_sql._subdivide_layer(
         path=path,
         layer=None,
-        output_dir=tmp_path,
+        output_path=tmp_path,
         subdivide_coords=subdivide_coords,
-        overlay_self=False,
+        keep_fid=False,
     )
 
     if retval_None:

@@ -11,7 +11,7 @@ Geofileops is a python toolbox to process large vector files faster.
 Most typical GIS operations are available: e.g.
 [buffer](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.buffer), 
 [dissolve](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.dissolve),
-[erase](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.erase)/difference, 
+[difference](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.difference), 
 [intersection](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.intersection), 
 [union](https://geofileops.readthedocs.io/en/stable/api/geofileops.apply.html#geofileops.union),... 
 

@@ -1150,10 +1150,17 @@ def test_rename_layer(tmp_path):
     test_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
     gfo.add_layerstyle(test_path, layer="parcels", name="stylename", qml="")
 
+    # Rename
     gfo.rename_layer(test_path, new_layer="parcels_renamed")
     layernames_renamed = gfo.listlayers(path=test_path)
     assert layernames_renamed[0] == "parcels_renamed"
     assert len(gfo.get_layerstyles(test_path, layer="parcels_renamed")) == 1
+
+    # # Rename layer with different casing
+    gfo.rename_layer(test_path, new_layer="PARCELS_RENAMED")
+    layernames_renamed = gfo.listlayers(path=test_path)
+    assert layernames_renamed[0] == "PARCELS_RENAMED"
+    assert len(gfo.get_layerstyles(test_path, layer="PARCELS_RENAMED")) == 1
 
 
 def test_rename_layer_unsupported(tmp_path):

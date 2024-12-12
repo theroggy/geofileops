@@ -16,6 +16,7 @@ Geometry tools
    :toctree: api/
 
    apply
+   apply_vectorized
    buffer
    clip_by_geometry
    convexhull
@@ -38,7 +39,7 @@ Spatial overlays and joins
    :toctree: api/
 
    clip
-   erase
+   difference
    export_by_distance
    export_by_location
    intersection

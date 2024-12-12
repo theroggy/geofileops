@@ -28,7 +28,7 @@ setuptools.setup(
         "geopandas>=0.12,<1.1",
         "numpy",
         "packaging",
-        "pandas",
+        "pandas>=1.5",
         "psutil",
         "pygeoops>=0.4,<0.5",
         "pyogrio",

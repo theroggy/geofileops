@@ -12,7 +12,7 @@ dependencies:
   - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
   - numpy =1.22  # released 2021-12-31
   - packaging
-  - pandas =1.4  # released 2022-01-28
+  - pandas =1.5  # released 2022-09-19
   - psutil
   - pygeoops =0.4  # released 2023-11-24
   - pyogrio =0.7  # 0.7.0 released 2023-10-25

@@ -107,7 +107,7 @@ Spatial overlays
 ----------------
 
 The standard :ref:`spatial overlays <reference-spatial-overlays-joins>` are
-available: :meth:`~intersection`, :meth:`~erase`, :meth:`~clip`, :meth:`~identity`,
+available: :meth:`~intersection`, :meth:`~difference`, :meth:`~clip`, :meth:`~identity`,
 :meth:`~union`, ...
 
 An example:
