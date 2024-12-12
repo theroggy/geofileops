@@ -898,7 +898,7 @@ def clip(
     primitivetypeid = input_layer_info.geometrytype.to_primitivetype.value
 
     # If explodecollections is False and the input type is not point, force the output
-    # type to multi, because erase clip cause eg. polygons to be split to multipolygons.
+    # type to multi, because clip can cause eg. polygons to be split to multipolygons.
     force_output_geometrytype = input_layer_info.geometrytype
     if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
         force_output_geometrytype = force_output_geometrytype.to_multitype
@@ -979,14 +979,14 @@ def clip(
     )
 
 
-def erase(
-    input_path: Path,
-    erase_path: Path,
+def difference(
+    input1_path: Path,
+    input2_path: Path,
     output_path: Path,
     overlay_self: bool,
     input_layer: Optional[str] = None,
-    input_columns: Optional[list[str]] = None,
-    erase_layer: Optional[str] = None,
+    input1_columns: Optional[list[str]] = None,
+    input2_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
@@ -999,25 +999,25 @@ def erase(
     output_with_spatial_index: Optional[bool] = None,
     operation_prefix: str = "",
 ):
-    # Because there might be extra preparation of the erase layer before going ahead
+    # Because there might be extra preparation of the input2 layer before going ahead
     # with the real calculation, do some additional init + checks here...
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
 
-    operation_name = f"{operation_prefix}erase"
+    operation_name = f"{operation_prefix}difference"
     logger = logging.getLogger(f"geofileops.{operation_name}")
 
     # Get layer names
     if input_layer is None:
-        input_layer = gfo.get_only_layer(input_path)
-    if erase_layer is None:
-        erase_layer = gfo.get_only_layer(erase_path)
+        input_layer = gfo.get_only_layer(input1_path)
+    if input2_layer is None:
+        input2_layer = gfo.get_only_layer(input2_path)
 
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
 
     start_time = datetime.now()
-    input_layer_info = gfo.get_layerinfo(input_path, input_layer)
+    input_layer_info = gfo.get_layerinfo(input1_path, input_layer)
     primitivetypeid = input_layer_info.geometrytype.to_primitivetype.value
 
     force_output_geometrytype = input_layer_info.geometrytype
@@ -1025,7 +1025,7 @@ def erase(
         force_output_geometrytype = force_output_geometrytype.to_singletype
     elif force_output_geometrytype is not GeometryType.POINT:
         # If explodecollections is False and the input type is not point, force the
-        # output type to multi, because erase can cause eg. polygons to be split to
+        # output type to multi, because difference can cause eg. polygons to be split to
         # multipolygons.
         force_output_geometrytype = force_output_geometrytype.to_multitype
 
@@ -1033,8 +1033,8 @@ def erase(
     # Save the original fid column in a new fid_1 column, we will need it to filter on
     # it later on.
     tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-    input_subdivided_path = _subdivide_layer(
-        path=input_path,
+    input1_subdivided_path = _subdivide_layer(
+        path=input1_path,
         layer=input_layer,
         output_path=tempdir / "subdivided/input_layer.gpkg",
         subdivide_coords=subdivide_coords,
@@ -1047,22 +1047,22 @@ def erase(
     where_clause_self = "1=1"
     if overlay_self:
         # If we are doing a self overlay, we need to filter out rows with the same rowid
-        if input_subdivided_path is None:
+        if input1_subdivided_path is None:
             where_clause_self = "layer1.rowid <> layer2_sub.rowid"
         else:
             # Filter out the same rowids using the original fids!
             where_clause_self = "layer1_subdiv.fid_1 <> layer2_sub.fid_1"
 
         # For overlay self, both subdivided layers are equal
-        erase_subdivided_path = input_subdivided_path
+        input2_subdivided_path = input1_subdivided_path
 
     else:
-        # Subdivide the erase layer if needed to speed up further processing.
-        # No self overlay, so we don't need the original fid column for the erase layer.
-        erase_subdivided_path = _subdivide_layer(
-            path=erase_path,
-            layer=erase_layer,
-            output_path=tempdir / "subdivided/erase_layer.gpkg",
+        # Subdivide the input2 layer if needed to speed up further processing.
+        # No self overlay, so no original fid column for the input2 layer needed.
+        input2_subdivided_path = _subdivide_layer(
+            path=input2_path,
+            layer=input2_layer,
+            output_path=tempdir / "subdivided/input2_layer.gpkg",
             subdivide_coords=subdivide_coords,
             keep_fid=False,
             nb_parallel=nb_parallel,
@@ -1070,9 +1070,9 @@ def erase(
             operation_prefix=f"{operation_name}/",
         )
 
-    # If the erase layer was subdivided
-    if erase_subdivided_path is not None:
-        erase_path = erase_subdivided_path
+    # If the input2 layer was subdivided
+    if input2_subdivided_path is not None:
+        input2_path = input2_subdivided_path
 
     # Prepare sql template for this operation
     # - WHERE geom IS NOT NULL to avoid rows with a NULL geom, they give issues in
@@ -1096,7 +1096,7 @@ def erase(
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
     input1_subdiv_layer_rtree = "rtree_{input1_layer}_{input1_subdiv_geometrycolumn}"
 
-    if input_subdivided_path is None:
+    if input1_subdivided_path is None:
         # The input layer was not subdivided
         sql_template = f"""
             SELECT * FROM (
@@ -1197,16 +1197,16 @@ def erase(
 
     # Go!
     _two_layer_vector_operation(
-        input1_path=input_path,
-        input1_subdivided_path=input_subdivided_path,
-        input2_path=erase_path,
+        input1_path=input1_path,
+        input1_subdivided_path=input1_subdivided_path,
+        input2_path=input2_path,
         output_path=output_path,
         sql_template=sql_template,
         operation_name=operation_name,
         input1_layer=input_layer,
-        input1_columns=input_columns,
+        input1_columns=input1_columns,
         input1_columns_prefix=input_columns_prefix,
-        input2_layer=erase_layer,
+        input2_layer=input2_layer,
         input2_columns=[],
         input2_columns_prefix="",
         output_layer=output_layer,
@@ -1222,7 +1222,7 @@ def erase(
     )
 
     # Print time taken
-    logger.info(f"Ready, full erase took {datetime.now()-start_time}")
+    logger.info(f"Ready, full difference took {datetime.now()-start_time}")
 
 
 def _subdivide_layer(
@@ -1382,7 +1382,7 @@ def export_by_location(
     subdivide_coords: int = 10000,
     force: bool = False,
 ):
-    # Because there might be extra preparation of the erase layer before going ahead
+    # Because there might be extra preparation of the 2nd layer before going ahead
     # with the real calculation, do some additional init + checks here...
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
@@ -1409,7 +1409,7 @@ def export_by_location(
         true_for_disjoint,
     ) = _prepare_filter_by_location_fields(spatial_relations_query)
 
-    # Subdivide the erase layer if applicable to speed up further processing.
+    # Subdivide the 2nd layer if applicable to speed up further processing.
     tmp_dir = _io_util.create_tempdir(f"geofileops/{operation_name}")
     input_to_compare_with_subdivided_path = _subdivide_layer(
         path=input_to_compare_with_path,
@@ -2265,7 +2265,7 @@ def identity(
     force: bool = False,
 ):
     # An identity is the combination of the results of an "intersection" of input1 and
-    # input2 and an erase of input2 with input1.
+    # input2 and an difference of input2 with input1.
 
     # Because the calculations of the intermediate results will be towards temp files,
     # we need to do some additional init + checks here...
@@ -2306,18 +2306,18 @@ def identity(
             operation_prefix="identity/",
         )
 
-        # Now erase input1 from input2 to another temporary output gfo...
-        logger.info("Step 2 of 3: erase")
-        erase_output_path = tempdir / "erase_output.gpkg"
-        erase(
-            input_path=input1_path,
-            erase_path=input2_path,
-            output_path=erase_output_path,
+        # Now difference input1 from input2 to another temporary output gfo...
+        logger.info("Step 2 of 3: difference")
+        difference_output_path = tempdir / "difference_output.gpkg"
+        difference(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=difference_output_path,
             overlay_self=overlay_self,
             input_layer=input1_layer,
-            input_columns=input1_columns,
+            input1_columns=input1_columns,
             input_columns_prefix=input1_columns_prefix,
-            erase_layer=input2_layer,
+            input2_layer=input2_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2334,7 +2334,7 @@ def identity(
         logger.info("Step 3 of 3: finalize")
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
-            src=erase_output_path,
+            src=difference_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
@@ -2379,11 +2379,11 @@ def symmetric_difference(
     subdivide_coords: int = 2000,
     force: bool = False,
 ):
-    # A symmetric difference can be simulated by doing an "erase" of input1
-    # and input2 and then append the result of an erase of input2 with
+    # A symmetric difference can be simulated by doing an difference of input1
+    # and input2 and then append the result of an difference of input2 with
     # input1...
 
-    # Because both erase calculations will be towards temp files,
+    # Because both difference calculations will be towards temp files,
     # we need to do some additional init + checks here...
     if subdivide_coords < 0:
         raise ValueError("subdivide_coords < 0 is not allowed")
@@ -2401,18 +2401,18 @@ def symmetric_difference(
 
     tempdir = _io_util.create_tempdir("geofileops/symmdiff")
     try:
-        # First erase input2 from input1 to a temporary output file
-        logger.info("Step 1 of 3: erase 1")
-        erase1_output_path = tempdir / "layer1_erase_layer2_output.gpkg"
-        erase(
-            input_path=input1_path,
-            erase_path=input2_path,
-            output_path=erase1_output_path,
+        # First difference input2 from input1 to a temporary output file
+        logger.info("Step 1 of 3: difference 1")
+        diff1_output_path = tempdir / "layer1_diff_layer2_output.gpkg"
+        difference(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=diff1_output_path,
             overlay_self=overlay_self,
             input_layer=input1_layer,
-            input_columns=input1_columns,
+            input1_columns=input1_columns,
             input_columns_prefix=input1_columns_prefix,
-            erase_layer=input2_layer,
+            input2_layer=input2_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2432,23 +2432,23 @@ def symmetric_difference(
             )
             for column in columns_to_add:
                 gfo.add_column(
-                    erase1_output_path,
+                    diff1_output_path,
                     name=f"{input2_columns_prefix}{column}",
                     type=input2_info.columns[column].gdal_type,
                 )
 
-        # Now erase input1 from input2 to another temporary output file
-        logger.info("Step 2 of 3: erase 2")
-        erase2_output_path = tempdir / "layer2_erase_layer1_output.gpkg"
-        erase(
-            input_path=input2_path,
-            erase_path=input1_path,
-            output_path=erase2_output_path,
+        # Now difference input1 from input2 to another temporary output file
+        logger.info("Step 2 of 3: difference 2")
+        diff2_output_path = tempdir / "layer2_diff_layer1_output.gpkg"
+        difference(
+            input1_path=input2_path,
+            input2_path=input1_path,
+            output_path=diff2_output_path,
             overlay_self=overlay_self,
             input_layer=input2_layer,
-            input_columns=input2_columns,
+            input1_columns=input2_columns,
             input_columns_prefix=input2_columns_prefix,
-            erase_layer=input1_layer,
+            input2_layer=input1_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2465,18 +2465,18 @@ def symmetric_difference(
         logger.info("Step 3 of 3: finalize")
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
-            src=erase2_output_path,
-            dst=erase1_output_path,
+            src=diff2_output_path,
+            dst=diff1_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
         )
 
         # Convert or add spatial index
-        tmp_output_path = erase1_output_path
-        if erase1_output_path.suffix != output_path.suffix:
+        tmp_output_path = diff1_output_path
+        if diff1_output_path.suffix != output_path.suffix:
             # Output file should be in diffent format, so convert
             tmp_output_path = tempdir / output_path.name
-            gfo.copy_layer(src=erase1_output_path, dst=tmp_output_path)
+            gfo.copy_layer(src=diff1_output_path, dst=tmp_output_path)
         elif GeofileInfo(tmp_output_path).default_spatial_index:
             gfo.create_spatial_index(path=tmp_output_path, layer=output_layer)
 
@@ -2511,7 +2511,8 @@ def union(
     force: bool = False,
 ):
     # A union is the combination of the results of an intersection of input1 and input2,
-    # the result of an erase of input2 with input1 and the erase of input1 with input2.
+    # the result of an difference of input2 with input1 and the difference of input1
+    # with input2.
 
     # Because the calculations of the intermediate results will be towards temp files,
     # we need to do some additional init + checks here...
@@ -2554,18 +2555,18 @@ def union(
             operation_prefix="union/",
         )
 
-        # Erase input1 from input2 to another temporary output gfo.
-        logger.info("Step 2 of 4: erase input 1 from input 2")
-        erase1_output_path = tempdir / "erase_input1_from_input2_output.gpkg"
-        erase(
-            input_path=input2_path,
-            erase_path=input1_path,
-            output_path=erase1_output_path,
+        # Difference input1 from input2 to another temporary output gfo.
+        logger.info("Step 2 of 4: difference of input 1 from input 2")
+        diff1_output_path = tempdir / "diff_input1_from_input2_output.gpkg"
+        difference(
+            input1_path=input2_path,
+            input2_path=input1_path,
+            output_path=diff1_output_path,
             overlay_self=overlay_self,
             input_layer=input2_layer,
-            input_columns=input2_columns,
+            input1_columns=input2_columns,
             input_columns_prefix=input2_columns_prefix,
-            erase_layer=input1_layer,
+            input2_layer=input1_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2579,26 +2580,26 @@ def union(
         )
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
-            src=erase1_output_path,
+            src=diff1_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
         )
-        gfo.remove(erase1_output_path)
+        gfo.remove(diff1_output_path)
 
-        # Erase input1 from input2 to and add to temporary output file.
-        logger.info("Step 3 of 4: erase input 2 from input 1")
-        erase2_output_path = tempdir / "erase_input2_from_input1_output.gpkg"
+        # Difference input1 from input2 to and add to temporary output file.
+        logger.info("Step 3 of 4: difference input 2 from input 1")
+        diff2_output_path = tempdir / "diff_input2_from_input1_output.gpkg"
 
-        erase(
-            input_path=input1_path,
-            erase_path=input2_path,
-            output_path=erase2_output_path,
+        difference(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=diff2_output_path,
             overlay_self=overlay_self,
             input_layer=input1_layer,
-            input_columns=input1_columns,
+            input1_columns=input1_columns,
             input_columns_prefix=input1_columns_prefix,
-            erase_layer=input2_layer,
+            input2_layer=input2_layer,
             output_layer=output_layer,
             explodecollections=explodecollections,
             gridsize=gridsize,
@@ -2611,12 +2612,12 @@ def union(
             operation_prefix="union/",
         )
         _append_to_nolock(
-            src=erase2_output_path,
+            src=diff2_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
         )
-        gfo.remove(erase2_output_path)
+        gfo.remove(diff2_output_path)
 
         # Convert or add spatial index
         logger.info("Step 4 of 4: finalize")

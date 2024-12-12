@@ -2,6 +2,12 @@
 
 ## 0.10 (????-??-??)
 
+### Deprecations and compatibility notes
+
+- `erase` was renamed to `difference`, as most other open source applications/libraries
+  use this terminology. `erase` just keeps existing for backwards compatibility for now,
+  but a warning is shown that it might be removed in the (distant) future. (#595)
+
 ### Improvements
 
 - Add function `apply_vectorized` to apply a vectorized function on a geometry column
@@ -14,6 +20,7 @@
 - Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
 - Improve performance of erase for very complex input geometries (#585)
 - Add configuration option to only warn on dissolve errors (#561)
+- Add support for renaming layer with only difference in casing (#593)
 
 ## 0.9.1 (2024-07-18)
 

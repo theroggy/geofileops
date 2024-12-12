@@ -1,4 +1,4 @@
-name: geofileops-latest-nofiona
+name: geofileops-latest-fiona
 channels:
   - conda-forge
 dependencies:

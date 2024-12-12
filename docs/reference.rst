@@ -39,7 +39,7 @@ Spatial overlays and joins
    :toctree: api/
 
    clip
-   erase
+   difference
    export_by_distance
    export_by_location
    intersection
