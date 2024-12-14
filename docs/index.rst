@@ -39,7 +39,7 @@ typically use input file(s) with 500K polygons, ran on a Windows PC with 12 core
 .. toctree::
    :maxdepth: 1
 
-   Getting started <getting_started>
+   Installation <installation>
    User guide <user_guide>
    API reference <reference>
    FAQ <faq>

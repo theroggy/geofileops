@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import tempfile
 import time
+import warnings
 from pathlib import Path
 from typing import Optional, Union
 
@@ -53,14 +54,29 @@ def spatialite_version_info() -> dict[str, str]:
         result = conn.execute(sql).fetchall()
         spatialite_version = result[0][0]
         geos_version = result[0][1]
-    except MissingRuntimeDependencyError:
+    except MissingRuntimeDependencyError:  # pragma: no cover
         conn.rollback()
         raise
-    except Exception as ex:
+    except Exception as ex:  # pragma: no cover
         conn.rollback()
         raise RuntimeError(f"Error {ex} executing {sql}") from ex
     finally:
         conn.close()
+
+    if not spatialite_version:  # pragma: no cover
+        warnings.warn(
+            "empty sqlite3 spatialite version: probably a geofileops dependency was "
+            "not installed correctly: check the installation instructions in the "
+            "geofileops docs.",
+            stacklevel=1,
+        )
+    if not geos_version:  # pragma: no cover
+        warnings.warn(
+            "empty sqlite3 spatialite GEOS version: probably a geofileops dependency "
+            "was not installed correctly: check the installation instructions in the "
+            "geofileops docs.",
+            stacklevel=1,
+        )
 
     versions = {
         "spatialite_version": spatialite_version,

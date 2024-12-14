@@ -3,6 +3,7 @@
 import logging
 import os
 import tempfile
+import warnings
 from collections.abc import Iterable
 from pathlib import Path
 from threading import Lock
@@ -13,6 +14,7 @@ from pygeoops import GeometryType
 
 import geofileops as gfo
 from geofileops import _compat, fileops
+from geofileops.util._general_util import MissingRuntimeDependencyError
 
 # Make sure only one instance per process is running
 lock = Lock()
@@ -52,6 +54,56 @@ class GDALError(Exception):
             return f"{retstring}\n{super().__str__()}"
         else:
             return super().__str__()
+
+
+def spatialite_version_info() -> dict[str, str]:
+    """Returns the versions of the spatialite module used in gdal.
+
+    Versions returned: spatialite_version, geos_version.
+
+    Raises:
+        RuntimeError: if a runtime dependency is not available.
+
+    Returns:
+        Dict[str, str]: a dict with the version of the runtime dependencies.
+    """
+    datasource = None
+    try:
+        test_path = Path(__file__).resolve().parent / "test.gpkg"
+        datasource = gdal.OpenEx(str(test_path))
+        result = datasource.ExecuteSQL("SELECT spatialite_version(), geos_version()")
+        row = result.GetNextFeature()
+        spatialite_version = row.GetField(0)
+        geos_version = row.GetField(1)
+        datasource.ReleaseResultSet(result)
+
+    except Exception as ex:  # pragma: no cover
+        message = f"error getting spatialite_version: {ex}"
+        raise MissingRuntimeDependencyError(message) from ex
+
+    finally:
+        datasource = None
+
+    if not spatialite_version:  # pragma: no cover
+        warnings.warn(
+            "empty gdal spatialite version: probably a geofileops dependency was "
+            "not installed correctly: check the installation instructions in the "
+            "geofileops docs.",
+            stacklevel=1,
+        )
+    if not geos_version:  # pragma: no cover
+        warnings.warn(
+            "empty gdal spatialite GEOS version: probably a geofileops dependency was "
+            "not installed correctly: check the installation instructions in the "
+            "geofileops docs.",
+            stacklevel=1,
+        )
+
+    versions = {
+        "spatialite_version": spatialite_version,
+        "geos_version": geos_version,
+    }
+    return versions
 
 
 def ogrtype_to_name(ogrtype: Optional[int]) -> str:
