@@ -257,8 +257,9 @@ def export_by_location_intersects_complexpoly(tmp_dir: Path) -> RunResult:
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
     input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    input2_path, input1_descr = testdata.TestFile.COMPLEX_POLYS.get_file(
-        tmp_dir, nb_points=300_000
+    bbox = gfo.get_layerinfo(input1_path).total_bounds
+    input2_path, input2_descr = testdata.create_testfile(
+        bbox=bbox, nb_points=300_000, dst_dir=tmp_dir
     )
 
     # Go!
@@ -281,7 +282,7 @@ def export_by_location_intersects_complexpoly(tmp_dir: Path) -> RunResult:
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
         operation_descr=(
-            f"{function_name} between agri parcels (~500k poly) and {input1_descr}"
+            f"{function_name} between agri parcels (~500k poly) and {input2_descr}"
         ),
         run_details={"nb_cpu": nb_parallel},
     )
@@ -325,8 +326,11 @@ def intersection_complexpoly_agri(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input1_path, input1_descr = testdata.TestFile.COMPLEX_POLYS.get_file(tmp_dir)
     input2_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    bbox = gfo.get_layerinfo(input2_path).total_bounds
+    input1_path, input1_descr = testdata.create_testfile(
+        bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
+    )
 
     # Go!
     start_time = datetime.now()
@@ -346,6 +350,42 @@ def intersection_complexpoly_agri(tmp_dir: Path) -> RunResult:
         operation_descr=(
             f"{function_name} between {input1_descr} and agri parcels (~500k poly)"
         ),
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    output_path.unlink()
+    return result
+
+
+def intersection_complexpoly_complexpoly(tmp_dir: Path) -> RunResult:
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
+    bbox = (30_000.123, 170_000.123, 250_000, 250_000)
+    input1_path, input1_descr = testdata.create_testfile(
+        bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
+    )
+    bbox = (31_000.123, 171_000.123, 250_000, 250_000)
+    input2_path, input2_descr = testdata.create_testfile(
+        bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
+    )
+    # Go!
+    start_time = datetime.now()
+    output_path = tmp_dir / f"{input1_path.stem}_inters_{input2_path.stem}.gpkg"
+    gfo.intersection(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        nb_parallel=nb_parallel,
+        force=True,
+    )
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation=function_name,
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=(f"{function_name} between {input1_descr} and {input2_descr}"),
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -524,8 +564,11 @@ def symmetric_difference_complexpolys_agri(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input1_path, input1_descr = testdata.TestFile.COMPLEX_POLYS.get_file(tmp_dir)
     input2_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    bbox = gfo.get_layerinfo(input2_path).total_bounds
+    input1_path, input1_descr = testdata.create_testfile(
+        bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
+    )
 
     # Go!
     start_time = datetime.now()

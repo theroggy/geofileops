@@ -20,6 +20,7 @@ dependencies:
   - shapely >=2,<2.1
   # optional
   # - fiona  # Not needed anymore except if pyogio < 0.7 is used.
+  - matplotlib-base
   - simplification
   # testing
   - pytest

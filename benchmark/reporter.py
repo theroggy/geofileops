@@ -255,6 +255,8 @@ def save_chart(
             if not np.array_equal(img_new, img_old):
                 shutil.move(tmp_output_path, output_path)
 
+    plt.close(fig=fig)
+
 
 if __name__ == "__main__":
     results_path = Path(__file__).resolve().parent / "results/benchmark_results.csv"
