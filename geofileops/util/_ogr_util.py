@@ -3,6 +3,7 @@
 import logging
 import os
 import tempfile
+import warnings
 from collections.abc import Iterable
 from pathlib import Path
 from threading import Lock
@@ -13,6 +14,7 @@ from pygeoops import GeometryType
 
 import geofileops as gfo
 from geofileops import _compat, fileops
+from geofileops.util._general_util import MissingRuntimeDependencyError
 
 # Make sure only one instance per process is running
 lock = Lock()
@@ -52,6 +54,56 @@ class GDALError(Exception):
             return f"{retstring}\n{super().__str__()}"
         else:
             return super().__str__()
+
+
+def spatialite_version_info() -> dict[str, str]:
+    """Returns the versions of the spatialite module used in gdal.
+
+    Versions returned: spatialite_version, geos_version.
+
+    Raises:
+        RuntimeError: if a runtime dependency is not available.
+
+    Returns:
+        Dict[str, str]: a dict with the version of the runtime dependencies.
+    """
+    datasource = None
+    try:
+        test_path = Path(__file__).resolve().parent / "test.gpkg"
+        datasource = gdal.OpenEx(str(test_path))
+        result = datasource.ExecuteSQL("SELECT spatialite_version(), geos_version()")
+        row = result.GetNextFeature()
+        spatialite_version = row.GetField(0)
+        geos_version = row.GetField(1)
+        datasource.ReleaseResultSet(result)
+
+    except Exception as ex:  # pragma: no cover
+        message = f"error getting spatialite_version: {ex}"
+        raise MissingRuntimeDependencyError(message) from ex
+
+    finally:
+        datasource = None
+
+    if not spatialite_version:  # pragma: no cover
+        warnings.warn(
+            "empty gdal spatialite version: probably a geofileops dependency was "
+            "not installed correctly: check the installation instructions in the "
+            "geofileops docs.",
+            stacklevel=1,
+        )
+    if not geos_version:  # pragma: no cover
+        warnings.warn(
+            "empty gdal spatialite GEOS version: probably a geofileops dependency was "
+            "not installed correctly: check the installation instructions in the "
+            "geofileops docs.",
+            stacklevel=1,
+        )
+
+    versions = {
+        "spatialite_version": spatialite_version,
+        "geos_version": geos_version,
+    }
+    return versions
 
 
 def ogrtype_to_name(ogrtype: Optional[int]) -> str:
@@ -496,57 +548,12 @@ def vector_translate(
 
         # Sometimes an invalid output file is written, so close and try to reopen it.
         output_ds = None
-        if output_path.exists():
-            try:
-                output_ds = gdal.OpenEx(
-                    str(output_path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_UPDATE
-                )
-
-                # If the (first) output row contains NULL as geom/geometry, gdal will
-                # add an attribute column with the name of the (alias of) the geometry
-                # column: so "geometry" or "geom".
-                # To fix this, delete the "geom" or "geometry" attribute column if
-                # present if the input file didn't have an attribute column with this
-                # name.
-                # Bug documented in https://github.com/geofileops/geofileops/issues/313
-                #
-                # Remark: this check must be done on the reopened output file because
-                # in some cases the "geometrycolumn" is incorrectly listed in the field
-                # list of the Dataset returned by VectorTranslate. E.g. when the input
-                # file is empty.
-                if not input_has_geometry_attribute or not input_has_geom_attribute:
-                    assert isinstance(output_ds, gdal.Dataset)
-                    if output_layer is not None:
-                        result_layer = output_ds.GetLayer(output_layer)
-                    elif output_ds.GetLayerCount() == 1:
-                        result_layer = output_ds.GetLayerByIndex(0)
-                    else:
-                        result_layer = None
-                        logger.warning(
-                            "Unable to determine output layer, so not able to remove "
-                            "possibly incorrect geom and geometry text columns, with "
-                            f"input_path: {input_path}, output_path: {output_path}"
-                        )
-
-                    # Output layer was found, so check it
-                    if result_layer is not None:
-                        layer_defn = result_layer.GetLayerDefn()
-                        for field_idx in range(layer_defn.GetFieldCount()):
-                            name = layer_defn.GetFieldDefn(field_idx).GetName().lower()
-                            if (name == "geom" and not input_has_geom_attribute) or (
-                                name == "geometry" and not input_has_geometry_attribute
-                            ):
-                                result_layer.DeleteField(field_idx)
-                                break
-
-            except Exception as ex:
-                logger.info(
-                    f"Opening output file gave error, probably the input file was "
-                    f"empty, no rows were selected or geom was NULL: {ex}"
-                )
-                gfo.remove(output_path)
-            finally:
-                output_ds = None
+        _validate_file(
+            output_path,
+            output_layer,
+            input_has_geometry_attribute,
+            input_has_geom_attribute,
+        )
 
     except Exception as ex:
         output_ds = None
@@ -579,6 +586,100 @@ def vector_translate(
                 pass
 
     return True
+
+
+def _validate_file(
+    path: Path,
+    layer: Optional[str],
+    input_has_geometry_attribute: bool,
+    input_has_geom_attribute: bool,
+):
+    """Check the file for invalid geometry columns and removes them.
+
+    Args:
+        path (Path): the file to check.
+        layer (Optional[str]): the output layer name.
+        input_has_geometry_attribute (bool): True if the input file has a geometry
+            attribute column.
+        input_has_geom_attribute (bool): True if the input file has a geom attribute
+            column.
+    """
+    if not path.exists():
+        return
+
+    def is_file_valid(path: Path, fix: bool) -> bool:
+        """Check if the file is valid.
+
+        Args:
+            path (Path): the file to check.
+            fix (bool): True to fix the invalid columns.
+        """
+        try:
+            # Only if fix is True, open the file in update mode
+            if fix:
+                nOpenFlags = gdal.OF_VECTOR | gdal.OF_UPDATE
+            else:
+                nOpenFlags = gdal.OF_VECTOR | gdal.OF_READONLY
+
+            output_ds = gdal.OpenEx(str(path), nOpenFlags=nOpenFlags)
+
+            # If the (first) output row contains NULL as geom/geometry, gdal will
+            # add an attribute column with the name of the (alias of) the geometry
+            # column: so "geometry" or "geom".
+            # To fix this, delete the "geom" or "geometry" attribute column if
+            # present if the input file didn't have an attribute column with this
+            # name.
+            # Bug documented in https://github.com/geofileops/geofileops/issues/313
+            #
+            # Remark: this check must be done on the reopened output file because
+            # in some cases the "geometrycolumn" is incorrectly listed in the field
+            # list of the Dataset returned by VectorTranslate. E.g. when the input
+            # file is empty.
+            if not input_has_geometry_attribute or not input_has_geom_attribute:
+                assert isinstance(output_ds, gdal.Dataset)
+                if layer is not None:
+                    result_layer = output_ds.GetLayer(layer)
+                elif output_ds.GetLayerCount() == 1:
+                    result_layer = output_ds.GetLayerByIndex(0)
+                else:
+                    result_layer = None
+                    logger.warning(
+                        "Unable to determine output layer, so not able to remove "
+                        "possibly incorrect geom and geometry text columns, with "
+                        f"path: {path}, path: {path}"
+                    )
+
+                # Output layer was found, so check it
+                if result_layer is not None:
+                    layer_defn = result_layer.GetLayerDefn()
+                    for field_idx in range(layer_defn.GetFieldCount()):
+                        name = layer_defn.GetFieldDefn(field_idx).GetName().lower()
+                        if (name == "geom" and not input_has_geom_attribute) or (
+                            name == "geometry" and not input_has_geometry_attribute
+                        ):
+                            if fix:
+                                result_layer.DeleteField(field_idx)
+                            else:
+                                return False
+
+                            break
+
+        except Exception as ex:
+            logger.warning(
+                f"Opening output file gave error, probably the input file was "
+                f"empty, no rows were selected or geom was NULL: {ex}"
+            )
+            gfo.remove(path)
+        finally:
+            output_ds = None
+
+        return True
+
+    # First check if the file has invalid geometry columns without fixing so we can
+    # open the file read-only.
+    if not is_file_valid(path, fix=False):
+        logger.warning(f"Invalid geometry columns found in {path}, try to fix...")
+        is_file_valid(path, fix=True)
 
 
 def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> dict:

@@ -1,10 +1,8 @@
 
-===============
-Getting started
-===============
-
+============
 Installation
-------------
+============
+
 geofileops is written in python, but it relies on several other libraries that 
 have dependencies written in C. Those C dependencies can be difficult to 
 install, but luckily the conda package management system also gives an easy 
@@ -42,6 +40,18 @@ If you are not able/willing to use conda to install the dependencies, please
 follow the instructions to `install GeoPandas`_.
 
 Afterwards you can install geofileops with pip.
+
+Notes
+-----
+
+- If you want to use a system version of gdal or if you include gdal directly
+  in a docker image, you should install pyogrio with pip without binaries.
+  Otherwise you will get a conflict between the system gdal and the gdal that
+  is included in the pyogrio wheels.
+  E.g. ::
+    
+      pip install pyogrio --no-binary pyogrio
+
 
 .. _miniforge installer : https://github.com/conda-forge/miniforge#miniforge3
 .. _install GeoPandas : https://geopandas.org/install.html

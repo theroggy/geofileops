@@ -219,6 +219,7 @@ def test_cmp(tmp_path, suffix):
     [
         *product(["polygon-parcel"], SUFFIXES_FILEOPS, SUFFIXES_FILEOPS, [None, "XYZ"]),
         ["curvepolygon", ".gpkg", ".gpkg", None],
+        ["polygon-parcel", ".gpkg", ".gpkg.zip", None],
     ],
 )
 def test_copy_layer(tmp_path, testfile, dimensions, suffix_input, suffix_output):

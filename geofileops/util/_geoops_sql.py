@@ -2772,7 +2772,7 @@ def _two_layer_vector_operation(
     # Prepare output filename
     tmp_output_path = tmp_dir / output_path.name
     tmp_output_path.parent.mkdir(exist_ok=True, parents=True)
-    gfo.remove(tmp_output_path)
+    gfo.remove(tmp_output_path, missing_ok=True)
 
     try:
         # Prepare tmp files/batches
