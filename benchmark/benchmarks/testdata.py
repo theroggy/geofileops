@@ -46,24 +46,28 @@ class TestFile(enum.Enum):
         0,
         "https://www.landbouwvlaanderen.be/bestanden/gis/Landbouwgebruikspercelen_2018_-_Definitief_(extractie_23-03-2022)_GPKG.zip",
         "agriprc_2018.gpkg",
+        "agri parcels (~500k poly)",
     )
     AGRIPRC_2019 = (
         1,
         "https://www.landbouwvlaanderen.be/bestanden/gis/Landbouwgebruikspercelen_2019_-_Definitief_(extractie_20-03-2020)_GPKG.zip",
         "agriprc_2019.gpkg",
+        "agri parcels (~500k poly)",
     )
 
-    def __init__(self, value, url, filename):
+    def __init__(self, value, url: str, filename: str, descr: Optional[str]):
         """Create a test file.
 
         Args:
             value (_type_): _description_
             url (_type_): _description_
             filename (_type_): _description_
+            descr (_type_): _description_
         """
         self._value_ = value
         self.url = url
         self.filename = filename
+        self.descr = descr
 
     def get_file(self, output_dir: Path) -> tuple[Path, str]:
         """Creates the test file.
@@ -81,7 +85,8 @@ class TestFile(enum.Enum):
         logger.debug(
             f"TestFile {self.name} contains {testfile_info.featurecount} rows."
         )
-        description = f"agri parcels, {testfile_info.featurecount} rows"
+        count_kilo = f"{int(testfile_info.featurecount / 1000)}k"
+        description = f"agri parcels ({count_kilo} polys)"
 
         return (testfile_path, description)
 
@@ -112,10 +117,13 @@ def create_testfile(
     Returns:
         tuple[Path, str]: The path to the file + a description of the test file.
     """
-    basename = f"custom_polys_{nb_points}_{bbox[0]}_{bbox[1]}_{bbox[2]}_{bbox[3]}.gpkg"
+    basename = (
+        f"custom_polys_{nb_polygons_x*nb_polygons_y}polys_{nb_points}pnts_"
+        f"{bbox[0]}-{bbox[1]}-{bbox[2]}-{bbox[3]}.gpkg"
+    )
     testfile_path = _prepare_dst_path(basename, dst_dir=dst_dir)
 
-    descr_template = "complex polys ({nb_polys} * {nb_coords} coords)"
+    descr_template = "complex polys ({nb_polys} * {nb_coords_str} coords)"
 
     if testfile_path.exists():
         polys_gdf = gpd.read_file(testfile_path, engine="pyogrio")
@@ -163,7 +171,13 @@ def create_testfile(
     nb_coords = shapely.get_num_coordinates(polys[0])
     nb_polys = len(polys)
 
-    descr = descr_template.format(nb_polys=nb_polys, nb_coords=nb_coords)
+    # Format the description
+    if nb_coords > 1000:
+        nb_coords_str = f"{int(nb_coords / 1000)}k"
+    else:
+        nb_coords_str = f"{nb_coords}"
+    descr = descr_template.format(nb_polys=nb_polys, nb_coords_str=nb_coords_str)
+
     return (testfile_path, descr)
 
 
@@ -195,7 +209,7 @@ def _create_complex_poly_points(
         nb_points_created = shapely.get_num_coordinates(poly_complex).item()
         if nb_points_created < nb_points_min:
             # Not enough points... increase nb_points_estimate
-            logger.info(
+            logger.debug(
                 f"retry: {nb_points_created=} for {line_distance_estimate=} "
                 f"and {nb_points_estimate=} not between {nb_points_min=} and "
                 f"{nb_points_max=}"
@@ -205,7 +219,7 @@ def _create_complex_poly_points(
             line_distance_estimate = _estimate_line_distance(nb_points_estimate)
         elif nb_points_created > nb_points_max:
             # Too many points... decrease nb_points_estimate
-            logger.info(
+            logger.debug(
                 f"retry: {nb_points_created=} for {line_distance_estimate=} "
                 f"and {nb_points_estimate=} not between {nb_points_min=} and "
                 f"{nb_points_max=}"
@@ -214,7 +228,7 @@ def _create_complex_poly_points(
             nb_points_estimate += nb_points_less
             line_distance_estimate = _estimate_line_distance(nb_points_estimate)
         else:
-            logger.info(
+            logger.debug(
                 f"poly_complex ready with {nb_points_created=} for {nb_points=} "
                 f"and {line_distance_estimate=}"
             )

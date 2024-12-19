@@ -26,7 +26,7 @@ def _get_version() -> str:
 
 def buffer(tmp_dir: Path) -> RunResult:
     # Init
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -37,7 +37,7 @@ def buffer(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="buffer",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr="buffer on agri parcel layer BEFL (~500.000 polygons)",
+        operation_descr=f"buffer on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -48,7 +48,7 @@ def buffer(tmp_dir: Path) -> RunResult:
 
 def buffer_spatialite(tmp_dir: Path) -> RunResult:
     # Init
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -61,7 +61,7 @@ def buffer_spatialite(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="buffer_spatialite",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr="buffer on agri parcel layer BEFL (~500.000 polygons)",
+        operation_descr=f"buffer on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -72,7 +72,7 @@ def buffer_spatialite(tmp_dir: Path) -> RunResult:
 
 def buffer_gridsize_spatialite(tmp_dir: Path) -> RunResult:
     # Init
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -90,9 +90,7 @@ def buffer_gridsize_spatialite(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="buffer_gridsize_spatialite",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(
-            "buffer with gridsize 0.1 on agri parcel layer BEFL (~500.000 polygons)"
-        ),
+        operation_descr=(f"buffer with gridsize 0.1 on {input_descr}"),
         run_details={"nb_cpu": multiprocessing.cpu_count()},
     )
 
@@ -103,7 +101,7 @@ def buffer_gridsize_spatialite(tmp_dir: Path) -> RunResult:
 
 def buffer_gpd(tmp_dir: Path) -> RunResult:
     # Init
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -116,7 +114,7 @@ def buffer_gpd(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="buffer_gpd",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr="buffer on agri parcel layer BEFL (~500.000 polygons)",
+        operation_descr=f"buffer on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -127,7 +125,7 @@ def buffer_gpd(tmp_dir: Path) -> RunResult:
 
 def dissolve_nogroupby(tmp_dir: Path) -> RunResult:
     # Init
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -144,7 +142,7 @@ def dissolve_nogroupby(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="dissolve",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr="dissolve on agri parcels BEFL (~500.000 polygons)",
+        operation_descr=f"dissolve on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -155,7 +153,7 @@ def dissolve_nogroupby(tmp_dir: Path) -> RunResult:
 
 def dissolve_groupby(tmp_dir: Path) -> RunResult:
     # Init
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -173,9 +171,7 @@ def dissolve_groupby(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="dissolve_groupby",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(
-            "dissolve on agri parcels BEFL (~500.000 polygons), groupby=[GEWASGROEP]"
-        ),
+        operation_descr=("dissolve on {input_descr}, groupby=[GEWASGROEP]"),
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -186,8 +182,10 @@ def dissolve_groupby(tmp_dir: Path) -> RunResult:
 
 def clip(tmp_dir: Path) -> RunResult:
     # Init
-    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    input2_path, _ = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -202,9 +200,9 @@ def clip(tmp_dir: Path) -> RunResult:
     result = RunResult(
         package="geofileops",
         package_version=gfo.__version__,
-        operation="clip",
+        operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr="clip between 2 agri parcel layers BEFL (2*~500.000 polygons)",
+        operation_descr=f"{function_name} between {input1_descr} and {input2_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -217,8 +215,8 @@ def export_by_location_intersects(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    input2_path, _ = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -239,10 +237,7 @@ def export_by_location_intersects(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(
-            "export_by_location_intersects between 2 agri parcel layers BEFL "
-            "(2*~500.000 polygons)"
-        ),
+        operation_descr=f"{function_name} between {input1_descr} and {input2_descr} ",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -256,7 +251,7 @@ def export_by_location_intersects_complexpoly(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
     bbox = gfo.get_layerinfo(input1_path).total_bounds
     input2_path, input2_descr = testdata.create_testfile(
         bbox=bbox, nb_points=300_000, dst_dir=tmp_dir
@@ -281,9 +276,7 @@ def export_by_location_intersects_complexpoly(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(
-            f"{function_name} between agri parcels (~500k poly) and {input2_descr}"
-        ),
+        operation_descr=(f"{function_name} between {input1_descr} and {input2_descr}"),
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -295,8 +288,10 @@ def export_by_location_intersects_complexpoly(tmp_dir: Path) -> RunResult:
 
 def intersection(tmp_dir: Path) -> RunResult:
     # Init
-    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    input2_path, _ = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -311,9 +306,9 @@ def intersection(tmp_dir: Path) -> RunResult:
     result = RunResult(
         package=_get_package(),
         package_version=_get_version(),
-        operation="intersection",
+        operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=("intersection between 2 agri parcel layers (2*~500k poly)"),
+        operation_descr=f"{function_name} between {input1_descr} and {input2_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -326,7 +321,7 @@ def intersection_complexpoly_agri(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input2_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
     bbox = gfo.get_layerinfo(input2_path).total_bounds
     input1_path, input1_descr = testdata.create_testfile(
         bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
@@ -347,9 +342,7 @@ def intersection_complexpoly_agri(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(
-            f"{function_name} between {input1_descr} and agri parcels (~500k poly)"
-        ),
+        operation_descr=(f"{function_name} between {input1_descr} and {input2_descr}"),
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -396,12 +389,14 @@ def intersection_complexpoly_complexpoly(tmp_dir: Path) -> RunResult:
 
 def intersection_gridsize(tmp_dir: Path) -> RunResult:
     # Init
-    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    input2_path, _ = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
-    output_path = tmp_dir / f"{input1_path.stem}_inters_grid01_{input2_path.stem}.gpkg"
+    output_path = tmp_dir / f"{input1_path.stem}_inters_grids_{input2_path.stem}.gpkg"
     gfo.intersection(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -413,11 +408,10 @@ def intersection_gridsize(tmp_dir: Path) -> RunResult:
     result = RunResult(
         package=_get_package(),
         package_version=_get_version(),
-        operation="intersection_gridsize",
+        operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
         operation_descr=(
-            "intersection with gridsize 0.001 between 2 agri parcel layers BEFL "
-            "(2*~500k polygons)"
+            f"{function_name} 0.001 between {input1_descr} and {input2_descr}"
         ),
         run_details={"nb_cpu": nb_parallel},
     )
@@ -428,9 +422,11 @@ def intersection_gridsize(tmp_dir: Path) -> RunResult:
 
 
 def join_by_location_intersects(tmp_dir: Path) -> RunResult:
-    # Init-
-    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    input2_path, _ = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -449,12 +445,9 @@ def join_by_location_intersects(tmp_dir: Path) -> RunResult:
     result = RunResult(
         package=_get_package(),
         package_version=_get_version(),
-        operation="join_by_location_intersects",
+        operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(
-            "join_by_location_intersects between 2 agri parcel layers BEFL "
-            "(2*~500.000 polygons)"
-        ),
+        operation_descr=f"{function_name} between {input1_descr} and {input2_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -467,7 +460,7 @@ def join_by_location_intersects(tmp_dir: Path) -> RunResult:
 def makevalid_gridsize_gpd(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -480,7 +473,7 @@ def makevalid_gridsize_gpd(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=f"{function_name} on agri parcel layer BEFL (~500k polygons)",
+        operation_descr=f"{function_name} on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -492,7 +485,7 @@ def makevalid_gridsize_gpd(tmp_dir: Path) -> RunResult:
 def makevalid_gridsize_spatialite(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -505,7 +498,7 @@ def makevalid_gridsize_spatialite(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=f"{function_name} on agri parcel layer BEFL (~500k polygons)",
+        operation_descr=f"{function_name} on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -517,7 +510,7 @@ def makevalid_gridsize_spatialite(tmp_dir: Path) -> RunResult:
 def makevalid_gpd(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -528,7 +521,7 @@ def makevalid_gpd(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=f"{function_name} on agri parcel layer BEFL (~500k polygons)",
+        operation_descr=f"{function_name} on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -540,7 +533,7 @@ def makevalid_gpd(tmp_dir: Path) -> RunResult:
 def makevalid_spatialite(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
-    input_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
@@ -551,7 +544,7 @@ def makevalid_spatialite(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=f"{function_name} on agri parcel layer BEFL (~500k polygons)",
+        operation_descr=f"{function_name} on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -564,7 +557,7 @@ def symmetric_difference_complexpolys_agri(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input2_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
     bbox = gfo.get_layerinfo(input2_path).total_bounds
     input1_path, input1_descr = testdata.create_testfile(
         bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
@@ -572,7 +565,7 @@ def symmetric_difference_complexpolys_agri(tmp_dir: Path) -> RunResult:
 
     # Go!
     start_time = datetime.now()
-    output_path = tmp_dir / f"{input1_path.stem}_inters_{input2_path.stem}.gpkg"
+    output_path = tmp_dir / f"{input1_path.stem}_symmdiff_{input2_path.stem}.gpkg"
     gfo.symmetric_difference(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -585,9 +578,7 @@ def symmetric_difference_complexpolys_agri(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(
-            f"{function_name} between {input1_descr} and agriparcels BEFL (~500k poly)"
-        ),
+        operation_descr=f"{function_name} between {input1_descr} and {input2_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -598,12 +589,14 @@ def symmetric_difference_complexpolys_agri(tmp_dir: Path) -> RunResult:
 
 def union(tmp_dir: Path) -> RunResult:
     # Init
-    input1_path, _ = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    input2_path, _ = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
     # Go!
     start_time = datetime.now()
-    output_path = tmp_dir / f"{input1_path.stem}_inters_{input2_path.stem}.gpkg"
+    output_path = tmp_dir / f"{input1_path.stem}_union_{input2_path.stem}.gpkg"
     gfo.union(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -614,9 +607,9 @@ def union(tmp_dir: Path) -> RunResult:
     result = RunResult(
         package=_get_package(),
         package_version=_get_version(),
-        operation="union",
+        operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr="union between 2 agri parcel layers BEFL (2*~500.000 polygons)",
+        operation_descr=f"{function_name} between {input2_descr} and {input2_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
