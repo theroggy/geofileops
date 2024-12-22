@@ -281,7 +281,7 @@ def assert_geodataframe_equal(
     sort_columns=False,
     sort_values=False,
     simplify: Optional[float] = None,
-    check_geom_gridsize: float = 0.0,
+    check_geom_tolerance: float = 0.0,
     output_dir: Optional[Path] = None,
 ):
     """
@@ -364,17 +364,28 @@ def assert_geodataframe_equal(
 
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / "left.geojson"
-        gfo.to_file(left, output_path, create_spatial_index=None)
-        output_path = output_dir / "right.geojson"
-        gfo.to_file(right, output_path, create_spatial_index=None)
+        left.to_file(output_dir / "left.geojson")
+        right.to_file(output_dir / "right.geojson")
 
-    if check_geom_gridsize > 0.0:
-        # The symmetric difference should result in all empty geometries
-        symdiff = shapely.symmetric_difference(
-            left.geometry, right.geometry, grid_size=check_geom_gridsize
-        )
-        assert all(symdiff.is_empty)
+    if check_geom_tolerance > 0.0:
+        # The symmetric difference should result in all empty geometries if the
+        # geometries are equal. Apply a negative buffer to the geometries with half the
+        # tolerance.
+        symdiff = shapely.symmetric_difference(left.geometry, right.geometry)
+        symdiff_tol = symdiff.buffer(-check_geom_tolerance / 2, join_style="mitre")
+        symdiff_tol_diff = symdiff_tol[~symdiff_tol.is_empty]
+
+        if not all(symdiff_tol_diff.is_empty):
+            if output_dir is not None:
+                # Write the differences to file
+                gdf = gpd.GeoDataFrame(geometry=symdiff_tol_diff, crs=left.crs)
+                gdf.to_file(output_dir / "symdiff_tol_not-empty.geojson")
+
+            raise AssertionError(
+                f"differences > {check_geom_tolerance} found in "
+                f"{len(symdiff_tol_diff)} geometries: {symdiff_tol_diff=}"
+            )
+
         right.geometry = left.geometry
 
     gpd_testing.assert_geodataframe_equal(

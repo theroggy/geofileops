@@ -1911,6 +1911,10 @@ def difference(
           interactions between the same rows in this layer will be ignored. The output
           will be the (pieces of) features in this layer that don't have any
           intersections with other features in this layer.
+        - To speed up processing, complex input geometries are subdivided by default.
+          For these geometries, the output geometries will contain extra collinear
+          points where the subdividing occured. This behaviour can be controlled via the
+          ``subdivide_coords`` parameter.
 
     Alternative names:
         - ArcMap: erase
@@ -1977,7 +1981,7 @@ def difference(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=overlay_self,
-        input_layer=input1_layer,
+        input1_layer=input1_layer,
         input1_columns=input1_columns,
         input2_layer=input2_layer,
         output_layer=output_layer,
@@ -2258,6 +2262,10 @@ def identity(
           recalculated manually if this is wanted.
         - If ``input2_path`` is None, the 1st input layer is used for both inputs but
           interactions between the same rows in this layer will be ignored.
+        - To speed up processing, complex input geometries are subdivided by default.
+          For these geometries, the output geometries will contain extra collinear
+          points where the subdividing occured. This behaviour can be controlled via the
+          ``subdivide_coords`` parameter.
 
     Args:
         input1_path (PathLike): the 1st input file.
@@ -2453,6 +2461,7 @@ def intersection(
     where_post: Optional[str] = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    subdivide_coords: int = 7500,
     force: bool = False,
 ):
     r"""Calculates the pairwise intersection of the two input layers.
@@ -2464,6 +2473,10 @@ def intersection(
         - If ``input2_path`` is None, the 1st input layer is used for both inputs but
           intersections between the same rows in this layer will be omitted from the
           result.
+        - To speed up processing, complex input geometries are subdivided by default.
+          For these geometries, the output geometries will contain extra collinear
+          points where the subdividing occured. This behaviour can be controlled via the
+          ``subdivide_coords`` parameter.
 
     Alternative names:
         - GeoPandas: overlay(how="intersection")
@@ -2506,6 +2519,11 @@ def intersection(
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about ``subdivide_coords`` coordinates during processing which
+            can offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 20000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -2543,6 +2561,7 @@ def intersection(
         where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
         force=force,
     )
 
@@ -3039,6 +3058,10 @@ def symmetric_difference(
           recalculated manually if this is wanted.
         - If ``input2_path`` is None, the 1st input layer is used for both inputs but
           interactions between the same rows in this layer will be ignored.
+        - To speed up processing, complex input geometries are subdivided by default.
+          For these geometries, the output geometries will contain extra collinear
+          points where the subdividing occured. This behaviour can be controlled via the
+          ``subdivide_coords`` parameter.
 
 
     Alternative names:
@@ -3168,6 +3191,10 @@ def union(
           recalculated manually if this is wanted.
         - If ``input2_path`` is None, the 1st input layer is used for both inputs but
           interactions between the same rows in this layer will be ignored.
+        - To speed up processing, complex input geometries are subdivided by default.
+          For these geometries, the output geometries will contain extra collinear
+          points where the subdividing occured. This behaviour can be controlled via the
+          ``subdivide_coords`` parameter.
 
 
     Alternative names:
