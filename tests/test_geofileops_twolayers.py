@@ -185,7 +185,7 @@ def test_difference(
         sort_values=True,
         check_less_precise=True,
         normalize=True,
-        check_geom_gridsize=check_geom_gridsize,
+        check_geom_tolerance=check_geom_gridsize,
     )
 
     # Make sure the output still has rows, otherwise the test isn't super useful
@@ -784,7 +784,6 @@ def test_intersect_deprecated(tmp_path):
     assert output_path.exists()
 
 
-@pytest.mark.parametrize("testfile", ["polygon-parcel"])
 @pytest.mark.parametrize(
     "suffix, epsg, gridsize, explodecollections, nb_parallel",
     [
@@ -797,19 +796,19 @@ def test_intersect_deprecated(tmp_path):
     ],
 )
 def test_intersection(
-    tmp_path, testfile, suffix, epsg, explodecollections, gridsize, nb_parallel
+    tmp_path, suffix, epsg, explodecollections, gridsize, nb_parallel
 ):
-    input1_path = test_helper.get_testfile(testfile, suffix=suffix, epsg=epsg)
+    # Prepare test data/parameters
+    input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
 
-    # Now run test
-    output_path = (
-        tmp_path / f"{input1_path.stem}_intersection_{input2_path.stem}{suffix}"
-    )
+    output_path = tmp_path / f"{input1_path.stem}_inters_{input2_path.stem}{suffix}"
     batchsize = -1
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     if nb_parallel > 1:
         batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+
+    # Now run test
     gfo.intersection(
         input1_path=str(input1_path),
         input2_path=str(input2_path),
@@ -875,9 +874,7 @@ def test_intersection_input_no_index(tmp_path):
     # Now run test
     output_path = tmp_path / f"{input1_path.stem}_intersection_{input2_path.stem}.gpkg"
     gfo.intersection(
-        input1_path=input1_path,
-        input2_path=input2_path,
-        output_path=output_path,
+        input1_path=input1_path, input2_path=input2_path, output_path=output_path
     )
 
     # Check if the tmp file is correctly created
@@ -902,15 +899,15 @@ def test_intersection_input_no_index(tmp_path):
             test_helper.get_testfile("polygon-zone"),
         ),
         (
-            "not_existing_path: No such file or directory",
-            RuntimeError,
+            "intersection: input1_path doesn't exist",
+            ValueError,
             "not_existing_path",
             test_helper.get_testfile("polygon-zone"),
             "output.gpkg",
         ),
         (
-            "not_existing_path: No such file or directory",
-            RuntimeError,
+            "intersection: input2_path doesn't exist",
+            ValueError,
             test_helper.get_testfile("polygon-zone"),
             "not_existing_path",
             "output.gpkg",
@@ -931,9 +928,7 @@ def test_intersection_invalid_params(
         output_path = tmp_path / output_path
     with pytest.raises(expected_exception, match=expected_error):
         gfo.intersection(
-            input1_path=input1_path,
-            input2_path=input2_path,
-            output_path=output_path,
+            input1_path=input1_path, input2_path=input2_path, output_path=output_path
         )
 
 
@@ -950,11 +945,7 @@ def test_intersection_invalid_params2(kwargs, expected_error):
     if "input2_path" not in kwargs:
         kwargs["input2_path"] = "input2.gpkg"
     with pytest.raises(ValueError, match=expected_error):
-        gfo.intersection(
-            input1_path="input1.gpkg",
-            output_path="output.gpkg",
-            **kwargs,
-        )
+        gfo.intersection(input1_path="input1.gpkg", output_path="output.gpkg", **kwargs)
 
 
 def test_intersection_output_path_exists(tmp_path):
@@ -1025,10 +1016,18 @@ def test_intersection_resultempty(tmp_path, suffix, input2_empty):
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
 
-def test_intersection_self(tmp_path):
+@pytest.mark.parametrize("subdivide", [False, True])
+def test_intersection_self(tmp_path, subdivide):
     input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+
+    if subdivide:
+        input1_gdf = gfo.read_file(input1_path)
+        max_coords = shapely.get_num_coordinates(input1_gdf.geometry).max().item()
+        subdivide_coords = max_coords / 3
+    else:
+        subdivide_coords = 7500
 
     # Now run test
     output_path = tmp_path / f"{input1_path.stem}_inters_self.gpkg"
@@ -1038,6 +1037,7 @@ def test_intersection_self(tmp_path):
         output_path=output_path,
         nb_parallel=2,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
     )
 
     # Check if the tmp file is correctly created
@@ -1112,10 +1112,108 @@ def test_intersection_different_crs(tmp_path):
 
     with pytest.warns(match="input1 layer doesn't have the same crs as input2 layer"):
         gfo.intersection(
-            input1_path=input1_path,
-            input2_path=input2_path,
-            output_path=output_path,
+            input1_path=input1_path, input2_path=input2_path, output_path=output_path
         )
+
+
+@pytest.mark.parametrize(
+    "testfile1, testfile2, subdivide1, subdivide2, suffix, epsg, gridsize",
+    [
+        ("polygon-parcel", "polygon-zone", True, True, ".gpkg", 31370, 0.0),
+        ("polygon-parcel", "polygon-zone", True, True, ".gpkg", 31370, 0.01),
+        ("polygon-zone", "polygon-parcel", False, True, ".gpkg", 31370, 0.0),
+        ("polygon-parcel", "polygon-zone", True, False, ".gpkg", 31370, 0.01),
+        ("polygon-parcel", "polygon-zone", True, True, ".gpkg", 4326, 0.0),
+        ("polygon-parcel", "polygon-zone", True, True, ".shp", 31370, 0.0),
+        ("polygon-parcel", "polygon-zone", True, False, ".shp", 31370, 0.0),
+        ("polygon-zone", "polygon-parcel", False, True, ".shp", 31370, 0.0),
+    ],
+)
+def test_intersection_subdivide(
+    tmp_path, testfile1, testfile2, subdivide1, subdivide2, suffix, epsg, gridsize
+):
+    # Prepare test data/parameters
+    input1_path = test_helper.get_testfile(testfile1, suffix=suffix, epsg=epsg)
+    input2_path = test_helper.get_testfile(testfile2, suffix=suffix, epsg=epsg)
+
+    # Determine subdivide_coords to use
+    input1_gdf = gfo.read_file(input1_path)
+    input1_max_coords = shapely.get_num_coordinates(input1_gdf.geometry).max().item()
+    input2_gdf = gfo.read_file(input2_path)
+    input2_max_coords = shapely.get_num_coordinates(input2_gdf.geometry).max().item()
+
+    if subdivide1 and subdivide2:
+        subdivide_coords = min(input1_max_coords, input2_max_coords) / 3
+    elif subdivide1:
+        subdivide_coords = input1_max_coords / 3
+        # Make sure subdivide_coords won't trigger subdividing input2 as well
+        assert subdivide_coords > input2_max_coords
+    elif subdivide2:
+        subdivide_coords = input2_max_coords / 3
+        # Make sure subdivide_coords won't trigger subdividing input1 as well
+        assert subdivide_coords > input1_max_coords
+
+    output_path = tmp_path / f"{input1_path.stem}_inters_{input2_path.stem}{suffix}"
+    batchsize = -1
+    input1_layerinfo = gfo.get_layerinfo(input1_path)
+    batchsize = math.ceil(input1_layerinfo.featurecount / 2)
+
+    # Now run test
+    gfo.intersection(
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
+        gridsize=gridsize,
+        batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert gfo.has_spatial_index(output_path) is exp_spatial_index
+    input2_layerinfo = gfo.get_layerinfo(input2_path)
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == (
+        len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
+    )
+    assert output_layerinfo.featurecount == 30
+
+    # Check the contents of the result file by comparing with geopandas
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["geometry"][0] is not None
+
+    input1_gdf = gfo.read_file(input1_path)
+    input2_gdf = gfo.read_file(input2_path)
+    overlay_operation = "intersection"
+    expected_gdf = input1_gdf.overlay(
+        input2_gdf, how=overlay_operation, keep_geom_type=True
+    )
+    renames = dict(zip(expected_gdf.columns, output_gdf.columns))
+    expected_gdf = expected_gdf.rename(columns=renames)
+    if gridsize != 0.0:
+        expected_gdf.geometry = shapely.set_precision(
+            expected_gdf.geometry, grid_size=gridsize
+        )
+        check_geom_tolerance = gridsize
+    else:
+        check_geom_tolerance = 1e-9
+
+    output_dir = None
+    if test_helper.RUNS_LOCAL:
+        # When running locally, write so extra files to disk for debugging
+        output_dir = tmp_path
+        expected_path = tmp_path / output_path.with_stem(f"{output_path.stem}_expected")
+        gfo.to_file(expected_gdf, expected_path)
+
+    assert_geodataframe_equal(
+        output_gdf,
+        expected_gdf,
+        check_dtype=False,
+        sort_values=True,
+        check_geom_tolerance=check_geom_tolerance,
+        output_dir=output_dir,
+    )
 
 
 @pytest.mark.parametrize(
