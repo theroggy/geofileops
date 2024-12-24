@@ -2830,8 +2830,40 @@ def union(
     start_time = datetime.now()
     tempdir = _io_util.create_tempdir("geofileops/union")
     try:
+        # Prepare the input files
+        logger.info("Step 1 of 5: prepare input files")
+        input1_subdivided_path = _subdivide_layer(
+            path=input1_path,
+            layer=input1_layer,
+            output_path=tempdir / "subdivided/input1_layer.gpkg",
+            subdivide_coords=subdivide_coords,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            operation_prefix="union/",
+        )
+        if input1_subdivided_path is None:
+            # Hardcoded optimization: root means that no subdivide was needed
+            input1_subdivided_path = Path("/")
+
+        if overlay_self:
+            # With overlay_self, input2 is the same as input1
+            input2_subdivided_path: Optional[Path] = input1_subdivided_path
+        else:
+            input2_subdivided_path = _subdivide_layer(
+                path=input2_path,
+                layer=input2_layer,
+                output_path=tempdir / "subdivided/input2_layer.gpkg",
+                subdivide_coords=subdivide_coords,
+                nb_parallel=nb_parallel,
+                batchsize=batchsize,
+                operation_prefix="union/",
+            )
+            if input2_subdivided_path is None:
+                # Hardcoded optimization: root means that no subdivide was needed
+                input2_subdivided_path = Path("/")
+
         # First apply intersection of input1 with input2 to a temporary output file...
-        logger.info("Step 1 of 4: intersection")
+        logger.info("Step 2 of 5: intersection")
         intersection_output_path = tempdir / "intersection_output.gpkg"
         intersection(
             input1_path=input1_path,
@@ -2853,10 +2885,12 @@ def union(
             force=force,
             output_with_spatial_index=False,
             operation_prefix="union/",
+            input1_subdivided_path=input1_subdivided_path,
+            input2_subdivided_path=input2_subdivided_path,
         )
 
         # Difference input1 from input2 to another temporary output gfo.
-        logger.info("Step 2 of 4: difference of input 1 from input 2")
+        logger.info("Step 3 of 5: difference of input 1 from input 2")
         diff1_output_path = tempdir / "diff_input1_from_input2_output.gpkg"
         difference(
             input1_path=input2_path,
@@ -2877,6 +2911,8 @@ def union(
             force=force,
             output_with_spatial_index=False,
             operation_prefix="union/",
+            input1_subdivided_path=input2_subdivided_path,
+            input2_subdivided_path=input1_subdivided_path,
         )
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
@@ -2888,7 +2924,7 @@ def union(
         gfo.remove(diff1_output_path)
 
         # Difference input1 from input2 to and add to temporary output file.
-        logger.info("Step 3 of 4: difference input 2 from input 1")
+        logger.info("Step 4 of 5: difference input 2 from input 1")
         diff2_output_path = tempdir / "diff_input2_from_input1_output.gpkg"
 
         difference(
@@ -2910,6 +2946,8 @@ def union(
             force=force,
             output_with_spatial_index=False,
             operation_prefix="union/",
+            input1_subdivided_path=input1_subdivided_path,
+            input2_subdivided_path=input2_subdivided_path,
         )
         _append_to_nolock(
             src=diff2_output_path,
@@ -2920,7 +2958,7 @@ def union(
         gfo.remove(diff2_output_path)
 
         # Convert or add spatial index
-        logger.info("Step 4 of 4: finalize")
+        logger.info("Step 5 of 5: finalize")
 
         tmp_output_path = intersection_output_path
         if intersection_output_path.suffix != output_path.suffix:

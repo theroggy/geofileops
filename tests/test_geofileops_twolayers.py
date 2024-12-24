@@ -683,6 +683,7 @@ def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords):
     exp_gdf = exp_gdf[~exp_gdf.geometry.isna()]
     exp_gdf = exp_gdf[~exp_gdf.geometry.is_empty]
 
+    # If input was subdivided, the output geometries will have some extra points
     check_geom_tolerance = 0.0
     if subdivide_coords < 2000:
         check_geom_tolerance = 1e-9
@@ -747,7 +748,8 @@ def test_identity_invalid_params(kwargs, expected_error):
         )
 
 
-def test_identity_self(tmp_path):
+@pytest.mark.parametrize("subdivide_coords", [2000, 10])
+def test_identity_self(tmp_path, subdivide_coords):
     input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
@@ -760,6 +762,7 @@ def test_identity_self(tmp_path):
         output_path=output_path,
         nb_parallel=2,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
     )
 
     # Check if the tmp file is correctly created
@@ -2077,7 +2080,8 @@ def test_symmetric_difference_invalid_params(kwargs, expected_error):
         )
 
 
-def test_symmetric_difference_self(tmp_path):
+@pytest.mark.parametrize("subdivide_coords", [2000, 10])
+def test_symmetric_difference_self(tmp_path, subdivide_coords):
     input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
@@ -2090,7 +2094,7 @@ def test_symmetric_difference_self(tmp_path):
         output_path=output_path,
         nb_parallel=2,
         batchsize=batchsize,
-        subdivide_coords=10,
+        subdivide_coords=subdivide_coords,
     )
 
     # Check if the tmp file is correctly created
@@ -2104,11 +2108,12 @@ def test_symmetric_difference_self(tmp_path):
 
 @pytest.mark.parametrize(
     "suffix, epsg, gridsize, where_post, explodecollections, keep_fid, "
-    "exp_featurecount",
+    "subdivide_coords, exp_featurecount",
     [
-        (".gpkg", 31370, 0.01, "ST_Area(geom) > 1000", True, True, 62),
-        (".shp", 31370, 0.0, "ST_Area(geom) > 1000", False, True, 59),
-        (".gpkg", 4326, 0.0, None, False, False, 73),
+        (".gpkg", 31370, 0.01, "ST_Area(geom) > 1000", True, True, 2000, 62),
+        (".shp", 31370, 0.0, "ST_Area(geom) > 1000", False, True, 2000, 59),
+        (".gpkg", 4326, 0.0, None, False, False, 2000, 73),
+        (".gpkg", 31370, 0.0, None, False, False, 10, 73),
     ],
 )
 def test_union(
@@ -2120,6 +2125,7 @@ def test_union(
     where_post: Optional[str],
     explodecollections: bool,
     keep_fid: bool,
+    subdivide_coords: int,
     exp_featurecount: int,
 ):
     if epsg == 4326 and sys.platform in ("darwin", "linux"):
@@ -2162,6 +2168,7 @@ def test_union(
         explodecollections=explodecollections,
         where_post=where_post,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
     )
 
     # Check if the output file is correctly created
@@ -2205,6 +2212,11 @@ def test_union(
     if where_post is not None:
         exp_gdf = exp_gdf[exp_gdf.geometry.area > 1000]
 
+    # If input was subdivided, the output geometries will have some extra points
+    check_geom_tolerance = 0.0
+    if subdivide_coords < 2000:
+        check_geom_tolerance = 1e-9
+
     # Compare result with expected result
     assert_geodataframe_equal(
         output_gdf,
@@ -2213,6 +2225,7 @@ def test_union(
         sort_values=True,
         check_less_precise=True,
         normalize=True,
+        check_geom_tolerance=check_geom_tolerance,
     )
 
 
@@ -2381,7 +2394,8 @@ def test_union_invalid_params(kwargs, expected_error):
         )
 
 
-def test_union_self(tmp_path):
+@pytest.mark.parametrize("subdivide_coords", [2000, 10])
+def test_union_self(tmp_path, subdivide_coords):
     input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
@@ -2394,6 +2408,7 @@ def test_union_self(tmp_path):
         output_path=output_path,
         nb_parallel=2,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
     )
 
     # Check if the tmp file is correctly created
