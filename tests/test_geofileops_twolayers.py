@@ -100,7 +100,7 @@ def test_clip_resultempty(tmp_path, suffix, clip_empty):
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
-    "testfile, gridsize, where_post, subdivide_coords, check_geom_gridsize",
+    "testfile, gridsize, where_post, subdivide_coords, check_geom_tolerance",
     [
         ("linestring-row-trees", 0.0, "ST_Length(geom) > 100", None, 0.0),
         ("linestring-row-trees", 0.01, None, 0, 0.0),
@@ -123,7 +123,7 @@ def test_difference(
     gridsize,
     where_post,
     subdivide_coords,
-    check_geom_gridsize,
+    check_geom_tolerance,
 ):
     input1_path = test_helper.get_testfile(testfile, suffix=suffix)
     if suffix == ".shp":
@@ -185,7 +185,7 @@ def test_difference(
         sort_values=True,
         check_less_precise=True,
         normalize=True,
-        check_geom_tolerance=check_geom_gridsize,
+        check_geom_tolerance=check_geom_tolerance,
     )
 
     # Make sure the output still has rows, otherwise the test isn't super useful
@@ -1978,17 +1978,14 @@ def test_split_deprecated(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, gridsize",
-    [(".gpkg", 31370, 0.01), (".gpkg", 4326, 0.0), (".shp", 31370, 0.0)],
+    "suffix, epsg, gridsize, subdivide_coords",
+    [
+        (".gpkg", 31370, 0.01, 2000),
+        (".gpkg", 4326, 0.0, 2000),
+        (".shp", 31370, 0.0, 10),
+    ],
 )
-def test_symmetric_difference(tmp_path, request, suffix, epsg, gridsize):
-    if epsg == 4326 and sys.platform in ("darwin", "linux"):
-        request.node.add_marker(
-            pytest.mark.xfail(
-                reason="epsg 4326 gives precision issues on MacOS14 on arm64 and linux"
-            )
-        )
-
+def test_symmetric_difference(tmp_path, suffix, epsg, gridsize, subdivide_coords):
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
@@ -2003,6 +2000,7 @@ def test_symmetric_difference(tmp_path, request, suffix, epsg, gridsize):
         output_path=str(output_path),
         gridsize=gridsize,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
     )
 
     # Check if the tmp file is correctly created
@@ -2029,6 +2027,12 @@ def test_symmetric_difference(tmp_path, request, suffix, epsg, gridsize):
     exp_gdf = exp_gdf[~exp_gdf.geometry.isna()]
     exp_gdf = exp_gdf[~exp_gdf.geometry.is_empty]
 
+    check_geom_tolerance = 0.0
+    if subdivide_coords < 2000 or (
+        epsg == 4326 and sys.platform in ("darwin", "linux")
+    ):
+        check_geom_tolerance = 1e-9
+
     assert_geodataframe_equal(
         output_gdf,
         exp_gdf,
@@ -2038,6 +2042,7 @@ def test_symmetric_difference(tmp_path, request, suffix, epsg, gridsize):
         check_dtype=False,
         check_less_precise=True,
         normalize=True,
+        check_geom_tolerance=check_geom_tolerance,
     )
 
 
@@ -2075,6 +2080,7 @@ def test_symmetric_difference_self(tmp_path):
         output_path=output_path,
         nb_parallel=2,
         batchsize=batchsize,
+        subdivide_coords=10,
     )
 
     # Check if the tmp file is correctly created

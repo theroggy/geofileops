@@ -979,7 +979,7 @@ def clip(
     )
 
 
-def difference(
+def difference(  # noqa: D417
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
@@ -998,7 +998,31 @@ def difference(
     input_columns_prefix: str = "",
     output_with_spatial_index: Optional[bool] = None,
     operation_prefix: str = "",
+    input1_subdivided_path: Union[Path, None] = None,
+    input2_subdivided_path: Union[Path, None] = None,
 ):
+    """Calculate the difference between two layers.
+
+    Only arguments specific to the internal difference operation are documented here.
+    For the other arguments, check out the corresponding function in geoops.py.
+
+    Args:
+        input_columns_prefix (str): Prefix to add to the columns of the input1 layer.
+        output_with_spatial_index (Optional[bool], optional): Controls whether the
+            output file is created with a spatial index. True to create one, False not
+            to create one, None to apply the GDAL standard behaviour. Defaults to None.
+        operation_prefix (str, optional): When this function is called from a compounded
+            spatial operation, the name of this operation can be specified to show
+            clearer progress messages,... Defaults to "".
+        input1_subdivided_path (Path | None, optional): If a Path to a file,
+            the subdivided version of input1 can be found here. If a Path to root
+            (Path("/")), input1 was tested, but it does not need subdividing. If None,
+            input1 still needs to be subdivided. Defaults to None.
+        input2_subdivided_path (Path | None, optional): If a Path to a file,
+            the subdivided version of input1 can be found here. If a Path to root
+            (Path("/")), input2 was tested, but it does not need subdividing. If None,
+            input2 still needs to be subdivided. Defaults to None.
+    """
     # Because there might be extra preparation of the input2 layer before going ahead
     # with the real calculation, do some additional init + checks here...
     start_time = datetime.now()
@@ -1032,24 +1056,29 @@ def difference(
         # multipolygons.
         force_output_geometrytype = force_output_geometrytype.to_multitype
 
-    # Subdivide the input1 layer if needed to speed up further processing.
-    # Save the original fid column in a new fid_1 column, we will need to filter/
-    # group by on it later on.
+    # Subdivide the input layers speeds up further processing if they are complex.
     tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-    input1_subdivided_path = _subdivide_layer(
-        path=input1_path,
-        layer=input1_layer,
-        output_path=tempdir / "subdivided/input1_layer.gpkg",
-        subdivide_coords=subdivide_coords,
-        keep_fid=True,
-        nb_parallel=nb_parallel,
-        batchsize=batchsize,
-        operation_prefix=f"{operation_name}/",
-    )
+
+    if input1_subdivided_path is None:
+        # input1_subdivided_path is None: try to subdivide.
+        input1_subdivided_path = _subdivide_layer(
+            path=input1_path,
+            layer=input1_layer,
+            output_path=tempdir / "subdivided/input1_layer.gpkg",
+            subdivide_coords=subdivide_coords,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            operation_prefix=f"{operation_name}/",
+        )
+    elif input1_subdivided_path == Path("/"):
+        # input1_subdivided_path is Path("/"): input1 doesn't contain complex geoms.
+        input1_subdivided_path = None
 
     where_clause_self = "1=1"
     if overlay_self:
-        # If we are doing a self overlay, we need to filter out rows with the same rowid
+        # If we are doing a self overlay
+        #   - input1 = input2, so if needed, it has already been subdivided
+        #   - we need to filter out rows with the same rowid
         if input1_subdivided_path is None:
             where_clause_self = "layer1.rowid <> layer2_sub.rowid"
         else:
@@ -1059,21 +1088,23 @@ def difference(
         # For overlay self, both subdivided layers are equal
         input2_subdivided_path = input1_subdivided_path
 
-    else:
-        # Subdivide the input2 layer if needed to speed up further processing.
-        # No self overlay, so no original fid column for the input2 layer needed.
+    elif input2_subdivided_path is None:
+        # input2_subdivided_path is None: try to subdivide.
         input2_subdivided_path = _subdivide_layer(
             path=input2_path,
             layer=input2_layer,
             output_path=tempdir / "subdivided/input2_layer.gpkg",
             subdivide_coords=subdivide_coords,
-            keep_fid=False,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}/",
         )
 
-    # If the input2 layer was subdivided
+    elif input2_subdivided_path == Path("/"):
+        # Input2 was tested previously, but it does not need subdividing
+        input2_subdivided_path = None
+
+    # If the input2 layer was subdivided, it can just be used as input2_path
     if input2_subdivided_path is not None:
         input2_path = input2_subdivided_path
 
@@ -1082,19 +1113,22 @@ def difference(
     #   later operations
     # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening e.g.
     #   "geom IS NOT NULL" leads to GFO_Difference_Collection calculated double!
-    # - ST_Intersects and ST_Touches slow down a lot when the data contains huge geoms
     # - Calculate difference in correlated subquery in SELECT clause reduces memory
     #   usage by a factor 10 compared with a WITH with GROUP BY. The WITH with a GROUP
     #   BY on layer1.rowid was a few % faster, but this is not worth it. E.g. for one
     #   test file 4-7 GB per process versus 70-700 MB). For another: crash.
-    # - Check if the result of GFO_Difference_Collection is empty (NULL) using IFNULL,
-    #   and if this is the case set to 'DIFF_EMPTY'. This way we can make the
-    #   distinction whether the subquery is finding a row (no match with spatial index)
-    #   or if the difference results in an empty/NULL geometry.
-    #   Tried to return EMPTY GEOMETRY from GFO_Difference_Collection, but it didn't
-    #   work to use spatialite's ST_IsEmpty(geom) = 0 to filter on this, probably
-    #   because ST_GeomFromWKB doesn't seem to support empty polygons.
-    # - ST_difference(geometry , NULL) gives NULL as result -> handle explicitly
+    # - ST_Touches is very slow when the data contains huge geoms -> only ST_intersects
+    # - ST_difference(geometry , NULL) gives NULL as result. This is not the wanted end
+    #   result: it should be the original geometry. Hence, only if the second parameter
+    #   is not NULL, the difference should be calculated. Otherwise return geometry.
+    #   second parameter would be NULL and if so, return the first parameter.
+    # - Check if the result of the difference is empty (NULL) using IFNULL, and if this
+    #   is the case set to 'DIFF_EMPTY'. This way we can make the distinction whether
+    #   the subquery is finding a row (no match with spatial index) or if the difference
+    #   results in an empty/NULL geometry.
+    # - Old comment: tried to return EMPTY GEOMETRY from GFO_Difference_Collection, but
+    #   it didn't work to use spatialite's ST_IsEmpty(geom) = 0 to filter on this,
+    #   probably because ST_GeomFromWKB doesn't seem to support empty polygons.
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
     input1_subdiv_layer_rtree = "rtree_{input1_layer}_{input1_subdiv_geometrycolumn}"
@@ -1233,12 +1267,15 @@ def _subdivide_layer(
     layer: Optional[str],
     output_path: Path,
     subdivide_coords: int,
-    keep_fid: bool,
+    keep_fid: bool = True,
     nb_parallel: int = -1,
     batchsize: int = -1,
     operation_prefix: str = "",
 ) -> Optional[Path]:
     """Subdivide a layer if needed.
+
+    By default, the original FID, before subdividing, is saved in column 'fid_1' in the
+    output file.
 
     Args:
         path (Path): path to the input file.
@@ -1419,7 +1456,6 @@ def export_by_location(
         layer=input_to_compare_with_layer,
         output_path=tmp_dir / "subdivided/input_to_compare_with_layer.gpkg",
         subdivide_coords=subdivide_coords,
-        keep_fid=False,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         operation_prefix=f"{operation_name}/",
@@ -1718,15 +1754,12 @@ def intersection(
         force_output_geometrytype = primitivetype_to_extract.to_multitype
 
     # Subdivide input1 layer if needed to speed up further processing.
-    # Save the original fid column in a new fid_1 column, we will need to filter/
-    # group by on it later on.
     tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
     input1_subdivided_path = _subdivide_layer(
         path=input1_path,
         layer=input1_layer,
         output_path=tempdir / "subdivided/input1_layer.gpkg",
         subdivide_coords=subdivide_coords,
-        keep_fid=True,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         operation_prefix=f"{operation_name}/",
@@ -1743,7 +1776,6 @@ def intersection(
             layer=input2_layer,
             output_path=tempdir / "subdivided/input2_layer.gpkg",
             subdivide_coords=subdivide_coords,
-            keep_fid=True,
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}/",
@@ -2560,8 +2592,36 @@ def symmetric_difference(
 
     tempdir = _io_util.create_tempdir("geofileops/symmdiff")
     try:
-        # First difference input2 from input1 to a temporary output file
-        logger.info("Step 1 of 3: difference 1")
+        # Prepare the input files
+        logger.info("Step 1 of 4: prepare input files")
+        input1_subdivided_path = _subdivide_layer(
+            path=input1_path,
+            layer=input1_layer,
+            output_path=tempdir / "subdivided/input1_layer.gpkg",
+            subdivide_coords=subdivide_coords,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            operation_prefix="symmetric_difference/",
+        )
+        if input1_subdivided_path is None:
+            # Hardcoded optimization: root means that no subdivide is needed further on
+            input1_subdivided_path = Path("/")
+
+        input2_subdivided_path = _subdivide_layer(
+            path=input2_path,
+            layer=input2_layer,
+            output_path=tempdir / "subdivided/input2_layer.gpkg",
+            subdivide_coords=subdivide_coords,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            operation_prefix="symmetric_difference/",
+        )
+        if input2_subdivided_path is None:
+            # Hardcoded optimization: root means that no subdivide is needed further on
+            input2_subdivided_path = Path("/")
+
+        # Difference input2 from input1 to a temporary output file
+        logger.info("Step 2 of 4: difference 1")
         diff1_output_path = tempdir / "layer1_diff_layer2_output.gpkg"
         difference(
             input1_path=input1_path,
@@ -2582,6 +2642,8 @@ def symmetric_difference(
             force=force,
             output_with_spatial_index=False,
             operation_prefix="symmetric_difference/",
+            input1_subdivided_path=input1_subdivided_path,
+            input2_subdivided_path=input2_subdivided_path,
         )
 
         if input2_columns is None or len(input2_columns) > 0:
@@ -2597,7 +2659,7 @@ def symmetric_difference(
                 )
 
         # Now difference input1 from input2 to another temporary output file
-        logger.info("Step 2 of 3: difference 2")
+        logger.info("Step 3 of 4: difference 2")
         diff2_output_path = tempdir / "layer2_diff_layer1_output.gpkg"
         difference(
             input1_path=input2_path,
@@ -2621,7 +2683,7 @@ def symmetric_difference(
         )
 
         # Now append
-        logger.info("Step 3 of 3: finalize")
+        logger.info("Step 4 of 4: finalize")
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
             src=diff2_output_path,
