@@ -1694,7 +1694,7 @@ def export_by_distance(
     )
 
 
-def intersection(
+def intersection(  # noqa: D417
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
@@ -1715,7 +1715,30 @@ def intersection(
     force: bool = False,
     output_with_spatial_index: Optional[bool] = None,
     operation_prefix: str = "",
+    input1_subdivided_path: Optional[Path] = None,
+    input2_subdivided_path: Optional[Path] = None,
 ):
+    """Calculate the intersection between two layers.
+
+    Only arguments specific to the internal difference operation are documented here.
+    For the other arguments, check out the corresponding function in geoops.py.
+
+    Args:
+        output_with_spatial_index (Optional[bool], optional): Controls whether the
+            output file is created with a spatial index. True to create one, False not
+            to create one, None to apply the GDAL standard behaviour. Defaults to None.
+        operation_prefix (str, optional): When this function is called from a compounded
+            spatial operation, the name of this operation can be specified to show
+            clearer progress messages,... Defaults to "".
+        input1_subdivided_path (Path | None, optional): If a Path to a file,
+            the subdivided version of input1 can be found here. If a Path to root
+            (Path("/")), input1 was tested, but it does not need subdividing. If None,
+            input1 still needs to be subdivided. Defaults to None.
+        input2_subdivided_path (Path | None, optional): If a Path to a file,
+            the subdivided version of input1 can be found here. If a Path to root
+            (Path("/")), input2 was tested, but it does not need subdividing. If None,
+            input2 still needs to be subdivided. Defaults to None.
+    """
     # Because there might be extra preparation of the input layers before going ahead
     # with the real calculation, do some additional init + checks here...
     start_time = datetime.now()
@@ -1755,22 +1778,28 @@ def intersection(
 
     # Subdivide input1 layer if needed to speed up further processing.
     tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-    input1_subdivided_path = _subdivide_layer(
-        path=input1_path,
-        layer=input1_layer,
-        output_path=tempdir / "subdivided/input1_layer.gpkg",
-        subdivide_coords=subdivide_coords,
-        nb_parallel=nb_parallel,
-        batchsize=batchsize,
-        operation_prefix=f"{operation_name}/",
-    )
+
+    if input1_subdivided_path is None:
+        # input1_subdivided_path is None: try to subdivide.
+        input1_subdivided_path = _subdivide_layer(
+            path=input1_path,
+            layer=input1_layer,
+            output_path=tempdir / "subdivided/input1_layer.gpkg",
+            subdivide_coords=subdivide_coords,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            operation_prefix=f"{operation_name}/",
+        )
+    elif input1_subdivided_path == Path("/"):
+        # input1_subdivided_path is Path("/"): input1 doesn't contain complex geoms.
+        input1_subdivided_path = None
 
     # Subdivide input2 layer as well if needed.
     if overlay_self:
         # If we are self-overlaying, input2 is the same as input1, so we can reuse the
         # result of subdividing input1.
         input2_subdivided_path = input1_subdivided_path
-    else:
+    elif input2_subdivided_path is None:
         input2_subdivided_path = _subdivide_layer(
             path=input2_path,
             layer=input2_layer,
@@ -1780,6 +1809,9 @@ def intersection(
             batchsize=batchsize,
             operation_prefix=f"{operation_name}/",
         )
+    elif input2_subdivided_path == Path("/"):
+        # input2_subdivided_path is Path("/"): input2 doesn't contain complex geoms.
+        input2_subdivided_path = None
 
     # If we are doing a self overlay, we need to filter out rows with the same rowid
     where_clause_self = "1=1"
@@ -2464,8 +2496,40 @@ def identity(
 
     tempdir = _io_util.create_tempdir("geofileops/identity")
     try:
-        # First calculate intersection of input1 with input2 to a temporary output file
-        logger.info("Step 1 of 3: intersection")
+        # Prepare the input files
+        logger.info("Step 1 of 4: prepare input files")
+        input1_subdivided_path = _subdivide_layer(
+            path=input1_path,
+            layer=input1_layer,
+            output_path=tempdir / "subdivided/input1_layer.gpkg",
+            subdivide_coords=subdivide_coords,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            operation_prefix="identity/",
+        )
+        if input1_subdivided_path is None:
+            # Hardcoded optimization: root means that no subdivide was needed
+            input1_subdivided_path = Path("/")
+
+        if overlay_self:
+            # If overlay_self is True, input1 and input2 are the same
+            input2_subdivided_path: Optional[Path] = input1_subdivided_path
+        else:
+            input2_subdivided_path = _subdivide_layer(
+                path=input2_path,
+                layer=input2_layer,
+                output_path=tempdir / "subdivided/input2_layer.gpkg",
+                subdivide_coords=subdivide_coords,
+                nb_parallel=nb_parallel,
+                batchsize=batchsize,
+                operation_prefix="identity/",
+            )
+            if input2_subdivided_path is None:
+                # Hardcoded optimization: root means that no subdivide was needed
+                input2_subdivided_path = Path("/")
+
+        # Calculate intersection of input1 with input2 to a temporary output file
+        logger.info("Step 2 of 4: intersection")
         intersection_output_path = tempdir / "intersection_output.gpkg"
         intersection(
             input1_path=input1_path,
@@ -2487,10 +2551,12 @@ def identity(
             force=force,
             output_with_spatial_index=False,
             operation_prefix="identity/",
+            input1_subdivided_path=input1_subdivided_path,
+            input2_subdivided_path=input2_subdivided_path,
         )
 
         # Now difference input1 from input2 to another temporary output gfo...
-        logger.info("Step 2 of 3: difference")
+        logger.info("Step 3 of 4: difference")
         difference_output_path = tempdir / "difference_output.gpkg"
         difference(
             input1_path=input1_path,
@@ -2511,10 +2577,12 @@ def identity(
             force=force,
             output_with_spatial_index=False,
             operation_prefix="identity/",
+            input1_subdivided_path=input1_subdivided_path,
+            input2_subdivided_path=input2_subdivided_path,
         )
 
         # Now append
-        logger.info("Step 3 of 3: finalize")
+        logger.info("Step 4 of 4: finalize")
         # Note: append will never create an index on an already existing layer.
         _append_to_nolock(
             src=difference_output_path,
@@ -2604,21 +2672,25 @@ def symmetric_difference(
             operation_prefix="symmetric_difference/",
         )
         if input1_subdivided_path is None:
-            # Hardcoded optimization: root means that no subdivide is needed further on
+            # Hardcoded optimization: root means that no subdivide was needed
             input1_subdivided_path = Path("/")
 
-        input2_subdivided_path = _subdivide_layer(
-            path=input2_path,
-            layer=input2_layer,
-            output_path=tempdir / "subdivided/input2_layer.gpkg",
-            subdivide_coords=subdivide_coords,
-            nb_parallel=nb_parallel,
-            batchsize=batchsize,
-            operation_prefix="symmetric_difference/",
-        )
-        if input2_subdivided_path is None:
-            # Hardcoded optimization: root means that no subdivide is needed further on
-            input2_subdivided_path = Path("/")
+        if overlay_self:
+            # With overlay_self, input2 is the same as input1
+            input2_subdivided_path: Optional[Path] = input1_subdivided_path
+        else:
+            input2_subdivided_path = _subdivide_layer(
+                path=input2_path,
+                layer=input2_layer,
+                output_path=tempdir / "subdivided/input2_layer.gpkg",
+                subdivide_coords=subdivide_coords,
+                nb_parallel=nb_parallel,
+                batchsize=batchsize,
+                operation_prefix="symmetric_difference/",
+            )
+            if input2_subdivided_path is None:
+                # Hardcoded optimization: root means that no subdivide was needed
+                input2_subdivided_path = Path("/")
 
         # Difference input2 from input1 to a temporary output file
         logger.info("Step 2 of 4: difference 1")

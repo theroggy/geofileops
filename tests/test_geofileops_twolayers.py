@@ -628,10 +628,14 @@ def test_export_by_distance(tmp_path, testfile, suffix):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, gridsize",
-    [(".gpkg", 31370, 0.01), (".gpkg", 4326, 0.0), (".shp", 31370, 0.01)],
+    "suffix, epsg, gridsize, subdivide_coords",
+    [
+        (".gpkg", 31370, 0.01, 2000),
+        (".gpkg", 4326, 0.0, 2000),
+        (".shp", 31370, 0.0, 10),
+    ],
 )
-def test_identity(tmp_path, suffix, epsg, gridsize):
+def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords):
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
@@ -646,6 +650,7 @@ def test_identity(tmp_path, suffix, epsg, gridsize):
         output_path=str(output_path),
         gridsize=gridsize,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
     )
 
     # Check if the output file is correctly created
@@ -678,6 +683,10 @@ def test_identity(tmp_path, suffix, epsg, gridsize):
     exp_gdf = exp_gdf[~exp_gdf.geometry.isna()]
     exp_gdf = exp_gdf[~exp_gdf.geometry.is_empty]
 
+    check_geom_tolerance = 0.0
+    if subdivide_coords < 2000:
+        check_geom_tolerance = 1e-9
+
     # OIDN is float vs int? -> check_column_type=False
     assert_geodataframe_equal(
         output_gdf,
@@ -687,6 +696,7 @@ def test_identity(tmp_path, suffix, epsg, gridsize):
         check_less_precise=True,
         normalize=True,
         check_dtype=False,
+        check_geom_tolerance=check_geom_tolerance,
     )
 
 
