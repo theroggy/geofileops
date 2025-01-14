@@ -448,7 +448,7 @@ def vector_translate(
     output_ds = None
     try:
         # Till gdal 3.10 datetime columns can be interpreted wrongly with arrow.
-        if _compat.GDAL_STE_310:
+        if _compat.GDAL_ST_311 and "OGR2OGR_USE_ARROW_API" not in config_options:
             config_options["OGR2OGR_USE_ARROW_API"] = False
 
         # Go!
