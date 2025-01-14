@@ -73,4 +73,4 @@ SHAPELY_GTE_20 = version.parse(shapely.__version__) >= version.parse("2")
 SPATIALITE_GTE_51 = version.parse(sqlite3_spatialite_version) >= version.parse("5.1")
 
 GDAL_GTE_38 = version.parse(gdal.__version__) >= version.parse("3.8")
-GDAL_STE_310 = version.parse(gdal.__version__) <= version.parse("3.10")
+GDAL_ST_311 = version.parse(gdal.__version__) < version.parse("3.11")

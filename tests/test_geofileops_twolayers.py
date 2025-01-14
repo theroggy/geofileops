@@ -2204,7 +2204,6 @@ def test_union(
     # For text columns, gfo gives None rather than np.nan for missing values.
     for column in exp_gdf.select_dtypes(include="O").columns:
         exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
-    exp_gdf["l1_DATUM"] = pd.to_datetime(exp_gdf["l1_DATUM"])
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     if explodecollections:
