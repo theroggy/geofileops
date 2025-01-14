@@ -25,6 +25,7 @@
 - Add configuration option to only warn on dissolve errors (#561)
 - Add some pre-flight checks when geofileops is imported (#573)
 - Add support for renaming layer with only difference in casing (#593)
+- Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
 
 ### Bugs fixed
 

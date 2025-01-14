@@ -244,6 +244,8 @@ def get_columns(
                     else:
                         output_geometrytype = GeometryType["GEOMETRY"]
                 columns[columnname] = output_geometrytype.name
+            elif columntype == "INT":
+                columns[columnname] = "INTEGER"
             elif columntype is None or columntype == "":
                 sql = f'SELECT typeof("{columnname}") FROM tmp;'
                 result = conn.execute(sql).fetchall()
