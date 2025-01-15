@@ -111,14 +111,18 @@ def test_convert_to_spatialite_based(
 
 
 @pytest.mark.parametrize(
-    "desc, testfile, subdivide_coords, retval_None",
+    "desc, testfile, subdivide_coords, expected_subdivided",
     [
-        ("input not complex", "polygon-zone", 1000, True),
-        ("input poly+complex", "polygon-zone", 1, False),
-        ("input no poly", "linestring-watercourse", 1, True),
+        ("input poly not complex", "polygon-zone", 1000, False),
+        ("input poly complex", "polygon-zone", 1, True),
+        ("input line not complex", "linestring-watercourse", 10_000, False),
+        ("input line complex", "linestring-watercourse", 1, True),
+        ("input point complex", "point", 1, False),
     ],
 )
-def test_subdivide_layer(desc, tmp_path, testfile, subdivide_coords, retval_None):
+def test_subdivide_layer(
+    desc, tmp_path, testfile, subdivide_coords, expected_subdivided: bool
+):
     path = test_helper.get_testfile(testfile)
     result = _geoops_sql._subdivide_layer(
         path=path,
@@ -128,7 +132,7 @@ def test_subdivide_layer(desc, tmp_path, testfile, subdivide_coords, retval_None
         keep_fid=False,
     )
 
-    if retval_None:
-        assert result is None
-    else:
+    if expected_subdivided:
         assert result is not None
+    else:
+        assert result is None

@@ -1294,9 +1294,9 @@ def _subdivide_layer(
     if subdivide_coords <= 0:
         return None
 
-    # Only subdivide Polygon layers
+    # Never subdivide simple Point layers
     layer_info = gfo.get_layerinfo(path, layer)
-    if layer_info.geometrytype.to_primitivetype != PrimitiveType.POLYGON:
+    if layer_info.geometrytype == GeometryType.POINT:
         return None
 
     # If layer has complex geometries, subdivide them.
