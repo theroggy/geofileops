@@ -1,0 +1,26 @@
+name: geofileops-nightly-deps
+channels:
+  - gdal-master
+  - conda-forge
+dependencies:
+  - python
+  - pip
+  # required
+  - cloudpickle
+  - gdal
+  - geopandas-base
+  - libspatialite
+  # - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
+  - numpy
+  - packaging
+  - pandas
+  - psutil
+  - pygeoops
+  - pyogrio
+  - pyproj
+  - shapely
+  # optional
+  - simplification
+  # testing
+  - pytest
+  - pytest-cov
