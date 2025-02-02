@@ -602,12 +602,12 @@ def test_export_by_distance(tmp_path, testfile, suffix):
     input_layerinfo = gfo.get_layerinfo(input_to_select_from_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     output_path = tmp_path / f"{input_to_select_from_path.stem}-output{suffix}"
-
+    max_distance = 10
     # Test
     gfo.export_by_distance(
         input_to_select_from_path=str(input_to_select_from_path),
         input_to_compare_with_path=str(input_to_compare_with_path),
-        max_distance=10,
+        max_distance=max_distance,
         output_path=str(output_path),
         batchsize=batchsize,
     )
@@ -618,13 +618,34 @@ def test_export_by_distance(tmp_path, testfile, suffix):
     assert gfo.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = gfo.get_layerinfo(input_to_select_from_path)
     assert input_layerinfo.featurecount == output_layerinfo.featurecount
-    assert len(input_layerinfo.columns) == len(output_layerinfo.columns)
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
 
     # Check the contents of the result file
-    # TODO: this test should be more elaborate...
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
+
+    input_gdf = gfo.read_file(input_to_compare_with_path)
+    # Check CRS consistency
+    assert input_gdf.crs == output_gdf.crs
+
+    # Check if the exported geometries are within the specified distance using shapely
+    input_geometries = input_gdf["geometry"]
+    for output_geom in output_gdf["geometry"]:
+        min_distance = min(
+            output_geom.distance(input_geom) for input_geom in input_geometries
+        )
+        assert min_distance <= max_distance
+
+    # Check if columns exist and have the same data type
+    for col_name, col_infos in input_layerinfo.columns.items():
+        assert col_name in output_layerinfo.columns.keys()
+        assert col_infos.gdal_type == output_layerinfo.columns.get(col_name).gdal_type
+
+    # Compare attribute values of a selected column
+    CHECK_COL = "OIDN"
+    input_ids = gfo.read_file(input_to_select_from_path)[CHECK_COL].tolist()
+    output_ids = output_gdf[CHECK_COL].tolist()
+    assert set(output_ids).issubset(input_ids)
 
 
 @pytest.mark.parametrize(

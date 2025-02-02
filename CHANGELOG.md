@@ -21,7 +21,7 @@
 - Improve performance of `erase` and `intersection` for very complex input geometries.
   This gives similar improvements for such datasets to `identity`,
   `symmetric_difference` and `union`. (#585, #601, #591)
-- only apply subdivide once on each input layer in symmetric_difference
+- Enable subdividing of linestring layers as well (#614)
 - Add configuration option to only warn on dissolve errors (#561)
 - Add some pre-flight checks when geofileops is imported (#573)
 - Add support for renaming layer with only difference in casing (#593)
