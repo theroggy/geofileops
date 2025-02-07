@@ -10,3 +10,4 @@ dependencies:
   - simplification
   # testing
   - pytest
+  - pytest-xdist

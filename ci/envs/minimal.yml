@@ -23,3 +23,4 @@ dependencies:
   # testing
   - pytest
   - pytest-cov
+  - pytest-xdist
