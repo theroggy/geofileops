@@ -108,8 +108,11 @@ def test_nested_collections(ogr_type):
 
     test_gdf = gfo.read_file(input_path, sql_stmt=sql_stmt)
     if ogr_type == "WKT":
-        # Due to a bug in spatialite this isn't equal even though it should be equal...
-        assert test_gdf.geometry[0].wkt != collection.wkt
+        # Due to a bug in spatialite this isn't equal even though it should be equal.
+        pytest.xfail("Spatialite: Multi-geom in WKT GeometryCollection is flattened")
+        assert test_gdf.geometry[0].wkt == collection.wkt
     elif ogr_type == "WKB":
         # Due to a worse bug in spatialite the wkb version is parsed to a POINT.
+        pytest.xfail("Spatialite: Multi-geom in WKB GeometryCollection becomes Point")
         assert test_gdf.geometry[0].wkt == "GEOMETRYCOLLECTION (POINT (0 0))"
+        assert test_gdf.geometry[0].wkt == collection.wkt
