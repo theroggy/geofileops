@@ -99,40 +99,34 @@ def create_new_spatialdb(path: Path, crs_epsg: Optional[int] = None):
             load_spatialite(conn)
 
             # Init file
+            # Starting transaction manually is necessary for performance
+            sql = "BEGIN TRANSACTION;\n"
             output_suffix_lower = path.suffix.lower()
             if output_suffix_lower == ".gpkg":
-                sql = "SELECT EnableGpkgMode();"
-                # sql = 'SELECT EnableGpkgAmphibiousMode();'
-                conn.execute(sql)
+                sql += "SELECT EnableGpkgMode();\n"
+                # sql += "SELECT EnableGpkgAmphibiousMode();"
                 # Remark: this only works on the main database!
-                sql = "SELECT gpkgCreateBaseTables();"
-                conn.execute(sql)
+                sql += "SELECT gpkgCreateBaseTables();\n"
                 if crs_epsg is not None and crs_epsg not in [0, -1, 4326]:
-                    sql = f"SELECT gpkgInsertEpsgSRID({crs_epsg})"
-                    conn.execute(sql)
+                    sql += f"SELECT gpkgInsertEpsgSRID({crs_epsg});\n"
 
                 # If they are present, remove triggers that were removed from the gpkg
                 # spec because of issues but apparently weren't removed in spatialite.
                 # https://github.com/opengeospatial/geopackage/pull/240
-                sql = "DROP TRIGGER gpkg_metadata_reference_row_id_value_insert;"
-                try:
-                    conn.execute(sql)
-                except Exception:  # pragma: no cover
-                    pass
-                sql = "DROP TRIGGER gpkg_metadata_reference_row_id_value_update;"
-                try:
-                    conn.execute(sql)
-                except Exception:  # pragma: no cover
-                    pass
+                sql += """
+                    DROP TRIGGER IF EXISTS gpkg_metadata_reference_row_id_value_insert;
+                    DROP TRIGGER IF EXISTS gpkg_metadata_reference_row_id_value_update;
+                """
 
             elif output_suffix_lower == ".sqlite":
-                sql = "SELECT InitSpatialMetaData(1);"
-                conn.execute(sql)
+                sql += "SELECT InitSpatialMetaData(1);\n"
                 if crs_epsg is not None and crs_epsg not in [0, -1, 4326]:
-                    sql = f"SELECT InsertEpsgSrid({crs_epsg})"
-                    conn.execute(sql)
+                    sql += f"SELECT InsertEpsgSrid({crs_epsg});\n"
             else:
                 raise Exception(f"Unsupported output format: {output_suffix_lower}")
+
+            sql += "COMMIT;\n"
+            conn.executescript(sql)
 
     except Exception as ex:
         raise Exception(f"Error creating spatial db {path}") from ex
@@ -165,6 +159,10 @@ def get_columns(
     sql = None
     conn = sqlite3.connect(main_db_path, detect_types=sqlite3.PARSE_DECLTYPES)
     try:
+        # Start transaction manually needed for performance
+        sql = "BEGIN TRANSACTION;"
+        conn.execute(sql)
+
         # Load spatialite if asked for
         if use_spatialite:
             load_spatialite(conn)
@@ -211,6 +209,7 @@ def get_columns(
         """
         conn.execute(sql)
         conn.commit()
+
         sql = "PRAGMA TABLE_INFO(tmp)"
         cur = conn.execute(sql)
         tmpcolumns = cur.fetchall()
@@ -352,6 +351,17 @@ def create_table_as_sql(
     if not output_path.exists():
         create_new_spatialdb(path=output_path, crs_epsg=output_crs)
 
+    # Determine columns/datatypes to create the table if not specified
+    column_types = column_datatypes
+    if column_types is None:
+        column_types = get_columns(
+            sql_stmt=sql_stmt,
+            input_databases=input_databases,
+            empty_output_ok=empty_output_ok,
+            use_spatialite=True,
+            output_geometrytype=output_geometrytype,
+        )
+
     sql = None
     conn = sqlite3.connect(output_path, detect_types=sqlite3.PARSE_DECLTYPES, uri=True)
     try:
@@ -405,16 +415,9 @@ def create_table_as_sql(
                     conn.execute(f"PRAGMA {databasename}.locking_mode=EXCLUSIVE;")
                     conn.execute(f"PRAGMA {databasename}.synchronous=OFF;")
 
-            # Determine columns/datatypes to create the table if not specified
-            column_types = column_datatypes
-            if column_types is None:
-                column_types = get_columns(
-                    sql_stmt=sql_stmt,
-                    input_databases=input_databases,
-                    empty_output_ok=empty_output_ok,
-                    use_spatialite=True,
-                    output_geometrytype=output_geometrytype,
-                )
+            # Start transaction manually needed for performance
+            sql = "BEGIN TRANSACTION;"
+            conn.execute(sql)
 
             # If geometry type was not specified, look for it in column_types
             if output_geometrytype is None and "geom" in column_types:
@@ -647,12 +650,12 @@ def load_spatialite(conn):
         ) from ex
 
     # Register custom functions
-    conn.create_function(
-        "GFO_Difference_Collection",
-        -1,
-        sqlite_userdefined.gfo_difference_collection,
-        deterministic=True,
-    )
+    # conn.create_function(
+    #     "GFO_Difference_Collection",
+    #     -1,
+    #     sqlite_userdefined.gfo_difference_collection,
+    #     deterministic=True,
+    # )
 
     conn.create_function(
         "GFO_ReducePrecision",
@@ -661,19 +664,13 @@ def load_spatialite(conn):
         deterministic=True,
     )
 
-    conn.create_function(
-        "GFO_Split",
-        -1,
-        sqlite_userdefined.gfo_split,
-        deterministic=True,
-    )
+    # conn.create_function(
+    #     "GFO_Split", -1, sqlite_userdefined.gfo_split, deterministic=True
+    # )
 
-    conn.create_function(
-        "GFO_Subdivide",
-        -1,
-        sqlite_userdefined.gfo_subdivide,
-        deterministic=True,
-    )
+    # conn.create_function(
+    #     "GFO_Subdivide", -1, sqlite_userdefined.gfo_subdivide, deterministic=True
+    # )
 
     # Register custom aggregate function
     # conn.create_aggregate("GFO_Difference_Agg", 3, userdefined.DifferenceAgg)

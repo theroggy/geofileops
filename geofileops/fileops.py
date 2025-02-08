@@ -319,16 +319,7 @@ def get_layerinfo(
         datasource = gdal.OpenEx(
             str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
         )
-        if layer is not None:
-            datasource_layer = datasource.GetLayer(layer)
-        else:
-            # No layer specified, if there is only one layer: use it, otherwise: raise.
-            datasource_layer = _get_only_layer(datasource)
-            layer = datasource_layer.GetName()
-
-        # If the layer doesn't exist, raise
-        if datasource_layer is None:
-            raise ValueError(f"Layer {layer} not found in file: {path}")
+        datasource_layer = _get_layer(datasource, layer)
 
         # Get column info
         columns = {}
@@ -348,7 +339,7 @@ def get_layerinfo(
                 if illegal_char in name:
                     errors.append(
                         f"Column name {name} contains illegal char: {illegal_char} "
-                        f"in file {path}, layer {layer}"
+                        f"in {path}#{layer}"
                     )
             column_info = ColumnInfo(
                 name=name, gdal_type=gdal_type, width=width, precision=precision
@@ -409,7 +400,7 @@ def get_layerinfo(
             )
 
     except Exception as ex:
-        ex.args = (f"get_layerinfo error for {path}.{layer}:\n  {ex}",)
+        ex.args = (f"get_layerinfo error for {path}#{layer}:\n  {ex}",)
         raise
     finally:
         datasource = None
@@ -449,6 +440,41 @@ def get_only_layer(path: Union[str, "os.PathLike[Any]"]) -> str:
         datasource = None
 
 
+def _get_layer(
+    datasource: gdal.Dataset, layer: Optional[Union[str, LayerInfo]]
+) -> ogr.Layer:
+    """Get the gdal layer specified in the datasource.
+
+    If layer is None and there is only one layer in the datasource, this layer is
+    returned. If there are multiple layers, an exception is thrown.
+
+    Remark: the datasource won't be opened nor closed in this function, this is the
+    responsibility of the calling function!
+
+    Args:
+        datasource (gdal.Dataset): the gdal DataSet to get the only layer from.
+        layer (str or LayerInfo, optional): the layer to get. If not specified, and
+            there is only one layer in the file, this layer is used. Otherwise
+            exception.
+
+    Raises:
+        ValueError: if the layer specified is not found, or if no or > 1 layers are
+            found in the datasource.
+
+    Returns:
+        ogr.Layer: the layer.
+    """
+    layername = layer.name if isinstance(layer, LayerInfo) else layer
+    if layername is not None:
+        datasource_layer = datasource.GetLayer(layername)
+        if datasource_layer is None:
+            raise ValueError(f"Layer {layername} not found in file")
+        return datasource_layer
+
+    else:
+        return _get_only_layer(datasource)
+
+
 def _get_only_layer(datasource: gdal.Dataset) -> ogr.Layer:
     """Get the gdal layer for datasource that only contains one layer.
 
@@ -462,7 +488,7 @@ def _get_only_layer(datasource: gdal.Dataset) -> ogr.Layer:
         ValueError: if no or > 1 layers are found in the datasource.
 
     Returns:
-        Any: the only layer found in the datasource.
+        ogr.Layer: the only layer found in the datasource.
     """
     nb_layers = datasource.GetLayerCount()
     if nb_layers == 1:
@@ -558,29 +584,30 @@ def create_spatial_index(
     # Add index
     path_info = _geofileinfo.get_geofileinfo(path)
     try:
-        # If index already exists, remove index or return
-        if has_spatial_index(path, layer):
-            if force_rebuild:
-                remove_spatial_index(path, layer)
-            elif exist_ok:
-                return
-            else:
-                raise RuntimeError(
-                    f"spatial index exists already on {path}#{layer.name}"
-                )
+        # The config options need to be set before opening the file!
+        with _ogr_util.set_config_options({"OGR_SQLITE_CACHE": cache_size_mb}):
+            datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
+            # If index already exists, remove index or return
+            if _has_spatial_index(datasource, path, layer):
+                if force_rebuild:
+                    remove_spatial_index(path, layer)
+                elif exist_ok:
+                    return
+                else:
+                    raise RuntimeError(
+                        f"spatial index exists already on {path}#{layer.name}"
+                    )
 
-        if path_info.is_spatialite_based:
-            # The config options need to be set before opening the file!
-            with _ogr_util.set_config_options({"OGR_SQLITE_CACHE": cache_size_mb}):
-                datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
+            if path_info.is_spatialite_based:
                 geometrycolumn = layer.geometrycolumn
                 sql = f"SELECT CreateSpatialIndex('{layer.name}', '{geometrycolumn}')"
                 result = datasource.ExecuteSQL(sql, dialect="SQLITE")
                 datasource.ReleaseResultSet(result)
-        else:
-            datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
-            result = datasource.ExecuteSQL(f'CREATE SPATIAL INDEX ON "{layer.name}"')
-            datasource.ReleaseResultSet(result)
+            else:
+                result = datasource.ExecuteSQL(
+                    f'CREATE SPATIAL INDEX ON "{layer.name}"'
+                )
+                datasource.ReleaseResultSet(result)
 
     except Exception as ex:
         if isinstance(ex, ValueError) and str(ex).startswith(
@@ -622,39 +649,68 @@ def has_spatial_index(
     path = Path(path)
 
     # Now check the index
-    datasource = None
-    path_info = _geofileinfo.get_geofileinfo(path)
     try:
-        if path_info.is_spatialite_based:
-            if not isinstance(layer, LayerInfo):
-                layer = get_layerinfo(path, layer, raise_on_nogeom=not no_geom_ok)
-            if no_geom_ok and layer.geometrycolumn is None:
-                return False
-            datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_READONLY)
-            sql = f"""
-                SELECT HasSpatialIndex('{layer.name}',
-                                       '{layer.geometrycolumn}')
-            """
-            result = datasource.ExecuteSQL(sql, dialect="SQLITE")
-            has_spatial_index = result.GetNextFeature().GetField(0) == 1
-            datasource.ReleaseResultSet(result)
-            return has_spatial_index
-        elif path_info.driver == "ESRI Shapefile":
-            index_path = path.parent / f"{path.stem}.qix"
-            return index_path.exists()
-        else:
-            raise ValueError(
-                f"has_spatial_index not supported for {path_info.driver}: {path}"
-            )
-
-    except ValueError:
-        raise
+        datasource = gdal.OpenEx(
+            str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
+        )
+        return _has_spatial_index(datasource, path, layer, no_geom_ok)
     except Exception as ex:
         layername = layer.name if isinstance(layer, LayerInfo) else layer
         ex.args = (f"has_spatial_index error: {ex}, for {path}#{layername}",)
         raise
     finally:
         datasource = None
+
+
+def _has_spatial_index(
+    datasource: gdal.Dataset,
+    path: Path,
+    layer: Optional[Union[str, LayerInfo]] = None,
+    no_geom_ok: bool = False,
+) -> bool:
+    """Check if the layer/column has a spatial index.
+
+    Args:
+        datasource (gdal.Dataset): Opened gdal Dataset.
+        path (Path): The file path to the datasource.
+        layer (str, optional): The layer. Defaults to None.
+        no_geom_ok (bool, options): If True and the file doesn't have a geometry column,
+            don't throw an error. Defaults to False.
+
+    Raises:
+        ValueError: an invalid parameter value was passed.
+
+    Returns:
+        bool: True if a spatial index exists, False if it doesn't exist.
+    """
+    path_info = _geofileinfo.get_geofileinfo(path)
+    if path_info.is_spatialite_based:
+        datasource_layer = _get_layer(datasource, layer)
+        layername = datasource_layer.GetName()
+
+        # The layer doesn't have a geometry column, so there can be no spatial index
+        if datasource_layer.GetGeomType() is None:
+            if no_geom_ok:
+                return False
+            else:
+                raise ValueError(f"Layer {layername} has no geometry column")
+
+        geometrycolumn = datasource_layer.GetGeometryColumn()
+        if geometrycolumn == "":
+            geometrycolumn = "geometry"
+
+        sql = f"SELECT HasSpatialIndex('{layername}', '{geometrycolumn}')"
+        result = datasource.ExecuteSQL(sql, dialect="SQLITE")
+        has_spatial_index = result.GetNextFeature().GetField(0) == 1
+        datasource.ReleaseResultSet(result)
+        return has_spatial_index
+
+    elif path_info.driver == "ESRI Shapefile":
+        index_path = path.parent / f"{path.stem}.qix"
+        return index_path.exists()
+
+    else:
+        raise ValueError(f"has_spatial_index not supported for {path_info.driver}")
 
 
 def remove_spatial_index(
@@ -725,19 +781,16 @@ def rename_layer(
     # Now really rename
     try:
         datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
-        if layer is not None:
-            datasource_layer = datasource.GetLayer(layer)
-        else:
-            datasource_layer = _get_only_layer(datasource)
-            layer = datasource_layer.GetName()
+        datasource_layer = _get_layer(datasource, layer)
+        layername = datasource_layer.GetName()
 
         if not datasource_layer.TestCapability(gdal.ogr.OLCRename):
             raise ValueError(f"rename_layer not supported for {path}")
 
         # If the layer name only differs in case, we need to rename it first to a
         # temporary layer name to avoid an error.
-        if layer.lower() == new_layer.lower():
-            datasource_layer.Rename(f"tmp_{layer}")
+        if layername.lower() == new_layer.lower():
+            datasource_layer.Rename(f"tmp_{layername}")
 
         # Rename layer
         datasource_layer.Rename(new_layer)
@@ -773,7 +826,6 @@ def rename_column(
         return
 
     # Now really rename
-    datasource = None
     try:
         datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
         datasource_layer = datasource.GetLayer(layerinfo.name)
@@ -919,7 +971,7 @@ def add_column(
             datasource.ReleaseResultSet(result)
 
     except Exception as ex:
-        ex.args = (f"add_column error for {path}.{layer}:\n  {ex}",)
+        ex.args = (f"add_column error for {path}#{layer}:\n  {ex}",)
         raise
     finally:
         datasource = None
@@ -946,7 +998,6 @@ def drop_column(
         return
 
     # Now really rename
-    datasource = None
     try:
         datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
         sql_stmt = f'ALTER TABLE "{layer}" DROP COLUMN "{column_name}"'
@@ -954,7 +1005,7 @@ def drop_column(
         datasource.ReleaseResultSet(result)
 
     except Exception as ex:
-        ex.args = (f"drop_column error for {path}.{layer}:\n  {ex}",)
+        ex.args = (f"drop_column error for {path}#{layer}:\n  {ex}",)
         raise
     finally:
         datasource = None
@@ -989,10 +1040,9 @@ def update_column(
         columns_upper.append(layerinfo.geometrycolumn.upper())
     if name.upper() not in columns_upper:
         # If column doesn't exist yet, error!
-        raise ValueError(f"Column {name} doesn't exist in {path}.{layerinfo.name}")
+        raise ValueError(f"Column {name} doesn't exist in {path}#{layerinfo.name}")
 
     # Go!
-    datasource = None
     try:
         datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
         sqlite_stmt = f'UPDATE "{layerinfo.name}" SET "{name}" = {expression}'
@@ -1879,15 +1929,7 @@ def get_crs(
         datasource = gdal.OpenEx(
             str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
         )
-        if layer is not None:
-            datasource_layer = datasource.GetLayer(layer)
-        else:
-            datasource_layer = _get_only_layer(datasource)
-            layer = datasource_layer.GetName()
-
-        # If the layer doesn't exist, raise
-        if datasource_layer is None:
-            raise ValueError(f"Layer {layer} not found in file: {path}")
+        datasource_layer = _get_layer(datasource, layer)
 
         # Get the crs
         spatialref = datasource_layer.GetSpatialRef()
@@ -1901,7 +1943,7 @@ def get_crs(
     except ValueError:
         raise
     except Exception as ex:
-        ex.args = (f"get_crs error: {ex} for {path}.{layer}",)
+        ex.args = (f"get_crs error: {ex} for {path}#{layer}",)
         raise
     finally:
         datasource = None

@@ -546,7 +546,9 @@ def vector_translate(
         if output_ds is None:
             raise RuntimeError("output_ds is None")
 
-        # Sometimes an invalid output file is written, so close and try to reopen it.
+        # Fix invalig files that were written with older versions of GDAL.
+        # More info: https://github.com/geofileops/geofileops/issues/313
+        # if not _compat.GDAL_GTE_38:
         output_ds = None
         _validate_file(
             output_path,

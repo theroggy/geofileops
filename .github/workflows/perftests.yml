@@ -1,24 +1,14 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# This workflow will install Python dependencies and run some performance tests
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Tests
+name: PerfTests
 
 on:
-  push:
-    branches: [ main, v0.** ]
   pull_request:
     branches: [ main, v0.** ]
-    paths-ignore:
-      - "benchmark/**"
-      - "docs/**"
+    paths:
       - "perftests/**"
-      - ".github/workflows/tests_installed.yml"
       - ".github/workflows/perftests.yml"
-      - "*.md"
-      - "*.yml"
-  schedule:
-    # every Wednesday at 3:40 AM
-    - cron: "40 3 * * 3"
 
 concurrency: 
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -37,25 +27,13 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         dev: [false]
-        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        python: ["3.12"]
         env: ["latest"]
         # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
         extra: ["nomkl"]
         include:
-          - env: nightly-deps
-            os: ubuntu-latest
-            dev: false
-            python: "3.12"
-          - env: minimal
-            os: ubuntu-latest
-            dev: false
-            python: "3.9"
-          - env: latest-fiona
-            os: windows-latest
-            dev: false
-            python: "3.12"
           - env: latest
-            os: macos-latest
+            os: windows-latest
             dev: false
             python: "3.12"
             
@@ -72,11 +50,5 @@ jobs:
             ${{ matrix.extra }}
         
       - name: Test
-        run: >-
-          pytest
-          --numprocesses 4 --color=yes 
-          --cov=geofileops --cov-append --cov-report term-missing --cov-report 
-          xml tests/
-
-      - uses: codecov/codecov-action@v5
-      
+        run: |
+          pytest --color=yes perftests/
