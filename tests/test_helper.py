@@ -13,7 +13,7 @@ import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
-from geofileops.util import _geofileinfo, _geoseries_util, geodataframe_util
+from geofileops.util import _geofileinfo, _geoseries_util, _io_util, geodataframe_util
 
 _data_dir = Path(__file__).parent.resolve() / "data"
 EPSGS = [31370, 4326]
@@ -139,7 +139,7 @@ def get_testfile(
     dimensions: Optional[str] = None,
     explodecollections: bool = False,
 ) -> Path:
-    # Prepare original filepath; but try first with .zip.gpkg file.
+    # Prepare original filepath.
     testfile_path = _data_dir / f"{testfile}.gpkg"
     if not testfile_path.exists():
         raise ValueError(f"Invalid testfile type: {testfile}")
@@ -157,56 +157,75 @@ def get_testfile(
     )
     if prepared_path.exists():
         return prepared_path
-    layers = gfo.listlayers(testfile_path)
-    dst_info = _geofileinfo.get_geofileinfo(prepared_path)
-    if len(layers) > 1 and dst_info.is_singlelayer:
-        raise ValueError(
-            f"multilayer testfile ({testfile}) cannot be converted to single layer "
-            f"geofiletype: {dst_info.driver}"
+
+    # Test file doesn't exist yet, so create it
+    # To be safe for parallelized tests, lock the creation.
+    prepared_lock_path = Path(f"{prepared_path}.lock")
+    try:
+        _io_util.create_file_atomic_wait(
+            prepared_lock_path, time_between_attempts=0.1, timeout=60
         )
 
-    # Copy all layers found
-    for src_layer in layers:
-        # Single layer files have stem as layername
-        dst_layer = prepared_path.stem if dst_info.is_singlelayer else src_layer
+        # Make sure it wasn't created by another process while waiting for the lock file
+        if prepared_path.exists():
+            return prepared_path
 
-        gfo.copy_layer(
-            testfile_path,
-            prepared_path,
-            src_layer=src_layer,
-            dst_layer=dst_layer,
-            dst_crs=epsg,
-            reproject=True,
-            append=True,
-            preserve_fid=not explodecollections,
-            dst_dimensions=dimensions,
-            explodecollections=explodecollections,
-        )
+        layers = gfo.listlayers(testfile_path)
+        dst_info = _geofileinfo.get_geofileinfo(prepared_path)
+        if len(layers) > 1 and dst_info.is_singlelayer:
+            raise ValueError(
+                f"multilayer testfile ({testfile}) cannot be converted to single layer "
+                f"geofiletype: {dst_info.driver}"
+            )
 
-        if empty:
-            # Remove all rows from destination layer.
-            # GDAL only supports DELETE using SQLITE dialect, not with OGRSQL.
-            gfo.execute_sql(
+        # Convert all layers found
+        for src_layer in layers:
+            # Single layer files have stem as layername
+            dst_layer = prepared_path.stem if dst_info.is_singlelayer else src_layer
+
+            gfo.copy_layer(
+                testfile_path,
                 prepared_path,
-                sql_stmt=f'DELETE FROM "{dst_layer}"',
-                sql_dialect="SQLITE",
+                src_layer=src_layer,
+                dst_layer=dst_layer,
+                dst_crs=epsg,
+                reproject=True,
+                append=True,
+                preserve_fid=not explodecollections,
+                dst_dimensions=dimensions,
+                explodecollections=explodecollections,
             )
-        elif dimensions is not None:
-            if dimensions != "XYZ":
-                raise ValueError(f"unimplemented dimensions: {dimensions}")
 
-            prepared_info = gfo.get_layerinfo(
-                prepared_path, layer=dst_layer, raise_on_nogeom=False
-            )
-            if prepared_info.geometrycolumn is not None:
-                gfo.update_column(
+            if empty:
+                # Remove all rows from destination layer.
+                # GDAL only supports DELETE using SQLITE dialect, not with OGRSQL.
+                gfo.execute_sql(
                     prepared_path,
-                    name=prepared_info.geometrycolumn,
-                    expression=f"CastToXYZ({prepared_info.geometrycolumn}, 5.0)",
-                    layer=dst_layer,
+                    sql_stmt=f'DELETE FROM "{dst_layer}"',
+                    sql_dialect="SQLITE",
                 )
+            elif dimensions is not None:
+                if dimensions != "XYZ":
+                    raise ValueError(f"unimplemented dimensions: {dimensions}")
 
-    return prepared_path
+                prepared_info = gfo.get_layerinfo(
+                    prepared_path, layer=dst_layer, raise_on_nogeom=False
+                )
+                if prepared_info.geometrycolumn is not None:
+                    gfo.update_column(
+                        prepared_path,
+                        name=prepared_info.geometrycolumn,
+                        expression=f"CastToXYZ({prepared_info.geometrycolumn}, 5.0)",
+                        layer=dst_layer,
+                    )
+
+        return prepared_path
+
+    except Exception:
+        gfo.remove(prepared_path, missing_ok=True)
+        raise
+    finally:
+        prepared_lock_path.unlink(missing_ok=True)
 
 
 class TestData:

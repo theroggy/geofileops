@@ -236,6 +236,12 @@ def get_driver(path: Union[str, "os.PathLike[Any]"]) -> str:
     """
     path = Path(path)
 
+    # gdal.OpenEx is relatively slow on windows, so for straightforward cases, avoid it.
+    if path.suffix.lower() == ".gpkg":
+        return "GPKG"
+    elif path.suffix.lower() == ".shp":
+        return "ESRI Shapefile"
+
     def get_driver_for_path(input_path) -> str:
         # If there is no suffix, possibly it is only a suffix, so prefix with filename
         if input_path.suffix == "":
@@ -254,7 +260,6 @@ def get_driver(path: Union[str, "os.PathLike[Any]"]) -> str:
             )
 
     # If the file exists, determine the driver based on the file.
-    datasource = None
     try:
         datasource = gdal.OpenEx(
             str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED

@@ -202,12 +202,16 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
 
 
 def test_apply_geooperation_invalid_operation(tmp_path):
+    input_path = test_helper.get_testfile("polygon-parcel")
+    layerinfo = gfo.get_layerinfo(input_path)
+
     with pytest.raises(ValueError, match="operation not supported: INVALID"):
         geoops_gpd._apply_geooperation(
-            input_path=test_helper.get_testfile("polygon-parcel"),
+            input_path=input_path,
             output_path=tmp_path / "output.gpkg",
             operation="INVALID",
             operation_params={},
+            input_layer=layerinfo,
         )
 
 

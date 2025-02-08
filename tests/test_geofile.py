@@ -1220,7 +1220,7 @@ def test_fill_out_sql_placeholders():
     "layer, sql_stmt, error",
     [
         (
-            "parcel",
+            "parcels",
             'SELECT {invalid_placeholder} FROM "parcel"',
             "unknown placeholder invalid_placeholder ",
         ),
@@ -1234,13 +1234,7 @@ def test_fill_out_sql_placeholders():
 def test_fill_out_sql_placeholders_errors(layer, sql_stmt, error):
     path = test_helper.get_testfile("polygon-twolayers")
 
-    # Test invalid placeholder
-    with pytest.raises(ValueError, match=error):
-        fileops._fill_out_sql_placeholders(
-            path, layer=layer, sql_stmt=sql_stmt, columns=None
-        )
-
-    # Test layer not passed with multi-layer input file
+    # Test
     with pytest.raises(ValueError, match=error):
         fileops._fill_out_sql_placeholders(
             path, layer=layer, sql_stmt=sql_stmt, columns=None

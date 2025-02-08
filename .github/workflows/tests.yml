@@ -70,8 +70,11 @@ jobs:
             ${{ matrix.extra }}
         
       - name: Test
-        run: |
-          pytest --color=yes --cov=geofileops --cov-append --cov-report term-missing --cov-report xml tests/
+        run: >-
+          pytest
+          --numprocesses 4 --color=yes 
+          --cov=geofileops --cov-append --cov-report term-missing --cov-report 
+          xml tests/
 
       - uses: codecov/codecov-action@v5
       

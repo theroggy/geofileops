@@ -8,6 +8,7 @@ from pygeoops import GeometryType
 from shapely import wkt
 
 import geofileops as gfo
+from geofileops import LayerInfo
 from geofileops.util import _io_util, _ogr_util
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ def clip_by_geometry(
     input_path: Path,
     output_path: Path,
     clip_geometry: Union[tuple[float, float, float, float], str],
-    input_layer: Optional[str] = None,
+    input_layer: Optional[Union[str, LayerInfo]] = None,
     output_layer: Optional[str] = None,
     columns: Optional[list[str]] = None,
     explodecollections: bool = False,
@@ -30,8 +31,9 @@ def clip_by_geometry(
 
     force_output_geometrytype = None
     if not explodecollections:
-        input_layer_info = gfo.get_layerinfo(input_path, input_layer)
-        if input_layer_info.geometrytype is not GeometryType.POINT:
+        if not isinstance(input_layer, LayerInfo):
+            input_layer = gfo.get_layerinfo(input_path, input_layer)
+        if input_layer.geometrytype is not GeometryType.POINT:
             # If explodecollections is False and the input type is not point, force the
             # output type to multi, because clip can cause eg. polygons to be split to
             # multipolygons.
@@ -110,7 +112,7 @@ def _run_ogr(
     operation: str,
     input_path: Path,
     output_path: Path,
-    input_layer: Optional[str] = None,
+    input_layer: Optional[Union[str, LayerInfo]] = None,
     output_layer: Optional[str] = None,
     input_srs: Union[int, str, None] = None,
     output_srs: Union[int, str, None] = None,
@@ -131,20 +133,19 @@ def _run_ogr(
 ) -> bool:
     # Init
     logger = logging.getLogger(f"geofileops.{operation}")
-    start_time = datetime.now()
-    if input_layer is None:
-        input_layer = gfo.get_only_layer(input_path)
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return True
-    if input_layer is None:
-        input_layer = gfo.get_only_layer(input_path)
+
+    start_time = datetime.now()
+    if not isinstance(input_layer, LayerInfo):
+        input_layer = gfo.get_layerinfo(input_path, input_layer, raise_on_nogeom=False)
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
     info = _ogr_util.VectorTranslateInfo(
         input_path=input_path,
         output_path=output_path,
-        input_layers=input_layer,
+        input_layers=input_layer.name,
         output_layer=output_layer,
         input_srs=input_srs,
         output_srs=output_srs,
