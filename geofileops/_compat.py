@@ -1,5 +1,6 @@
 """Module with compatibility and dependency availability checks."""
 
+import multiprocessing
 import warnings
 from pathlib import Path
 
@@ -46,23 +47,25 @@ def _pyogrio_spatialite_version_info() -> dict[str, str]:
     return versions
 
 
-pyogrio_spatialite_version_info = _pyogrio_spatialite_version_info()
-sqlite3_spatialite_version_info = _sqlite_util.spatialite_version_info()
-gdal_spatialite_version_info = _ogr_util.spatialite_version_info()
+# If running in the main process, check the spatialite versions of the dependencies
+if multiprocessing.parent_process() is None:
+    pyogrio_spatialite_version_info = _pyogrio_spatialite_version_info()
+    sqlite3_spatialite_version_info = _sqlite_util.spatialite_version_info()
+    gdal_spatialite_version_info = _ogr_util.spatialite_version_info()
 
-# Check that the spatialite versions are the same
-pyogrio_spatialite_version = pyogrio_spatialite_version_info["spatialite_version"]
-sqlite3_spatialite_version = sqlite3_spatialite_version_info["spatialite_version"]
-gdal_spatialite_version = gdal_spatialite_version_info["spatialite_version"]
-if (
-    pyogrio_spatialite_version != sqlite3_spatialite_version
-    or pyogrio_spatialite_version != gdal_spatialite_version
-):  # pragma: no cover
-    warnings.warn(
-        f"different spatialite versions loaded: {pyogrio_spatialite_version=} vs "
-        f"{sqlite3_spatialite_version=} vs {gdal_spatialite_version=}",
-        stacklevel=1,
-    )
+    # Check that the spatialite versions are the same
+    pyogrio_spatialite_version = pyogrio_spatialite_version_info["spatialite_version"]
+    sqlite3_spatialite_version = sqlite3_spatialite_version_info["spatialite_version"]
+    gdal_spatialite_version = gdal_spatialite_version_info["spatialite_version"]
+    if (
+        pyogrio_spatialite_version != sqlite3_spatialite_version
+        or pyogrio_spatialite_version != gdal_spatialite_version
+    ):  # pragma: no cover
+        warnings.warn(
+            f"different spatialite versions loaded: {pyogrio_spatialite_version=} vs "
+            f"{sqlite3_spatialite_version=} vs {gdal_spatialite_version=}",
+            stacklevel=1,
+        )
 
 # Determine the versions of the runtime dependencies
 # gdal.__version__ includes a "dev-..." suffix for master/development versions. This
