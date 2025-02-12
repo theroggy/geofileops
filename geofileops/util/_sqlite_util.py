@@ -100,36 +100,45 @@ def create_new_spatialdb(path: Path, crs_epsg: Optional[int] = None):
 
             # Init file
             # Starting transaction manually is necessary for performance
-            sql = "BEGIN TRANSACTION;\n"
+            sql = "BEGIN TRANSACTION;"
+            conn.execute(sql)
+
             output_suffix_lower = path.suffix.lower()
             if output_suffix_lower == ".gpkg":
-                sql += "SELECT EnableGpkgMode();\n"
-                # sql += "SELECT EnableGpkgAmphibiousMode();"
+                sql = "SELECT EnableGpkgMode();"
+                conn.execute(sql)
+                # sql = "SELECT EnableGpkgAmphibiousMode();"
+                # conn.execute(sql)
+
                 # Remark: this only works on the main database!
-                sql += "SELECT gpkgCreateBaseTables();\n"
+                sql = "SELECT gpkgCreateBaseTables();"
+                conn.execute(sql)
+
                 if crs_epsg is not None and crs_epsg not in [0, -1, 4326]:
-                    sql += f"SELECT gpkgInsertEpsgSRID({crs_epsg});\n"
+                    sql = f"SELECT gpkgInsertEpsgSRID({crs_epsg});"
+                    conn.execute(sql)
 
                 # If they are present, remove triggers that were removed from the gpkg
                 # spec because of issues but apparently weren't removed in spatialite.
                 # https://github.com/opengeospatial/geopackage/pull/240
-                sql += """
-                    DROP TRIGGER IF EXISTS gpkg_metadata_reference_row_id_value_insert;
-                    DROP TRIGGER IF EXISTS gpkg_metadata_reference_row_id_value_update;
-                """
+                sql = "DROP TRIGGER IF EXISTS gpkg_metadata_reference_row_id_value_insert;"  # noqa: E501
+                conn.execute(sql)
+                sql = "DROP TRIGGER IF EXISTS gpkg_metadata_reference_row_id_value_update;"  # noqa: E501
+                conn.execute(sql)
 
             elif output_suffix_lower == ".sqlite":
-                sql += "SELECT InitSpatialMetaData(1);\n"
+                sql = "SELECT InitSpatialMetaData(1);"
+                conn.execute(sql)
                 if crs_epsg is not None and crs_epsg not in [0, -1, 4326]:
-                    sql += f"SELECT InsertEpsgSrid({crs_epsg});\n"
+                    sql = f"SELECT InsertEpsgSrid({crs_epsg});"
+                    conn.execute(sql)
             else:
-                raise Exception(f"Unsupported output format: {output_suffix_lower}")
+                raise ValueError(f"Unsupported output format: {output_suffix_lower}")
 
-            sql += "COMMIT;\n"
-            conn.executescript(sql)
+            conn.commit()
 
     except Exception as ex:
-        raise Exception(f"Error creating spatial db {path}") from ex
+        raise RuntimeError(f"Error creating spatial db {path} executing {sql}") from ex
     finally:
         conn.close()
 
