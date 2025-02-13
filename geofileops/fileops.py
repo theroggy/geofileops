@@ -2117,22 +2117,27 @@ def move(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"
     dst = Path(dst)
     src_info = _geofileinfo.get_geofileinfo(src)
 
-    # Move the main file
-    shutil.move(str(src), dst)
-
     # For some file types, extra files need to be moved
-    # If dest is a dir, just use move. Otherwise concat dest filepaths
-    if dst.is_dir():
-        for suffix in src_info.suffixes_extrafiles:
-            srcfile = src.parent / f"{src.stem}{suffix}"
-            if srcfile.exists():
-                shutil.move(str(srcfile), dst)
-    else:
-        for suffix in src_info.suffixes_extrafiles:
-            srcfile = src.parent / f"{src.stem}{suffix}"
-            dstfile = dst.parent / f"{dst.stem}{suffix}"
-            if srcfile.exists():
-                shutil.move(str(srcfile), dstfile)
+    dst_is_dir = dst.is_dir()
+    for suffix in src_info.suffixes_extrafiles:
+        if src.suffix.lower() == suffix:
+            # Skip the main file, as it should be moved last
+            continue
+
+        srcfile = src.parent / f"{src.stem}{suffix}"
+        if dst_is_dir:
+            # If the destination is a dir, we can just move the extra files to the dir
+            dst_tmp = dst
+        else:
+            # If dst is not a dir concat dest filepath...
+            dst_tmp = dst.parent / f"{dst.stem}{suffix}"
+
+        if srcfile.exists():
+            shutil.move(str(srcfile), dst_tmp)
+
+    # Move the main file last, so that checks if the geofile exists are only
+    # True once all files have been moved.
+    shutil.move(str(src), dst)
 
 
 def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False):
