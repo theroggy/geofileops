@@ -27,7 +27,7 @@ from geofileops.util._geometry_util import (
     SimplifyAlgorithm,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     import os
 
 logger = logging.getLogger(__name__)

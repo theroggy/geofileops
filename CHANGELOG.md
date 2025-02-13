@@ -12,22 +12,21 @@
 
 - Add function `apply_vectorized` to apply a vectorized function on a geometry column
   and use it internally where possible (#588, #594)
-- Add support for renaming column with only difference in casing (#549)
+- Improve performance of `erase` and `intersection` for very complex input geometries.
+  This gives similar improvements for such datasets to `identity`,
+  `symmetric_difference` and `union`. (#585, #601, #591, #614)
+- Add support to rename columns and layers with only a difference in casing (#549, #593)
+- Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
+- Speed up two layer operations: explicitly start transactions in sqlite3 code, don't 
+  create obsolete triggers and use a memory temp file where possible (#626, #628, #630)
+- Speed up processing many small files: reduce calls to `gdal.OpenEx` (#622, #625)
 - Add support to pass a single string for all `column` type parameters if a single
   column should be retained (#523)
 - Enable "CURVE" geometrytype files to be processed in the general file and
   layer operations (#558)
 - Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
-- Improve performance of `erase` and `intersection` for very complex input geometries.
-  This gives similar improvements for such datasets to `identity`,
-  `symmetric_difference` and `union`. (#585, #601, #591)
-- Enable subdividing of linestring layers as well (#614)
 - Add configuration option to only warn on dissolve errors (#561)
 - Add some pre-flight checks when geofileops is imported (#573, #627)
-- Add support for renaming layer with only difference in casing (#593)
-- Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
-- Speed up processing many small files: reduce calls to `gdal.OpenEx` (#622, #625)
-- Speed up on windows: explicitly start transactions in sqlite3 code (#626)
 
 ### Bugs fixed
 

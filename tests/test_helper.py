@@ -170,8 +170,11 @@ def get_testfile(
         if prepared_path.exists():
             return prepared_path
 
+        # Prepare the file in a tmp file so the file is not visible to other
+        # processes until it is completely ready.
+        tmp_path = prepared_path.with_stem(f"{prepared_path.stem}_tmp")
         layers = gfo.listlayers(testfile_path)
-        dst_info = _geofileinfo.get_geofileinfo(prepared_path)
+        dst_info = _geofileinfo.get_geofileinfo(tmp_path)
         if len(layers) > 1 and dst_info.is_singlelayer:
             raise ValueError(
                 f"multilayer testfile ({testfile}) cannot be converted to single layer "
@@ -181,11 +184,11 @@ def get_testfile(
         # Convert all layers found
         for src_layer in layers:
             # Single layer files have stem as layername
-            dst_layer = prepared_path.stem if dst_info.is_singlelayer else src_layer
+            dst_layer = tmp_path.stem if dst_info.is_singlelayer else src_layer
 
             gfo.copy_layer(
                 testfile_path,
-                prepared_path,
+                tmp_path,
                 src_layer=src_layer,
                 dst_layer=dst_layer,
                 dst_crs=epsg,
@@ -200,7 +203,7 @@ def get_testfile(
                 # Remove all rows from destination layer.
                 # GDAL only supports DELETE using SQLITE dialect, not with OGRSQL.
                 gfo.execute_sql(
-                    prepared_path,
+                    tmp_path,
                     sql_stmt=f'DELETE FROM "{dst_layer}"',
                     sql_dialect="SQLITE",
                 )
@@ -209,15 +212,18 @@ def get_testfile(
                     raise ValueError(f"unimplemented dimensions: {dimensions}")
 
                 prepared_info = gfo.get_layerinfo(
-                    prepared_path, layer=dst_layer, raise_on_nogeom=False
+                    tmp_path, layer=dst_layer, raise_on_nogeom=False
                 )
                 if prepared_info.geometrycolumn is not None:
                     gfo.update_column(
-                        prepared_path,
+                        tmp_path,
                         name=prepared_info.geometrycolumn,
                         expression=f"CastToXYZ({prepared_info.geometrycolumn}, 5.0)",
                         layer=dst_layer,
                     )
+
+        # Rename tmp file to prepared file
+        gfo.move(tmp_path, prepared_path)
 
         return prepared_path
 

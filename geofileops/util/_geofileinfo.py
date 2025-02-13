@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Union
 from osgeo import gdal
 from osgeo_utils.auxiliary.util import GetOutputDriversFor
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     import os
 
 # Enable exceptions for GDAL
