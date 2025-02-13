@@ -40,16 +40,10 @@ from geofileops.util import (
     _ogr_util,
 )
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     import os
 
-#####################################################################
-# First define/init some general variables/constants
-#####################################################################
-
-# Get a logger...
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.DEBUG)
 
 # Enable exceptions for GDAL
 gdal.UseExceptions()
@@ -94,10 +88,6 @@ PRJ_EPSG_31370 = (
     'AUTHORITY["EPSG",31370]'
     "]"
 )
-
-#####################################################################
-# The real work
-#####################################################################
 
 
 def listlayers(
