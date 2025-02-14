@@ -24,7 +24,7 @@ import geofileops as gfo
 from geofileops import GeometryType, LayerInfo, PrimitiveType, fileops
 from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.fileops import _append_to_nolock
-from geofileops.helpers import _parameter_helper
+from geofileops.helpers import _general_helper, _parameter_helper
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
     _general_util,
@@ -718,9 +718,8 @@ def _single_layer_vector_operation(
         tmp_output_path = tempdir / output_path.name
 
         # Processing in threads is 2x faster for small datasets (on Windows)
-        calculate_in_threads = True if input_layer.featurecount <= 100 else False
         with _processing_util.PooledExecutorFactory(
-            threadpool=calculate_in_threads,
+            threadpool=_general_helper.use_threads(input_layer.featurecount),
             max_workers=processing_params.nb_parallel,
             initializer=_processing_util.initialize_worker(),
         ) as calculate_pool:
@@ -3345,14 +3344,12 @@ def _two_layer_vector_operation(
 
         # Calculate
         # ---------
-        # Processing in threads is 2x faster for small datasets (on Windows)
-        calculate_in_threads = True if input1_layer.featurecount <= 100 else False
         logger.info(
             f"Start processing ({processing_params.nb_parallel} "
             f"parallel workers, batch size: {processing_params.batchsize})"
         )
         with _processing_util.PooledExecutorFactory(
-            threadpool=calculate_in_threads,
+            threadpool=_general_helper.use_threads(input1_layer.featurecount),
             max_workers=processing_params.nb_parallel,
             initializer=_processing_util.initialize_worker(),
         ) as calculate_pool:

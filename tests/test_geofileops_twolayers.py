@@ -907,9 +907,12 @@ def test_intersection_input_no_index(tmp_path):
 
     # Now run test
     output_path = tmp_path / f"{input1_path.stem}_intersection_{input2_path.stem}.gpkg"
-    gfo.intersection(
-        input1_path=input1_path, input2_path=input2_path, output_path=output_path
-    )
+
+    # Use "process" worker type to test this as well
+    with gfo.TempEnv({"GFO_WORKER_TYPE": "process"}):
+        gfo.intersection(
+            input1_path=input1_path, input2_path=input2_path, output_path=output_path
+        )
 
     # Check if the tmp file is correctly created
     assert output_path.exists()
@@ -1460,17 +1463,20 @@ def test_join_nearest(tmp_path, suffix, epsg):
     output_path = tmp_path / f"{input1_path.stem}-output{suffix}"
     nb_nearest = 2
     input1_columns = ["OIDN", "UIDN", "HFDTLT", "fid"]
-    gfo.join_nearest(
-        input1_path=str(input1_path),
-        input1_columns=input1_columns,
-        input2_path=str(input2_path),
-        output_path=str(output_path),
-        nb_nearest=nb_nearest,
-        distance=1000,
-        expand=True,
-        batchsize=batchsize,
-        force=True,
-    )
+
+    # Use "process" worker type to test this as well
+    with gfo.TempEnv({"GFO_WORKER_TYPE": "process"}):
+        gfo.join_nearest(
+            input1_path=str(input1_path),
+            input1_columns=input1_columns,
+            input2_path=str(input2_path),
+            output_path=str(output_path),
+            nb_nearest=nb_nearest,
+            distance=1000,
+            expand=True,
+            batchsize=batchsize,
+            force=True,
+        )
 
     # Check if the output file is correctly created
     assert output_path.exists()

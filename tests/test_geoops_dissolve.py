@@ -755,15 +755,18 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
         ]
     }
     groupby_columns = ["GEWASgroep"]
-    gfo.dissolve(
-        input_path=input_path,
-        output_path=output_path,
-        groupby_columns=groupby_columns,
-        agg_columns=agg_columns,
-        explodecollections=False,
-        nb_parallel=2,
-        batchsize=batchsize,
-    )
+
+    # Force use of processes as workers
+    with gfo.TempEnv({"GFO_WORKER_TYPE": "process"}):
+        gfo.dissolve(
+            input_path=input_path,
+            output_path=output_path,
+            groupby_columns=groupby_columns,
+            agg_columns=agg_columns,
+            explodecollections=False,
+            nb_parallel=2,
+            batchsize=batchsize,
+        )
 
     # Now check if the tmp file is correctly created
     assert output_path.exists()

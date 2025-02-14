@@ -55,6 +55,20 @@ class ConfigOptions:
         """
         return get_bool("GFO_REMOVE_TEMP_FILES", default=True)
 
+    @classproperty
+    def worker_type(cls) -> str:
+        """The type of workers to use for parallel processing.
+
+        Supported values (case insensitive):
+            - "thread": use threads when processing in parallel.
+            - "process": use processes when processing in parallel.
+            - "auto": determine the type automatically.
+
+        Returns:
+            str: the type of workers to use. Defaults to "auto".
+        """
+        return os.environ.get("GFO_WORKER_TYPE", default="auto").strip().lower()
+
 
 def get_bool(key: str, default: bool) -> bool:
     """Get the value for the environment variable ``key`` as a bool.
