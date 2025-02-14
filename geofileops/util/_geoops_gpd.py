@@ -31,7 +31,7 @@ from pygeoops import GeometryType, PrimitiveType
 import geofileops as gfo
 from geofileops import LayerInfo, fileops
 from geofileops._compat import GEOPANDAS_GTE_10, PANDAS_GTE_22
-from geofileops.helpers import _parameter_helper
+from geofileops.helpers import _general_helper, _parameter_helper
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
     _general_util,
@@ -782,7 +782,7 @@ def _apply_geooperation_to_layer(
     try:
         # Calculate the best number of parallel processes and batches for
         # the available resources
-        processing_params = _prepare_processing_params(
+        process_params = _prepare_processing_params(
             input_path=input_path,
             input_layer=input_layer,
             nb_parallel=nb_parallel,
@@ -790,19 +790,16 @@ def _apply_geooperation_to_layer(
             parallelization_config=parallelization_config,
             tmp_dir=tmp_dir,
         )
-        assert processing_params.batches is not None
+        assert process_params.batches is not None
 
+        # Start processing
         logger.info(
-            f"Start processing ({processing_params.nb_parallel} "
-            f"parallel workers, batch size: {processing_params.batchsize})"
-        )
-        # Processing in threads is 2x faster for small datasets (on Windows)
-        calculate_in_threads = (
-            True if processing_params.nb_rows_to_process <= 100 else False
+            f"Start processing ({process_params.nb_parallel} "
+            f"parallel workers, batch size: {process_params.batchsize})"
         )
         with _processing_util.PooledExecutorFactory(
-            threadpool=calculate_in_threads,
-            max_workers=processing_params.nb_parallel,
+            threadpool=_general_helper.use_threads(process_params.nb_rows_to_process),
+            max_workers=process_params.nb_parallel,
             initializer=_processing_util.initialize_worker(),
         ) as calculate_pool:
             # Prepare output filename
@@ -811,7 +808,7 @@ def _apply_geooperation_to_layer(
             batches: dict[int, dict] = {}
             future_to_batch_id = {}
 
-            for batch_id, batch_filter in enumerate(processing_params.batches):
+            for batch_id, batch_filter in enumerate(process_params.batches):
                 batches[batch_id] = {}
                 batches[batch_id]["layer"] = output_layer
 
@@ -851,13 +848,13 @@ def _apply_geooperation_to_layer(
             # can write to the same output file at the time...
             start_time = datetime.now()
             nb_done = 0
-            nb_batches = len(processing_params.batches)
+            nb_batches = len(process_params.batches)
             _general_util.report_progress(
                 start_time,
                 nb_done,
                 nb_todo=nb_batches,
                 operation=operation.value,
-                nb_parallel=processing_params.nb_parallel,
+                nb_parallel=process_params.nb_parallel,
             )
             for future in futures.as_completed(future_to_batch_id):
                 try:
@@ -908,7 +905,7 @@ def _apply_geooperation_to_layer(
                     nb_done,
                     nb_todo=nb_batches,
                     operation=operation.value,
-                    nb_parallel=processing_params.nb_parallel,
+                    nb_parallel=process_params.nb_parallel,
                 )
 
         # Round up and clean up
@@ -1650,10 +1647,8 @@ def _dissolve_polygons_pass(
     gfo.create_spatial_index(input_path, layer=input_layer, exist_ok=True)
 
     # Start calculation in parallel
-    # Processing in threads is 2x faster for small datasets (on Windows)
-    calculate_in_threads = True if input_layer.featurecount <= 100 else False
     with _processing_util.PooledExecutorFactory(
-        threadpool=calculate_in_threads,
+        threadpool=_general_helper.use_threads(input_layer.featurecount),
         max_workers=nb_parallel,
         initializer=_processing_util.initialize_worker(),
     ) as calculate_pool:

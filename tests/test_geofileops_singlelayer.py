@@ -14,7 +14,7 @@ from shapely import MultiPolygon, Polygon
 
 from geofileops import GeometryType, fileops, geoops
 from geofileops._compat import SPATIALITE_GTE_51
-from geofileops.util import _geofileinfo, _geoops_sql
+from geofileops.util import _general_util, _geofileinfo, _geoops_sql
 from geofileops.util import _io_util as io_util
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
@@ -300,16 +300,18 @@ def test_buffer_force(tmp_path, geoops_module):
 
     # Run buffer
     output_path = tmp_path / f"{input_path.stem}-output{input_path.suffix}"
-    assert output_path.exists() is False
+    assert not output_path.exists()
 
-    geoops.buffer(
-        input_path=input_path,
-        output_path=output_path,
-        distance=distance,
-        keep_empty_geoms=False,
-        nb_parallel=2,
-        batchsize=batchsize,
-    )
+    # Use "process" worker type to test this as well
+    with _general_util.TempEnv({"GFO_WORKER_TYPE": "process"}):
+        geoops.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            keep_empty_geoms=False,
+            nb_parallel=2,
+            batchsize=batchsize,
+        )
 
     # Test buffer to existing output path
     assert output_path.exists()

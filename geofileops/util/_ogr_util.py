@@ -330,8 +330,9 @@ def vector_translate(
             raise ValueError(f"unsupported warp algorithm: {algorithm}")
 
     # Input dataset open options
+    input_open_options = []
     for option_name, value in gdal_options["INPUT_OPEN"].items():
-        args.extend(["-oo", f"{option_name}={value}"])
+        input_open_options.append(f"{option_name}={value!s}")
 
     # Output file parameters
     # Get driver for the output_path
@@ -457,6 +458,7 @@ def vector_translate(
             input_ds = gdal.OpenEx(
                 str(input_path),
                 nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED,
+                open_options=input_open_options,
             )
 
             # If output_srs is not specified and the result has 0 rows, gdal creates the

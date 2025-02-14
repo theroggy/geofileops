@@ -47,15 +47,32 @@ def _pyogrio_spatialite_version_info() -> dict[str, str]:
     return versions
 
 
+# Determine the versions of the runtime dependencies
+# gdal.__version__ includes a "dev-..." suffix for master/development versions. This
+# must be dropped for the version checks here.
+GDAL_BASE_VERSION = version.parse(gdal.__version__.split("-")[0]).base_version
+GDAL_GTE_38 = version.parse(GDAL_BASE_VERSION) >= version.parse("3.8")
+GDAL_ST_311 = version.parse(GDAL_BASE_VERSION) < version.parse("3.11")
+
+GEOPANDAS_GTE_10 = version.parse(gpd.__version__) >= version.parse("1.0")
+PANDAS_GTE_22 = version.parse(pd.__version__) >= version.parse("2.2")
+PYOGRIO_GTE_07 = version.parse(pyogrio.__version__) >= version.parse("0.7")
+SHAPELY_GTE_20 = version.parse(shapely.__version__) >= version.parse("2")
+
+sqlite3_spatialite_version_info = _sqlite_util.spatialite_version_info()
+sqlite3_spatialite_version = sqlite3_spatialite_version_info["spatialite_version"]
+SPATIALITE_GTE_51 = version.parse(sqlite3_spatialite_version) >= version.parse("5.1")
+
+
 # If running in the main process, check the spatialite versions of the dependencies
 if multiprocessing.parent_process() is None:
     pyogrio_spatialite_version_info = _pyogrio_spatialite_version_info()
-    sqlite3_spatialite_version_info = _sqlite_util.spatialite_version_info()
+
     gdal_spatialite_version_info = _ogr_util.spatialite_version_info()
 
     # Check that the spatialite versions are the same
     pyogrio_spatialite_version = pyogrio_spatialite_version_info["spatialite_version"]
-    sqlite3_spatialite_version = sqlite3_spatialite_version_info["spatialite_version"]
+
     gdal_spatialite_version = gdal_spatialite_version_info["spatialite_version"]
     if (
         pyogrio_spatialite_version != sqlite3_spatialite_version
@@ -66,18 +83,3 @@ if multiprocessing.parent_process() is None:
             f"{sqlite3_spatialite_version=} vs {gdal_spatialite_version=}",
             stacklevel=1,
         )
-
-# Determine the versions of the runtime dependencies
-# gdal.__version__ includes a "dev-..." suffix for master/development versions. This
-# must be dropped for the version checks here.
-GDAL_BASE_VERSION = version.parse(gdal.__version__.split("-")[0]).base_version
-
-GDAL_GTE_38 = version.parse(GDAL_BASE_VERSION) >= version.parse("3.8")
-GEOPANDAS_GTE_10 = version.parse(gpd.__version__) >= version.parse("1.0")
-PANDAS_GTE_22 = version.parse(pd.__version__) >= version.parse("2.2")
-PYOGRIO_GTE_07 = version.parse(pyogrio.__version__) >= version.parse("0.7")
-SHAPELY_GTE_20 = version.parse(shapely.__version__) >= version.parse("2")
-SPATIALITE_GTE_51 = version.parse(sqlite3_spatialite_version) >= version.parse("5.1")
-
-GDAL_GTE_38 = version.parse(GDAL_BASE_VERSION) >= version.parse("3.8")
-GDAL_ST_311 = version.parse(GDAL_BASE_VERSION) < version.parse("3.11")
