@@ -1546,6 +1546,39 @@ def test_join_nearest_invalid_params(
         )
 
 
+def test_join_nearest_distance(tmp_path):
+    geoms = [
+        "POLYGON ((0 0, 3 0, 3 3, 0 3, 0 0))",
+        "POLYGON ((10 1, 13 1, 13 4, 10 4, 10 1))",
+    ]
+    for index, geom in enumerate(geoms):
+        box_geom = shapely.from_wkt(geom)
+        box_geom = shapely.segmentize(box_geom, 1)
+        gdf_geom = gpd.GeoDataFrame(geometry=[box_geom], crs="EPSG:31370")
+        geom_path = tmp_path / f"geom{index+1}.gpkg"
+        gfo.to_file(gdf=gdf_geom, path=geom_path)
+
+    # Test
+    output_path = tmp_path / "geom_join_nearest.gpkg"
+    gfo.join_nearest(
+        input1_path=tmp_path / "geom1.gpkg",
+        input2_path=tmp_path / "geom2.gpkg",
+        output_path=output_path,
+        nb_nearest=1,
+        distance=50,
+        expand=True,
+        force=True,
+    )
+
+    # Check if the output file is correctly created
+    assert output_path.exists()
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert output_layerinfo.featurecount == 1
+    # Check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+    assert output_gdf["distance"][0] == 7
+
+
 @pytest.mark.parametrize(
     "suffix, epsg, gridsize",
     [(".gpkg", 31370, 0.01), (".gpkg", 4326, 0.0), (".shp", 31370, 0.01)],

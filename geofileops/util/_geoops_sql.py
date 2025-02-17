@@ -2351,7 +2351,11 @@ def join_nearest(
             SELECT layer1.{{input1_geometrycolumn}} as geom
                   {{layer1_columns_prefix_alias_str}}
                   {{layer2_columns_prefix_alias_str}}
-                  ,k.pos, k.distance_m AS distance, k.distance_crs
+                  ,k.pos
+                  ,ST_Distance(
+                    layer1.{{input1_geometrycolumn}}, layer2.{{input2_geometrycolumn}}
+                  ) AS distance
+                  ,k.distance_crs
               FROM "{{input1_layer}}" layer1
               JOIN knn2 k
               JOIN "{{input2_layer}}" layer2 ON layer2.rowid = k.fid

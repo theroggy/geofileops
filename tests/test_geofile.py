@@ -345,6 +345,34 @@ def test_copy_layer_invalid_params(tmp_path):
         gfo.copy_layer(src, dst)
 
 
+def test_copy_layer_input_open_options(tmp_path):
+    # Prepare test data
+    src = tmp_path / "input.csv"
+    dst = tmp_path / "output.gpkg"
+    with open(src, "w") as srcfile:
+        srcfile.write("POINT_ID, POINT_LAT, POINT_LON, POINT_NAME\n")
+        srcfile.write('1, 50.939972761,3.888498686, "random spot"\n')
+
+    # copy_layer with open_options
+    gfo.copy_layer(
+        src,
+        dst,
+        options={
+            "INPUT_OPEN.X_POSSIBLE_NAMES": "POINT_LON",
+            "INPUT_OPEN.Y_POSSIBLE_NAMES": "POINT_LAT",
+        },
+        dst_crs="EPSG:4326",
+    )
+
+    # Check result
+    assert dst.exists()
+    result_gdf = gfo.read_file(dst)
+    assert len(result_gdf) == 1
+    assert "geometry" in result_gdf.columns
+    assert result_gdf.geometry[0].x == 3.888498686
+    assert result_gdf.geometry[0].y == 50.939972761
+
+
 @pytest.mark.parametrize(
     "src_suffix, dst_suffix, preserve_fid, exp_preserved_fids",
     [
