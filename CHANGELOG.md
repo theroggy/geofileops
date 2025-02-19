@@ -29,12 +29,16 @@
 - Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
 - Add configuration option to only warn on dissolve errors (#561)
 - Add some pre-flight checks when geofileops is imported (#573, #627)
+- When using join_nearest with spatialite version >= 5.1,
+  show ST_distance between the two geometries instead of 
+  the distance between the centroid of the two geometries (#634)
 
 ### Bugs fixed
 
 - Fix `copy_layer` to a gpkg.zip file (#604)
 - Fix GDAL input open options being ignored in `copy_layer` (#632)
 - Fix `missing_ok` parameter in `remove` being ~ignored (#605)
+- Fix `dissolve` with `agg_columns` on sqlite 3.49.1 (#636)
 
 ## 0.9.1 (2024-07-18)
 

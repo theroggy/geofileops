@@ -1470,7 +1470,7 @@ def dissolve(
                             # Prepare column name string.
                             column_str = (
                                 "json_extract(json_data.json_row, "
-                                f'"$.{agg_column["column"]}")'
+                                f"'$.{agg_column['column']}')"
                             )
 
                             # Now put everything together
@@ -1534,7 +1534,7 @@ def dissolve(
                                 {groupby_select_prefixed_str.format(prefix="layer_for_json.")}
                               FROM "{{input_layer}}" layer_for_json
                               CROSS JOIN json_each(
-                                  layer_for_json.__DISSOLVE_TOJSON, "$") json_rows_table
+                                  layer_for_json.__DISSOLVE_TOJSON, '$') json_rows_table
                             ) json_data
                          WHERE 1=1
                             {groupby_filter_str}
