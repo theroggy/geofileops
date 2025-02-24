@@ -2088,6 +2088,7 @@ def _dissolve(
     to all geometries within a groupself.
     Observations associated with each `groupby` group will be aggregated
     using the `aggfunc`.
+
     Parameters
     ----------
     by : string, default None
