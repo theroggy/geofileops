@@ -2758,6 +2758,8 @@ def symmetric_difference(
             force=force,
             output_with_spatial_index=False,
             operation_prefix="symmetric_difference/",
+            input1_subdivided_path=input2_subdivided_path,
+            input2_subdivided_path=input1_subdivided_path,
         )
 
         # Now append
