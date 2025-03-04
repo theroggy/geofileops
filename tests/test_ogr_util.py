@@ -328,6 +328,61 @@ def test_vector_translate_sql_input_empty(tmp_path, input_suffix, output_suffix)
 
 @pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES_GEOOPS)
+def test_vector_translate_sql_invalid_new_output(tmp_path, input_suffix, output_suffix):
+    input_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=input_suffix, empty=True
+    )
+    output_path = tmp_path / f"output{output_suffix}"
+    layer = gfo.get_only_layer(input_path)
+    sql_stmt = f'SELECT * FROM "{layer}55" WHERE not_existing_column = 1'
+    try:
+        _ogr_util.vector_translate(input_path, output_path, sql_stmt=sql_stmt)
+    except Exception:
+        pass
+
+    assert not output_path.exists()
+
+
+@pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)
+@pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES_GEOOPS)
+@pytest.mark.parametrize(
+    "update, append, output_file_expected",
+    [
+        (False, False, False),
+        (True, False, True),
+        (False, True, True),
+        (True, True, True),
+    ],
+)
+def test_vector_translate_sql_invalid_existing_output(
+    tmp_path, input_suffix, output_suffix, update, append, output_file_expected
+):
+    """Run an invalid query that tries to add a layer to an existing file (update).
+
+    If append and update are both False, the existing output file will be overwritten.
+    In this case, if the sql query is invalid, the output file will effectively be
+    removed.
+    """
+    input_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=input_suffix, empty=True
+    )
+    output_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=input_suffix, dst_dir=tmp_path
+    )
+    layer = gfo.get_only_layer(input_path)
+    sql_stmt = f'SELECT * FROM "{layer}" WHERE not_existing_column = 1'
+    try:
+        _ogr_util.vector_translate(
+            input_path, output_path, sql_stmt=sql_stmt, update=update, append=append
+        )
+    except Exception:
+        pass
+
+    assert output_path.exists() is output_file_expected
+
+
+@pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)
+@pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("columns", [["OIDN"], "OIDN"])
 def test_vector_translate_columns(tmp_path, input_suffix, output_suffix, columns):
     # Prepare test data

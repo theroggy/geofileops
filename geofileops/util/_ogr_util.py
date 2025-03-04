@@ -268,7 +268,7 @@ def vector_translate(
     dst_dimensions: Optional[str] = None,
 ) -> bool:
     # API Doc of VectorTranslateOptions:
-    #   https://gdal.org/api/python/osgeo.gdal.html#osgeo.gdal.VectorTranslateOptions
+    #   https://gdal.org/en/stable/api/python/utilities.html#osgeo.gdal.VectorTranslateOptions
     args = []
     if isinstance(input_path, str):
         input_path = Path(input_path)
@@ -347,16 +347,17 @@ def vector_translate(
         output_srs = f"EPSG:{output_srs}"
 
     # Output basic options
-    if output_path.exists() is True:
-        if append is True:
+    output_exists = output_path.exists()
+    if output_exists:
+        if append:
             args.append("-append")
-        if update is True:
+        if update:
             args.append("-update")
 
     datasetCreationOptions = []
     # Output dataset creation options are only applicable if a new output file
     # will be created
-    if output_path.exists() is False or update is False:
+    if not output_exists or not update:
         dataset_creation_options = gdal_options["DATASET_CREATION"]
         if output_info.driver == "SQLite":
             # If SQLite file, use the spatialite type of sqlite by default
@@ -366,7 +367,7 @@ def vector_translate(
             datasetCreationOptions.extend([f"{option_name}={value}"])
 
     # Output layer options
-    if explodecollections is True:
+    if explodecollections:
         args.append("-explodecollections")
     output_geometrytypes = []
     if force_output_geometrytype is not None:
@@ -407,7 +408,7 @@ def vector_translate(
     # Output layer creation options are only applicable if a new layer will be
     # created
     layerCreationOptions = []
-    if output_path.exists() is False or (update is True and append is False):
+    if not output_exists or (update and not append):
         for option_name, value in gdal_options["LAYER_CREATION"].items():
             layerCreationOptions.extend([f"{option_name}={value}"])
 
@@ -447,6 +448,8 @@ def vector_translate(
 
     # Now we can really get to work
     output_ds = None
+    input_has_geom_attribute = False
+    input_has_geometry_attribute = False
     try:
         # Till gdal 3.10 datetime columns can be interpreted wrongly with arrow.
         if _compat.GDAL_ST_311 and "OGR2OGR_USE_ARROW_API" not in config_options:
@@ -496,8 +499,6 @@ def vector_translate(
             # creates an attribute column "geometry" in the output file. To be able to
             # detect this case later on, check here if the input file already has an
             # attribute column "geometry".
-            input_has_geom_attribute = False
-            input_has_geometry_attribute = False
             input_layer = input_ds.GetLayer()
             layer_defn = input_layer.GetLayerDefn()
             for field_idx in range(layer_defn.GetFieldCount()):
@@ -548,17 +549,6 @@ def vector_translate(
         if output_ds is None:
             raise RuntimeError("output_ds is None")
 
-        # Fix invalig files that were written with older versions of GDAL.
-        # More info: https://github.com/geofileops/geofileops/issues/313
-        # if not _compat.GDAL_GTE_38:
-        output_ds = None
-        _validate_file(
-            output_path,
-            output_layer,
-            input_has_geometry_attribute,
-            input_has_geom_attribute,
-        )
-
     except Exception as ex:
         output_ds = None
 
@@ -578,6 +568,15 @@ def vector_translate(
     finally:
         output_ds = None
         input_ds = None
+
+        # Fix/remove invalid files that were written.
+        output_ds = None
+        _validate_file(
+            output_path,
+            output_layer,
+            input_has_geometry_attribute,
+            input_has_geom_attribute,
+        )
 
         if gdal_cpl_log_path.exists():
             # Truncate the cpl log file already, because sometimes it is locked and
@@ -611,12 +610,21 @@ def _validate_file(
     if not path.exists():
         return
 
-    def is_file_valid(path: Path, fix: bool) -> bool:
+    def is_file_valid(
+        path: Path,
+        fix: bool,
+        input_has_geometry_attribute: bool,
+        input_has_geom_attribute: bool,
+    ) -> bool:
         """Check if the file is valid.
 
         Args:
             path (Path): the file to check.
             fix (bool): True to fix the invalid columns.
+            input_has_geometry_attribute (bool): True if the input file has a geometry
+                attribute column.
+            input_has_geom_attribute (bool): True if the input file has a geom attribute
+                column.
         """
         try:
             # Only if fix is True, open the file in update mode
@@ -669,9 +677,11 @@ def _validate_file(
                             break
 
         except Exception as ex:
+            # In gdal 3.10, invalid gpkg files are still written when an invalid sql
+            # is used if a new file is created or an existing one is overwritten.
             logger.warning(
-                f"Opening output file gave error, probably the input file was "
-                f"empty, no rows were selected or geom was NULL: {ex}"
+                f"Opening output file gave error. Probably the input file was empty, "
+                f"no rows were selected, geom was NULL or the SQL was invalid: {ex}"
             )
             gfo.remove(path)
         finally:
@@ -681,9 +691,19 @@ def _validate_file(
 
     # First check if the file has invalid geometry columns without fixing so we can
     # open the file read-only.
-    if not is_file_valid(path, fix=False):
+    if not is_file_valid(
+        path,
+        fix=False,
+        input_has_geometry_attribute=input_has_geometry_attribute,
+        input_has_geom_attribute=input_has_geom_attribute,
+    ):
         logger.warning(f"Invalid geometry columns found in {path}, try to fix...")
-        is_file_valid(path, fix=True)
+        is_file_valid(
+            path,
+            fix=True,
+            input_has_geometry_attribute=input_has_geometry_attribute,
+            input_has_geom_attribute=input_has_geom_attribute,
+        )
 
 
 def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> dict:

@@ -39,6 +39,8 @@
 - Fix GDAL input open options being ignored in `copy_layer` (#632)
 - Fix `missing_ok` parameter in `remove` being ~ignored (#605)
 - Fix `dissolve` with `agg_columns` on sqlite 3.49.1 (#636)
+- Fix an invalid output .gpkg file being created when e.g. `copy_layer` is ran with an
+  invalid sql statement (#641)
 
 ## 0.9.1 (2024-07-18)
 
