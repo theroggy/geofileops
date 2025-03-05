@@ -33,14 +33,14 @@ jobs:
       matrix:
         os: ["ubuntu-latest"]
         dev: [false]
-        python: ["3.11"]
+        python: ["3.12"]
         env: ["installed"]
         include:
           - checkout_ref: "v0.9.x"
             # nomkl: openblas instead of mkl saves 600 MB. Linux OK, but 50% slower on Windows and OSX!
             install_extra_args: >-
               nomkl
-              geofileops=0.9.1
+              geofileops=0.9.1=pyhd8ed1ab_3
 
     steps:
       - uses: actions/checkout@v4

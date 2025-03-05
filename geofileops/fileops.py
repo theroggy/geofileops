@@ -525,6 +525,14 @@ def execute_sql(
             * 'OGRSQL': force the use of the OGR SQL dialect.
             * 'SQLITE': force the use of the SQLITE dialect.
             Defaults to None.
+
+    See Also:
+        * :func:`read_file`: read a layer to a (Geo)DataFrame, optionally using a SQL
+          statement
+        * :func:`update_column`: update the values of a column in the layer
+        * :func:`add_column`: add a column to the layer, optionally using a SQL
+          expression to fill out the values
+
     """
     datasource = None
     try:
@@ -562,6 +570,11 @@ def create_spatial_index(
             exists already. Defaults to False.
         no_geom_ok (bool, options): If True and the file doesn't have a geometry column,
             don't throw an error. Defaults to False.
+
+    See Also:
+        * :func:`has_spatial_index`: check if the layer has a spatial index
+        * :func:`remove_spatial_index`: remove the spatial index from the layer
+
     """
     # Init
     path = Path(path)
@@ -634,6 +647,11 @@ def has_spatial_index(
 
     Returns:
         bool: True if a spatial index exists, False if it doesn't exist.
+
+    See Also:
+        * :func:`create_spatial_index`: create a spatial index on the layer
+        * :func:`remove_spatial_index`: remove the spatial index from the layer
+
     """
     # Init
     path = Path(path)
@@ -712,6 +730,11 @@ def remove_spatial_index(
         path (PathLike): The file path.
         layer (str or LayerInfo, optional): The layer. If not specified, and there is
             only one layer in the file, this layer is used. Otherwise exception.
+
+    See Also:
+        * :func:`create_spatial_index`: create a spatial index on the layer
+        * :func:`has_spatial_index`: check if the layer has a spatial index
+
     """
     # Init
     path = Path(path)
@@ -805,6 +828,14 @@ def rename_column(
         new_column_name (str): new column name.
         layer (Optional[str]): layer name. If not specified, and there is only
             one layer in the file, this layer is used. Otherwise exception.
+
+    See Also:
+        * :func:`add_column`: add a column to the layer
+        * :func:`drop_column`: drop a column from the layer
+        * :func:`get_layerinfo`: get information about the layer, including the list of
+          columns
+        * :func:`update_column`: update a column of the layer
+
     """
     # Check input parameters
     path = Path(path)
@@ -898,12 +929,16 @@ def add_column(
 ):
     """Add a column to a layer of the geofile.
 
+    You can specify an `expression` to use to fill out the value of the column.
+
     Args:
         path (PathLike): Path to the geofile.
         name (str): Name for the new column.
-        type (str): Column type of the new column.
-        expression (str; int or float, optional): SQLite expression to use to update
-            the value. Defaults to None.
+        type (str): Column type of the new column. For GPKG, the supported data types
+            can be found in the |gpkg_specs_datatypes|.
+        expression (str; int or float, optional): SQL expression to use to fill out the
+            column value. It should be in SQLite syntax and |spatialite_reference_link|
+            functions can be used. Defaults to None.
         expression_dialect (str, optional): SQL dialect used for the expression.
         layer (str, optional): The layer name. If None and the geofile
             has only one layer, that layer is used. Defaults to None.
@@ -911,9 +946,57 @@ def add_column(
             the update anyway. Defaults to False.
         width (int, optional): the width of the field.
 
-    Raises:
-        ex: [description]
-    """
+    See Also:
+        * :func:`drop_column`: drop a column from the layer
+        * :func:`get_layerinfo`: get information about the layer, including the list of
+          columns
+        * :func:`rename_column`: rename a column in the layer
+        * :func:`update_column`: update a column of the layer
+
+    Examples:
+        A typical example is to add a column with the area of the geometry to the layer.
+        This uses the `ST_Area` function from spatialite (|spatialite_reference_link|):
+
+        .. code-block:: python
+
+            gfo.add_column(
+                "file.gpkg", name="area", type="REAL", expression="ST_Area(geom)",
+            )
+
+
+        For string/text type columns, not that in SQL it is mandatory to use single
+        quotes around the string value. For example:
+
+        .. code-block:: python
+
+            gfo.add_column(
+                "file.gpkg", type="TEXT", name="text_column", expression="'Hello!'"
+            )
+
+
+        You can also use more complex SQL expressions like CASE WHEN statements:
+
+        .. code-block:: python
+
+            expression = '''
+                CASE
+                    WHEN "type" = 'A' THEN 1
+                    WHEN "type" = 'B' THEN 2
+                    ELSE 3
+                END
+            '''
+            gfo.add_column("file.gpkg", "type_id", "INT", expression=expression)
+
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    .. |gpkg_specs_datatypes| raw:: html
+
+        <a href="https://www.geopackage.org/spec/#:~:text=Table%201.%20GeoPackage%20Data%20Types" target="_blank">Geopackage specification</a>
+
+    """  # noqa: E501
     # Init
     if isinstance(type, DataType):
         type_str = type.value
@@ -978,6 +1061,14 @@ def drop_column(
         layer (Optional[str]): The layer name. If not specified, and there is only
             one layer in the file, this layer is used. Otherwise a ValueError is
             raised.
+
+    See Also:
+        * :func:`add_column`: add a column to the layer
+        * :func:`get_layerinfo`: get information about the layer, including the list of
+          columns
+        * :func:`rename_column`: rename a column in the layer
+        * :func:`update_column`: update a column of the layer
+
     """
     # Check input parameters
     path = Path(path)
@@ -1013,15 +1104,58 @@ def update_column(
     Args:
         path (PathLike): Path to the geofile
         name (str): Name for the new column
-        expression (str): SQLite expression to use to update the value.
+        expression (str): SQL expression to use to update the column value. It should be
+            in SQLite syntax and |spatialite_reference_link| functions can be used.
+            Defaults to None.
         layer (str, optional): The layer name. If None and the geofile
             has only one layer, that layer is used. Defaults to None.
         where (str, optional): SQL where clause to restrict the rows that will
             be updated. Defaults to None.
 
-    Raises:
-        ValueError: an invalid parameter value was passed.
-    """
+    See Also:
+        * :func:`add_column`: add a column to the layer
+        * :func:`drop_column`: drop a column from the layer
+        * :func:`get_layerinfo`: get information about the layer, including the list of
+          columns
+        * :func:`rename_column`: rename a column in the layer
+
+    Examples:
+        A typical example is to update an "area" column after doing an operation on the
+        geometry. This uses the `ST_Area` function from spatialite
+        (|spatialite_reference_link|):
+
+        .. code-block:: python
+
+            gfo.update_column("file.gpkg", name="area", expression="ST_Area(geom)")
+
+
+        For string/text type columns, not that in SQL it is mandatory to use single
+        quotes around the string value. For example:
+
+        .. code-block:: python
+
+            gfo.update_column("file.gpkg", name="text_column", expression="'Hello!'")
+
+
+        You can also use more complex SQL expressions like CASE WHEN statements:
+
+        .. code-block:: python
+
+            expression = '''
+                CASE
+                    WHEN "type" = 'A' THEN 1
+                    WHEN "type" = 'B' THEN 2
+                    ELSE 3
+                END
+            '''
+            gfo.update_column("file.gpkg", name="type_id", expression=expression)
+
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     # Init
     path = Path(path)
     layerinfo = get_layerinfo(path, layer)

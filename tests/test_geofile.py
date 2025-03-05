@@ -141,6 +141,42 @@ def test_append_different_layer(tmp_path):
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
+def test_append_columns(tmp_path, suffix):
+    """Test appending rows specifying some columns.
+
+    This does not seem to be supported by GDAL.
+    """
+    # Prepare test data
+    src_path = test_helper.get_testfile(
+        "polygon-parcel", dst_dir=tmp_path, suffix=suffix
+    )
+    dst_path = tmp_path / f"dst{suffix}"
+    gfo.copy(src_path, dst_path)
+
+    src_info = gfo.get_layerinfo(src_path, raise_on_nogeom=False)
+    src_columns = list(src_info.columns)
+    dst_columns = ["OIDN", "UIDN", "GEWASGROEP"]
+    for column in src_columns:
+        if column not in dst_columns:
+            gfo.drop_column(dst_path, column_name=column)
+
+    # For GPKG and CSV files, the append fails
+    if suffix in (".gpkg", ".csv"):
+        pytest.xfail(
+            "Appending only certain columns is not supported for GPKG and CSV files"
+        )
+
+    # For other file types, all rows are appended tot the dst layer, but the extra
+    # column is not!
+    gfo.append_to(src_path, dst_path, columns=dst_columns)
+
+    # Check results
+    dst_info = gfo.get_layerinfo(dst_path, raise_on_nogeom=False)
+    assert (src_info.featurecount * 2) == dst_info.featurecount
+    assert len(dst_info.columns) == len(dst_columns)
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
 def test_append_different_columns(tmp_path, suffix):
     """Test appending rows to a file with a column less than in source file."""
     # Prepare test data
