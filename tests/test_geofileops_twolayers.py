@@ -18,7 +18,7 @@ import shapely.geometry as sh_geom
 import geofileops as gfo
 from geofileops import GeometryType
 from geofileops._compat import GEOPANDAS_GTE_10, SPATIALITE_GTE_51
-from geofileops.util import _geofileinfo
+from geofileops.util import _geofileinfo, _sqlite_util
 from geofileops.util import _geoops_sql as geoops_sql
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
@@ -1635,6 +1635,11 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
         len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     )
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+
+    # Check if the "gpkg_ogr_contents" table is present in the output gpkg
+    if suffix == ".gpkg":
+        tables = _sqlite_util.get_tables(output_path)
+        assert "gpkg_ogr_contents" in tables
 
     # Check the contents of the result file
     output_gdf = gfo.read_file(output_path)

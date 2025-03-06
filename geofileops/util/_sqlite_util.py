@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from pygeoops import GeometryType
+from pyproj import CRS, Transformer
 
 import geofileops as gfo
 from geofileops.helpers._configoptions_helper import ConfigOptions
@@ -97,6 +98,9 @@ def create_new_spatialdb(
     filetype: Optional[str] = None,
 ) -> sqlite3.Connection:
     """Create a new spatialite database file.
+
+    Notes:
+        - the bounds filled out in the gpkg_contents table will be the bounds of the crs
 
     Args:
         path (PathLike): the path the create the database file.
@@ -529,13 +533,30 @@ def create_table_as_sql(
         if output_suffix_lower == ".gpkg":
             data_type = "features" if "geom" in column_types else "attributes"
 
+            # Fill out the bounds of the layer using the bounds of the crs if possible
+            try:
+                crs = CRS.from_user_input(output_crs)
+                if crs is not None and crs.area_of_use is not None:
+                    transformer = Transformer.from_crs(
+                        crs.geodetic_crs, crs, always_xy=True
+                    )
+                    bounds = transformer.transform_bounds(*crs.area_of_use.bounds)
+                    min_x, min_y, max_x, max_y = [
+                        to_string_for_sql(coord) for coord in bounds
+                    ]
+                else:
+                    min_x = min_y = max_x = max_y = "NULL"
+
+            except Exception:
+                min_x = min_y = max_x = max_y = "NULL"
+
             # ~ mimic behaviour of gpkgAddGeometryColumn()
             sql = f"""
                 INSERT INTO {output_databasename}.gpkg_contents (
-                    table_name, data_type, identifier, description, last_change,
-                    min_x, min_y, max_x, max_y, srs_id)
+                  table_name, data_type, identifier, description, last_change,
+                  min_x, min_y, max_x, max_y, srs_id)
                 VALUES ('{output_layer}', '{data_type}', NULL, '', DATETIME(),
-                    NULL, NULL, NULL, NULL, {to_string_for_sql(output_crs)});
+                  {min_x}, {min_y}, {max_x}, {max_y}, {to_string_for_sql(output_crs)});
             """
             conn.execute(sql)
 
@@ -662,6 +683,54 @@ def execute_sql(
         raise Exception(f"Error executing {sql}") from ex
     finally:
         conn.close()
+
+
+def get_gpkg_contents(path: Path) -> dict[str, dict]:
+    """Get the contents of the gpkg_contents table of a geopackage.
+
+    Args:
+        path (Path): file path to the geopackage.
+
+    Returns:
+        dict[str, Any]: the contents of the geopackage.
+    """
+    conn = sqlite3.connect(path)
+    sql = None
+    try:
+        sql = "SELECT * FROM gpkg_contents;"
+        conn.row_factory = sqlite3.Row
+        cursor = conn.execute(sql)
+        contents = cursor.fetchall()
+        contents_dict = {row["table_name"]: dict(row) for row in contents}
+    except Exception as ex:
+        raise RuntimeError(f"Error executing {sql}") from ex
+    finally:
+        conn.close()
+
+    return contents_dict
+
+
+def get_tables(path: Path) -> list[str]:
+    """List all tables in the database.
+
+    Args:
+        path (Path): file path to the database.
+
+    Returns:
+        list[str]: the list of all tables in the database.
+    """
+    conn = sqlite3.connect(path)
+    sql = None
+    try:
+        sql = "SELECT name FROM sqlite_master WHERE type='table';"
+        cursor = conn.execute(sql)
+        tables = [row[0] for row in cursor.fetchall()]
+    except Exception as ex:
+        raise RuntimeError(f"Error executing {sql}") from ex
+    finally:
+        conn.close()
+
+    return tables
 
 
 def test_data_integrity(path: Path, use_spatialite: bool = True):

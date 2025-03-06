@@ -59,10 +59,11 @@ def test_create_new_spatialdb_error(
 
 
 @pytest.mark.parametrize("create_spatial_index", [(True), (False)])
+@pytest.mark.parametrize("output_epsg", [-1, 31370])
 @pytest.mark.filterwarnings(
     "ignore:.*Using create_spatial_index=True for a GPKG file is not recommended .*"
 )
-def test_create_table_as_sql(tmp_path, create_spatial_index):
+def test_create_table_as_sql(tmp_path, create_spatial_index, output_epsg):
     output_path = tmp_path / "output.gpkg"
     input1_path = test_helper.get_testfile(testfile="polygon-parcel", dst_dir=tmp_path)
     input2_path = test_helper.get_testfile(testfile="polygon-zone", dst_dir=tmp_path)
@@ -97,7 +98,7 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
         output_path=output_path,
         output_layer=output_path.stem,
         output_geometrytype=gfo.GeometryType.MULTIPOLYGON,
-        output_crs=31370,
+        output_crs=output_epsg,
         sql_stmt=sql_stmt,
         profile=sqlite_util.SqliteProfile.SPEED,
         create_spatial_index=create_spatial_index,
@@ -107,6 +108,19 @@ def test_create_table_as_sql(tmp_path, create_spatial_index):
     assert gfo.has_spatial_index(output_path) is create_spatial_index
     output_info = gfo.get_layerinfo(output_path)
     assert output_info.featurecount == 7
+
+    # The "gpkg_ogr_contents" table won't be present in the output gpkg
+    tables = sqlite_util.get_tables(output_path)
+    assert "gpkg_ogr_contents" not in tables
+
+    # The bounds of the layer should typically be filled out. It won't be filled out
+    # if the output_epsg is -1 and no spatial index is created.
+    if create_spatial_index or output_epsg != -1:
+        gpkg_contents = sqlite_util.get_gpkg_contents(output_path)
+        assert gpkg_contents["output"]["min_x"] is not None
+        assert gpkg_contents["output"]["min_y"] is not None
+        assert gpkg_contents["output"]["max_x"] is not None
+        assert gpkg_contents["output"]["max_y"] is not None
 
     # The gpkg created by spatialite by default include some triggers that have errors
     # and were removed from the gpkg spec but not removed in spatialite.
