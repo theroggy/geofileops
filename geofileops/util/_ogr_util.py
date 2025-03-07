@@ -166,6 +166,65 @@ def read_cpl_log(path: Path) -> tuple[list[str], list[str]]:
     return (lines_cleaned, lines_error)
 
 
+def StartTransaction(datasource: gdal.Dataset) -> bool:
+    """Starts a transaction on an open datasource.
+
+    Args:
+        datasource (gdal.Dataset): the datasource to start the transaction on.
+
+    Raises:
+        ValueError: if datasource is None.
+
+    Returns:
+        bool: True if the transaction was started successfully.
+    """
+    if datasource is None:
+        raise ValueError("datasource is None")
+
+    if datasource.TestCapability(ogr.ODsCTransactions):
+        datasource.StartTransaction()
+
+    return True
+
+
+def CommitTransaction(datasource: Optional[gdal.Dataset]) -> bool:
+    """Commits a transaction on an open datasource.
+
+    Args:
+        datasource (gdal.Dataset): the datasource to commit the transaction on. If None,
+            no commit is executed.
+
+    Returns:
+        bool: True if the transaction was committed successfully.
+    """
+    if datasource is None:
+        return False
+
+    if datasource.TestCapability(ogr.ODsCTransactions):
+        datasource.CommitTransaction()
+
+    return True
+
+
+def RollbackTransaction(datasource: Optional[gdal.Dataset]) -> bool:
+    """Rolls back a transaction on an open datasource.
+
+    Args:
+        datasource (gdal.Dataset): the datasource to roll back the transaction on. If
+            None, no rollback is executed.
+
+    Returns:
+        bool: True if the transaction was rolled back successfully.
+    """
+    if datasource is None:
+        return False
+
+    if datasource.TestCapability(ogr.ODsCTransactions):
+        datasource.RollbackTransaction()
+
+    return True
+
+
 class VectorTranslateInfo:
     def __init__(
         self,

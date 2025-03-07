@@ -1028,8 +1028,8 @@ def add_column(
                 f'ALTER TABLE "{layer}" ADD COLUMN "{name}" {type_str}{width_str}'
             )
             datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
-            result = datasource.ExecuteSQL(sql_stmt)
-            datasource.ReleaseResultSet(result)
+            _ogr_util.StartTransaction(datasource)
+            datasource.ExecuteSQL(sql_stmt)
         else:
             logger.warning(f"Column {name} existed already in {path}, layer {layer}")
 
@@ -1039,11 +1039,14 @@ def add_column(
         ):
             if datasource is None:
                 datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
+                _ogr_util.StartTransaction(datasource)
             sql_stmt = f'UPDATE "{layer}" SET "{name}" = {expression}'
-            result = datasource.ExecuteSQL(sql_stmt, dialect=expression_dialect)
-            datasource.ReleaseResultSet(result)
+            datasource.ExecuteSQL(sql_stmt, dialect=expression_dialect)
+
+        _ogr_util.CommitTransaction(datasource)
 
     except Exception as ex:
+        _ogr_util.RollbackTransaction(datasource)
         ex.args = (f"add_column error for {path}#{layer}:\n  {ex}",)
         raise
     finally:
