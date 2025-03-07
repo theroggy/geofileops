@@ -2313,9 +2313,9 @@ def append_to(
     dst_dimensions: Optional[str] = None,
     options: dict = {},
 ):
-    """Append src file to the dst file.
+    """Append a layer of the source file to the destination file.
 
-    If an sql_stmt is specified, the sqlite query can contain following placeholders
+    If an `sql_stmt` is specified, the sqlite query can contain following placeholders
     that will be automatically replaced for you:
 
       * {geometrycolumn}: the column where the primary geometry is stored.
@@ -2346,8 +2346,10 @@ def append_to(
     Args:
         src (Union[str,): source file path.
         dst (Union[str,): destination file path.
-        src_layer (str, optional): source layer. Defaults to None.
-        dst_layer (str, optional): destination layer. Defaults to None.
+        src_layer (str, optional): the source layer. If None and there is only one layer
+            in the src file, that layer is taken. Defaults to None.
+        dst_layer (str, optional): the destination layer. If None, the destination file
+            stem is used as layer name. Defaults to None.
         src_crs (str, optional): an epsg int or anything supported
             by the OGRSpatialReference.SetFromUserInput() call, which includes
             an EPSG string (eg. "EPSG:4326"), a well known text (WKT) CRS
@@ -2414,6 +2416,8 @@ def append_to(
     # Check/clean input params
     src = Path(src)
     dst = Path(dst)
+    if dst_layer is None:
+        dst_layer = get_default_layer(dst)
     if force_output_geometrytype is not None:
         force_output_geometrytype = GeometryType(force_output_geometrytype)
 
@@ -2495,6 +2499,8 @@ def _append_to_nolock(
     if isinstance(columns, str):
         # If a string is passed, convert to list
         columns = [columns]
+    if dst_layer is None:
+        dst_layer = get_default_layer(dst)
 
     options = _ogr_util._prepare_gdal_options(options)
     if (
@@ -2640,9 +2646,10 @@ def copy_layer(
     append: bool = False,
     force: bool = False,
 ):
-    """Read a layer from a source file and write it to a new destination file.
+    """Copy a layer from a source file to a destination file.
 
-    Typically used to convert from one fileformat to another or to reproject.
+    Typically used to convert from one fileformat to another, to reproject or to export
+    a subset of the data using the `where` parameter.
 
     The options parameter can be used to pass any type of options to GDAL in
     the following form:
@@ -2662,7 +2669,7 @@ def copy_layer(
         dst (PathLike): The destination file path.
         src_layer (str, optional): The source layer. If None and there is only
             one layer in the src file, that layer is taken. Defaults to None.
-        dst_layer (str, optional): The destination layer. If None, the file
+        dst_layer (str, optional): The destination layer. If None, the destination file
             stem is taken as layer name. Defaults to None.
         src_crs (Union[str, int], optional): an epsg int or anything supported
             by the OGRSpatialReference.SetFromUserInput() call, which includes
@@ -2740,8 +2747,10 @@ def copy_layer(
         else:
             logger.info(f"Output file exists already, so stop: {dst}")
             return
+    if dst_layer is None:
+        dst_layer = get_default_layer(dst)
 
-    # Convert
+    # Copy
     logger.info(f"Copy layer from {src} to {dst}")
     _append_to_nolock(
         src,

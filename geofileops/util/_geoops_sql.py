@@ -3473,6 +3473,8 @@ def _two_layer_vector_operation(
                     fileops._append_to_nolock(
                         src=tmp_partial_output_path,
                         dst=tmp_output_path,
+                        src_layer=output_layer,
+                        dst_layer=output_layer,
                         explodecollections=explodecollections,
                         force_output_geometrytype=force_output_geometrytype,
                         where=where_post,

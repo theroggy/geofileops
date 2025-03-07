@@ -7,6 +7,8 @@
 - `erase` was renamed to `difference`, as most other open source applications/libraries
   use this terminology. `erase` just keeps existing for backwards compatibility for now,
   but a warning is shown that it might be removed in the (distant) future. (#595)
+- in `copy_layer` and `append_to` the default `dst_layer` was, contrary to the
+  documentation, not the stem of the destination filename. This is corrected now. (#648)
 
 ### Improvements
 
