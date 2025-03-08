@@ -957,12 +957,26 @@ def delete_duplicate_geometries(
     input_layer: Optional[str] = None,
     output_layer: Optional[str] = None,
     columns: Optional[list[str]] = None,
+    priority_column: Optional[str] = None,
+    priority_ascending: bool = True,
     explodecollections: bool = False,
     keep_empty_geoms: bool = False,
     where_post: Optional[str] = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
     force: bool = False,
 ):
     """Copy all rows to the output file, except for duplicate geometries.
+
+    The check for duplicates is done using ``ST_Equals``. ``ST_Equals`` is ``True`` if`
+    the given geometries are "topologically equal". This means that the geometries have
+    the same dimension and their point-sets occupy the same space. This means e.g. that
+    the order of vertices may be different, starting points of rings can be different
+    and polygons can contain extra points if they don't change the surface occupied.
+
+    If a ``priority_column`` is specified, the row with the lowest value in this column
+    is retained. If ``priority_ascending`` is False, the row with the highest value is
+    retained.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -978,6 +992,10 @@ def delete_duplicate_geometries(
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
             "fid" will be aliased eg. to "fid_1". Defaults to None.
+        priority_column (str, optional): column to use as priority for keeping rows.
+            Defaults to None.
+        priority_ascending (bool, optional): True to keep the row with the lowest
+            priority value. Defaults to True.
         explodecollections (bool, optional): True to output only simple geometries.
             Defaults to False.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
@@ -985,6 +1003,12 @@ def delete_duplicate_geometries(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
+        nb_parallel (int, optional): the number of parallel processes to use.
+            Defaults to -1: use all available CPUs.
+        batchsize (int, optional): indicative number of rows to process per
+            batch. A smaller batch size, possibly in combination with a
+            smaller ``nb_parallel``, will reduce the memory usage.
+            Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -1002,9 +1026,13 @@ def delete_duplicate_geometries(
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
+        priority_column=priority_column,
+        priority_ascending=priority_ascending,
         explodecollections=explodecollections,
         keep_empty_geoms=keep_empty_geoms,
         where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
         force=force,
     )
 
