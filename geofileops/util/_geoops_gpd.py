@@ -884,6 +884,8 @@ def _apply_geooperation_to_layer(
                             fileops._append_to_nolock(
                                 src=tmp_partial_output_path,
                                 dst=tmp_output_path,
+                                src_layer=output_layer,
+                                dst_layer=output_layer,
                                 explodecollections=explodecollections,
                                 create_spatial_index=False,
                                 force_output_geometrytype=force_output_geometrytype,
@@ -1740,6 +1742,8 @@ def _dissolve_polygons_pass(
                         fileops._append_to_nolock(
                             src=output_notonborder_tmp_partial_path,
                             dst=output_notonborder_path,
+                            src_layer=output_layer,
+                            dst_layer=output_layer,
                             create_spatial_index=False,
                         )
                         gfo.remove(output_notonborder_tmp_partial_path)
@@ -1755,6 +1759,8 @@ def _dissolve_polygons_pass(
                         fileops._append_to_nolock(
                             src=output_onborder_tmp_partial_path,
                             dst=output_onborder_path,
+                            src_layer=output_layer,
+                            dst_layer=output_layer,
                             create_spatial_index=False,
                         )
                         gfo.remove(output_onborder_tmp_partial_path)
@@ -1764,7 +1770,7 @@ def _dissolve_polygons_pass(
                 message = f"Error executing {batches[batch_id]}: {ex}"
                 logger.exception(message)
                 calculate_pool.shutdown()
-                raise Exception(message) from ex
+                raise RuntimeError(message) from ex
 
             # Log the progress and prediction speed
             _general_util.report_progress(
@@ -2269,7 +2275,7 @@ def _add_orderby_column(path: Path, layer: str, name: str):
     # Prepare the expression to calculate the orderby column.
     # In a spatial file, a spatial order will make later use more efficiënt,
     # so use a geohash.
-    layerinfo = gfo.get_layerinfo(path)
+    layerinfo = gfo.get_layerinfo(path, layer=layer)
     if layerinfo.crs is not None and layerinfo.crs.is_geographic:
         # If the coordinates are geographic (in lat/lon degrees), ok
         expression = f"ST_GeoHash({layerinfo.geometrycolumn}, 10)"
@@ -2293,6 +2299,8 @@ def _add_orderby_column(path: Path, layer: str, name: str):
                 )*{to_geographic_factor_approx}, 4326), 10)"""
 
     # Now we can actually add the column.
-    gfo.add_column(path=path, name=name, type=gfo.DataType.TEXT, expression=expression)
+    gfo.add_column(
+        path=path, layer=layer, name=name, type=gfo.DataType.TEXT, expression=expression
+    )
     sqlite_stmt = f'CREATE INDEX {name}_idx ON "{layer}"({name})'
     gfo.execute_sql(path=path, sql_stmt=sqlite_stmt)

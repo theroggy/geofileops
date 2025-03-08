@@ -3451,11 +3451,14 @@ def _two_layer_vector_operation(
 
                 # If there is only one tmp_partial file and it is already ok as
                 # output file, just rename/move it.
+                # Just for GPKG, don't do this, as there are small issues in the file
+                # created by spatialite that are fixed by copying with ogr2ogr.
                 if (
                     nb_batches == 1
                     and not explodecollections
                     and force_output_geometrytype is None
                     and where_post is None
+                    and tmp_output_path.suffix.lower() != ".gpkg"
                     and tmp_partial_output_path.suffix.lower()
                     == tmp_output_path.suffix.lower()
                 ):
@@ -3470,6 +3473,8 @@ def _two_layer_vector_operation(
                     fileops._append_to_nolock(
                         src=tmp_partial_output_path,
                         dst=tmp_output_path,
+                        src_layer=output_layer,
+                        dst_layer=output_layer,
                         explodecollections=explodecollections,
                         force_output_geometrytype=force_output_geometrytype,
                         where=where_post,

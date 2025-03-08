@@ -7,6 +7,8 @@
 - `erase` was renamed to `difference`, as most other open source applications/libraries
   use this terminology. `erase` just keeps existing for backwards compatibility for now,
   but a warning is shown that it might be removed in the (distant) future. (#595)
+- in `copy_layer` and `append_to` the default `dst_layer` was, contrary to the
+  documentation, not the stem of the destination filename. This is corrected now. (#648)
 
 ### Improvements
 
@@ -27,8 +29,11 @@
 - Enable "CURVE" geometrytype files to be processed in the general file and
   layer operations (#558)
 - Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
+- In `add_column`, don't add column if update expression is invalid (#650)
 - Add configuration option to only warn on dissolve errors (#561)
 - Add some pre-flight checks when geofileops is imported (#573, #627)
+- For `select_two_layers`, add the `gpkg_ogr_contents` table + fill out extents in the
+  `gpkg_contents` table in the output file (#647)
 - When using join_nearest with spatialite version >= 5.1,
   show ST_distance between the two geometries instead of 
   the distance between the centroid of the two geometries (#634)
