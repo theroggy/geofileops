@@ -4,8 +4,7 @@
 name: TestsOnInstalled
 
 on:
-  #pull_request:
-  #  branches: [ main, v0.** ]
+  workflow_dispatch
   schedule:
     # every Monday to Friday at 5:40 AM
     - cron: "40 5 * * 1-5"
