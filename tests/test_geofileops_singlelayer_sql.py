@@ -6,6 +6,7 @@ import math
 
 import geopandas as gpd
 import pytest
+from shapely.geometry import Polygon
 
 import geofileops as gfo
 from geofileops import GeometryType
@@ -14,10 +15,14 @@ from tests import test_helper
 from tests.test_helper import EPSGS, SUFFIXES_GEOOPS, assert_geodataframe_equal
 
 
-def test_delete_duplicate_geometries(tmp_path):
+@pytest.mark.parametrize(
+    "priority_column, priority_ascending",
+    [(None, True), (None, False), ("priority", True), ("priority", False)],
+)
+def test_delete_duplicate_geoms(tmp_path, priority_column, priority_ascending):
     # Prepare test data
     test_gdf = gpd.GeoDataFrame(
-        {"fid": [1, 2, 3, 4, 5]},
+        {"fid": [1, 2, 3, 4, 5], "priority": [5, 3, 3, 4, 5]},
         geometry=[
             test_helper.TestData.polygon_with_island,
             test_helper.TestData.polygon_with_island,
@@ -27,21 +32,69 @@ def test_delete_duplicate_geometries(tmp_path):
         ],
         crs=test_helper.TestData.crs_epsg,
     )
-    expected_gdf = test_gdf.iloc[[0, 2, 4]].set_index(keys="fid")
+    if priority_column is None:
+        if priority_ascending:
+            expected_gdf = test_gdf.iloc[[0, 2, 4]].set_index(keys="fid")
+        else:
+            expected_gdf = test_gdf.iloc[[1, 3, 4]].set_index(keys="fid")
+    else:  # noqa: PLR5501
+        if priority_ascending:
+            expected_gdf = test_gdf.iloc[[1, 2, 4]].set_index(keys="fid")
+        else:
+            expected_gdf = test_gdf.iloc[[0, 3, 4]].set_index(keys="fid")
+
     suffix = ".gpkg"
     input_path = tmp_path / f"input_test_data{suffix}"
     gfo.to_file(test_gdf, input_path)
-    input_info = gfo.get_layerinfo(input_path)
+    batchsize = math.ceil(gfo.get_layerinfo(input_path).featurecount / 2)
 
     # Run test
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
-    print(f"Run test for suffix {suffix}")
-    # delete_duplicate_geometries isn't multiprocess, so no batchsize needed
+    gfo.delete_duplicate_geometries(
+        input_path=input_path,
+        output_path=output_path,
+        priority_column=priority_column,
+        priority_ascending=priority_ascending,
+        batchsize=batchsize,
+    )
+
+    # Check result
+    result_gdf = gfo.read_file(output_path, fid_as_index=True)
+    assert_geodataframe_equal(result_gdf, expected_gdf)
+
+
+def test_delete_duplicate_geoms_notexact(tmp_path):
+    """Test if the test of being duplicates is tolerant enough for small differences.
+
+    Technically this should be the case because the comparison is done using ST_Equals.
+
+    E.g.:
+      - The order of points in a polygon can be different
+      - The starting point of rings in polygons can be different
+      - A polygon can countain extra points if they don't add any surfact
+    """
+    # Prepare test data
+    test_gdf = gpd.GeoDataFrame(
+        {"fid": [1, 2, 3, 4, 5]},
+        geometry=[
+            Polygon([(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)]),
+            Polygon([(1, 0), (1, 1), (0, 1), (0, 0), (1, 0)]),
+            Polygon([(1, 0), (0, 0), (0, 1), (1, 1), (1, 0)]),
+            Polygon([(0, 0), (1, 0), (1, 1), (0, 1), (0, 0.5), (0, 0)]),
+            Polygon([(3, 0), (3, 1), (2, 1), (2, 0), (3, 0)]),
+        ],
+        crs=test_helper.TestData.crs_epsg,
+    )
+    expected_gdf = test_gdf.iloc[[0, 4]].set_index(keys="fid")
+    suffix = ".gpkg"
+    input_path = tmp_path / f"input_test_data{suffix}"
+    gfo.to_file(test_gdf, input_path)
+
+    # Run test
+    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
     gfo.delete_duplicate_geometries(input_path=input_path, output_path=output_path)
 
-    # Check result, 2 duplicates should be removed
-    result_info = gfo.get_layerinfo(output_path)
-    assert result_info.featurecount == input_info.featurecount - 2
+    # Check result
     result_gdf = gfo.read_file(output_path, fid_as_index=True)
     assert_geodataframe_equal(result_gdf, expected_gdf)
 

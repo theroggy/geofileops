@@ -18,6 +18,7 @@
   This gives similar improvements for such datasets to `identity`,
   `symmetric_difference` and `union`. (#585, #601, #591, #614)
 - Add support to rename columns and layers with only a difference in casing (#549, #593)
+- Use `ST_Equals` and add priority feature to `delete_duplicate_geometries` (#638)
 - Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
 - Speed up processing many small files, mainly on windows:
     - reduce calls to `gdal.OpenEx` (#622, #625)
