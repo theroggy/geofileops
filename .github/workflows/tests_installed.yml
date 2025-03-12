@@ -39,7 +39,7 @@ jobs:
             # nomkl: openblas instead of mkl saves 600 MB. Linux OK, but 50% slower on Windows and OSX!
             install_extra_args: >-
               nomkl
-              geofileops=0.9.1=pyhd8ed1ab_3
+              geofileops=0.9.2
 
     steps:
       - uses: actions/checkout@v4
