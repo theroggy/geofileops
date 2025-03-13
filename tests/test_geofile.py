@@ -395,12 +395,26 @@ def test_copy_layer_force_output_geometrytype(tmp_path, testfile, force_geometry
     assert len(result_gdf) == 48
 
 
-def test_copy_layer_invalid_params(tmp_path):
+@pytest.mark.parametrize(
+    "kwargs, expected_error",
+    [
+        ({"src": "non_existing_file.gpkg"}, "src file doesn't exist"),
+        ({"write_mode": "invalid"}, "Invalid write_mode"),
+        ({"write_mode": "add_layer"}, "dst_layer is required when write_mode is"),
+        (
+            {"write_mode": "append", "append": True},
+            "append parameter is deprecated, use write_mode",
+        ),
+    ],
+)
+def test_copy_layer_invalid_params(tmp_path, kwargs, expected_error):
     # Convert
-    src = tmp_path / "nonexisting_file.gpkg"
-    dst = tmp_path / "output.gpkg"
-    with pytest.raises(ValueError, match="src file doesn't exist: "):
-        gfo.copy_layer(src, dst)
+    if "src" not in kwargs:
+        kwargs["src"] = test_helper.get_testfile("polygon-parcel")
+    kwargs["dst"] = tmp_path / "output.gpkg"
+
+    with pytest.raises(ValueError, match=expected_error):
+        gfo.copy_layer(**kwargs)
 
 
 def test_copy_layer_input_open_options(tmp_path):
@@ -578,6 +592,55 @@ def test_copy_layer_where(tmp_path, suffix):
     dst_layerinfo = gfo.get_layerinfo(dst, raise_on_nogeom=raise_on_nogeom)
     assert src_layerinfo.featurecount > dst_layerinfo.featurecount
     assert dst_layerinfo.featurecount == exp_featurecount
+
+
+def test_copy_layer_write_mode_add_layer(tmp_path):
+    src = test_helper.get_testfile("polygon-parcel")
+    dst = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    dst_layer = "parcels_2"
+
+    # Test
+    gfo.copy_layer(src, dst, dst_layer=dst_layer, write_mode="add_layer")
+
+    # Test if number of rows is correct
+    layers = gfo.listlayers(dst)
+    assert len(layers) == 2
+    assert dst_layer in layers
+
+    info = gfo.get_layerinfo(dst, layer=dst_layer)
+    assert info.featurecount == 48
+
+
+def test_copy_layer_write_mode_append(tmp_path):
+    src = test_helper.get_testfile("polygon-parcel")
+    dst = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    dst_layer = gfo.get_only_layer(dst)
+
+    # Test
+    gfo.copy_layer(src, dst, dst_layer=dst_layer, write_mode="append")
+
+    # Test if number of rows is correct
+    info = gfo.get_layerinfo(dst)
+    assert info.featurecount == 96
+
+
+@pytest.mark.parametrize("write_mode", [None, "create", "add_layer"])
+@pytest.mark.parametrize("force", [True, False])
+def test_copy_layer_write_mode_force(tmp_path, write_mode, force):
+    """Test if force parameter is properly handled."""
+    src = test_helper.get_testfile("polygon-parcel")
+    dst = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    kwargs = {}
+    if write_mode is not None:
+        kwargs["write_mode"] = write_mode
+    dst_layer = gfo.get_only_layer(dst)
+
+    mtime_orig = dst.stat().st_mtime
+    gfo.copy_layer(src, dst, dst_layer=dst_layer, force=force, **kwargs)
+    if force:
+        assert dst.stat().st_mtime > mtime_orig
+    else:
+        assert dst.stat().st_mtime == mtime_orig
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
@@ -1364,9 +1427,9 @@ def test_spatial_index(tmp_path, suffix):
     has_spatial_index = gfo.has_spatial_index(path=test_path, layer=layer)
     assert has_spatial_index is True
 
-    # Spatial index if it exists already by default gives error
+    # Spatial index if it already exists by default gives error
     with pytest.raises(
-        Exception, match="create_spatial_index error: spatial index exists already"
+        Exception, match="create_spatial_index error: spatial index already exists"
     ):
         gfo.create_spatial_index(path=test_path, layer=layer)
     gfo.create_spatial_index(path=test_path, layer=layer, exist_ok=True)

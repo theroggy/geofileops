@@ -246,7 +246,7 @@ def save_chart(
     if not output_path.exists():
         fig.savefig(str(output_path))
     else:
-        # If it exists already, only save it if it has changed
+        # If it already exists, only save it if it has changed
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_output_path = Path(tmp_dir) / output_path.name
             fig.savefig(tmp_output_path)

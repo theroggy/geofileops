@@ -7,8 +7,10 @@
 - `erase` was renamed to `difference`, as most other open source applications/libraries
   use this terminology. `erase` just keeps existing for backwards compatibility for now,
   but a warning is shown that it might be removed in the (distant) future. (#595)
-- in `copy_layer` and `append_to` the default `dst_layer` was, contrary to the
+- In `copy_layer` and `append_to` the default `dst_layer` was, contrary to the
   documentation, not the stem of the destination filename. This is corrected now. (#648)
+- In `copy_layer`, the `append` parameter is deprecated and replaced by the `write_mode`
+  parameter that accepts e.g. "append" as value (#663).
 
 ### Improvements
 
@@ -29,6 +31,7 @@
   column should be retained (#523)
 - Enable "CURVE" geometrytype files to be processed in the general file and
   layer operations (#558)
+- Replace `append` parameter by `write_mode` in `copy_file` (#663)
 - Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
 - In `add_column`, don't add column if update expression is invalid (#650)
 - Add configuration option to only warn on dissolve errors (#561)

@@ -114,7 +114,7 @@ def create_file_atomic_wait(
 ):
     """Create a file in an atomic way.
 
-    If it exists already, wait till it can be created.
+    If it already exists, wait till it can be created.
 
     Returns once the file is created.
 
@@ -191,7 +191,7 @@ def output_exists(path: Path, remove_if_exists: bool) -> bool:
             gfo.remove(path)
             return False
         else:
-            logging.info(msg=f"Stop, output exists already {path}", stacklevel=2)
+            logging.info(msg=f"Stop, output already exists {path}", stacklevel=2)
             return True
 
     return False

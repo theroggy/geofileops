@@ -881,11 +881,12 @@ def _apply_geooperation_to_layer(
                         ):
                             gfo.move(tmp_partial_output_path, tmp_output_path)
                         else:
-                            fileops._append_to_nolock(
+                            fileops.copy_layer(
                                 src=tmp_partial_output_path,
                                 dst=tmp_output_path,
                                 src_layer=output_layer,
                                 dst_layer=output_layer,
+                                write_mode="append",
                                 explodecollections=explodecollections,
                                 create_spatial_index=False,
                                 force_output_geometrytype=force_output_geometrytype,
@@ -945,8 +946,8 @@ def _apply_geooperation(
     if not output_path.parent.exists():
         raise ValueError(f"Output directory does not exist: {output_path.parent}")
     if output_path.exists():
-        if force is False:
-            message = f"Stop, output exists already {output_path}"
+        if not force:
+            message = f"Stop, output already exists {output_path}"
             return message
         else:
             gfo.remove(output_path)
@@ -1739,11 +1740,12 @@ def _dissolve_polygons_pass(
                         output_notonborder_tmp_partial_path.exists()
                         and output_notonborder_tmp_partial_path.stat().st_size > 0
                     ):
-                        fileops._append_to_nolock(
+                        fileops.copy_layer(
                             src=output_notonborder_tmp_partial_path,
                             dst=output_notonborder_path,
                             src_layer=output_layer,
                             dst_layer=output_layer,
+                            write_mode="append",
                             create_spatial_index=False,
                         )
                         gfo.remove(output_notonborder_tmp_partial_path)
@@ -1756,11 +1758,12 @@ def _dissolve_polygons_pass(
                         output_onborder_tmp_partial_path.exists()
                         and output_onborder_tmp_partial_path.stat().st_size > 0
                     ):
-                        fileops._append_to_nolock(
+                        fileops.copy_layer(
                             src=output_onborder_tmp_partial_path,
                             dst=output_onborder_path,
                             src_layer=output_layer,
                             dst_layer=output_layer,
+                            write_mode="append",
                             create_spatial_index=False,
                         )
                         gfo.remove(output_onborder_tmp_partial_path)
