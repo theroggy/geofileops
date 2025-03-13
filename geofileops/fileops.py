@@ -929,7 +929,9 @@ def add_column(
 ):
     """Add a column to a layer of the geofile.
 
-    You can specify an `expression` to use to fill out the value of the column.
+    You can specify an `expression` to use to fill out the value of the column. For file
+    formats that support transactions, the column won't be added if updating the value
+    fails.
 
     Args:
         path (PathLike): Path to the geofile.
