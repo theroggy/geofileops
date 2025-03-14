@@ -30,7 +30,7 @@ from pygeoops import GeometryType, PrimitiveType
 
 import geofileops as gfo
 from geofileops import LayerInfo, fileops
-from geofileops._compat import GEOPANDAS_GTE_10, PANDAS_GTE_22
+from geofileops._compat import PANDAS_GTE_22
 from geofileops.helpers import _general_helper, _parameter_helper
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
@@ -881,11 +881,12 @@ def _apply_geooperation_to_layer(
                         ):
                             gfo.move(tmp_partial_output_path, tmp_output_path)
                         else:
-                            fileops._append_to_nolock(
+                            fileops.copy_layer(
                                 src=tmp_partial_output_path,
                                 dst=tmp_output_path,
                                 src_layer=output_layer,
                                 dst_layer=output_layer,
+                                write_mode="append",
                                 explodecollections=explodecollections,
                                 create_spatial_index=False,
                                 force_output_geometrytype=force_output_geometrytype,
@@ -945,8 +946,8 @@ def _apply_geooperation(
     if not output_path.parent.exists():
         raise ValueError(f"Output directory does not exist: {output_path.parent}")
     if output_path.exists():
-        if force is False:
-            message = f"Stop, output exists already {output_path}"
+        if not force:
+            message = f"Stop, output already exists {output_path}"
             return message
         else:
             gfo.remove(output_path)
@@ -1215,6 +1216,8 @@ def dissolve(
         )
 
     elif input_layer.geometrytype.to_primitivetype is PrimitiveType.POLYGON:
+        start_time = datetime.now()
+
         # Prepare where_post
         if where_post is not None:
             if where_post == "":
@@ -1620,6 +1623,9 @@ def dissolve(
         finally:
             if ConfigOptions.remove_temp_files:
                 shutil.rmtree(tempdir, ignore_errors=True)
+
+        logger.info(f"Ready, full dissolve took {datetime.now()-start_time}")
+
     else:
         raise NotImplementedError(
             f"Unsupported input geometrytype: {input_layer.geometrytype}"
@@ -1739,11 +1745,12 @@ def _dissolve_polygons_pass(
                         output_notonborder_tmp_partial_path.exists()
                         and output_notonborder_tmp_partial_path.stat().st_size > 0
                     ):
-                        fileops._append_to_nolock(
+                        fileops.copy_layer(
                             src=output_notonborder_tmp_partial_path,
                             dst=output_notonborder_path,
                             src_layer=output_layer,
                             dst_layer=output_layer,
+                            write_mode="append",
                             create_spatial_index=False,
                         )
                         gfo.remove(output_notonborder_tmp_partial_path)
@@ -1756,11 +1763,12 @@ def _dissolve_polygons_pass(
                         output_onborder_tmp_partial_path.exists()
                         and output_onborder_tmp_partial_path.stat().st_size > 0
                     ):
-                        fileops._append_to_nolock(
+                        fileops.copy_layer(
                             src=output_onborder_tmp_partial_path,
                             dst=output_onborder_path,
                             src_layer=output_layer,
                             dst_layer=output_layer,
+                            write_mode="append",
                             create_spatial_index=False,
                         )
                         gfo.remove(output_onborder_tmp_partial_path)
@@ -1906,10 +1914,10 @@ def _dissolve_polygons(
             aggfunc=aggfunc,
             as_index=False,
             dropna=False,
+            grid_size=gridsize,
         )
     except Exception as ex:
-        # If a GEOS exception occurs, it is probably due to invalid geometries.
-        # Try to fix them and try again.
+        # If a GEOS exception occurs, check on_data_error on how to proceed.
         if on_data_error == "warn":
             message = f"Error processing tile, ENTIRE TILE LOST!!!: {ex}"
             warnings.warn(message, UserWarning, stacklevel=3)
@@ -1977,13 +1985,8 @@ def _dissolve_polygons(
 
         perfinfo["time_clip"] = (datetime.now() - start_clip).total_seconds()
 
-    if gridsize != 0.0:
-        diss_gdf.geometry = _geoseries_util.set_precision(
-            diss_gdf.geometry, grid_size=gridsize, raise_on_topoerror=False
-        )
-        assert isinstance(diss_gdf.geometry, gpd.GeoSeries)
-
     # Set empty geometries to None
+    assert isinstance(diss_gdf.geometry, gpd.GeoSeries)
     diss_gdf.loc[diss_gdf.geometry.is_empty, diss_gdf.geometry.name] = None
 
     if not keep_empty_geoms:
@@ -2087,6 +2090,7 @@ def _dissolve(
     sort=True,
     observed=False,
     dropna=True,
+    grid_size: float = 0.0,
 ) -> gpd.GeoDataFrame:
     """Dissolve geometries within `groupby` into single observation.
 
@@ -2228,18 +2232,13 @@ def _dissolve(
             dropped_columns = [
                 column for column in columns_to_agg if column not in agg_data.columns
             ]
-            raise Exception(
+            raise ValueError(
                 f"Column(s) {dropped_columns} are not supported for aggregation, stop"
             )
 
     # Process spatial component
     def merge_geometries(block):
-        if GEOPANDAS_GTE_10:
-            merged_geom = block.union_all()
-        else:
-            merged_geom = block.unary_union
-
-        return merged_geom
+        return shapely.union_all(block, grid_size=grid_size)
 
     g = df.groupby(group_keys=False, **groupby_kwargs)[df.geometry.name].agg(
         merge_geometries

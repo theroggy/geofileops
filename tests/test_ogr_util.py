@@ -359,20 +359,20 @@ def test_vector_translate_sql_invalid_new_output(tmp_path, input_suffix, output_
 @pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
-    "update, append, output_file_expected",
+    "access_mode, output_file_expected",
     [
-        (False, False, False),
-        (True, False, True),
-        (False, True, True),
-        (True, True, True),
+        (None, False),
+        ("update", True),
+        ("append", True),
+        ("append", True),
     ],
 )
 def test_vector_translate_sql_invalid_existing_output(
-    tmp_path, input_suffix, output_suffix, update, append, output_file_expected
+    tmp_path, input_suffix, output_suffix, access_mode, output_file_expected
 ):
     """Run an invalid query that tries to add a layer to an existing file (update).
 
-    If append and update are both False, the existing output file will be overwritten.
+    If access_mode is None, the existing output file will be overwritten.
     In this case, if the sql query is invalid, the output file will effectively be
     removed.
     """
@@ -386,7 +386,7 @@ def test_vector_translate_sql_invalid_existing_output(
     sql_stmt = f'SELECT * FROM "{layer}" WHERE not_existing_column = 1'
     try:
         _ogr_util.vector_translate(
-            input_path, output_path, sql_stmt=sql_stmt, update=update, append=append
+            input_path, output_path, sql_stmt=sql_stmt, access_mode=access_mode
         )
     except Exception:
         pass

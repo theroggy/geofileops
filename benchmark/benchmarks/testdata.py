@@ -356,7 +356,7 @@ def _download_samplefile(
         tmp_dir = dst_path.parent / "tmp"
 
         try:
-            # Remove tmp dir if it exists already
+            # Remove tmp dir if it already exists
             if tmp_dir.exists():
                 shutil.rmtree(tmp_dir)
             tmp_dir.mkdir(parents=True, exist_ok=True)

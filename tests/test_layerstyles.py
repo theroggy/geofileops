@@ -41,7 +41,7 @@ def test_add_get_remove_layer_styles(tmp_path):
     assert len(layerstyles_df) == 1
 
     # Adding the same style again should give an error
-    with pytest.raises(ValueError, match="layer style exists already: "):
+    with pytest.raises(ValueError, match="layer style already exists: "):
         gfo.add_layerstyle(
             path=test_path, layer="parcels", name="test_style", qml="test_qml"
         )

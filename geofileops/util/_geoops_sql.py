@@ -23,7 +23,6 @@ import shapely.geometry.base
 import geofileops as gfo
 from geofileops import GeometryType, LayerInfo, PrimitiveType, fileops
 from geofileops._compat import SPATIALITE_GTE_51
-from geofileops.fileops import _append_to_nolock
 from geofileops.helpers import _general_helper, _parameter_helper
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
@@ -318,11 +317,11 @@ def makevalid(
     batchsize: int = -1,
     force: bool = False,
 ):
-    # If output file exists already, either clean up or return...
+    # If output file already exists, either clean up or return...
     operation_name = "makevalid"
     logger = logging.getLogger(f"geofileops.{operation_name}")
     if not force and output_path.exists():
-        logger.info(f"Stop, output exists already {output_path}")
+        logger.info(f"Stop, output already exists {output_path}")
         return
 
     # Determine output_geometrytype + make it multitype if it wasn't specified.
@@ -411,7 +410,7 @@ def select(
     force: bool = False,
     operation_prefix: str = "",
 ):
-    # Check if output exists already here, to avoid to much logging to be written
+    # Check if output already exists here, to avoid to much logging to be written
     logger = logging.getLogger(f"geofileops.{operation_prefix}select")
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
@@ -574,7 +573,7 @@ def _single_layer_vector_operation(
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
-    # If output file exists already, either clean up or return...
+    # If output file already exists, either clean up or return...
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
 
@@ -834,9 +833,10 @@ def _single_layer_vector_operation(
                         where_post = where_post.format(
                             geometrycolumn=info.geometrycolumn
                         )
-                    fileops._append_to_nolock(
+                    fileops.copy_layer(
                         src=tmp_partial_output_path,
                         dst=tmp_output_path,
+                        write_mode="append",
                         explodecollections=explodecollections,
                         force_output_geometrytype=force_output_geometrytype,
                         where=where_post,
@@ -1451,7 +1451,7 @@ def export_by_location(
     logger = logging.getLogger(f"geofileops.{operation_name}")
     if output_path.exists():
         if force is False:
-            logger.info(f"Stop, output exists already {output_path}")
+            logger.info(f"Stop, output already exists {output_path}")
             return
         else:
             gfo.remove(output_path)
@@ -2315,7 +2315,7 @@ def join_nearest(
     # here already
     logger = logging.getLogger("geofileops.join_nearest")
     if output_path.exists() and force is False:
-        logger.info(f"Stop, output exists already {output_path}")
+        logger.info(f"Stop, output already exists {output_path}")
         return
     if input1_layer is None:
         input1_layer = gfo.get_only_layer(input1_path)
@@ -2611,11 +2611,12 @@ def identity(
         # Now append
         logger.info("Step 4 of 4: finalize")
         # Note: append will never create an index on an already existing layer.
-        _append_to_nolock(
+        fileops.copy_layer(
             src=difference_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
+            write_mode="append",
         )
 
         # Convert or add spatial index
@@ -2785,11 +2786,12 @@ def symmetric_difference(
         # Now append
         logger.info("Step 4 of 4: finalize")
         # Note: append will never create an index on an already existing layer.
-        _append_to_nolock(
+        fileops.copy_layer(
             src=diff2_output_path,
             dst=diff1_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
+            write_mode="append",
         )
 
         # Convert or add spatial index
@@ -2943,11 +2945,12 @@ def union(
             input2_subdivided_path=input1_subdivided_path,
         )
         # Note: append will never create an index on an already existing layer.
-        _append_to_nolock(
+        fileops.copy_layer(
             src=diff1_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
+            write_mode="append",
         )
         gfo.remove(diff1_output_path)
 
@@ -2977,11 +2980,12 @@ def union(
             input1_subdivided_path=input1_subdivided_path,
             input2_subdivided_path=input2_subdivided_path,
         )
-        _append_to_nolock(
+        fileops.copy_layer(
             src=diff2_output_path,
             dst=intersection_output_path,
             src_layer=output_layer,
             dst_layer=output_layer,
+            write_mode="append",
         )
         gfo.remove(diff2_output_path)
 
@@ -3490,11 +3494,12 @@ def _two_layer_vector_operation(
                         True if nb_batches == 1 and output_with_spatial_index else False
                     )
 
-                    fileops._append_to_nolock(
+                    fileops.copy_layer(
                         src=tmp_partial_output_path,
                         dst=tmp_output_path,
                         src_layer=output_layer,
                         dst_layer=output_layer,
+                        write_mode="append",
                         explodecollections=explodecollections,
                         force_output_geometrytype=force_output_geometrytype,
                         where=where_post,
