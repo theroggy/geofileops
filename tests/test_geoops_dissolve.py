@@ -10,6 +10,7 @@ import geopandas as gpd
 import pandas as pd
 import pygeoops
 import pytest
+import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
@@ -281,7 +282,7 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
     [
         (".gpkg", 31370, False, ["GEWASgroep"], True, 0.0, "", 26),
         (".gpkg", 31370, False, "GEWASgroep", True, 0.0, "", 26),
-        (".gpkg", 31370, False, ["GEWASgroep"], True, 0.01, "", 25),
+        (".gpkg", 31370, False, ["GEWASgroep"], True, 0.01, "", 24),
         (".gpkg", 31370, False, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg", 31370, True, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg", 31370, False, ["gewasGROEP"], False, 0.01, WHERE_AREA_GT_5000, 4),
@@ -304,6 +305,9 @@ def test_dissolve_polygons(
     where_post,
     expected_featurecount,
 ):
+    if gridsize > 0.0:
+        pytest.xfail("Geopandas doesn't support dissolve with gridsize yet")
+
     # Prepare test data
     test_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
     if explode_input:
@@ -374,6 +378,10 @@ def test_dissolve_polygons(
 
     # Compare result expected values using geopandas
     columns = ["geometry"]
+    if gridsize > 0.0:
+        input_gdf.geometry = shapely.set_precision(
+            input_gdf.geometry, grid_size=gridsize
+        )
     if groupby_columns is None or len(groupby_columns) == 0:
         expected_gdf = input_gdf[columns].dissolve()
     else:

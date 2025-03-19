@@ -35,6 +35,7 @@
 - Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
 - In `add_column`, don't add column if update expression is invalid (#650)
 - Add configuration option to only warn on dissolve errors (#561)
+- For `dissolve`, apply `grid_size` within `union_all` (#566)
 - Add some pre-flight checks when geofileops is imported (#573, #627)
 - For `select_two_layers`, add the `gpkg_ogr_contents` table + fill out extents in the
   `gpkg_contents` table in the output file (#647)
