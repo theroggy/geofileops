@@ -118,7 +118,7 @@ def create_testfile(
         tuple[Path, str]: The path to the file + a description of the test file.
     """
     basename = (
-        f"custom_polys_{nb_polygons_x*nb_polygons_y}polys_{nb_points}pnts_"
+        f"custom_polys_{nb_polygons_x * nb_polygons_y}polys_{nb_points}pnts_"
         f"{bbox[0]}-{bbox[1]}-{bbox[2]}-{bbox[3]}.gpkg"
     )
     testfile_path = _prepare_dst_path(basename, dst_dir=dst_dir)

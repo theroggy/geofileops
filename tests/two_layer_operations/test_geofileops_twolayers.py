@@ -1352,7 +1352,7 @@ def test_join_nearest_distance(tmp_path):
         box_geom = shapely.from_wkt(geom)
         box_geom = shapely.segmentize(box_geom, 1)
         gdf_geom = gpd.GeoDataFrame(geometry=[box_geom], crs="EPSG:31370")
-        geom_path = tmp_path / f"geom{index+1}.gpkg"
+        geom_path = tmp_path / f"geom{index + 1}.gpkg"
         gfo.to_file(gdf=gdf_geom, path=geom_path)
 
     # Test

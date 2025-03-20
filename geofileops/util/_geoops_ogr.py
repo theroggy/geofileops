@@ -165,5 +165,5 @@ def _run_ogr(
 
     # Run + return result
     result = _ogr_util.vector_translate_by_info(info)
-    logger.info(f"Ready, took {datetime.now()-start_time}")
+    logger.info(f"Ready, took {datetime.now() - start_time}")
     return result

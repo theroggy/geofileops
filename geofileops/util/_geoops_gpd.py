@@ -924,7 +924,7 @@ def _apply_geooperation_to_layer(
         if ConfigOptions.remove_temp_files:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    logger.info(f"Ready, took {datetime.now()-start_time_global}")
+    logger.info(f"Ready, took {datetime.now() - start_time_global}")
 
 
 def _apply_geooperation(
@@ -1044,7 +1044,7 @@ def _apply_geooperation(
         create_spatial_index=False,
     )
 
-    message = f"Took {datetime.now()-start_time} for {len(data_gdf)} rows ({where})"
+    message = f"Took {datetime.now() - start_time} for {len(data_gdf)} rows ({where})"
     return message
 
 
@@ -1357,7 +1357,7 @@ def dissolve(
                 # Now go!
                 logger.info(
                     f"Start pass {pass_id} to {len(tiles_gdf)} tiles "
-                    f"(batch size: {int(nb_rows_total/len(tiles_gdf))})"
+                    f"(batch size: {int(nb_rows_total / len(tiles_gdf))})"
                 )
                 pass_start = datetime.now()
                 _ = _dissolve_polygons_pass(
@@ -1375,7 +1375,7 @@ def dissolve(
                     nb_parallel=nb_parallel,
                     on_data_error=on_data_error,
                 )
-                logger.info(f"Pass {pass_id} ready, took {datetime.now()-pass_start}")
+                logger.info(f"Pass {pass_id} ready, took {datetime.now() - pass_start}")
 
                 # If this was the last pass, if the last pass didn't have any onborder
                 # polygons as result, we are ready dissolving.
@@ -1624,7 +1624,7 @@ def dissolve(
             if ConfigOptions.remove_temp_files:
                 shutil.rmtree(tempdir, ignore_errors=True)
 
-        logger.info(f"Ready, full dissolve took {datetime.now()-start_time}")
+        logger.info(f"Ready, full dissolve took {datetime.now() - start_time}")
 
     else:
         raise NotImplementedError(
@@ -2059,7 +2059,9 @@ def _dissolve_polygons(
     perfinfo["time_to_file"] = (datetime.now() - start_to_file).total_seconds()
 
     # Finalise...
-    message = f"dissolve_polygons: ready in {datetime.now()-start_time} on {input_path}"
+    message = (
+        f"dissolve_polygons: ready in {datetime.now() - start_time} on {input_path}"
+    )
     logger.debug(message)
 
     # Collect perfinfo

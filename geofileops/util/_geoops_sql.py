@@ -884,7 +884,7 @@ def _single_layer_vector_operation(
         if ConfigOptions.remove_temp_files:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    logger.info(f"Ready, took {datetime.now()-start_time}")
+    logger.info(f"Ready, took {datetime.now() - start_time}")
 
 
 # ------------------------
@@ -1277,7 +1277,7 @@ def difference(  # noqa: D417
     )
 
     # Print time taken
-    logger.info(f"Ready, full difference took {datetime.now()-start_time}")
+    logger.info(f"Ready, full difference took {datetime.now() - start_time}")
 
 
 def _subdivide_layer(
@@ -1613,7 +1613,7 @@ def export_by_location(
     )
 
     # Print time taken
-    logger.info(f"Ready, full export_by_location took {datetime.now()-start_time}")
+    logger.info(f"Ready, full export_by_location took {datetime.now() - start_time}")
 
 
 def export_by_distance(
@@ -1962,7 +1962,7 @@ def intersection(  # noqa: D417
     )
 
     # Print time taken
-    logger.info(f"Ready, full intersection took {datetime.now()-start_time}")
+    logger.info(f"Ready, full intersection took {datetime.now() - start_time}")
 
 
 def join_by_location(
@@ -2701,7 +2701,7 @@ def identity(
         if ConfigOptions.remove_temp_files:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    logger.info(f"Ready, full identity took {datetime.now()-start_time}")
+    logger.info(f"Ready, full identity took {datetime.now() - start_time}")
 
 
 def symmetric_difference(
@@ -2876,7 +2876,7 @@ def symmetric_difference(
         if ConfigOptions.remove_temp_files:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    logger.info(f"Ready, full symmetric_difference took {datetime.now()-start_time}")
+    logger.info(f"Ready, full symmetric_difference took {datetime.now() - start_time}")
 
 
 def union(
@@ -3073,7 +3073,7 @@ def union(
         if ConfigOptions.remove_temp_files:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    logger.info(f"Ready, full union took {datetime.now()-start_time}")
+    logger.info(f"Ready, full union took {datetime.now() - start_time}")
 
 
 def _two_layer_vector_operation(
@@ -3599,7 +3599,7 @@ def _two_layer_vector_operation(
         else:
             logger.debug("Result was empty!")
 
-        logger.info(f"Ready, took {datetime.now()-start_time}")
+        logger.info(f"Ready, took {datetime.now() - start_time}")
 
     except Exception:
         gfo.remove(output_path, missing_ok=True)
@@ -4372,7 +4372,7 @@ def dissolve_singlethread(
         if ConfigOptions.remove_temp_files:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    logger.info(f"Ready, took {datetime.now()-start_time}")
+    logger.info(f"Ready, took {datetime.now() - start_time}")
 
 
 def _format_apply_gridsize_operation(

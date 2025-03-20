@@ -379,7 +379,7 @@ def dissolve_within_distance(
         if ConfigOptions.remove_temp_files:
             shutil.rmtree(tempdir, ignore_errors=True)
 
-    logger.info(f"Ready, took {datetime.now()-start_time}")
+    logger.info(f"Ready, took {datetime.now() - start_time}")
 
 
 def apply(

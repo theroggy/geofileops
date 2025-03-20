@@ -812,8 +812,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     ].index.to_list()[0]
     assert output_gdf["lbl_count"][groenten_idx] == 5
     print(
-        "groenten.lblhfdtlt_concat_distinct: "
-        "f{output_gdf['lbl_conc_d'][groenten_idx]}"
+        "groenten.lblhfdtlt_concat_distinct: f{output_gdf['lbl_conc_d'][groenten_idx]}"
     )
     assert output_gdf["lbl_cnt_d"][groenten_idx] == 4
     fid_concat_result = sorted(output_gdf["fid_concat"][groenten_idx].split(","))

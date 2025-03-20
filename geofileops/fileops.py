@@ -2024,8 +2024,7 @@ def _to_file_pyogrio(
         isinstance(gdf, gpd.GeoDataFrame) and "geometry" not in gdf.columns
     ):
         # If geometry column should be written, specifying SPATIAL INDEX is not allowed.
-        if "SPATIAL_INDEX" in kwargs:
-            del kwargs["SPATIAL_INDEX"]
+        kwargs.pop("SPATIAL_INDEX", None)
         pyogrio.write_dataframe(gdf, str(path), **kwargs)
     else:
         kwargs["engine"] = "pyogrio"

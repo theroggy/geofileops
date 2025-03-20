@@ -592,7 +592,7 @@ def create_table_as_sql(
             columns_for_insert = [f'"{column}"' for column in column_types]
             sql = (
                 f'INSERT INTO {output_databasename}."{output_layer}" '
-                f'({", ".join(columns_for_insert)})\n{sql_stmt}'
+                f"({', '.join(columns_for_insert)})\n{sql_stmt}"
             )
             conn.execute(sql)
 
@@ -782,7 +782,7 @@ def set_performance_options(
         sql = "PRAGMA temp_store=2;"
         conn.execute(sql)
         # Set soft heap limit to 1 GB (in bytes)
-        sql = f"PRAGMA soft_heap_limit={1024*1024*1024};"
+        sql = f"PRAGMA soft_heap_limit={1024 * 1024 * 1024};"
         conn.execute(sql)
 
         # Use the sqlite profile specified
