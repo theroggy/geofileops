@@ -19,6 +19,9 @@
 - Improve performance of `erase` and `intersection` for very complex input geometries.
   This gives similar improvements for such datasets to `identity`,
   `symmetric_difference` and `union`. (#585, #601, #591, #614)
+- Improve performance of `export_by_location` and `join_by_location` for simple queries
+  (#548)
+- Add support for `query=""` in `export_by_location` (#597)
 - Add support to rename columns and layers with only a difference in casing (#549, #593)
 - Use `ST_Equals` and add priority feature to `delete_duplicate_geometries` (#638)
 - Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
@@ -51,6 +54,7 @@
 - Fix `dissolve` with `agg_columns` on sqlite 3.49.1 (#636)
 - Fix an invalid output .gpkg file being created when e.g. `copy_layer` is ran with an
   invalid sql statement (#641)
+- Fix wrong results for `export_by_location` with queries != "intersects is True" (#617)
 
 ## 0.9.1 (2024-07-18)
 

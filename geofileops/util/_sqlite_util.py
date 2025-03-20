@@ -541,9 +541,9 @@ def create_table_as_sql(
                         crs.geodetic_crs, crs, always_xy=True
                     )
                     bounds = transformer.transform_bounds(*crs.area_of_use.bounds)
-                    min_x, min_y, max_x, max_y = [
+                    min_x, min_y, max_x, max_y = (
                         to_string_for_sql(coord) for coord in bounds
-                    ]
+                    )
                 else:
                     min_x = min_y = max_x = max_y = "NULL"
 
