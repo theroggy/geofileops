@@ -5,7 +5,7 @@ Tests for operations that are executed using a sql statement on one layer.
 import logging
 import math
 from importlib import import_module
-from typing import Any, Optional
+from typing import Any
 
 import geopandas as gpd
 import pytest
@@ -69,7 +69,7 @@ def basic_combinations_to_test(
         for geoops_module in geoops_modules:
             for testfile in testfiles:
                 where_post = None
-                keep_empty_geoms: Optional[bool] = False
+                keep_empty_geoms: bool | None = False
                 dimensions = None
                 gridsize = 0.01 if epsg == 31370 else GRIDSIZE_DEFAULT
                 if testfile == "polygon-parcel":

@@ -2,7 +2,6 @@
 
 import logging
 import warnings
-from typing import Union
 
 import geopandas as gpd
 import geopandas._compat as gpd_compat
@@ -168,7 +167,7 @@ def set_precision(
     grid_size: float,
     mode: str = "valid_output",
     raise_on_topoerror: bool = True,
-) -> Union[BaseGeometry, NDArray[BaseGeometry], None]:
+) -> BaseGeometry | NDArray[BaseGeometry] | None:
     """Returns geometry with the precision set to a precision grid size.
 
     By default, geometries use double precision coordinates (grid_size = 0).

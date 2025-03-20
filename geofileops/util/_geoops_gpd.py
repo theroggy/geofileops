@@ -12,11 +12,11 @@ import re
 import shutil
 import time
 import warnings
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from concurrent import futures
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any
 
 import cloudpickle
 import geopandas as gpd
@@ -67,8 +67,8 @@ class ParallelizationConfig:
         bytes_per_row: int = 1000,
         min_rows_per_batch: int = 1000,
         max_rows_per_batch: int = 100000,
-        bytes_min_per_process: Optional[int] = None,
-        bytes_usable: Optional[int] = None,
+        bytes_min_per_process: int | None = None,
+        bytes_usable: int | None = None,
         cpu_count: int = -1,
     ):
         """Heuristics for geopandas based geo operations.
@@ -126,7 +126,7 @@ def _determine_nb_batches(
     nb_rows_total: int,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    parallelization_config: Optional[ParallelizationConfig] = None,
+    parallelization_config: ParallelizationConfig | None = None,
 ) -> tuple[int, int]:
     """Determines recommended parallelization params.
 
@@ -256,8 +256,8 @@ def _prepare_processing_params(
     input_layer: LayerInfo,
     nb_parallel: int,
     batchsize: int,
-    parallelization_config: Optional[ParallelizationConfig] = None,
-    tmp_dir: Optional[Path] = None,
+    parallelization_config: ParallelizationConfig | None = None,
+    tmp_dir: Path | None = None,
 ) -> ProcessingParams:
     fid_column = input_layer.fid_column if input_layer.fid_column != "" else "fid"
     nb_parallel, nb_batches = _determine_nb_batches(
@@ -365,20 +365,20 @@ def apply(
     input_path: Path,
     output_path: Path,
     func: Callable[[Any], Any],
-    operation_name: Optional[str] = None,
+    operation_name: str | None = None,
     only_geom_input: bool = True,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-    parallelization_config: Optional[ParallelizationConfig] = None,
+    parallelization_config: ParallelizationConfig | None = None,
 ):
     # Init
     operation_params = {
@@ -413,19 +413,19 @@ def apply_vectorized(
     input_path: Path,
     output_path: Path,
     func: Callable[[Any], Any],
-    operation_name: Optional[str] = None,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    operation_name: str | None = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-    parallelization_config: Optional[ParallelizationConfig] = None,
+    parallelization_config: ParallelizationConfig | None = None,
 ):
     # Init
     operation_params = {"pickled_func": cloudpickle.dumps(func)}
@@ -462,13 +462,13 @@ def buffer(
     join_style: BufferJoinStyle = BufferJoinStyle.ROUND,
     mitre_limit: float = 5.0,
     single_sided: bool = False,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -514,13 +514,13 @@ def buffer(
 def convexhull(
     input_path: Path,
     output_path: Path,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -551,14 +551,14 @@ def convexhull(
 def makevalid(
     input_path: Path,
     output_path: Path,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[str, None, GeometryType] = None,
+    force_output_geometrytype: str | None | GeometryType = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     validate_attribute_data: bool = False,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -605,13 +605,13 @@ def simplify(
     tolerance: float,
     algorithm: SimplifyAlgorithm = SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER,
     lookahead: int = 8,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -648,18 +648,18 @@ def _apply_geooperation_to_layer(
     output_path: Path,
     operation: GeoOperation,
     operation_params: dict,
-    input_layer: Optional[Union[str, LayerInfo]],  # = None
-    columns: Optional[list[str]],  # = None
-    output_layer: Optional[str],  # = None
+    input_layer: str | LayerInfo | None,  # = None
+    columns: list[str] | None,  # = None
+    output_layer: str | None,  # = None
     explodecollections: bool,  # = False
-    force_output_geometrytype: Union[GeometryType, str, None],  # = None
+    force_output_geometrytype: GeometryType | str | None,  # = None
     gridsize: float,  # = 0.0
     keep_empty_geoms: bool,  # = False
-    where_post: Optional[str],  # = None
+    where_post: str | None,  # = None
     nb_parallel: int,  # = -1
     batchsize: int,  # = -1
     force: bool,  # = False
-    parallelization_config: Optional[ParallelizationConfig] = None,
+    parallelization_config: ParallelizationConfig | None = None,
 ):
     """Applies a geo operation on a layer.
 
@@ -933,8 +933,8 @@ def _apply_geooperation(
     operation: GeoOperation,
     operation_params: dict,
     input_layer: LayerInfo,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     where=None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
@@ -1051,15 +1051,15 @@ def _apply_geooperation(
 def dissolve(
     input_path: Path,
     output_path: Path,
-    groupby_columns: Optional[Iterable[str]] = None,
-    agg_columns: Optional[dict] = None,
+    groupby_columns: Iterable[str] | None = None,
+    agg_columns: dict | None = None,
     explodecollections: bool = True,
-    tiles_path: Optional[Path] = None,
+    tiles_path: Path | None = None,
     nb_squarish_tiles: int = 1,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1637,11 +1637,11 @@ def _dissolve_polygons_pass(
     output_notonborder_path: Path,
     output_onborder_path: Path,
     explodecollections: bool,
-    groupby_columns: Optional[Iterable[str]],
-    agg_columns: Optional[dict],
+    groupby_columns: Iterable[str] | None,
+    agg_columns: dict | None,
     tiles_gdf: gpd.GeoDataFrame,
-    input_layer: Optional[Union[str, LayerInfo]],
-    output_layer: Optional[str],
+    input_layer: str | LayerInfo | None,
+    output_layer: str | None,
     gridsize: float,
     keep_empty_geoms: bool,
     nb_parallel: int,
@@ -1791,13 +1791,13 @@ def _dissolve_polygons(
     output_notonborder_path: Path,
     output_onborder_path: Path,
     explodecollections: bool,
-    groupby_columns: Optional[Iterable[str]],
-    agg_columns: Optional[dict],
+    groupby_columns: Iterable[str] | None,
+    agg_columns: dict | None,
     input_geometrytype: GeometryType,
-    input_layer: Optional[Union[str, LayerInfo]],
-    output_layer: Optional[str],
+    input_layer: str | LayerInfo | None,
+    output_layer: str | None,
     bbox: tuple[float, float, float, float],
-    tile_id: Optional[int],
+    tile_id: int | None,
     gridsize: float,
     keep_empty_geoms: bool,
     on_data_error: str = "raise",
@@ -1895,7 +1895,7 @@ def _dissolve_polygons(
         return return_info
 
     # Now the real processing
-    aggfunc: Union[str, dict, None] = None
+    aggfunc: str | dict | None = None
     if agg_columns is not None:
         if "__DISSOLVE_TOJSON" not in input_gdf.columns:
             # First pass -> put relevant columns in json field.
@@ -2086,7 +2086,7 @@ def _dissolve_polygons(
 def _dissolve(
     df: gpd.GeoDataFrame,
     by=None,
-    aggfunc: Optional[Union[str, dict]] = "first",
+    aggfunc: str | dict | None = "first",
     as_index=True,
     level=None,
     sort=True,

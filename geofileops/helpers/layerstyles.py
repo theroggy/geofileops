@@ -2,7 +2,6 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from osgeo import gdal, ogr
@@ -14,7 +13,7 @@ ogr.UseExceptions()
 
 
 def get_layerstyles(
-    path: Path, layer: Optional[str] = None, name: Optional[str] = None
+    path: Path, layer: str | None = None, name: str | None = None
 ) -> pd.DataFrame:
     """Get the layer styles saved in the geofile.
 

@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from concurrent import futures
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -49,13 +49,13 @@ def buffer(
     output_path: Path,
     distance: float,
     quadrantsegments: int = 5,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -112,13 +112,13 @@ def buffer(
 def convexhull(
     input_path: Path,
     output_path: Path,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -162,14 +162,14 @@ def convexhull(
 def delete_duplicate_geometries(
     input_path: Path,
     output_path: Path,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
-    priority_column: Optional[str] = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
+    priority_column: str | None = None,
     priority_ascending: bool = True,
     explodecollections: bool = False,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -231,9 +231,9 @@ def delete_duplicate_geometries(
 def isvalid(
     input_path: Path,
     output_path: Path,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     validate_attribute_data: bool = False,
     nb_parallel: int = -1,
@@ -305,14 +305,14 @@ def isvalid(
 def makevalid(
     input_path: Path,
     output_path: Path,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[str, None, GeometryType] = None,
+    force_output_geometrytype: str | None | GeometryType = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -397,12 +397,12 @@ def select(
     input_path: Path,
     output_path: Path,
     sql_stmt: str,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = "SQLITE",
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = "SQLITE",
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Optional[GeometryType] = None,
+    force_output_geometrytype: GeometryType | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     nb_parallel: int = 1,
@@ -457,13 +457,13 @@ def simplify(
     input_path: Path,
     output_path: Path,
     tolerance: float,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -508,17 +508,17 @@ def _single_layer_vector_operation(
     input_path: Path,
     output_path: Path,
     sql_template: str,
-    geom_selected: Optional[bool],
+    geom_selected: bool | None,
     operation_name: str,
-    input_layer: Optional[Union[str, LayerInfo]],
-    output_layer: Optional[str],
-    columns: Optional[list[str]],
+    input_layer: str | LayerInfo | None,
+    output_layer: str | None,
+    columns: list[str] | None,
     explodecollections: bool,
-    force_output_geometrytype: Optional[GeometryType],
+    force_output_geometrytype: GeometryType | None,
     gridsize: float,
     keep_empty_geoms: bool,
-    where_post: Optional[str],
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]],
+    where_post: str | None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None,
     nb_parallel: int,
     batchsize: int,
     force: bool,
@@ -896,18 +896,18 @@ def clip(
     input_path: Path,
     clip_path: Path,
     output_path: Path,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    input_columns: Optional[list[str]] = None,
-    clip_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    input_layer: str | LayerInfo | None = None,
+    input_columns: list[str] | None = None,
+    clip_layer: str | None = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
     input_columns_prefix: str = "",
-    output_with_spatial_index: Optional[bool] = None,
+    output_with_spatial_index: bool | None = None,
 ):
     # Init
     # In the query, important to only extract the geometry types that are expected
@@ -1002,22 +1002,22 @@ def difference(  # noqa: D417
     input2_path: Path,
     output_path: Path,
     overlay_self: bool,
-    input1_layer: Optional[Union[str, LayerInfo]] = None,
-    input1_columns: Optional[list[str]] = None,
-    input2_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
+    input1_layer: str | LayerInfo | None = None,
+    input1_columns: list[str] | None = None,
+    input2_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
     input_columns_prefix: str = "",
-    output_with_spatial_index: Optional[bool] = None,
+    output_with_spatial_index: bool | None = None,
     operation_prefix: str = "",
-    input1_subdivided_path: Union[Path, None] = None,
-    input2_subdivided_path: Union[Path, None] = None,
+    input1_subdivided_path: Path | None = None,
+    input2_subdivided_path: Path | None = None,
 ):
     """Calculate the difference between two layers.
 
@@ -1282,14 +1282,14 @@ def difference(  # noqa: D417
 
 def _subdivide_layer(
     path: Path,
-    layer: Optional[Union[str, LayerInfo]],
+    layer: str | LayerInfo | None,
     output_path: Path,
     subdivide_coords: int,
     keep_fid: bool = True,
     nb_parallel: int = -1,
     batchsize: int = -1,
     operation_prefix: str = "",
-) -> Optional[Path]:
+) -> Path | None:
     """Subdivide a layer if needed.
 
     By default, the original FID, before subdividing, is saved in column 'fid_1' in the
@@ -1429,14 +1429,14 @@ def export_by_location(
     input_to_compare_with_path: Path,
     output_path: Path,
     spatial_relations_query: str,
-    min_area_intersect: Optional[float] = None,
-    area_inters_column_name: Optional[str] = None,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    input_columns: Optional[list[str]] = None,
-    input_to_compare_with_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    min_area_intersect: float | None = None,
+    area_inters_column_name: str | None = None,
+    input_layer: str | LayerInfo | None = None,
+    input_columns: list[str] | None = None,
+    input_to_compare_with_layer: str | None = None,
+    output_layer: str | None = None,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 10000,
@@ -1621,12 +1621,12 @@ def export_by_distance(
     input_to_compare_with_path: Path,
     output_path: Path,
     max_distance: float,
-    input1_layer: Optional[Union[str, LayerInfo]] = None,
-    input1_columns: Optional[list[str]] = None,
-    input2_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
+    input1_layer: str | LayerInfo | None = None,
+    input1_columns: list[str] | None = None,
+    input2_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -1688,24 +1688,24 @@ def intersection(  # noqa: D417
     input2_path: Path,
     output_path: Path,
     overlay_self: bool,
-    input1_layer: Optional[Union[str, LayerInfo]] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | LayerInfo | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[Union[str, LayerInfo]] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | LayerInfo | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 7500,
     force: bool = False,
-    output_with_spatial_index: Optional[bool] = None,
+    output_with_spatial_index: bool | None = None,
     operation_prefix: str = "",
-    input1_subdivided_path: Optional[Path] = None,
-    input2_subdivided_path: Optional[Path] = None,
+    input1_subdivided_path: Path | None = None,
+    input2_subdivided_path: Path | None = None,
 ):
     """Calculate the intersection between two layers.
 
@@ -1971,18 +1971,18 @@ def join_by_location(
     output_path: Path,
     spatial_relations_query: str = "intersects is True",
     discard_nonmatching: bool = True,
-    min_area_intersect: Optional[float] = None,
-    area_inters_column_name: Optional[str] = None,
-    input1_layer: Optional[Union[str, LayerInfo]] = None,
-    input1_columns: Optional[list[str]] = None,
+    min_area_intersect: float | None = None,
+    area_inters_column_name: str | None = None,
+    input1_layer: str | LayerInfo | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[Union[str, LayerInfo]] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | LayerInfo | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
@@ -2362,15 +2362,15 @@ def join_nearest(
     input2_path: Path,
     output_path: Path,
     nb_nearest: int,
-    distance: Optional[float],
-    expand: Optional[bool],
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    distance: float | None,
+    expand: bool | None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     nb_parallel: int = -1,
     batchsize: int = -1,
@@ -2502,22 +2502,22 @@ def select_two_layers(
     input2_path: Path,
     output_path: Path,
     sql_stmt: str,
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
-    force_output_geometrytype: Optional[GeometryType] = None,
+    output_layer: str | None = None,
+    force_output_geometrytype: GeometryType | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
-    output_with_spatial_index: Optional[bool] = None,
+    output_with_spatial_index: bool | None = None,
 ):
     # Go!
     return _two_layer_vector_operation(
@@ -2549,16 +2549,16 @@ def identity(
     input2_path: Path,
     output_path: Path,
     overlay_self: bool,
-    input1_layer: Optional[Union[str, LayerInfo]] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | LayerInfo | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[Union[str, LayerInfo]] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | LayerInfo | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = 1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
@@ -2606,7 +2606,7 @@ def identity(
 
         if overlay_self:
             # If overlay_self is True, input1 and input2 are the same
-            input2_subdivided_path: Optional[Path] = input1_subdivided_path
+            input2_subdivided_path: Path | None = input1_subdivided_path
         else:
             input2_subdivided_path = _subdivide_layer(
                 path=input2_path,
@@ -2709,16 +2709,16 @@ def symmetric_difference(
     input2_path: Path,
     output_path: Path,
     overlay_self: bool,
-    input1_layer: Optional[Union[str, LayerInfo]] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | LayerInfo | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[Union[str, LayerInfo]] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | LayerInfo | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
@@ -2771,7 +2771,7 @@ def symmetric_difference(
 
         if overlay_self:
             # With overlay_self, input2 is the same as input1
-            input2_subdivided_path: Optional[Path] = input1_subdivided_path
+            input2_subdivided_path: Path | None = input1_subdivided_path
         else:
             input2_subdivided_path = _subdivide_layer(
                 path=input2_path,
@@ -2884,16 +2884,16 @@ def union(
     input2_path: Path,
     output_path: Path,
     overlay_self: bool,
-    input1_layer: Optional[Union[str, LayerInfo]] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | LayerInfo | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[Union[str, LayerInfo]] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | LayerInfo | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
@@ -2943,7 +2943,7 @@ def union(
 
         if overlay_self:
             # With overlay_self, input2 is the same as input1
-            input2_subdivided_path: Optional[Path] = input1_subdivided_path
+            input2_subdivided_path: Path | None = input1_subdivided_path
         else:
             input2_subdivided_path = _subdivide_layer(
                 path=input2_path,
@@ -3082,25 +3082,25 @@ def _two_layer_vector_operation(
     output_path: Path,
     sql_template: str,
     operation_name: str,
-    input1_layer: Optional[Union[str, LayerInfo]],
-    input1_columns: Optional[list[str]],
+    input1_layer: str | LayerInfo | None,
+    input1_columns: list[str] | None,
     input1_columns_prefix: str,
-    input2_layer: Optional[Union[str, LayerInfo]],
-    input2_columns: Optional[list[str]],
+    input2_layer: str | LayerInfo | None,
+    input2_columns: list[str] | None,
     input2_columns_prefix: str,
-    output_layer: Optional[str],
+    output_layer: str | None,
     explodecollections: bool,
-    force_output_geometrytype: Optional[GeometryType],
+    force_output_geometrytype: GeometryType | None,
     gridsize: float,
-    where_post: Optional[str],
+    where_post: str | None,
     nb_parallel: int,
     batchsize: int,
     force: bool,
-    input1_subdivided_path: Optional[Path] = None,
-    input2_subdivided_path: Optional[Path] = None,
+    input1_subdivided_path: Path | None = None,
+    input2_subdivided_path: Path | None = None,
     use_ogr: bool = False,
-    output_with_spatial_index: Optional[bool] = None,
-    tmp_dir: Optional[Path] = None,
+    output_with_spatial_index: bool | None = None,
+    tmp_dir: Path | None = None,
 ):
     """Executes an operation that needs 2 input files.
 
@@ -3614,9 +3614,9 @@ def _validate_params(
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
-    input1_layer: Optional[Union[str, LayerInfo]],
-    input2_layer: Optional[Union[str, LayerInfo]],
-    output_layer: Optional[str],
+    input1_layer: str | LayerInfo | None,
+    input2_layer: str | LayerInfo | None,
+    output_layer: str | None,
     operation_name: str,
 ) -> tuple[LayerInfo, LayerInfo, str]:
     """Validate the input parameters, return the layer names.
@@ -3664,9 +3664,9 @@ def _validate_params(
 
 
 def _prepare_input_db_names(
-    input_paths: dict[str, Optional[Path]], use_ogr: bool
+    input_paths: dict[str, Path | None], use_ogr: bool
 ) -> tuple[dict, dict]:
-    placeholders_to_name: dict[str, Optional[str]] = {}
+    placeholders_to_name: dict[str, str | None] = {}
     names_to_path: dict[str, Path] = {}
     for index, (placeholder, path) in enumerate(input_paths.items()):
         # If path is already in input_databases, reuse the db_name
@@ -3690,7 +3690,7 @@ def _prepare_input_db_names(
     return placeholders_to_name, names_to_path
 
 
-def _check_crs(input1_layer: LayerInfo, input2_layer: Optional[LayerInfo]) -> int:
+def _check_crs(input1_layer: LayerInfo, input2_layer: LayerInfo | None) -> int:
     crs_epsg = -1
     if input1_layer.crs is not None:
         crs_epsg1 = input1_layer.crs.to_epsg()
@@ -3721,7 +3721,7 @@ def _calculate_two_layers(
     sql_stmt: str,
     output_layer: str,
     explodecollections: bool,
-    force_output_geometrytype: Optional[GeometryType],
+    force_output_geometrytype: GeometryType | None,
     output_crs: int,
     create_spatial_index: bool,
     column_datatypes: dict,
@@ -3797,9 +3797,9 @@ def _convert_to_spatialite_based(
     input1_path: Path,
     input1_layer: LayerInfo,
     tempdir: Path,
-    input2_path: Optional[Path] = None,
-    input2_layer: Optional[LayerInfo] = None,
-) -> tuple[Path, LayerInfo, Optional[Path], Optional[LayerInfo]]:
+    input2_path: Path | None = None,
+    input2_layer: LayerInfo | None = None,
+) -> tuple[Path, LayerInfo, Path | None, LayerInfo | None]:
     """Prepare input files for the calculation.
 
     The input files should be spatialite based, and should be of the same type: either
@@ -3886,12 +3886,12 @@ def _prepare_processing_params(
     tempdir: Path,
     nb_parallel: int,
     batchsize: int = -1,
-    input1_layer_alias: Optional[str] = None,
+    input1_layer_alias: str | None = None,
     input1_is_subdivided: bool = False,
     filter_column: str = "rowid",
-    input2_path: Optional[Path] = None,
-    input2_layer: Optional[LayerInfo] = None,
-) -> Optional[ProcessingParams]:
+    input2_path: Path | None = None,
+    input2_layer: LayerInfo | None = None,
+) -> ProcessingParams | None:
     # Prepare batches to process
     nb_rows_input_layer = input1_layer.featurecount
     input2_layername = None if input2_layer is None else input2_layer.name
@@ -4023,7 +4023,7 @@ def _determine_nb_batches(
     nb_parallel: int,
     batchsize: int,
     is_twolayer_operation: bool,
-    cpu_count: Optional[int] = None,
+    cpu_count: int | None = None,
 ) -> tuple[int, int]:
     """Determine an optimal number of batches and parallel workers.
 
@@ -4106,14 +4106,14 @@ def _determine_nb_batches(
 def dissolve_singlethread(
     input_path: Path,
     output_path: Path,
-    groupby_columns: Union[str, Iterable[str], None] = None,
-    agg_columns: Optional[dict] = None,
+    groupby_columns: str | Iterable[str] | None = None,
+    agg_columns: dict | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
+    where_post: str | None = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
     force: bool = False,
 ):
     """Remark: this is not a parallelized version!!!"""

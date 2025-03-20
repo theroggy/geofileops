@@ -5,7 +5,6 @@ Helper functions for all tests.
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional, Union
 
 import geopandas as gpd
 import geopandas.testing as gpd_testing
@@ -35,9 +34,9 @@ def prepare_expected_result(
     gdf: gpd.GeoDataFrame,
     keep_empty_geoms: bool,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     explodecollections=False,
-    columns: Optional[list[str]] = None,
+    columns: list[str] | None = None,
 ) -> gpd.GeoDataFrame:
     """Prepare expected data"""
     if keep_empty_geoms is None:
@@ -90,7 +89,7 @@ def prepare_test_file(
     input_path: Path,
     output_dir: Path,
     suffix: str,
-    crs_epsg: Optional[int] = None,
+    crs_epsg: int | None = None,
     use_cachedir: bool = False,
 ) -> Path:
     # Tmp dir
@@ -132,11 +131,11 @@ def prepare_test_file(
 
 def get_testfile(
     testfile: str,
-    dst_dir: Optional[Path] = None,
+    dst_dir: Path | None = None,
     suffix: str = ".gpkg",
     epsg: int = 31370,
     empty: bool = False,
-    dimensions: Optional[str] = None,
+    dimensions: str | None = None,
     explodecollections: bool = False,
 ) -> Path:
     # Prepare original filepath.
@@ -270,7 +269,7 @@ class TestData:
     )
 
 
-def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path:
+def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
     # Parent
     if parent_dir is None:
         parent_dir = Path(tempfile.gettempdir())
@@ -293,8 +292,8 @@ def assert_geodataframe_equal(
     left: gpd.GeoDataFrame,
     right: gpd.GeoDataFrame,
     check_dtype=True,
-    check_index_type: Union[bool, str] = "equiv",
-    check_column_type: Union[bool, str] = "equiv",
+    check_index_type: bool | str = "equiv",
+    check_column_type: bool | str = "equiv",
     check_frame_type=True,
     check_like=False,
     check_less_precise=False,
@@ -305,9 +304,9 @@ def assert_geodataframe_equal(
     promote_to_multi=False,
     sort_columns=False,
     sort_values=False,
-    simplify: Optional[float] = None,
+    simplify: float | None = None,
     check_geom_tolerance: float = 0.0,
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
 ):
     """
     Check that two GeoDataFrames are equal/

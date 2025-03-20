@@ -6,12 +6,12 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 import geofileops as gfo
 
 
-def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path:
+def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
     """Creates a new tempdir in the default temp location.
 
     Remark: the temp dir won't be cleaned up automatically!
@@ -54,8 +54,8 @@ def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path
 def get_tempfile_locked(
     base_filename: str,
     suffix: str = ".tmp",
-    dirname: Optional[str] = None,
-    tempdir: Optional[Path] = None,
+    dirname: str | None = None,
+    tempdir: Path | None = None,
 ) -> tuple[Path, Path]:
     """Formats a temp file path, and creates a corresponding lock file.
 

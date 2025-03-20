@@ -1,6 +1,5 @@
 # import datetime
 import logging
-from typing import Optional
 
 import pygeoops
 import shapely
@@ -18,7 +17,7 @@ def gfo_difference_collection(
     geom_to_subtract_wkb: bytes,
     keep_geom_type: int = 0,
     subdivide_coords: int = 2000,
-) -> Optional[bytes]:
+) -> bytes | None:
     """Applies the difference of geom_to_subtract on geom.
 
     If the input geometry has many points, they can be subdivided in smaller parts
@@ -95,7 +94,7 @@ def gfo_difference_collection(
         return None
 
 
-def gfo_reduceprecision(geom_wkb: bytes, gridsize: int) -> Optional[bytes]:
+def gfo_reduceprecision(geom_wkb: bytes, gridsize: int) -> bytes | None:
     """Reduces the precision of the geometry to the gridsize specified.
 
     If reducing the precison leads to a topologyerror, retries after applying make_valid
@@ -159,7 +158,7 @@ def gfo_reduceprecision(geom_wkb: bytes, gridsize: int) -> Optional[bytes]:
 def gfo_split(
     geom_wkb: bytes,
     blade_wkb: bytes,
-) -> Optional[bytes]:
+) -> bytes | None:
     """Applies a split in the geom using the blade specified.
 
     Args:

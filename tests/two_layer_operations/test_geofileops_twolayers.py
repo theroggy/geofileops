@@ -7,7 +7,6 @@ import os
 import sys
 from contextlib import nullcontext
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import numpy as np
@@ -1984,7 +1983,7 @@ def test_union(
     suffix: str,
     epsg: int,
     gridsize: float,
-    where_post: Optional[str],
+    where_post: str | None,
     explodecollections: bool,
     keep_fid: bool,
     subdivide_coords: int,

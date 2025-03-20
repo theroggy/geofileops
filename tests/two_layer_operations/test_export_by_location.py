@@ -1,6 +1,5 @@
 import math
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import pytest
@@ -599,7 +598,7 @@ def _test_export_by_location(
     input_to_compare_with_path: Path,
     output_path: Path,
     spatial_relations_query: str,
-    area_inters_column_name: Optional[str],
+    area_inters_column_name: str | None,
     subdivide_coords: int,
     exp_featurecount: int,
 ):

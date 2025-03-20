@@ -7,7 +7,7 @@ import warnings
 from collections.abc import Iterable
 from pathlib import Path
 from threading import Lock
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from osgeo import gdal, ogr
 from pygeoops import GeometryType
@@ -106,7 +106,7 @@ def spatialite_version_info() -> dict[str, str]:
     return versions
 
 
-def ogrtype_to_name(ogrtype: Optional[int]) -> str:
+def ogrtype_to_name(ogrtype: int | None) -> str:
     if ogrtype is None:
         return "NONE"
     else:
@@ -187,7 +187,7 @@ def StartTransaction(datasource: gdal.Dataset) -> bool:
     return True
 
 
-def CommitTransaction(datasource: Optional[gdal.Dataset]) -> bool:
+def CommitTransaction(datasource: gdal.Dataset | None) -> bool:
     """Commits a transaction on an open datasource.
 
     Args:
@@ -206,7 +206,7 @@ def CommitTransaction(datasource: Optional[gdal.Dataset]) -> bool:
     return True
 
 
-def RollbackTransaction(datasource: Optional[gdal.Dataset]) -> bool:
+def RollbackTransaction(datasource: gdal.Dataset | None) -> bool:
     """Rolls back a transaction on an open datasource.
 
     Args:
@@ -230,25 +230,25 @@ class VectorTranslateInfo:
         self,
         input_path: Path,
         output_path: Path,
-        input_layers: Union[list[str], str, None] = None,
-        output_layer: Optional[str] = None,
-        access_mode: Optional[str] = None,
-        input_srs: Union[int, str, None] = None,
-        output_srs: Union[int, str, None] = None,
+        input_layers: list[str] | str | None = None,
+        output_layer: str | None = None,
+        access_mode: str | None = None,
+        input_srs: int | str | None = None,
+        output_srs: int | str | None = None,
         reproject: bool = False,
-        spatial_filter: Optional[tuple[float, float, float, float]] = None,
-        clip_geometry: Optional[Union[tuple[float, float, float, float], str]] = None,
-        sql_stmt: Optional[str] = None,
-        sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
-        where: Optional[str] = None,
+        spatial_filter: tuple[float, float, float, float] | None = None,
+        clip_geometry: tuple[float, float, float, float] | str | None = None,
+        sql_stmt: str | None = None,
+        sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
+        where: str | None = None,
         transaction_size: int = 65536,
         explodecollections: bool = False,
-        force_output_geometrytype: Union[GeometryType, str, Iterable[str], None] = None,
+        force_output_geometrytype: GeometryType | str | Iterable[str] | None = None,
         options: dict = {},
-        columns: Optional[Iterable[str]] = None,
-        warp: Optional[dict] = None,
-        preserve_fid: Optional[bool] = None,
-        dst_dimensions: Optional[str] = None,
+        columns: Iterable[str] | None = None,
+        warp: dict | None = None,
+        preserve_fid: bool | None = None,
+        dst_dimensions: str | None = None,
     ):
         self.input_path = input_path
         self.output_path = output_path
@@ -300,27 +300,27 @@ def vector_translate_by_info(info: VectorTranslateInfo):
 
 
 def vector_translate(
-    input_path: Union[Path, str],
+    input_path: Path | str,
     output_path: Path,
-    input_layers: Union[list[str], str, None] = None,
-    output_layer: Optional[str] = None,
-    access_mode: Optional[str] = None,
-    input_srs: Union[int, str, None] = None,
-    output_srs: Union[int, str, None] = None,
+    input_layers: list[str] | str | None = None,
+    output_layer: str | None = None,
+    access_mode: str | None = None,
+    input_srs: int | str | None = None,
+    output_srs: int | str | None = None,
     reproject: bool = False,
-    spatial_filter: Optional[tuple[float, float, float, float]] = None,
-    clip_geometry: Optional[Union[tuple[float, float, float, float], str]] = None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
-    where: Optional[str] = None,
+    spatial_filter: tuple[float, float, float, float] | None = None,
+    clip_geometry: tuple[float, float, float, float] | str | None = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
+    where: str | None = None,
     transaction_size: int = 65536,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, Iterable[str], None] = None,
+    force_output_geometrytype: GeometryType | str | Iterable[str] | None = None,
     options: dict = {},
-    columns: Optional[Iterable[str]] = None,
-    warp: Optional[dict] = None,
-    preserve_fid: Optional[bool] = None,
-    dst_dimensions: Optional[str] = None,
+    columns: Iterable[str] | None = None,
+    warp: dict | None = None,
+    preserve_fid: bool | None = None,
+    dst_dimensions: str | None = None,
 ) -> bool:
     # API Doc of VectorTranslateOptions:
     #   https://gdal.org/en/stable/api/python/utilities.html#osgeo.gdal.VectorTranslateOptions
@@ -642,7 +642,7 @@ def vector_translate(
 
 def _validate_file(
     path: Path,
-    layer: Optional[str],
+    layer: str | None,
     input_has_geometry_attribute: bool,
     input_has_geom_attribute: bool,
 ):

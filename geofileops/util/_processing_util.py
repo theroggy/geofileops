@@ -2,7 +2,6 @@
 
 import os
 from concurrent import futures
-from typing import Optional
 
 import psutil
 
@@ -25,7 +24,7 @@ class PooledExecutorFactory:
         else:
             self.max_workers = max_workers
         self.initializer = initializer
-        self.pool: Optional[futures.Executor] = None
+        self.pool: futures.Executor | None = None
 
     def __enter__(self) -> futures.Executor:
         if self.threadpool:

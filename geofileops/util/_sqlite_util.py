@@ -9,7 +9,7 @@ import sqlite3
 import time
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from pygeoops import GeometryType
 from pyproj import CRS, Transformer
@@ -94,8 +94,8 @@ class SqliteProfile(enum.Enum):
 
 def create_new_spatialdb(
     path: Union[str, "os.PathLike[Any]"],
-    crs_epsg: Optional[int] = None,
-    filetype: Optional[str] = None,
+    crs_epsg: int | None = None,
+    filetype: str | None = None,
 ) -> sqlite3.Connection:
     """Create a new spatialite database file.
 
@@ -214,7 +214,7 @@ def get_columns(
     input_databases: dict[str, Path],
     empty_output_ok: bool = True,
     use_spatialite: bool = True,
-    output_geometrytype: Optional[GeometryType] = None,
+    output_geometrytype: GeometryType | None = None,
 ) -> dict[str, str]:
     # Init
     start = time.perf_counter()
@@ -377,13 +377,13 @@ def create_table_as_sql(
     output_path: Path,
     sql_stmt: str,
     output_layer: str,
-    output_geometrytype: Optional[GeometryType],
+    output_geometrytype: GeometryType | None,
     output_crs: int,
     append: bool = False,
     update: bool = False,
     create_spatial_index: bool = False,
     empty_output_ok: bool = True,
-    column_datatypes: Optional[dict] = None,
+    column_datatypes: dict | None = None,
     profile: SqliteProfile = SqliteProfile.DEFAULT,
 ):
     """Execute sql statement and save the result in the output file.
@@ -649,9 +649,7 @@ def create_table_as_sql(
             conn.close()
 
 
-def execute_sql(
-    path: Path, sql_stmt: Union[str, list[str]], use_spatialite: bool = True
-):
+def execute_sql(path: Path, sql_stmt: str | list[str], use_spatialite: bool = True):
     # Connect to database file
     conn = sqlite3.connect(path)
     sql = None
@@ -771,7 +769,7 @@ def test_data_integrity(path: Path, use_spatialite: bool = True):
 
 def set_performance_options(
     conn: sqlite3.Connection,
-    profile: Optional[SqliteProfile] = None,
+    profile: SqliteProfile | None = None,
     database_names: list[str] = [],
 ):
     try:

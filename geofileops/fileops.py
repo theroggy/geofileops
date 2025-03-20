@@ -16,7 +16,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
-    Optional,
     Union,
 )
 
@@ -158,8 +157,8 @@ class ColumnInfo:
         self,
         name: str,
         gdal_type: str,
-        width: Optional[int],
-        precision: Optional[int],
+        width: int | None,
+        precision: int | None,
     ):
         """Constructor of ColumnInfo.
 
@@ -211,7 +210,7 @@ class LayerInfo:
         geometrytypename: str,
         columns: dict[str, ColumnInfo],
         fid_column: str,
-        crs: Optional[pyproj.CRS],
+        crs: pyproj.CRS | None,
         errors: list[str],
     ):
         """Constructor of Layerinfo.
@@ -251,7 +250,7 @@ class LayerInfo:
 
 
 def get_layer_geometrytypes(
-    path: Union[str, "os.PathLike[Any]"], layer: Optional[str] = None
+    path: Union[str, "os.PathLike[Any]"], layer: str | None = None
 ) -> list[str]:
     """Get the geometry types in the layer by examining each geometry in the layer.
 
@@ -281,7 +280,7 @@ def get_layer_geometrytypes(
 
 def get_layerinfo(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[str] = None,
+    layer: str | None = None,
     raise_on_nogeom: bool = True,
 ) -> LayerInfo:
     """Get information about a layer in the geofile.
@@ -430,9 +429,7 @@ def get_only_layer(path: Union[str, "os.PathLike[Any]"]) -> str:
         datasource = None
 
 
-def _get_layer(
-    datasource: gdal.Dataset, layer: Optional[Union[str, LayerInfo]]
-) -> ogr.Layer:
+def _get_layer(datasource: gdal.Dataset, layer: str | LayerInfo | None) -> ogr.Layer:
     """Get the gdal layer specified in the datasource.
 
     If layer is None and there is only one layer in the datasource, this layer is
@@ -511,7 +508,7 @@ def get_default_layer(path: Union[str, "os.PathLike[Any]"]) -> str:
 def execute_sql(
     path: Union[str, "os.PathLike[Any]"],
     sql_stmt: str,
-    sql_dialect: Optional[str] = None,
+    sql_dialect: str | None = None,
 ):
     """Execute a SQL statement (DML or DDL) on the file.
 
@@ -549,8 +546,8 @@ def execute_sql(
 
 def create_spatial_index(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[Union[str, LayerInfo]] = None,
-    cache_size_mb: Optional[int] = 128,
+    layer: str | LayerInfo | None = None,
+    cache_size_mb: int | None = 128,
     exist_ok: bool = False,
     force_rebuild: bool = False,
     no_geom_ok: bool = False,
@@ -631,7 +628,7 @@ def create_spatial_index(
 
 def has_spatial_index(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[Union[str, LayerInfo]] = None,
+    layer: str | LayerInfo | None = None,
     no_geom_ok: bool = False,
 ) -> bool:
     """Check if the layer/column has a spatial index.
@@ -673,7 +670,7 @@ def has_spatial_index(
 def _has_spatial_index(
     datasource: gdal.Dataset,
     path: Path,
-    layer: Optional[Union[str, LayerInfo]] = None,
+    layer: str | LayerInfo | None = None,
     no_geom_ok: bool = False,
 ) -> bool:
     """Check if the layer/column has a spatial index.
@@ -722,7 +719,7 @@ def _has_spatial_index(
 
 
 def remove_spatial_index(
-    path: Union[str, "os.PathLike[Any]"], layer: Optional[Union[str, LayerInfo]] = None
+    path: Union[str, "os.PathLike[Any]"], layer: str | LayerInfo | None = None
 ):
     """Remove the spatial index from the layer specified.
 
@@ -772,7 +769,7 @@ def remove_spatial_index(
 
 
 def rename_layer(
-    path: Union[str, "os.PathLike[Any]"], new_layer: str, layer: Optional[str] = None
+    path: Union[str, "os.PathLike[Any]"], new_layer: str, layer: str | None = None
 ):
     """Rename the layer specified.
 
@@ -818,7 +815,7 @@ def rename_column(
     path: Union[str, "os.PathLike[Any]"],
     column_name: str,
     new_column_name: str,
-    layer: Optional[str] = None,
+    layer: str | None = None,
 ):
     """Rename the column specified.
 
@@ -920,12 +917,12 @@ class DataType(enum.Enum):
 def add_column(
     path: Union[str, "os.PathLike[Any]"],
     name: str,
-    type: Union[DataType, str],
-    expression: Union[str, float, None] = None,
-    expression_dialect: Optional[str] = None,
-    layer: Optional[str] = None,
+    type: DataType | str,
+    expression: str | float | None = None,
+    expression_dialect: str | None = None,
+    layer: str | None = None,
     force_update: bool = False,
-    width: Optional[int] = None,
+    width: int | None = None,
 ):
     """Add a column to a layer of the geofile.
 
@@ -1056,7 +1053,7 @@ def add_column(
 
 
 def drop_column(
-    path: Union[str, "os.PathLike[Any]"], column_name: str, layer: Optional[str] = None
+    path: Union[str, "os.PathLike[Any]"], column_name: str, layer: str | None = None
 ):
     """Drop the column specified.
 
@@ -1101,8 +1098,8 @@ def update_column(
     path: Union[str, "os.PathLike[Any]"],
     name: str,
     expression: str,
-    layer: Optional[str] = None,
-    where: Optional[str] = None,
+    layer: str | None = None,
+    where: str | None = None,
 ):
     """Update a column from a layer of the geofile.
 
@@ -1189,13 +1186,13 @@ def update_column(
 
 def read_file(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[str] = None,
-    columns: Optional[Iterable[str]] = None,
+    layer: str | None = None,
+    columns: Iterable[str] | None = None,
     bbox=None,
     rows=None,
-    where: Optional[str] = None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    where: str | None = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
     **kwargs,
@@ -1299,12 +1296,12 @@ def read_file(
 
 def read_file_nogeom(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[str] = None,
-    columns: Optional[Iterable[str]] = None,
+    layer: str | None = None,
+    columns: Iterable[str] | None = None,
     bbox=None,
     rows=None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     fid_as_index: bool = False,
 ) -> pd.DataFrame:
     """DEPRECATED: please use read_file with option ignore_geometry=True."""
@@ -1330,17 +1327,17 @@ def read_file_nogeom(
 
 def _read_file_base(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[str] = None,
-    columns: Optional[Iterable[str]] = None,
+    layer: str | None = None,
+    columns: Iterable[str] | None = None,
     bbox=None,
     rows=None,
-    where: Optional[str] = None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    where: str | None = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
     **kwargs,
-) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+) -> pd.DataFrame | gpd.GeoDataFrame:
     """Reads a file to a pandas Dataframe."""
     # Check if the fid column needs to be read as column via the columns parameter
     fid_as_column = False
@@ -1395,17 +1392,17 @@ def _read_file_base(
 
 def _read_file_base_fiona(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[str] = None,
-    columns: Optional[Iterable[str]] = None,
+    layer: str | None = None,
+    columns: Iterable[str] | None = None,
     bbox=None,
     rows=None,
-    where: Optional[str] = None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    where: str | None = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
     **kwargs,
-) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+) -> pd.DataFrame | gpd.GeoDataFrame:
     """Reads a file to a pandas Dataframe using fiona."""
     if ignore_geometry and columns == []:
         return pd.DataFrame()
@@ -1503,17 +1500,17 @@ def _read_file_base_fiona(
 
 def _read_file_base_pyogrio(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[Union[str, LayerInfo]] = None,
-    columns: Optional[Iterable[str]] = None,
+    layer: str | LayerInfo | None = None,
+    columns: Iterable[str] | None = None,
     bbox=None,
     rows=None,
-    where: Optional[str] = None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    where: str | None = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
     **kwargs,
-) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+) -> pd.DataFrame | gpd.GeoDataFrame:
     """Reads a file to a pandas Dataframe using pyogrio."""
     # Init
     path = Path(path)
@@ -1589,18 +1586,18 @@ def _read_file_base_pyogrio(
     # to proper datetime64 columns.
     if len(result_gdf) > 0:
         for column in result_gdf.select_dtypes(include=["object"]):
-            if isinstance(result_gdf[column].iloc[0], (date, datetime)):
+            if isinstance(result_gdf[column].iloc[0], date | datetime):
                 result_gdf[column] = pd.to_datetime(result_gdf[column])
 
-    assert isinstance(result_gdf, (gpd.GeoDataFrame, pd.DataFrame))
+    assert isinstance(result_gdf, gpd.GeoDataFrame | pd.DataFrame)
     return result_gdf
 
 
 def _fill_out_sql_placeholders(
     path: Path,
-    layer: Optional[Union[str, LayerInfo]],
+    layer: str | LayerInfo | None,
     sql_stmt: str,
-    columns: Optional[Iterable[str]],
+    columns: Iterable[str] | None,
 ) -> str:
     # Fill out placeholders in the sql_stmt if needed:
     placeholders = [
@@ -1637,10 +1634,10 @@ def _fill_out_sql_placeholders(
 def read_file_sql(
     path: Union[str, "os.PathLike[Any]"],
     sql_stmt: str,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = "SQLITE",
-    layer: Optional[str] = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = "SQLITE",
+    layer: str | None = None,
     ignore_geometry: bool = False,
-) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+) -> pd.DataFrame | gpd.GeoDataFrame:
     """DEPRECATED: Reads a file using an SQL statement.
 
     Args:
@@ -1673,15 +1670,15 @@ def read_file_sql(
 
 
 def to_file(
-    gdf: Union[pd.DataFrame, gpd.GeoDataFrame],
+    gdf: pd.DataFrame | gpd.GeoDataFrame,
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[str] = None,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    layer: str | None = None,
+    force_output_geometrytype: GeometryType | str | None = None,
     force_multitype: bool = False,
     append: bool = False,
     append_timeout_s: int = 600,
-    index: Optional[bool] = None,
-    create_spatial_index: Optional[bool] = None,
+    index: bool | None = None,
+    create_spatial_index: bool | None = None,
     **kwargs,
 ):
     """Writes a pandas dataframe to file.
@@ -1803,15 +1800,15 @@ def to_file(
 
 
 def _to_file_fiona(
-    gdf: Union[pd.DataFrame, gpd.GeoDataFrame],
+    gdf: pd.DataFrame | gpd.GeoDataFrame,
     path: Path,
     layer: str,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
     force_multitype: bool = False,
     append: bool = False,
     append_timeout_s: int = 600,
-    index: Optional[bool] = None,
-    create_spatial_index: Optional[bool] = None,
+    index: bool | None = None,
+    create_spatial_index: bool | None = None,
     **kwargs,
 ):
     """Writes a pandas dataframe to file using fiona."""
@@ -1826,7 +1823,7 @@ def _to_file_fiona(
         # type data instead of strings.
         if len(gdf) > 0:
             for column in gdf.select_dtypes(include=["object"]):
-                if isinstance(gdf[column][0], (date, datetime)):
+                if isinstance(gdf[column][0], (date | datetime)):
                     gdf[column] = gdf[column].astype(str)
 
     # Handle some specific cases where the file schema needs to be manipulated.
@@ -1867,12 +1864,12 @@ def _to_file_fiona(
         gdf: gpd.GeoDataFrame,
         path: Path,
         layer: str,
-        index: Optional[bool] = None,
-        force_output_geometrytype: Optional[str] = None,
+        index: bool | None = None,
+        force_output_geometrytype: str | None = None,
         force_multitype: bool = False,
         append: bool = False,
-        schema: Optional[dict] = None,
-        create_spatial_index: Optional[bool] = None,
+        schema: dict | None = None,
+        create_spatial_index: bool | None = None,
         **kwargs,
     ):
         # Prepare args for to_file
@@ -1972,12 +1969,12 @@ def _to_file_pyogrio(
     gdf: gpd.GeoDataFrame,
     path: Path,
     layer: str,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
     force_multitype: bool = False,
     append: bool = False,
     append_timeout_s: int = 600,
-    index: Optional[bool] = None,
-    create_spatial_index: Optional[bool] = None,
+    index: bool | None = None,
+    create_spatial_index: bool | None = None,
     **kwargs,
 ):
     """Writes a pandas dataframe to file using pyogrio."""
@@ -2033,9 +2030,9 @@ def _to_file_pyogrio(
 
 def get_crs(
     path: Union[str, "os.PathLike[Any]"],
-    layer: Optional[str] = None,
+    layer: str | None = None,
     min_confidence: int = 70,
-) -> Optional[pyproj.CRS]:
+) -> pyproj.CRS | None:
     """Get the CRS (projection) of the file.
 
     Args:
@@ -2079,7 +2076,7 @@ def get_crs(
     return crs
 
 
-def _crs_custom_match(crs: pyproj.CRS, path_to_fix: Optional[Path]) -> pyproj.CRS:
+def _crs_custom_match(crs: pyproj.CRS, path_to_fix: Path | None) -> pyproj.CRS:
     """Custom matching of crs's not matched automatically, based on name.
 
     If path_to_fix is specified, the corresponding .prj file located on the path will be
@@ -2299,22 +2296,22 @@ def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False):
 def append_to(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
-    src_layer: Optional[str] = None,
-    dst_layer: Optional[str] = None,
-    src_crs: Union[int, str, None] = None,
-    dst_crs: Union[int, str, None] = None,
-    columns: Optional[Iterable[str]] = None,
-    where: Optional[str] = None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    src_layer: str | None = None,
+    dst_layer: str | None = None,
+    src_crs: int | str | None = None,
+    dst_crs: int | str | None = None,
+    columns: Iterable[str] | None = None,
+    where: str | None = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     reproject: bool = False,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
-    create_spatial_index: Optional[bool] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
+    create_spatial_index: bool | None = None,
     append_timeout_s: int = 600,
     transaction_size: int = 50000,
-    preserve_fid: Optional[bool] = None,
-    dst_dimensions: Optional[str] = None,
+    preserve_fid: bool | None = None,
+    dst_dimensions: str | None = None,
     options: dict = {},
 ):
     """Append a layer of the source file to the destination file.
@@ -2483,16 +2480,16 @@ def append_to(
 def convert(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
-    src_layer: Optional[str] = None,
-    dst_layer: Optional[str] = None,
-    src_crs: Union[str, int, None] = None,
-    dst_crs: Union[str, int, None] = None,
-    where: Optional[str] = None,
+    src_layer: str | None = None,
+    dst_layer: str | None = None,
+    src_crs: str | int | None = None,
+    dst_crs: str | int | None = None,
+    where: str | None = None,
     reproject: bool = False,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
-    create_spatial_index: Optional[bool] = None,
-    preserve_fid: Optional[bool] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
+    create_spatial_index: bool | None = None,
+    preserve_fid: bool | None = None,
     options: dict = {},
     append: bool = False,
     force: bool = False,
@@ -2521,22 +2518,22 @@ def convert(
 def copy_layer(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
-    src_layer: Optional[Union[str, LayerInfo]] = None,
-    dst_layer: Optional[str] = None,
+    src_layer: str | LayerInfo | None = None,
+    dst_layer: str | None = None,
     write_mode: str = "create",
-    src_crs: Union[str, int, None] = None,
-    dst_crs: Union[str, int, None] = None,
-    columns: Optional[Iterable[str]] = None,
-    where: Optional[str] = None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    src_crs: str | int | None = None,
+    dst_crs: str | int | None = None,
+    columns: Iterable[str] | None = None,
+    where: str | None = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     reproject: bool = False,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
-    create_spatial_index: Optional[bool] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
+    create_spatial_index: bool | None = None,
     transaction_size: int = 50000,
-    preserve_fid: Optional[bool] = None,
-    dst_dimensions: Optional[str] = None,
+    preserve_fid: bool | None = None,
+    dst_dimensions: str | None = None,
     options: dict = {},
     append: bool = False,
     force: bool = False,
