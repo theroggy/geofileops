@@ -31,7 +31,7 @@ setuptools.setup(
         "pandas>=1.5",
         "psutil",
         "pygeoops>=0.4,<0.5",
-        "pyogrio",
+        "pyogrio>=0.7",
         "pyproj",
         "shapely>=2,<2.1",
     ],
