@@ -14,7 +14,9 @@ import shapely.geometry as sh_geom
 import geofileops as gfo
 from geofileops.util import _geofileinfo, _geoseries_util, _io_util, geodataframe_util
 
-_data_dir = Path(__file__).parent.resolve() / "data"
+data_dir = Path(__file__).parent.resolve() / "data"
+data_url = "https://raw.githubusercontent.com/geofileops/geofileops/main/tests/data"
+
 EPSGS = [31370, 4326]
 GRIDSIZE_DEFAULT = 0.0
 SUFFIXES_FILEOPS = [".gpkg", ".shp", ".csv"]
@@ -139,7 +141,7 @@ def get_testfile(
     explodecollections: bool = False,
 ) -> Path:
     # Prepare original filepath.
-    testfile_path = _data_dir / f"{testfile}.gpkg"
+    testfile_path = data_dir / f"{testfile}.gpkg"
     if not testfile_path.exists():
         raise ValueError(f"Invalid testfile type: {testfile}")
 

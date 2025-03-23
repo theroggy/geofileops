@@ -158,7 +158,7 @@ def create_file_atomic(path: Union[str, "os.PathLike[Any]"]) -> bool:
         if ex.errno == 13:
             return False
         else:
-            raise Exception(f"Error creating file {path}") from ex
+            raise RuntimeError(f"Error creating file {path}") from ex
 
 
 def with_stem(path: Path, new_stem) -> Path:

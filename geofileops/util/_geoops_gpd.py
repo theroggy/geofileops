@@ -746,7 +746,7 @@ def _apply_geooperation_to_layer(
 
     # Check input parameters...
     if not input_path.exists():
-        raise ValueError(f"{operation_name}: input_path doesn't exist: {input_path}")
+        raise FileNotFoundError(f"{operation_name}: input_path not found: {input_path}")
     if input_path == output_path:
         raise ValueError(f"{operation_name}: output_path must not equal input_path")
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
@@ -838,6 +838,7 @@ def _apply_geooperation_to_layer(
                     gridsize=gridsize,
                     keep_empty_geoms=keep_empty_geoms,
                     preserve_fid=preserve_fid,
+                    create_spatial_index=False,
                     force=force,
                 )
                 future_to_batch_id[future] = batch_id
@@ -940,6 +941,7 @@ def _apply_geooperation(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     preserve_fid: bool = False,
+    create_spatial_index: bool = False,
     force: bool = False,
 ) -> str:
     # Init
@@ -1041,7 +1043,7 @@ def _apply_geooperation(
         index=False,
         force_output_geometrytype=force_output_geometrytype,
         force_multitype=not explodecollections,
-        create_spatial_index=False,
+        create_spatial_index=create_spatial_index,
     )
 
     message = f"Took {datetime.now() - start_time} for {len(data_gdf)} rows ({where})"
@@ -1123,7 +1125,7 @@ def dissolve(
     if groupby_columns is not None and len(list(groupby_columns)) == 0:
         raise ValueError("groupby_columns=[] is not supported. Use None.")
     if not input_path.exists():
-        raise ValueError(f"input_path doesn't exist: {input_path}")
+        raise FileNotFoundError(f"input_path not found: {input_path}")
     if input_path == output_path:
         raise ValueError("output_path must not equal input_path")
 

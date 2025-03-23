@@ -11,6 +11,8 @@
   documentation, not the stem of the destination filename. This is corrected now. (#648)
 - In `copy_layer`, the `append` parameter is deprecated and replaced by the `write_mode`
   parameter that accepts e.g. "append" as value (#663).
+- The `append_to` function is deprecated, as it is almost identical to `copy_layer` with
+  `write_mode="append"` (#669).
 
 ### Improvements
 
@@ -22,6 +24,7 @@
 - Improve performance of `export_by_location` and `join_by_location` for simple queries
   (#548)
 - Add support for `query=""` in `export_by_location` (#597)
+- Support GDAL vsi handlers in paths in most general file/layer operations (#669)
 - Add support to rename columns and layers with only a difference in casing (#549, #593)
 - Use `ST_Equals` and add priority feature to `delete_duplicate_geometries` (#638)
 - Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)

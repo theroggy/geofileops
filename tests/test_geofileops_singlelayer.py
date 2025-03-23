@@ -342,15 +342,17 @@ def test_buffer_force(tmp_path, geoops_module):
 
 
 @pytest.mark.parametrize(
-    "expected_error, input_path, output_path",
+    "exp_error, exp_ex, input_path, output_path",
     [
         (
             "buffer: output_path must not equal input_path",
+            ValueError,
             test_helper.get_testfile("polygon-parcel"),
             test_helper.get_testfile("polygon-parcel"),
         ),
         (
-            "buffer: input_path doesn't exist:",
+            "buffer: input_path not found:",
+            FileNotFoundError,
             "not_existing_path",
             "output.gpkg",
         ),
@@ -358,11 +360,9 @@ def test_buffer_force(tmp_path, geoops_module):
 )
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
 def test_buffer_invalid_params(
-    tmp_path, input_path, output_path, expected_error, geoops_module
+    tmp_path, input_path, output_path, exp_ex, exp_error, geoops_module
 ):
-    """
-    Invalid params for single layer operations.
-    """
+    """Invalid params for single layer operations."""
     # Internal functions are directly called, so need to be Path objects
     if isinstance(output_path, str):
         output_path = tmp_path / output_path
@@ -371,7 +371,7 @@ def test_buffer_invalid_params(
 
     # Now run test
     set_geoops_module(geoops_module)
-    with pytest.raises(ValueError, match=expected_error):
+    with pytest.raises(exp_ex, match=exp_error):
         geoops.buffer(input_path=input_path, output_path=output_path, distance=1)
 
 

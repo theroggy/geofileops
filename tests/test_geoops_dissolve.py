@@ -477,12 +477,21 @@ def test_dissolve_emptyfile(tmp_path, testfile, suffix, explodecollections):
 
 @pytest.mark.parametrize("sql_singlethread", [True, False])
 @pytest.mark.parametrize(
-    "exp_match, invalid_params",
+    "exp_error, exp_ex, invalid_params",
     [
-        ("column in groupby_columns not", {"groupby_columns": "NON_EXISTING_COLUMN"}),
-        ("input_path doesn't exist: ", {"input_path": Path("nonexisting.abc")}),
+        (
+            "column in groupby_columns not",
+            ValueError,
+            {"groupby_columns": "NON_EXISTING_COLUMN"},
+        ),
+        (
+            "input_path not found: ",
+            FileNotFoundError,
+            {"input_path": Path("nonexisting.abc")},
+        ),
         (
             "output_path must not equal input_path",
+            ValueError,
             {
                 "input_path": test_helper.get_testfile("polygon-parcel"),
                 "output_path": test_helper.get_testfile("polygon-parcel"),
@@ -490,6 +499,7 @@ def test_dissolve_emptyfile(tmp_path, testfile, suffix, explodecollections):
         ),
         (
             "Dissolve to tiles is not supported for GeometryType.MULTILINESTRING, ",
+            ValueError,
             {
                 "input_path": test_helper.get_testfile("linestring-watercourse"),
                 "nb_squarish_tiles": 2,
@@ -497,6 +507,7 @@ def test_dissolve_emptyfile(tmp_path, testfile, suffix, explodecollections):
         ),
         (
             "abc not available in: ",
+            ValueError,
             {
                 "agg_columns": {
                     "columns": [{"column": "abc", "agg": "count", "as": "cba"}]
@@ -505,9 +516,10 @@ def test_dissolve_emptyfile(tmp_path, testfile, suffix, explodecollections):
         ),
     ],
 )
-def test_dissolve_invalid_params(tmp_path, sql_singlethread, invalid_params, exp_match):
-    """
-    Test dissolve with some invalid input params.
+def test_dissolve_invalid_params(
+    tmp_path, sql_singlethread, invalid_params, exp_ex, exp_error
+):
+    """Test dissolve with some invalid input params.
 
     Remark: the structure of agg_columns parameter is tested in
       test_parameter_helper.test_validate_agg_columns_invalid.
@@ -533,7 +545,7 @@ def test_dissolve_invalid_params(tmp_path, sql_singlethread, invalid_params, exp
             raise ValueError(f"unsupported invalid_param: {invalid_param}")
 
     # Run test
-    with pytest.raises(ValueError, match=exp_match):
+    with pytest.raises(exp_ex, match=exp_error):
         if sql_singlethread:
             if nb_squarish_tiles > 1:
                 pytest.skip("nb_squarish_tiles not relevant for dissolve_singlethread")
