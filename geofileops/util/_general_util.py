@@ -4,7 +4,7 @@ import datetime
 import logging
 import os
 from collections.abc import Iterable
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ def report_progress(
     start_time: datetime.datetime,
     nb_done: int,
     nb_todo: int,
-    operation: Optional[str] = None,
+    operation: str | None = None,
     nb_parallel: int = 1,
 ):
     # If logging level not enabled for INFO, no progress reporting...
@@ -104,9 +104,9 @@ def format_progress(
     start_time: datetime.datetime,
     nb_done: int,
     nb_todo: int,
-    operation: Optional[str] = None,
+    operation: str | None = None,
     nb_parallel: int = 1,
-) -> Optional[str]:
+) -> str | None:
     # Init
     time_passed = (datetime.datetime.now() - start_time).total_seconds()
     pct_progress = 100.0 - (nb_todo - nb_done) * 100 / nb_todo
@@ -168,9 +168,9 @@ def formatbytes(bytes: float):
 def prepare_for_serialize(data: dict) -> dict:
     prepared: dict[str, Any] = {}
     for key, value in data.items():
-        if isinstance(value, (dict)):
+        if isinstance(value, dict):
             prepared[key] = prepare_for_serialize(value)
-        elif isinstance(value, (list, tuple)):
+        elif isinstance(value, list | tuple):
             prepared[key] = value
         else:
             prepared[key] = str(value)

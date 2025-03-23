@@ -9,7 +9,6 @@ import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Optional
 
 import geopandas as gpd
 import shapely
@@ -55,7 +54,7 @@ class TestFile(enum.Enum):
         "agri parcels (~500k poly)",
     )
 
-    def __init__(self, value, url: str, filename: str, descr: Optional[str]):
+    def __init__(self, value, url: str, filename: str, descr: str | None):
         """Create a test file.
 
         Args:
@@ -99,7 +98,7 @@ def create_testfile(
     nb_polygons_y: int = 1,
     poly_width: int = 15000,
     poly_height: int = 15000,
-    dst_dir: Optional[Path] = None,
+    dst_dir: Path | None = None,
 ) -> tuple[Path, str]:
     """Creates a test file.
 
@@ -118,7 +117,7 @@ def create_testfile(
         tuple[Path, str]: The path to the file + a description of the test file.
     """
     basename = (
-        f"custom_polys_{nb_polygons_x*nb_polygons_y}polys_{nb_points}pnts_"
+        f"custom_polys_{nb_polygons_x * nb_polygons_y}polys_{nb_points}pnts_"
         f"{bbox[0]}-{bbox[1]}-{bbox[2]}-{bbox[3]}.gpkg"
     )
     testfile_path = _prepare_dst_path(basename, dst_dir=dst_dir)
@@ -318,9 +317,7 @@ def _create_complex_poly(
     return poly_complex
 
 
-def _download_samplefile(
-    url: str, dst_name: str, dst_dir: Optional[Path] = None
-) -> Path:
+def _download_samplefile(url: str, dst_name: str, dst_dir: Path | None = None) -> Path:
     """Download a sample file to dest_path.
 
     If it is zipped, it will be unzipped. If needed, it will be converted to
@@ -397,7 +394,7 @@ def _download_samplefile(
     return dst_path
 
 
-def _prepare_dst_path(dst_name: str, dst_dir: Optional[Path] = None):
+def _prepare_dst_path(dst_name: str, dst_dir: Path | None = None):
     if dst_dir is None:
         return Path(tempfile.gettempdir()) / "geofileops_sampledata" / dst_name
     else:

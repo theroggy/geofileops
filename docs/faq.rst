@@ -30,13 +30,14 @@ You can find more details on why this is needed in the
 Supported file formats
 ----------------------
 
-The spatial functionalities of geofileops are tested on geopackage and shapefile
-input/output files. However, geopackage is highly recommended because it will offer
-better performance in geofileops as well as for the reasons listed here: 
+The spatial functionalities of geofileops are supported on standard geopackage and
+shapefile input/output files. However, geopackage is highly recommended because it will
+offer better performance in geofileops as well as for the reasons listed here: 
 `www.switchfromshapefile.org <http://www.switchfromshapefile.org>`_.
 
 Most general file/layer operations can be used on all vector formats supported by
-`GDAL <https://gdal.org/drivers/vector/index.html>`_.
+`GDAL <https://gdal.org/drivers/vector/index.html>`_ as well as on paths using
+`GDAL VSI handlers <https://gdal.org/en/stable/user/virtual_file_systems.html>`_.
 
 Runtime configuration options
 -----------------------------

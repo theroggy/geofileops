@@ -2,7 +2,7 @@ import logging
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Literal
 
 from pygeoops import GeometryType
 from shapely import wkt
@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 def clip_by_geometry(
     input_path: Path,
     output_path: Path,
-    clip_geometry: Union[tuple[float, float, float, float], str],
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    clip_geometry: tuple[float, float, float, float] | str,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
 ):
@@ -58,9 +58,9 @@ def export_by_bounds(
     input_path: Path,
     output_path: Path,
     bounds: tuple[float, float, float, float],
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
 ):
@@ -80,12 +80,12 @@ def export_by_bounds(
 def warp(
     input_path: Path,
     output_path: Path,
-    gcps: list[tuple[float, float, float, float, Optional[float]]],
+    gcps: list[tuple[float, float, float, float, float | None]],
     algorithm: str = "polynomial",
-    order: Optional[int] = None,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    order: int | None = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
 ):
@@ -112,23 +112,23 @@ def _run_ogr(
     operation: str,
     input_path: Path,
     output_path: Path,
-    input_layer: Optional[Union[str, LayerInfo]] = None,
-    output_layer: Optional[str] = None,
-    input_srs: Union[int, str, None] = None,
-    output_srs: Union[int, str, None] = None,
+    input_layer: str | LayerInfo | None = None,
+    output_layer: str | None = None,
+    input_srs: int | str | None = None,
+    output_srs: int | str | None = None,
     reproject: bool = False,
-    spatial_filter: Optional[tuple[float, float, float, float]] = None,
-    clip_geometry: Optional[Union[tuple[float, float, float, float], str]] = None,
-    sql_stmt: Optional[str] = None,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = None,
+    spatial_filter: tuple[float, float, float, float] | None = None,
+    clip_geometry: tuple[float, float, float, float] | str | None = None,
+    sql_stmt: str | None = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     transaction_size: int = 65536,
     append: bool = False,
     update: bool = False,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, Iterable[str], None] = None,
+    force_output_geometrytype: GeometryType | str | Iterable[str] | None = None,
     options: dict = {},
-    columns: Optional[list[str]] = None,
-    warp: Optional[dict] = None,
+    columns: list[str] | None = None,
+    warp: dict | None = None,
     force: bool = False,
 ) -> bool:
     # Init
@@ -165,5 +165,5 @@ def _run_ogr(
 
     # Run + return result
     result = _ogr_util.vector_translate_by_info(info)
-    logger.info(f"Ready, took {datetime.now()-start_time}")
+    logger.info(f"Ready, took {datetime.now() - start_time}")
     return result

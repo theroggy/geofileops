@@ -44,5 +44,5 @@ setuptools.setup(
         "Programming Language :: Python :: 3 :: Only",
         "Topic :: Scientific/Engineering :: GIS",
     ],
-    python_requires=">=3.9",
+    python_requires=">=3.10",
 )

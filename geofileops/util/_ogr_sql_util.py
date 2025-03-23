@@ -1,7 +1,6 @@
 """Module with utilities to format sql statements meant for use with ogr."""
 
 from collections.abc import Iterable
-from typing import Optional
 
 
 class ColumnFormatter:
@@ -11,11 +10,11 @@ class ColumnFormatter:
     regarding the handling of the special "fid" column.
     """
 
-    _aliases_cache: Optional[list[str]] = None
+    _aliases_cache: list[str] | None = None
 
     def __init__(
         self,
-        columns_asked: Optional[list[str]],
+        columns_asked: list[str] | None,
         columns_in_layer: Iterable[str],
         fid_column: str,
         table_alias: str = "",

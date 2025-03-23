@@ -85,7 +85,7 @@ def validate_agg_columns(agg_columns: dict):
             if agg_column["agg"].lower() not in supported_aggfuncs:
                 raise ValueError(
                     'agg_columns["columns"] contains unsupported aggregation '
-                    f'{agg_column["agg"]}, use one of {supported_aggfuncs}'
+                    f"{agg_column['agg']}, use one of {supported_aggfuncs}"
                 )
             if not isinstance(agg_column["as"], str):
                 raise ValueError(
