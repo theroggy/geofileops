@@ -245,7 +245,7 @@ def test_copy_layer(tmp_path, testfile, dimensions, suffix_input, suffix_output)
         assert src_layerinfo.geometrytypename == dst_layerinfo.geometrytypename
 
 
-def test_copy_layer_add_layer(tmp_path):
+def test_copy_layer_add_layer_gpkg(tmp_path):
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel")
     dst = tmp_path / "output.gpkg"
@@ -287,6 +287,20 @@ def test_copy_layer_add_layer(tmp_path):
 
     layer2_info = gfo.get_layerinfo(dst, layer2)
     assert layer2_info.featurecount == 48
+
+
+def test_copy_layer_add_layer_shp(tmp_path):
+    # Prepare test data
+    src = test_helper.get_testfile("polygon-parcel")
+    dst = tmp_path / "output.shp"
+    layer1 = gfo.get_default_layer(dst)
+
+    # First "add_layer" to file already while the file doesn't exist yet
+    gfo.copy_layer(src, dst, dst_layer=layer1, write_mode="add_layer")
+
+    # Check result
+    layer1_info = gfo.get_layerinfo(dst, layer1)
+    assert layer1_info.featurecount == 48
 
 
 def test_copy_layer_append_different_layer(tmp_path):
@@ -1164,8 +1178,9 @@ def test_is_geofile_deprecated():
     assert gfo.is_geofile("/test/testje.txt") is False
 
 
-def test_listlayers_errors():
-    path = "not_existing_file.gpkg"
+@pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
+def test_listlayers_errors(suffix):
+    path = f"not_existing_file{suffix}"
     with pytest.raises(FileNotFoundError, match=f"File not found: {path}"):
         _ = gfo.listlayers(path)
 
@@ -1939,8 +1954,12 @@ def test_to_file_fid_append_to(tmp_path, engine_setter):
     # Now merge them, but start with the high fid numbers
     gfo.copy(output2_path, output_path)
     gfo.rename_layer(output_path, output_path.stem)
-    gfo.append_to(
-        output1_path, output_path, dst_layer=output_path.stem, preserve_fid=True
+    gfo.copy_layer(
+        output1_path,
+        output_path,
+        dst_layer=output_path.stem,
+        write_mode="append",
+        preserve_fid=True,
     )
 
     # Prepare expected result

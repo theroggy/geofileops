@@ -58,6 +58,7 @@
 - Fix an invalid output .gpkg file being created when e.g. `copy_layer` is ran with an
   invalid sql statement (#641)
 - Fix wrong results for `export_by_location` with queries != "intersects is True" (#617)
+- Fix listlayers returns layer name for a non-existing .shp (#672)
 
 ## 0.9.1 (2024-07-18)
 

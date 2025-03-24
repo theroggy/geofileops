@@ -113,6 +113,8 @@ def listlayers(
     """  # noqa: E501
     path_p = Path(path)
     if path_p.suffix.lower() == ".shp":
+        if not _vsi_exists(path):
+            raise FileNotFoundError(f"File not found: {path}")
         return [path_p.stem]
 
     datasource = None
