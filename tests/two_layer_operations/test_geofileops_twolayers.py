@@ -615,24 +615,31 @@ def test_intersect_deprecated(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "suffix, epsg, gridsize, explodecollections, nb_parallel",
+    "suffix_in, suffix_out, epsg, gridsize, explodecollections, nb_parallel",
     [
-        (".gpkg", 31370, 0.0, True, 1),
-        (".gpkg", 31370, 0.01, True, 1),
-        (".gpkg", 31370, 0.0, False, 2),
-        (".gpkg", 4326, 0.0, True, 2),
-        (".shp", 31370, 0.0, True, 1),
-        (".shp", 31370, 0.0, False, 2),
+        (".gpkg.zip", ".gpkg", 31370, 0.0, True, 1),
+        (".gpkg", ".gpkg", 31370, 0.01, True, 1),
+        (".gpkg", ".gpkg", 31370, 0.0, False, 2),
+        (".gpkg", ".gpkg", 4326, 0.0, True, 2),
+        (".shp", ".shp", 31370, 0.0, True, 1),
+        (".shp", ".shp", 31370, 0.0, False, 2),
     ],
 )
 def test_intersection(
-    tmp_path, suffix, epsg, explodecollections, gridsize, nb_parallel
+    tmp_path, suffix_in, suffix_out, epsg, explodecollections, gridsize, nb_parallel
 ):
-    # Prepare test data/parameters
-    input1_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
-    input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix, epsg=epsg)
+    if suffix_in == ".gpkg.zip":
+        pytest.xfail(
+            "Two layer operations use sqlite directly, so .gpkg.zip does not work"
+        )
 
-    output_path = tmp_path / f"{input1_path.stem}_inters_{input2_path.stem}{suffix}"
+    # Prepare test data/parameters
+    input1_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix_in, epsg=epsg
+    )
+    input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix_in, epsg=epsg)
+
+    output_path = tmp_path / f"{input1_path.stem}_inters_{input2_path.stem}{suffix_out}"
     batchsize = -1
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     if nb_parallel > 1:
@@ -659,7 +666,7 @@ def test_intersection(
         len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     )
 
-    if explodecollections and suffix != ".shp":
+    if explodecollections and suffix_out != ".shp":
         assert output_layerinfo.geometrytype == GeometryType.POLYGON
     else:
         assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON

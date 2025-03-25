@@ -161,12 +161,6 @@ def create_file_atomic(path: Union[str, "os.PathLike[Any]"]) -> bool:
             raise RuntimeError(f"Error creating file {path}") from ex
 
 
-def with_stem(path: Path, new_stem) -> Path:
-    # Remark: from python 3.9 this is available on any Path, but to avoid
-    # having to require 3.9 for this, this hack...
-    return path.parent / f"{new_stem}{path.suffix}"
-
-
 def output_exists(path: Path, remove_if_exists: bool) -> bool:
     """Checks and returns whether the file specified exists.
 
