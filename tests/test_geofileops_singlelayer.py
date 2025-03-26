@@ -150,8 +150,9 @@ def basic_combinations_to_test(
 
 
 @pytest.mark.parametrize("suffix_input", SUFFIXES_GEOOPS_INPUT)
+@pytest.mark.parametrize("worker_type", ["thread", "process"])
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
-def test_buffer(tmp_path, suffix_input, geoops_module):
+def test_buffer(tmp_path, suffix_input, worker_type, geoops_module):
     """Buffer minimal test."""
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix_input)
@@ -161,14 +162,15 @@ def test_buffer(tmp_path, suffix_input, geoops_module):
     # Now run test
     output_path = tmp_path / "output.gpkg"
     set_geoops_module(geoops_module)
-    geoops.buffer(
-        input_path=input_path,
-        output_path=output_path,
-        distance=1,
-        nb_parallel=2,
-        keep_empty_geoms=True,
-        batchsize=batchsize,
-    )
+    with _general_util.TempEnv({"GFO_WORKER_TYPE": worker_type}):
+        geoops.buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=1,
+            nb_parallel=2,
+            keep_empty_geoms=True,
+            batchsize=batchsize,
+        )
 
     # Now check if the output file is correctly created
     assert output_path.exists()

@@ -1,4 +1,4 @@
-import os
+"""Tests for the general_helper module."""
 
 import pytest
 
@@ -15,11 +15,8 @@ def test_use_threads(worker_type, input_layer_featurecount):
         expected = False
     elif worker_type == "thread":
         expected = True
-    elif os.name == "nt":
-        if input_layer_featurecount <= 100:
-            expected = True
-        else:
-            expected = False
+    elif input_layer_featurecount <= 100:
+        expected = True
     else:
         expected = False
 

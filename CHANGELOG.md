@@ -4,6 +4,10 @@
 
 ### Deprecations and compatibility notes
 
+- worker processes are now being created using "forkserver" on linux. This solves risks
+  of deadlocks and the corresponding warning for that. Consequence is that also on linux
+  the `if __name__ == "__main__":` construct needs to be used in scripts. Some more info
+  can be found in the geofileops FAQ (#675).
 - `erase` was renamed to `difference`, as most other open source applications/libraries
   use this terminology. `erase` just keeps existing for backwards compatibility for now,
   but a warning is shown that it might be removed in the (distant) future. (#595)

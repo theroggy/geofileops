@@ -18,7 +18,7 @@ import shapely.geometry as sh_geom
 import geofileops as gfo
 from geofileops import GeometryType
 from geofileops._compat import GEOPANDAS_GTE_10, SPATIALITE_GTE_51
-from geofileops.util import _geofileinfo, _sqlite_util
+from geofileops.util import _general_util, _geofileinfo, _sqlite_util
 from geofileops.util import _geoops_sql as geoops_sql
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
@@ -615,18 +615,26 @@ def test_intersect_deprecated(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "suffix_in, suffix_out, epsg, gridsize, explodecollections, nb_parallel",
+    "suffix_in, suffix_out, epsg, gridsize, explodecollections, worker_type, "
+    "nb_parallel",
     [
-        (".gpkg.zip", ".gpkg", 31370, 0.0, True, 1),
-        (".gpkg", ".gpkg", 31370, 0.01, True, 1),
-        (".gpkg", ".gpkg", 31370, 0.0, False, 2),
-        (".gpkg", ".gpkg", 4326, 0.0, True, 2),
-        (".shp", ".shp", 31370, 0.0, True, 1),
-        (".shp", ".shp", 31370, 0.0, False, 2),
+        (".gpkg.zip", ".gpkg", 31370, 0.0, True, "thread", 1),
+        (".gpkg", ".gpkg", 31370, 0.01, True, "thread", 1),
+        (".gpkg", ".gpkg", 31370, 0.0, False, "process", 2),
+        (".gpkg", ".gpkg", 4326, 0.0, True, "thread", 2),
+        (".shp", ".shp", 31370, 0.0, True, "thread", 1),
+        (".shp", ".shp", 31370, 0.0, False, "process", 2),
     ],
 )
 def test_intersection(
-    tmp_path, suffix_in, suffix_out, epsg, explodecollections, gridsize, nb_parallel
+    tmp_path,
+    suffix_in,
+    suffix_out,
+    epsg,
+    explodecollections,
+    gridsize,
+    worker_type,
+    nb_parallel,
 ):
     if suffix_in == ".gpkg.zip":
         pytest.xfail(
@@ -646,15 +654,16 @@ def test_intersection(
         batchsize = math.ceil(input1_layerinfo.featurecount / 2)
 
     # Now run test
-    gfo.intersection(
-        input1_path=str(input1_path),
-        input2_path=str(input2_path),
-        output_path=str(output_path),
-        gridsize=gridsize,
-        explodecollections=explodecollections,
-        nb_parallel=nb_parallel,
-        batchsize=batchsize,
-    )
+    with _general_util.TempEnv({"GFO_WORKER_TYPE": worker_type}):
+        gfo.intersection(
+            input1_path=str(input1_path),
+            input2_path=str(input2_path),
+            output_path=str(output_path),
+            gridsize=gridsize,
+            explodecollections=explodecollections,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+        )
 
     # Check if the tmp file is correctly created
     assert output_path.exists()
