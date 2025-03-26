@@ -35,7 +35,7 @@
 - Use `ST_Equals` and add priority feature to `delete_duplicate_geometries` (#638)
 - Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
 - Speed up processing many small files, mainly on windows:
-    - reduce calls to `gdal.OpenEx` (#622, #625)
+    - reduce calls to `gdal.OpenEx` (#622, #625, #677)
     - improvements in sqlite3 code for 2 layer operations: start transactions
       explicitly, remove obsolete GPKG triggers, use a :memory: temp file where possible
       (#626, #628, #630)
