@@ -1397,8 +1397,11 @@ def dissolve(
                 str(output_tmp_onborder_path) != str(output_tmp_path)
                 and output_tmp_onborder_path.exists()
             ):
-                gfo.append_to(
-                    output_tmp_onborder_path, output_tmp_path, dst_layer=output_layer
+                gfo.copy_layer(
+                    output_tmp_onborder_path,
+                    output_tmp_path,
+                    dst_layer=output_layer,
+                    write_mode="append",
                 )
 
             # If there is a result...

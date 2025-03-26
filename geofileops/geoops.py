@@ -358,8 +358,11 @@ def dissolve_within_distance(
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
         dst_layer = fileops.get_only_layer(diss_path)
-        fileops.append_to(
-            src=parts_to_add_filtered_path, dst=diss_path, dst_layer=dst_layer
+        fileops.copy_layer(
+            src=parts_to_add_filtered_path,
+            dst=diss_path,
+            dst_layer=dst_layer,
+            write_mode="append",
         )
 
         step += 1

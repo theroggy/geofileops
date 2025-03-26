@@ -1553,13 +1553,16 @@ def export_by_location(
         if area_inters_column_name is None:
             area_inters_column_name = "area_inters"
 
+        # Cast the intersection to REAL so SQLite knows the result is a REAL even if the
+        # result is NULL. Without it, GDAL gives warnings afterwards because the data
+        # type is ''.
         sql_template = f"""
             SELECT filtered.*
-                  ,(SELECT SUM(ST_area(
+                  ,(SELECT CAST(SUM(ST_area(
                              ST_intersection(
                                filtered.geom, layer2_sub.{{input2_geometrycolumn}}
                              )
-                           ))
+                           )) AS REAL)
                       FROM {{input2_databasename}}."{{input2_layer}}" layer2_sub
                       JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
                         ON layer2_sub.rowid = layer2tree.id
@@ -2423,11 +2426,12 @@ def join_nearest(
         # Add input2 layer to sqlite gfo...
         input2_tmp_path = input1_tmp_path
         input2_tmp_layer = "input2_layer"
-        gfo.append_to(
+        gfo.copy_layer(
             src=input2_path,
             src_layer=input2_layer,
             dst=input2_tmp_path,
             dst_layer=input2_tmp_layer,
+            write_mode="append",
             preserve_fid=True,
         )
 
@@ -3377,7 +3381,9 @@ def _two_layer_vector_operation(
         )
 
         column_datatypes = _sqlite_util.get_columns(
-            sql_stmt=sql_stmt, input_databases=input_db_names
+            sql_stmt=sql_stmt,
+            input_databases=input_db_names,
+            output_geometrytype=force_output_geometrytype,
         )
 
         # Apply gridsize if it is specified
@@ -3489,6 +3495,8 @@ def _two_layer_vector_operation(
                 ):
                     # convert geometrytype to multitype to avoid ogr warnings
                     output_geometrytype_now = force_output_geometrytype.to_multitype
+                    if "geom" in column_datatypes:
+                        column_datatypes["geom"] = output_geometrytype_now.name
 
                 # Remark: this temp file doesn't need spatial index
                 future = calculate_pool.submit(
