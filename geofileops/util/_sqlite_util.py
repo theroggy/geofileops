@@ -16,7 +16,7 @@ from pyproj import CRS, Transformer
 
 import geofileops as gfo
 from geofileops.helpers._configoptions_helper import ConfigOptions
-from geofileops.util import _sqlite_userdefined as sqlite_userdefined
+from geofileops.util import _geopath_util, _sqlite_userdefined
 from geofileops.util._general_util import MissingRuntimeDependencyError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -220,17 +220,22 @@ def get_columns(
     start = time.perf_counter()
     tmp_dir = None
 
+    def get_filetype(path: Path) -> str:
+        if _geopath_util.suffixes(path).lower() in (".gpkg", ".gpkg.zip"):
+            return "gpkg"
+        return path.suffix.lstrip(".")
+
     # Connect to/create sqlite main database
     if "main" in input_databases:
         # If an input database is main, use it as the main database
         main_db_path = input_databases["main"]
-        filetype = main_db_path.suffix.lstrip(".")
+        filetype = get_filetype(main_db_path)
         conn = sqlite3.connect(main_db_path, detect_types=sqlite3.PARSE_DECLTYPES)
         new_db = False
     else:
         # Create temp output db to be sure the output DB is writable, even though we
         # only create a temporary table.
-        filetype = next(iter(input_databases.values())).suffix.lstrip(".")
+        filetype = get_filetype(next(iter(input_databases.values())))
         conn = create_new_spatialdb(":memory:", filetype=filetype)
         new_db = True
 
@@ -831,7 +836,7 @@ def load_spatialite(conn):
     conn.create_function(
         "GFO_ReducePrecision",
         -1,
-        sqlite_userdefined.gfo_reduceprecision,
+        _sqlite_userdefined.gfo_reduceprecision,
         deterministic=True,
     )
 

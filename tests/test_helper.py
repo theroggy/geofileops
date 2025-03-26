@@ -12,7 +12,13 @@ import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
-from geofileops.util import _geofileinfo, _geoseries_util, _io_util, geodataframe_util
+from geofileops.util import (
+    _geofileinfo,
+    _geopath_util,
+    _geoseries_util,
+    _io_util,
+    geodataframe_util,
+)
 
 data_dir = Path(__file__).parent.resolve() / "data"
 data_url = "https://raw.githubusercontent.com/geofileops/geofileops/main/tests/data"
@@ -20,7 +26,9 @@ data_url = "https://raw.githubusercontent.com/geofileops/geofileops/main/tests/d
 EPSGS = [31370, 4326]
 GRIDSIZE_DEFAULT = 0.0
 SUFFIXES_FILEOPS = [".gpkg", ".shp", ".csv"]
+SUFFIXES_FILEOPS_EXT = [".gpkg", ".gpkg.zip", ".shp.zip", ".shp", ".csv"]
 SUFFIXES_GEOOPS = [".gpkg", ".shp"]
+SUFFIXES_GEOOPS_INPUT = [".gpkg", ".gpkg.zip", ".shp.zip", ".shp"]
 TESTFILES = ["polygon-parcel", "linestring-row-trees", "point"]
 WHERE_AREA_GT_400 = "ST_Area({geometrycolumn}) > 400"
 WHERE_AREA_GT_5000 = "ST_Area({geometrycolumn}) > 5000"
@@ -173,7 +181,8 @@ def get_testfile(
 
         # Prepare the file in a tmp file so the file is not visible to other
         # processes until it is completely ready.
-        tmp_path = prepared_path.with_stem(f"{prepared_path.stem}_tmp")
+        tmp_stem = f"{_geopath_util.stem(prepared_path)}_tmp"
+        tmp_path = _geopath_util.with_stem(prepared_path, tmp_stem)
         layers = gfo.listlayers(testfile_path)
         dst_info = _geofileinfo.get_geofileinfo(tmp_path)
         if len(layers) > 1 and dst_info.is_singlelayer:
@@ -185,7 +194,13 @@ def get_testfile(
         # Convert all layers found
         for src_layer in layers:
             # Single layer files have stem as layername
-            dst_layer = tmp_path.stem if dst_info.is_singlelayer else src_layer
+            assert isinstance(tmp_path, Path)
+            if dst_info.is_singlelayer:
+                dst_layer = tmp_stem
+                preserve_fid = False
+            else:
+                dst_layer = src_layer
+                preserve_fid = not explodecollections
 
             gfo.copy_layer(
                 testfile_path,
@@ -195,7 +210,7 @@ def get_testfile(
                 write_mode="add_layer",
                 dst_crs=epsg,
                 reproject=True,
-                preserve_fid=not explodecollections,
+                preserve_fid=preserve_fid,
                 dst_dimensions=dimensions,
                 explodecollections=explodecollections,
             )

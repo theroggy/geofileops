@@ -14,14 +14,14 @@ from shapely import MultiPolygon, Polygon
 
 from geofileops import GeometryType, fileops, geoops
 from geofileops._compat import SPATIALITE_GTE_51
-from geofileops.util import _general_util, _geofileinfo, _geoops_sql
-from geofileops.util import _io_util as io_util
+from geofileops.util import _general_util, _geofileinfo, _geoops_sql, _geopath_util
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
 from tests.test_helper import (
     EPSGS,
     GRIDSIZE_DEFAULT,
     SUFFIXES_GEOOPS,
+    SUFFIXES_GEOOPS_INPUT,
     TESTFILES,
     WHERE_AREA_GT_400,
     assert_geodataframe_equal,
@@ -149,12 +149,40 @@ def basic_combinations_to_test(
     return result
 
 
+@pytest.mark.parametrize("suffix_input", SUFFIXES_GEOOPS_INPUT)
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
+def test_buffer(tmp_path, suffix_input, geoops_module):
+    """Buffer minimal test."""
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix_input)
+    input_layerinfo = fileops.get_layerinfo(input_path)
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    # Now run test
+    output_path = tmp_path / "output.gpkg"
+    set_geoops_module(geoops_module)
+    geoops.buffer(
+        input_path=input_path,
+        output_path=output_path,
+        distance=1,
+        nb_parallel=2,
+        keep_empty_geoms=True,
+        batchsize=batchsize,
+    )
+
+    # Now check if the output file is correctly created
+    assert output_path.exists()
+    output_layerinfo = fileops.get_layerinfo(output_path)
+    assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
+    assert output_layerinfo.featurecount == input_layerinfo.featurecount
+
+
 @pytest.mark.parametrize(
     "suffix, epsg, geoops_module, testfile, empty_input, gridsize, keep_empty_geoms, "
     "where_post, dimensions",
     basic_combinations_to_test(),
 )
-def test_buffer(
+def test_buffer_basic(
     tmp_path,
     suffix,
     epsg,
@@ -1114,7 +1142,9 @@ def test_simplify(
     kwargs = {}
     if keep_empty_geoms is not None:
         kwargs["keep_empty_geoms"] = keep_empty_geoms
-    output_path = io_util.with_stem(input_path, output_path)
+    output_path = _geopath_util.with_stem(
+        input_path, f"{output_path.stem}_{keep_empty_geoms}"
+    )
     geoops.simplify(
         input_path=input_path,
         output_path=output_path,

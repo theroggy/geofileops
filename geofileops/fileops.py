@@ -3,21 +3,18 @@
 import enum
 import filecmp
 import logging
+import os
 import pprint
 import shutil
 import string
 import tempfile
 import time
 import warnings
+import zipfile
 from collections.abc import Iterable
 from datetime import date, datetime
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    Union,
-)
+from typing import Any, Literal, Union
 
 import geopandas as gpd
 import numpy as np
@@ -32,14 +29,12 @@ from pygeoops import GeometryType, PrimitiveType  # noqa: F401
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
     _geofileinfo,
+    _geopath_util,
     _geoseries_util,
     _io_util,
     _ogr_sql_util,
     _ogr_util,
 )
-
-if TYPE_CHECKING:  # pragma: no cover
-    import os
 
 logger = logging.getLogger(__name__)
 
@@ -111,11 +106,10 @@ def listlayers(
         <a href="https://gdal.org/en/stable/user/virtual_file_systems.html" target="_blank">GDAL vsi</a>
 
     """  # noqa: E501
-    path_p = Path(path)
-    if path_p.suffix.lower() == ".shp":
+    if str(path).lower().endswith((".shp", ".shp.zip")):
         if not _vsi_exists(path):
             raise FileNotFoundError(f"File not found: {path}")
-        return [path_p.stem]
+        return [_geopath_util.stem(path)]
 
     datasource = None
     try:
@@ -534,7 +528,7 @@ def get_default_layer(path: Union[str, "os.PathLike[Any]"]) -> str:
     Returns:
         str: The default layer name.
     """
-    return Path(path).stem
+    return _geopath_util.stem(path)
 
 
 def execute_sql(
@@ -609,6 +603,25 @@ def create_spatial_index(
         layer = get_layerinfo(path, layer, raise_on_nogeom=not no_geom_ok)
     if no_geom_ok and layer.geometrycolumn is None:
         return
+    if exist_ok and force_rebuild:
+        raise ValueError("exist_ok and force_rebuild can't both be True")
+
+    # .gpkg.zip files don't support update, so use has_spatial_index up-front to check
+    # if there is an index.
+    if str(path).lower().endswith(".gpkg.zip"):
+        if has_spatial_index(path, layer):
+            if force_rebuild:
+                pass
+            elif exist_ok:
+                return
+            else:
+                raise RuntimeError(
+                    f"spatial index already exists on {path}#{layer.name}"
+                )
+
+        raise RuntimeError(
+            f"create_spatial_index not supported for .gpkg.zip files: {path}"
+        )
 
     # Add index
     path_info = _geofileinfo.get_geofileinfo(path)
@@ -767,7 +780,9 @@ def remove_spatial_index(
 
     # Now really remove index
     try:
-        if path_info.is_spatialite_based:
+        if path_info.is_spatialite_based and not str(path).lower().endswith(
+            ".gpkg.zip"
+        ):
             datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
             result = datasource.ExecuteSQL(
                 "SELECT DisableSpatialIndex("
@@ -2710,6 +2725,39 @@ def copy_layer(
         dst_dimensions=dst_dimensions,
     )
     _ogr_util.vector_translate_by_info(info=translate_info)
+
+
+def _zip(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
+    """Zip a file or directory.
+
+    Args:
+        src (PathLike): the file or directory to zip.
+        dst (PathLike): the destination zip file.
+    """
+    # Init input parameters
+    src = Path(src)
+
+    # Zip the file or directory
+    with zipfile.ZipFile(dst, "w") as zipf:
+        if src.is_file():
+            zipf.write(src, src.name)
+        elif src.is_dir():
+            for root, _, files in os.walk(src):
+                for file in files:
+                    file_path = Path(root) / file
+                    zipf.write(file_path, file_path.relative_to(src))
+
+
+def _unzip(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
+    """Unzip a zip file.
+
+    Args:
+        src (PathLike): the zip file to unzip.
+        dst (PathLike): the destination directory.
+    """
+    # Unzip the file
+    with zipfile.ZipFile(src, "r") as zipf:
+        zipf.extractall(dst)
 
 
 def _determine_access_mode(

@@ -4,7 +4,7 @@ import shapely.ops
 from shapely import MultiPolygon, Point, Polygon
 from shapely.testing import assert_geometries_equal
 
-from geofileops.util import _sqlite_userdefined as sqlite_userdefined
+from geofileops.util import _sqlite_userdefined
 
 
 def test_gfo_difference_collection():
@@ -12,12 +12,12 @@ def test_gfo_difference_collection():
     box0_5 = shapely.box(0, 0, 5, 5)
     box0_10 = shapely.box(0, 0, 10, 10)
     assert (
-        sqlite_userdefined.gfo_difference_collection(box0_10.wkb, box0_5.wkb)
+        _sqlite_userdefined.gfo_difference_collection(box0_10.wkb, box0_5.wkb)
         == shapely.difference(box0_10, box0_5).wkb
     )
     # Difference of polygons gives a linestring to test -> No testcase at hand
     assert (
-        sqlite_userdefined.gfo_difference_collection(
+        _sqlite_userdefined.gfo_difference_collection(
             box0_10.wkb, box0_5.wkb, keep_geom_type=1
         )
         == shapely.difference(box0_10, box0_5).wkb
@@ -25,7 +25,7 @@ def test_gfo_difference_collection():
 
     # Result of the difference is None.
     assert (
-        sqlite_userdefined.gfo_difference_collection(
+        _sqlite_userdefined.gfo_difference_collection(
             shapely.Point(1, 1).wkb, box0_10.wkb
         )
         is None
@@ -47,7 +47,7 @@ def test_gfo_difference_collection():
 def test_gfo_difference_collection_empty_geoms(
     test_id, geom, geoms_to_subtract, exp_result
 ):
-    result = sqlite_userdefined.gfo_difference_collection(geom, geoms_to_subtract)
+    result = _sqlite_userdefined.gfo_difference_collection(geom, geoms_to_subtract)
     if exp_result is None:
         assert result is None, f"Issue with test {test_id}"
     else:
@@ -57,22 +57,22 @@ def test_gfo_difference_collection_empty_geoms(
 def test_gfo_difference_collection_invalid_params():
     # geom_to_subtract is not a wkb
     with pytest.raises(TypeError, match="Expected bytes or string, got Point"):
-        sqlite_userdefined.gfo_difference_collection(
+        _sqlite_userdefined.gfo_difference_collection(
             shapely.Point(1, 1).wkb, shapely.Point(1, 1)
         )
     # geom is not a wkb
     with pytest.raises(TypeError, match="Expected bytes or string, got Point"):
-        sqlite_userdefined.gfo_difference_collection(
+        _sqlite_userdefined.gfo_difference_collection(
             shapely.Point(1, 1), shapely.Point(1, 1).wkb
         )
 
     # keep_geom_type should be int (0 or 1)
     with pytest.raises(TypeError, match="keep_geom_type must be int"):
-        sqlite_userdefined.gfo_difference_collection(
+        _sqlite_userdefined.gfo_difference_collection(
             shapely.Point(1, 1).wkb, shapely.Point(1, 1).wkb, keep_geom_type="TRUE"
         )
     with pytest.raises(ValueError, match="keep_geom_type has invalid value"):
-        sqlite_userdefined.gfo_difference_collection(
+        _sqlite_userdefined.gfo_difference_collection(
             shapely.Point(1, 1).wkb, shapely.Point(1, 1).wkb, keep_geom_type=5
         )
 
@@ -101,7 +101,7 @@ def test_gfo_reduceprecision(test_descr, geom, exp_result):
     geom_wkb = None if geom is None else geom.wkb
 
     # Run test
-    result_wkb = sqlite_userdefined.gfo_reduceprecision(geom_wkb, gridsize=1)
+    result_wkb = _sqlite_userdefined.gfo_reduceprecision(geom_wkb, gridsize=1)
 
     # Check result
     result = shapely.from_wkb(result_wkb)
@@ -125,7 +125,7 @@ def test_gfo_split(test):
 
     if test == "poly":
         # Split of polygon with linestring blade gives collection of polygons
-        result = shapely.from_wkb(sqlite_userdefined.gfo_split(box1_4.wkb, blade.wkb))
+        result = shapely.from_wkb(_sqlite_userdefined.gfo_split(box1_4.wkb, blade.wkb))
         assert result == shapely.ops.split(box1_4, blade)
 
     elif test == "multipoly":
@@ -133,7 +133,7 @@ def test_gfo_split(test):
         box5_9 = shapely.box(5, 0, 9, 4)
         multipoly = MultiPolygon([box1_4, box5_9])
         result = shapely.from_wkb(
-            sqlite_userdefined.gfo_split(multipoly.wkb, blade.wkb)
+            _sqlite_userdefined.gfo_split(multipoly.wkb, blade.wkb)
         )
         expected_result = """
             GEOMETRYCOLLECTION (POLYGON ((4 2, 4 0, 1 0, 1 2, 4 2)),
@@ -146,7 +146,7 @@ def test_gfo_split(test):
 
     elif test == "None":
         # Result of splitting None is None.
-        assert sqlite_userdefined.gfo_split(None, blade) is None
+        assert _sqlite_userdefined.gfo_split(None, blade) is None
 
     else:
         raise ValueError(f"test not implemented: {test}")
@@ -165,7 +165,7 @@ def test_gfo_split(test):
     ],
 )
 def test_gfo_split_empty_geoms(test_id, geom, blade, exp_result):
-    result = sqlite_userdefined.gfo_split(geom, blade)
+    result = _sqlite_userdefined.gfo_split(geom, blade)
     if exp_result is None:
         assert result is None, f"Issue with test {test_id}"
     else:
@@ -202,7 +202,7 @@ def test_gfo_subdivide(test_descr, geom, subdivide_coords, exp_result):
     geom_wkb = None if geom is None else geom.wkb
 
     # Test
-    result_wkb = sqlite_userdefined.gfo_subdivide(geom_wkb, coords=subdivide_coords)
+    result_wkb = _sqlite_userdefined.gfo_subdivide(geom_wkb, coords=subdivide_coords)
 
     # Check result
     result = shapely.from_wkb(result_wkb)
