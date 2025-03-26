@@ -1,9 +1,13 @@
 # CHANGELOG
 
-## 0.10 (????-??-??)
+## 0.10 (2025-03-26)
 
 ### Deprecations and compatibility notes
 
+- worker processes are now being created using "forkserver" on linux. This solves risks
+  of deadlocks and the corresponding warning for that. Consequence is that also on linux
+  the `if __name__ == "__main__":` construct needs to be used in scripts. Some more info
+  can be found in the geofileops FAQ (#675).
 - `erase` was renamed to `difference`, as most other open source applications/libraries
   use this terminology. `erase` just keeps existing for backwards compatibility for now,
   but a warning is shown that it might be removed in the (distant) future. (#595)
@@ -31,7 +35,7 @@
 - Use `ST_Equals` and add priority feature to `delete_duplicate_geometries` (#638)
 - Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
 - Speed up processing many small files, mainly on windows:
-    - reduce calls to `gdal.OpenEx` (#622, #625)
+    - reduce calls to `gdal.OpenEx` (#622, #625, #677)
     - improvements in sqlite3 code for 2 layer operations: start transactions
       explicitly, remove obsolete GPKG triggers, use a :memory: temp file where possible
       (#626, #628, #630)

@@ -295,10 +295,9 @@ def get_layerinfo(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     raise_on_nogeom: bool = True,
+    datasource: gdal.Dataset | None = None,
 ) -> LayerInfo:
-    """Get information about a layer in the geofile.
-
-    Raises ValueError if the layer definition has errors like invalid column names,...
+    """Get information about a layer in a geofile.
 
     Args:
         path (PathLike): path to the file to get info about. |GDAL_vsi| paths are also
@@ -308,6 +307,12 @@ def get_layerinfo(
         raise_on_nogeom (bool, optional): True to raise if the layer doesn't have a
             geometry column. If False, the returned LayerInfo.geometrycolumn will be
             None. Defaults to True.
+        datasource (gdal.Dataset, optional): the already opened gdal dataset found on
+            `path`. This can be used to avoid opening and closing the file many times.
+            If specified, the datasource will not be closed! Defaults to None.
+
+    Raises:
+        ValueError if the layer definition has errors like invalid column names,...
 
     Returns:
         LayerInfo: the information about the layer.
@@ -317,12 +322,12 @@ def get_layerinfo(
         <a href="https://gdal.org/en/stable/user/virtual_file_systems.html" target="_blank">GDAL vsi</a>
 
     """  # noqa: E501
-    # Init
-    datasource = None
+    datasource_specified = datasource is not None
     try:
-        datasource = gdal.OpenEx(
-            str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
-        )
+        if datasource is None:
+            datasource = gdal.OpenEx(
+                str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
+            )
         datasource_layer = _get_layer(datasource, layer)
 
         # Get column info
@@ -410,7 +415,9 @@ def get_layerinfo(
         ex.args = (f"get_layerinfo error for {path}#{layer}:\n  {ex}",)
         raise
     finally:
-        datasource = None
+        if not datasource_specified:
+            # Close the datasource if it wasn't passed in as a parameter
+            datasource = None
 
     # If we didn't return or raise yet here, there must have been errors
     errors_str = pprint.pformat(errors)
@@ -630,9 +637,9 @@ def create_spatial_index(
         with _ogr_util.set_config_options({"OGR_SQLITE_CACHE": cache_size_mb}):
             datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
             # If index already exists, remove index or return
-            if _has_spatial_index(datasource, path, layer):
+            if has_spatial_index(path, layer, datasource=datasource):
                 if force_rebuild:
-                    remove_spatial_index(path, layer)
+                    remove_spatial_index(path, layer, datasource=datasource)
                 elif exist_ok:
                     return
                 else:
@@ -672,94 +679,78 @@ def has_spatial_index(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | LayerInfo | None = None,
     no_geom_ok: bool = False,
+    datasource: gdal.Dataset | None = None,
 ) -> bool:
     """Check if the layer/column has a spatial index.
 
     Args:
-        path (PathLike): The file path.
+        path (PathLike): The path to the datasource.
         layer (str, optional): The layer. Defaults to None.
         no_geom_ok (bool, options): If True and the file doesn't have a geometry column,
             don't throw an error. Defaults to False.
+        datasource (gdal.Dataset, optional): the already opened gdal dataset found on
+            `path`. This can be used to avoid opening and closing the file many times.
+            If specified, the datasource will not be closed! Defaults to None.
 
     Raises:
         ValueError: an invalid parameter value was passed.
 
     Returns:
         bool: True if a spatial index exists, False if it doesn't exist.
-
-    See Also:
-        * :func:`create_spatial_index`: create a spatial index on the layer
-        * :func:`remove_spatial_index`: remove the spatial index from the layer
-
     """
-    # Now check the index
+    datasource_specified = datasource is not None
     try:
-        datasource = gdal.OpenEx(
-            str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
-        )
-        return _has_spatial_index(datasource, path, layer, no_geom_ok)
+        path_info = _geofileinfo.get_geofileinfo(path)
+        if path_info.is_spatialite_based:
+            if datasource is None:
+                datasource = gdal.OpenEx(
+                    str(path),
+                    nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED,
+                )
+            datasource_layer = _get_layer(datasource, layer)
+            layername = datasource_layer.GetName()
+
+            # The layer doesn't have a geometry column, so there can be no spatial index
+            if datasource_layer.GetGeomType() is None:
+                if no_geom_ok:
+                    return False
+                else:
+                    raise ValueError(f"Layer {layername} has no geometry column")
+
+            geometrycolumn = datasource_layer.GetGeometryColumn()
+            if geometrycolumn == "":
+                geometrycolumn = "geometry"
+
+            sql = f"SELECT HasSpatialIndex('{layername}', '{geometrycolumn}')"
+            result = datasource.ExecuteSQL(sql, dialect="SQLITE")
+            has_spatial_index = result.GetNextFeature().GetField(0) == 1
+            datasource.ReleaseResultSet(result)
+
+            return has_spatial_index
+
+        elif path_info.driver == "ESRI Shapefile":
+            path_p = Path(path)
+            index_path = path_p.parent / f"{path_p.stem}.qix"
+            return index_path.exists()
+
+        else:
+            raise ValueError(f"has_spatial_index not supported for {path_info.driver}")
+    except ValueError:
+        raise
     except Exception as ex:
         layername = layer.name if isinstance(layer, LayerInfo) else layer
         ex.args = (f"has_spatial_index error: {ex}, for {path}#{layername}",)
         raise
     finally:
-        datasource = None
-
-
-def _has_spatial_index(
-    datasource: gdal.Dataset,
-    path: Union[str, "os.PathLike[Any]"],
-    layer: str | LayerInfo | None = None,
-    no_geom_ok: bool = False,
-) -> bool:
-    """Check if the layer/column has a spatial index.
-
-    Args:
-        datasource (gdal.Dataset): Opened gdal Dataset.
-        path (PathLike): The file path to the datasource.
-        layer (str, optional): The layer. Defaults to None.
-        no_geom_ok (bool, options): If True and the file doesn't have a geometry column,
-            don't throw an error. Defaults to False.
-
-    Raises:
-        ValueError: an invalid parameter value was passed.
-
-    Returns:
-        bool: True if a spatial index exists, False if it doesn't exist.
-    """
-    path_info = _geofileinfo.get_geofileinfo(path)
-    if path_info.is_spatialite_based:
-        datasource_layer = _get_layer(datasource, layer)
-        layername = datasource_layer.GetName()
-
-        # The layer doesn't have a geometry column, so there can be no spatial index
-        if datasource_layer.GetGeomType() is None:
-            if no_geom_ok:
-                return False
-            else:
-                raise ValueError(f"Layer {layername} has no geometry column")
-
-        geometrycolumn = datasource_layer.GetGeometryColumn()
-        if geometrycolumn == "":
-            geometrycolumn = "geometry"
-
-        sql = f"SELECT HasSpatialIndex('{layername}', '{geometrycolumn}')"
-        result = datasource.ExecuteSQL(sql, dialect="SQLITE")
-        has_spatial_index = result.GetNextFeature().GetField(0) == 1
-        datasource.ReleaseResultSet(result)
-        return has_spatial_index
-
-    elif path_info.driver == "ESRI Shapefile":
-        path_p = Path(path)
-        index_path = path_p.parent / f"{path_p.stem}.qix"
-        return index_path.exists()
-
-    else:
-        raise ValueError(f"has_spatial_index not supported for {path_info.driver}")
+        if not datasource_specified:
+            # Close the datasource if it wasn't passed in as a parameter
+            datasource = None
 
 
 def remove_spatial_index(
-    path: Union[str, "os.PathLike[Any]"], layer: str | LayerInfo | None = None
+    path: Union[str, "os.PathLike[Any]"],
+    layer: str | LayerInfo | None = None,
+    datasource: gdal.Dataset | None = None,
 ):
     """Remove the spatial index from the layer specified.
 
@@ -767,23 +758,28 @@ def remove_spatial_index(
         path (PathLike): The file path.
         layer (str or LayerInfo, optional): The layer. If not specified, and there is
             only one layer in the file, this layer is used. Otherwise exception.
+        datasource (gdal.Dataset, optional): the already opened gdal dataset (in update
+            mode!) found on `path`. This can be used to avoid opening and closing the
+            file many times. If specified, the datasource will not be closed! Defaults
+            to None.
 
     See Also:
         * :func:`create_spatial_index`: create a spatial index on the layer
         * :func:`has_spatial_index`: check if the layer has a spatial index
 
     """
-    # Init
-    if not isinstance(layer, LayerInfo):
-        layer = get_layerinfo(path, layer)
-    path_info = _geofileinfo.get_geofileinfo(path)
-
-    # Now really remove index
+    datasource_specified = datasource is not None
     try:
+        if datasource is None:
+            datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
+
+        if not isinstance(layer, LayerInfo):
+            layer = get_layerinfo(path, layer, datasource=datasource)
+        path_info = _geofileinfo.get_geofileinfo(path)
+
         if path_info.is_spatialite_based and not str(path).lower().endswith(
             ".gpkg.zip"
         ):
-            datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
             result = datasource.ExecuteSQL(
                 "SELECT DisableSpatialIndex("
                 f"      '{layer.name}', '{layer.geometrycolumn}')",
@@ -803,10 +799,13 @@ def remove_spatial_index(
     except ValueError:
         raise
     except Exception as ex:
-        ex.args = (f"remove_spatial_index error: {ex}, for {path}#{layer.name}",)
+        layer_name = layer.name if isinstance(layer, LayerInfo) else layer
+        ex.args = (f"remove_spatial_index error: {ex}, for {path}#{layer_name}",)
         raise
     finally:
-        datasource = None
+        if not datasource_specified:
+            # Close the datasource if it wasn't passed in as a parameter
+            datasource = None
 
 
 def rename_layer(

@@ -15,7 +15,7 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops.util import _geofileinfo
+from geofileops.util import _general_util, _geofileinfo
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
 from tests.test_helper import (
@@ -602,6 +602,34 @@ def test_dissolve_polygons_groupby_None(tmp_path):
         output_layerinfo.columns["none_values"].gdal_type
         == input_layerinfo.columns["none_values"].gdal_type
     )
+
+
+@pytest.mark.parametrize("worker_type", ["thread", "process"])
+def test_dissolve_polygons_process_threads(tmp_path, worker_type):
+    """
+    Test dissolve polygons with different worker types.
+    """
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    # Run test
+    output_path = tmp_path / "output.gpkg"
+    with _general_util.TempEnv({"GFO_WORKER_TYPE": worker_type}):
+        gfo.dissolve(
+            input_path=input_path,
+            output_path=output_path,
+            groupby_columns="GEWASGROEP",
+            explodecollections=True,
+            nb_parallel=2,
+            batchsize=batchsize,
+        )
+
+    # Now check if the tmp file is correctly created
+    assert output_path.exists()
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert output_layerinfo.geometrytype == GeometryType.POLYGON
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
