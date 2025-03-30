@@ -1,6 +1,7 @@
 name: geofileops-nightly-deps
 channels:
   - gdal-master
+  - conda-forge/label/shapely_dev
   - conda-forge
 dependencies:
   - python
@@ -18,9 +19,12 @@ dependencies:
   - pygeoops
   - pyogrio
   - pyproj
-  - shapely
+  #- shapely >=2,<2.1
+  - shapely ==2.1.0rc1
   # optional
   - simplification
+  # extra dependencies for pip packages
+  - geos
   # testing
   - pytest
   - pytest-cov
