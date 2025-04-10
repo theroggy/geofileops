@@ -6,6 +6,11 @@
 
 - Don't pin maximum versions of dependencies for e.g. geopandas, shapely, pyogrio (#685)
 
+### Bugs fixed
+
+- Fix error in `create_spatial_index` on a read-only file even if index exists
+  already (#686)
+
 ## 0.10.0 (2025-03-26)
 
 ### Deprecations and compatibility notes

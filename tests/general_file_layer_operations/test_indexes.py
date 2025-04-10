@@ -11,9 +11,10 @@ from tests.test_helper import SUFFIXES_FILEOPS
 
 
 @pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
-def test_create_spatial_index(tmp_path, suffix):
+@pytest.mark.parametrize("read_only", [True, False])
+def test_create_spatial_index(tmp_path, suffix, read_only):
     test_path = test_helper.get_testfile(
-        "polygon-parcel", dst_dir=tmp_path, suffix=suffix
+        "polygon-parcel", dst_dir=tmp_path, suffix=suffix, read_only=read_only
     )
     layer = gfo.get_only_layer(test_path)
     default_spatial_index = GeofileInfo(test_path).default_spatial_index
@@ -22,45 +23,68 @@ def test_create_spatial_index(tmp_path, suffix):
     has_spatial_index = gfo.has_spatial_index(path=test_path, layer=layer)
     assert has_spatial_index is default_spatial_index
 
+    # Set read-write for initialisation
+    test_helper.set_read_only(test_path, False)
+
     # Remove spatial index
     gfo.remove_spatial_index(path=test_path, layer=layer)
     has_spatial_index = gfo.has_spatial_index(path=test_path, layer=layer)
     assert has_spatial_index is False
 
-    # Create spatial index
-    gfo.create_spatial_index(path=test_path, layer=layer)
-    has_spatial_index = gfo.has_spatial_index(path=test_path, layer=layer)
-    assert has_spatial_index is True
+    # Set read-only status before testing create_spatial_index
+    test_helper.set_read_only(test_path, read_only)
 
-    # Spatial index if it already exists by default gives error
-    with pytest.raises(Exception, match="spatial index already exists"):
+    if read_only:
+        with pytest.raises(RuntimeError, match="create_spatial_index error"):
+            gfo.create_spatial_index(path=test_path, layer=layer)
+    else:
+        # Create spatial index
         gfo.create_spatial_index(path=test_path, layer=layer)
-    gfo.create_spatial_index(path=test_path, layer=layer, exist_ok=True)
+        has_spatial_index = gfo.has_spatial_index(path=test_path, layer=layer)
+        assert has_spatial_index is True
+
+        # Spatial index if it already exists by default gives error
+        with pytest.raises(Exception, match="spatial index already exists"):
+            gfo.create_spatial_index(path=test_path, layer=layer)
+        gfo.create_spatial_index(path=test_path, layer=layer, exist_ok=True)
 
 
 @pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
-def test_create_spatial_index_force_rebuild(tmp_path, suffix):
+@pytest.mark.parametrize("read_only", [True, False])
+def test_create_spatial_index_force_rebuild(tmp_path, suffix, read_only):
     test_path = test_helper.get_testfile(
-        "polygon-parcel", dst_dir=tmp_path, suffix=suffix
+        "polygon-parcel", dst_dir=tmp_path, suffix=suffix, read_only=read_only
     )
+    # Set read-write for initialisation
+    test_helper.set_read_only(test_path, False)
+    gfo.create_spatial_index(path=test_path, exist_ok=True)
+    # Set read-only status before testing create_spatial_index
+    test_helper.set_read_only(test_path, read_only)
+
     if suffix == ".shp":
         # Shapefile doesn't have a spatial index by default
-        gfo.create_spatial_index(path=test_path, exist_ok=True)
         # Test of rebuild on shp can be checked on the files created/changed
         qix_path = test_path.with_suffix(".qix")
         qix_modified_time_orig = qix_path.stat().st_mtime
         gfo.create_spatial_index(path=test_path, exist_ok=True)
         assert qix_path.stat().st_mtime == qix_modified_time_orig
-        gfo.create_spatial_index(path=test_path, force_rebuild=True)
-        assert qix_path.stat().st_mtime > qix_modified_time_orig
+        if read_only:
+            with pytest.raises(RuntimeError, match="create_spatial_index error"):
+                gfo.create_spatial_index(path=test_path, force_rebuild=True)
+        else:
+            gfo.create_spatial_index(path=test_path, force_rebuild=True)
+            assert qix_path.stat().st_mtime > qix_modified_time_orig
 
     elif suffix == ".gpkg":
-        gfo.create_spatial_index(path=test_path, exist_ok=True)
         has_spatial_index = gfo.has_spatial_index(path=test_path)
         assert has_spatial_index is True
-        gfo.create_spatial_index(path=test_path, force_rebuild=True)
-        has_spatial_index = gfo.has_spatial_index(path=test_path)
-        assert has_spatial_index is True
+        if read_only:
+            with pytest.raises(RuntimeError, match="create_spatial_index error"):
+                gfo.create_spatial_index(path=test_path, force_rebuild=True)
+        else:
+            gfo.create_spatial_index(path=test_path, force_rebuild=True)
+            has_spatial_index = gfo.has_spatial_index(path=test_path)
+            assert has_spatial_index is True
 
 
 def test_create_spatial_index_gpkg_zip(tmp_path):
@@ -88,9 +112,7 @@ def test_create_spatial_index_gpkg_zip(tmp_path):
         gfo.create_spatial_index(path=test_path, layer=layer)
 
     # If  `force_rebuild=True` is specified, error
-    with pytest.raises(
-        RuntimeError, match="create_spatial_index not supported for .gpkg.zip files"
-    ):
+    with pytest.raises(RuntimeError, match="create_spatial_index error"):
         gfo.create_spatial_index(path=test_path, layer=layer, force_rebuild=True)
 
     # Test cases where the input file does not have an index
@@ -106,9 +128,7 @@ def test_create_spatial_index_gpkg_zip(tmp_path):
     fileops._zip(test_path, test_zip_path)
     assert not gfo.has_spatial_index(path=test_path, layer=layer)
 
-    with pytest.raises(
-        RuntimeError, match="create_spatial_index not supported for .gpkg.zip files"
-    ):
+    with pytest.raises(RuntimeError, match="create_spatial_index error"):
         gfo.create_spatial_index(path=test_zip_path, layer=layer)
 
 

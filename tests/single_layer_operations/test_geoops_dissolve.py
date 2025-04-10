@@ -309,7 +309,10 @@ def test_dissolve_polygons(
         pytest.xfail("Geopandas doesn't support dissolve with gridsize yet")
 
     # Prepare test data
-    test_path = test_helper.get_testfile("polygon-parcel", suffix=suffix, epsg=epsg)
+    dst_dir = tmp_path if suffix == ".shp" else None
+    test_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, epsg=epsg, dst_dir=dst_dir
+    )
     if explode_input:
         # A bug caused in the past that the output was forced to the same type as the
         # input. If input was simple Polygon, this cause invalid output because
@@ -635,7 +638,10 @@ def test_dissolve_polygons_process_threads(tmp_path, worker_type):
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 def test_dissolve_polygons_specialcases(tmp_path, suffix):
     # Prepare test data
-    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    dst_dir = tmp_path if suffix == ".shp" else None
+    input_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dst_dir=dst_dir
+    )
     output_basepath = tmp_path / f"{input_path.stem}-output{suffix}"
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
@@ -701,7 +707,10 @@ def test_dissolve_polygons_specialcases(tmp_path, suffix):
 @pytest.mark.parametrize("nb_parallel", [-1, 2])
 def test_dissolve_polygons_tiles_empty(tmp_path, suffix, nb_parallel):
     # Prepare test data
-    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    dst_dir = tmp_path if suffix == ".shp" else None
+    input_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dst_dir=dst_dir
+    )
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     output_path = tmp_path / f"{input_path.stem}-tilesoutput{suffix}"
@@ -757,7 +766,10 @@ def test_dissolve_polygons_tiles_empty(tmp_path, suffix, nb_parallel):
 @pytest.mark.filterwarnings("ignore: .* field lbl_conc has been truncated to 254")
 def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     # Prepare test data
-    input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
+    dst_dir = tmp_path if suffix == ".shp" else None
+    input_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dst_dir=dst_dir
+    )
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     output_basepath = tmp_path / f"{input_path.stem}-output{suffix}"
