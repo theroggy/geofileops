@@ -2,14 +2,19 @@
 
 ## 0.10.1 (yyyy-mm-dd)
 
+### Deprecations and compatibility notes
+
+- Add warning when the GFO_IO_ENGINE configuration option is used with engine "fiona"
+  that this is deprecated and will be removed/ignored in a future version (#688)
+
 ### Improvements
 
 - Don't pin maximum versions of dependencies for e.g. geopandas, shapely, pyogrio (#685)
 
 ### Bugs fixed
 
-- Fix error in `create_spatial_index` on a read-only file even if index exists
-  already (#686)
+- Don't throw error when running `create_spatial_index` on a read-only file if the index
+  exists already (#686)
 
 ## 0.10.0 (2025-03-26)
 

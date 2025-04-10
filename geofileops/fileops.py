@@ -1429,7 +1429,17 @@ def _read_file_base_fiona(
     fid_as_index: bool = False,
     **kwargs,
 ) -> pd.DataFrame | gpd.GeoDataFrame:
-    """Reads a file to a pandas Dataframe using fiona."""
+    """Reads a file to a pandas Dataframe using fiona.
+
+    The "fiona" IO engine is deprecated and will be removed in the future.
+    """
+    warnings.warn(
+        "The geofileops configuration option GFO_IO_ENGINE is deprecated. In a future "
+        "version it will be ignored and the pyogrio engine will always be used.",
+        FutureWarning,
+        stacklevel=4,
+    )
+
     if ignore_geometry and columns == []:
         return pd.DataFrame()
     if sql_stmt is not None:
@@ -1837,7 +1847,16 @@ def _to_file_fiona(
     create_spatial_index: bool | None = None,
     **kwargs,
 ):
-    """Writes a pandas dataframe to file using fiona."""
+    """Writes a pandas dataframe to file using fiona.
+
+    The "fiona" IO engine is deprecated and will be removed in the future.
+    """
+    warnings.warn(
+        "The geofileops configuration option GFO_IO_ENGINE is deprecated. In a future "
+        "version it will be ignored and the pyogrio engine will always be used.",
+        FutureWarning,
+        stacklevel=3,
+    )
     if append and not _vsi_exists(path):
         append = False
 
