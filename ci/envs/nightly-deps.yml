@@ -19,8 +19,7 @@ dependencies:
   - pygeoops
   - pyogrio
   - pyproj
-  #- shapely >=2,<2.1
-  - shapely ==2.1.0rc1
+  - shapely >=2
   # optional
   - simplification
   # extra dependencies for pip packages

@@ -1,10 +1,26 @@
 # CHANGELOG
 
-## 0.10 (2025-03-26)
+## 0.10.1 (yyyy-mm-dd)
 
 ### Deprecations and compatibility notes
 
-- worker processes are now being created using "forkserver" on linux. This solves risks
+- Add warning when the GFO_IO_ENGINE configuration option is used with engine "fiona"
+  that this is deprecated and will be removed/ignored in a future version (#688)
+
+### Improvements
+
+- Don't pin maximum versions of dependencies for e.g. geopandas, shapely, pyogrio (#685)
+
+### Bugs fixed
+
+- Don't throw error when running `create_spatial_index` on a read-only file if the index
+  exists already (#686)
+
+## 0.10.0 (2025-03-26)
+
+### Deprecations and compatibility notes
+
+- Worker processes are now being created using "forkserver" on linux. This solves risks
   of deadlocks and the corresponding warning for that. Consequence is that also on linux
   the `if __name__ == "__main__":` construct needs to be used in scripts. Some more info
   can be found in the geofileops FAQ (#675).
