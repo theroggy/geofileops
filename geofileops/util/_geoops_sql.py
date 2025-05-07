@@ -87,7 +87,6 @@ def buffer(
         force_output_geometrytype = GeometryType.MULTIPOLYGON
 
     # Go!
-    # ---
     return _single_layer_vector_operation(
         input_path=input_path,
         output_path=output_path,
@@ -124,9 +123,6 @@ def convexhull(
     force: bool = False,
 ):
     # Init + prepare sql template for this operation
-    # ----------------------------------------------
-    if not isinstance(input_layer, LayerInfo):
-        input_layer = gfo.get_layerinfo(input_path, input_layer)
     sql_template = """
         SELECT ST_ConvexHull({geometrycolumn}) AS {geometrycolumn}
                 {columns_to_select_str}
@@ -135,9 +131,7 @@ def convexhull(
            {batch_filter}
     """
 
-    # Go!
-    # ---
-    # Output geometry type same as input geometry type
+    # TODO: output type is now always the same as input, but that's not correct.
     return _single_layer_vector_operation(
         input_path=input_path,
         output_path=output_path,
@@ -148,7 +142,7 @@ def convexhull(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
-        force_output_geometrytype=input_layer.geometrytype,
+        force_output_geometrytype="KEEP_INPUT",
         gridsize=gridsize,
         keep_empty_geoms=keep_empty_geoms,
         where_post=where_post,
@@ -204,9 +198,6 @@ def delete_duplicate_geometries(
     """
 
     # Go!
-    if not isinstance(input_layer, LayerInfo):
-        input_layer = gfo.get_layerinfo(input_path, input_layer)
-
     return _single_layer_vector_operation(
         input_path=input_path,
         output_path=output_path,
@@ -217,7 +208,7 @@ def delete_duplicate_geometries(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
-        force_output_geometrytype=input_layer.geometrytype,
+        force_output_geometrytype="KEEP_INPUT",
         gridsize=0.0,
         keep_empty_geoms=keep_empty_geoms,
         where_post=where_post,
@@ -317,11 +308,7 @@ def makevalid(
     batchsize: int = -1,
     force: bool = False,
 ):
-    # If output file already exists, either clean up or return...
-    operation_name = "makevalid"
-    logger = logging.getLogger(f"geofileops.{operation_name}")
-    if not force and output_path.exists():
-        logger.info(f"Stop, output already exists {output_path}")
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
 
     # Determine output_geometrytype + make it multitype if it wasn't specified.
@@ -377,7 +364,7 @@ def makevalid(
         output_path=output_path,
         sql_template=sql_template,
         geom_selected=True,
-        operation_name=operation_name,
+        operation_name="makevalid",
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
@@ -410,10 +397,10 @@ def select(
     force: bool = False,
     operation_prefix: str = "",
 ):
-    # Check if output already exists here, to avoid to much logging to be written
-    logger = logging.getLogger(f"geofileops.{operation_prefix}select")
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
+
+    logger = logging.getLogger(f"geofileops.{operation_prefix}select")
     logger.debug(f"  -> select to execute:\n{sql_stmt}")
 
     # If no output geometrytype is specified, use the geometrytype of the input layer
@@ -479,10 +466,6 @@ def simplify(
             {{batch_filter}}
     """
 
-    # Output geometry type same as input geometry type
-    if not isinstance(input_layer, LayerInfo):
-        input_layer = gfo.get_layerinfo(input_path, input_layer)
-
     return _single_layer_vector_operation(
         input_path=input_path,
         output_path=output_path,
@@ -493,7 +476,7 @@ def simplify(
         output_layer=output_layer,
         columns=columns,
         explodecollections=explodecollections,
-        force_output_geometrytype=input_layer.geometrytype,
+        force_output_geometrytype="KEEP_INPUT",
         gridsize=gridsize,
         keep_empty_geoms=keep_empty_geoms,
         where_post=where_post,
@@ -514,7 +497,7 @@ def _single_layer_vector_operation(
     output_layer: str | None,
     columns: list[str] | None,
     explodecollections: bool,
-    force_output_geometrytype: GeometryType | None,
+    force_output_geometrytype: GeometryType | str | None,
     gridsize: float,
     keep_empty_geoms: bool,
     where_post: str | None,
@@ -556,11 +539,15 @@ def _single_layer_vector_operation(
     start_time = datetime.now()
     logger = logging.getLogger(f"geofileops.{operation_name}")
 
+    # If output file already exists, either clean up or return...
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     # Check/clean input parameters...
-    if not input_path.exists():
-        raise FileNotFoundError(f"{operation_name}: input_path not found: {input_path}")
     if input_path == output_path:
         raise ValueError(f"{operation_name}: output_path must not equal input_path")
+    if not input_path.exists():
+        raise FileNotFoundError(f"{operation_name}: input_path not found: {input_path}")
     if where_post is not None and where_post == "":
         where_post = None
     if isinstance(columns, str):
@@ -573,9 +560,11 @@ def _single_layer_vector_operation(
     if output_layer is None:
         output_layer = gfo.get_default_layer(output_path)
 
-    # If output file already exists, either clean up or return...
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
+    if isinstance(force_output_geometrytype, str):
+        if force_output_geometrytype == "KEEP_INPUT":
+            force_output_geometrytype = input_layer.geometrytype
+        else:
+            raise ValueError(f"unsupported {force_output_geometrytype=}")
 
     # Determine if fid can be preserved
     preserve_fid = False
@@ -909,7 +898,9 @@ def clip(
     input_columns_prefix: str = "",
     output_with_spatial_index: bool | None = None,
 ):
-    # Init
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     # In the query, important to only extract the geometry types that are expected
     if not isinstance(input_layer, LayerInfo):
         input_layer = gfo.get_layerinfo(input_path, input_layer)
@@ -1050,6 +1041,9 @@ def difference(  # noqa: D417
     operation_name = f"{operation_prefix}difference"
     logger = logging.getLogger(f"geofileops.{operation_name}")
 
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     input1_layer, input2_layer, output_layer = _validate_params(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -1059,8 +1053,6 @@ def difference(  # noqa: D417
         output_layer=output_layer,
         operation_name=operation_name,
     )
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
 
     # Determine output_geometrytype
     primitivetypeid = input1_layer.geometrytype.to_primitivetype.value
@@ -1449,12 +1441,9 @@ def export_by_location(
 
     operation_name = "export_by_location"
     logger = logging.getLogger(f"geofileops.{operation_name}")
-    if output_path.exists():
-        if not force:
-            logger.info(f"Stop, output already exists {output_path}")
-            return
-        else:
-            gfo.remove(output_path)
+
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     start_time = datetime.now()
 
@@ -1588,10 +1577,6 @@ def export_by_location(
             WHERE sub_area.{area_inters_column_name} >= {min_area_intersect}
         """
 
-    if not isinstance(input_layer, LayerInfo):
-        input_layer = gfo.get_layerinfo(input_path, input_layer)
-
-    # Go!
     _two_layer_vector_operation(
         input1_path=input_path,
         input2_path=input_to_compare_with_path,
@@ -1606,7 +1591,7 @@ def export_by_location(
         input2_columns_prefix="",
         output_layer=output_layer,
         explodecollections=False,
-        force_output_geometrytype=input_layer.geometrytype,
+        force_output_geometrytype="KEEP_INPUT",
         gridsize=gridsize,
         where_post=where_post,
         nb_parallel=nb_parallel,
@@ -1659,10 +1644,6 @@ def export_by_distance(
                             layer2.{{input2_geometrycolumn}}) <= {max_distance})
     """
 
-    if not isinstance(input1_layer, LayerInfo):
-        input1_layer = gfo.get_layerinfo(input_to_select_from_path, input1_layer)
-
-    # Go!
     return _two_layer_vector_operation(
         input1_path=input_to_select_from_path,
         input2_path=input_to_compare_with_path,
@@ -1677,7 +1658,7 @@ def export_by_distance(
         input2_columns_prefix="",
         output_layer=output_layer,
         explodecollections=False,
-        force_output_geometrytype=input1_layer.geometrytype,
+        force_output_geometrytype="KEEP_INPUT",
         gridsize=gridsize,
         where_post=where_post,
         nb_parallel=nb_parallel,
@@ -1740,6 +1721,9 @@ def intersection(  # noqa: D417
     operation_name = f"{operation_prefix}intersection"
     logger = logging.getLogger(f"geofileops.{operation_name}")
 
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     input1_layer, input2_layer, output_layer = _validate_params(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -1749,8 +1733,6 @@ def intersection(  # noqa: D417
         output_layer=output_layer,
         operation_name=operation_name,
     )
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
 
     # In the query, important to only extract the geometry types that are expected
     primitivetype_to_extract = PrimitiveType(
@@ -2091,10 +2073,6 @@ def join_by_location(
                    SELECT l1_fid FROM layer1_relations_filtered)
         """
 
-    if not isinstance(input1_layer, LayerInfo):
-        input1_layer = gfo.get_layerinfo(input1_path, input1_layer)
-
-    # Go!
     return _two_layer_vector_operation(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -2109,7 +2087,7 @@ def join_by_location(
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
         explodecollections=explodecollections,
-        force_output_geometrytype=input1_layer.geometrytype,
+        force_output_geometrytype="KEEP_INPUT",
         gridsize=gridsize,
         where_post=where_post,
         nb_parallel=nb_parallel,
@@ -2168,10 +2146,6 @@ def _prepare_filter_by_location_params(
     layer2_groupby = "GROUP BY layer2.fid_1" if subdivided else ""
     geom2 = f"ST_union({geom2})" if subdivided else f"{geom2}"
 
-    # When "contains" is used, geomA and geomB need to be swapped
-    geomA = geom2 if "contains" in query.lower() else geom1
-    geomB = geom1 if "contains" in query.lower() else geom2
-
     spatial_relations_filter: str = ""
     relation_should_be_found = True
 
@@ -2206,7 +2180,7 @@ def _prepare_filter_by_location_params(
             relation_is_true = not relation_is_true
 
         spatial_relations_column = (
-            f',ST_{spatial_relation}({geomA}, {geomB}) AS "GFO_$TEMP$_SPATIAL_RELATION"'
+            f',ST_{spatial_relation}({geom1}, {geom2}) AS "GFO_$TEMP$_SPATIAL_RELATION"'
         )
         spatial_relations_filter = (
             f'{subquery_alias}."GFO_$TEMP$_SPATIAL_RELATION" = {int(relation_is_true)}'
@@ -2243,7 +2217,7 @@ def _prepare_filter_by_location_params(
 
         # Prepare the spatial relation column
         spatial_relations_column = spatial_relations_column.format(
-            input1=geomA, input2=geomB
+            input1=geom1, input2=geom2
         )
 
     if true_for_disjoint and avoid_disjoint:
@@ -2382,10 +2356,9 @@ def join_nearest(
     # Init some things...
     # Because there is preprocessing done in this function, check output path
     # here already
-    logger = logging.getLogger("geofileops.join_nearest")
-    if output_path.exists() and force is False:
-        logger.info(f"Stop, output already exists {output_path}")
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
+
     if input1_layer is None:
         input1_layer = gfo.get_only_layer(input1_path)
     if input2_layer is None:
@@ -2474,9 +2447,6 @@ def join_nearest(
                {{batch_filter}}
         """
 
-    input1_layer_info = gfo.get_layerinfo(input1_path, input1_layer)
-
-    # Go!
     return _two_layer_vector_operation(
         input1_path=input1_tmp_path,
         input2_path=input2_tmp_path,
@@ -2490,7 +2460,7 @@ def join_nearest(
         input2_columns=input2_columns,
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
-        force_output_geometrytype=input1_layer_info.geometrytype,
+        force_output_geometrytype="KEEP_INPUT",
         explodecollections=explodecollections,
         gridsize=0.0,
         where_post=None,
@@ -2579,6 +2549,9 @@ def identity(
 
     logger = logging.getLogger("geofileops.identity")
 
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     input1_layer, input2_layer, output_layer = _validate_params(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -2588,8 +2561,6 @@ def identity(
         output_layer=output_layer,
         operation_name="identity",
     )
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
 
     tempdir = _io_util.create_tempdir("geofileops/identity")
     try:
@@ -2744,6 +2715,9 @@ def symmetric_difference(
         f"input2: {input2_path}, output: {output_path}"
     )
 
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     input1_layer, input2_layer, output_layer = _validate_params(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -2753,8 +2727,6 @@ def symmetric_difference(
         output_layer=output_layer,
         operation_name="symmetric_difference",
     )
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
 
     tempdir = _io_util.create_tempdir("geofileops/symmdiff")
     try:
@@ -2915,6 +2887,9 @@ def union(
     operation_name = "union"
     logger = logging.getLogger(f"geofileops.{operation_name}")
 
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     input1_layer, input2_layer, output_layer = _validate_params(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -2924,8 +2899,6 @@ def union(
         output_layer=output_layer,
         operation_name=operation_name,
     )
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
 
     start_time = datetime.now()
     tempdir = _io_util.create_tempdir("geofileops/union")
@@ -3094,7 +3067,7 @@ def _two_layer_vector_operation(
     input2_columns_prefix: str,
     output_layer: str | None,
     explodecollections: bool,
-    force_output_geometrytype: GeometryType | None,
+    force_output_geometrytype: GeometryType | str | None,
     gridsize: float,
     where_post: str | None,
     nb_parallel: int,
@@ -3131,7 +3104,8 @@ def _two_layer_vector_operation(
         output_layer (str): [description]. Defaults to None.
         explodecollections (bool, optional): Explode collecions in output.
             Defaults to False.
-        force_output_geometrytype (GeometryType, optional): Defaults to None.
+        force_output_geometrytype (GeometryType or str, optional): Defaults to None.
+            If "KEEP_INPUT", the geometry type of the input1_layer is used.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
             will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
             the precision. Defaults to 0.0.
@@ -3167,6 +3141,9 @@ def _two_layer_vector_operation(
     # Init
     logger = logging.getLogger(f"geofileops.{operation_name}")
 
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     # Validate the input and output layer parameter
     input1_layer, input2_layer, output_layer = _validate_params(
         input1_path=input1_path,
@@ -3182,9 +3159,11 @@ def _two_layer_vector_operation(
             f"{operation_name}: if use_ogr True, input1_path should equal input2_path!"
         )
 
-    # Only check this after _validate_params to avoid files getting accidentely removed.
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
+    if isinstance(force_output_geometrytype, str):
+        if force_output_geometrytype == "KEEP_INPUT":
+            force_output_geometrytype = input1_layer.geometrytype
+        else:
+            raise ValueError(f"unsupported {force_output_geometrytype=}")
 
     # For columns params, if a string is passed, convert to list
     if isinstance(input1_columns, str):
@@ -3496,6 +3475,7 @@ def _two_layer_vector_operation(
                     # convert geometrytype to multitype to avoid ogr warnings
                     output_geometrytype_now = force_output_geometrytype.to_multitype
                     if "geom" in column_datatypes:
+                        assert output_geometrytype_now is not None
                         column_datatypes["geom"] = output_geometrytype_now.name
 
                 # Remark: this temp file doesn't need spatial index
@@ -3647,6 +3627,10 @@ def _validate_params(
         a tuple with the layers:
         input1_layer (LayerInfo), input2_layer (LayerInfo), output_layer (str)
     """
+    if output_path in (input1_path, input2_path):
+        raise ValueError(
+            f"{operation_name}: output_path must not equal one of input paths"
+        )
     if not input1_path.exists():
         raise FileNotFoundError(
             f"{operation_name}: input1_path not found: {input1_path}"
@@ -3654,10 +3638,6 @@ def _validate_params(
     if not input2_path.exists():
         raise FileNotFoundError(
             f"{operation_name}: input2_path not found: {input2_path}"
-        )
-    if output_path in (input1_path, input2_path):
-        raise ValueError(
-            f"{operation_name}: output_path must not equal one of input paths"
         )
 
     # Get layer info
@@ -4129,15 +4109,18 @@ def dissolve_singlethread(
     force: bool = False,
 ):
     """Remark: this is not a parallelized version!!!"""
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
     # Init
     logger = logging.getLogger("geofileops.dissolve")
     start_time = datetime.now()
 
     # Check input params
-    if not input_path.exists():
-        raise FileNotFoundError(f"input_path not found: {input_path}")
     if input_path == output_path:
         raise ValueError("output_path must not equal input_path")
+    if not input_path.exists():
+        raise FileNotFoundError(f"input_path not found: {input_path}")
     if where_post is not None and where_post == "":
         where_post = None
 
@@ -4257,10 +4240,6 @@ def dissolve_singlethread(
                     f", {aggregation_str}({distinct_str}{column_str}{extra_param_str}) "
                     f'AS "{agg_column["as"]}"'
                 )
-
-    # Check output path
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
 
     # Now prepare the sql statement
     # Remark: calculating the area in the enclosing selects halves the processing time

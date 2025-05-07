@@ -736,16 +736,16 @@ def test_intersection_input_no_index(tmp_path):
         (
             "intersection: output_path must not equal one of input paths",
             ValueError,
-            test_helper.get_testfile("polygon-parcel"),
+            "not_existing_path",
             test_helper.get_testfile("polygon-zone"),
-            test_helper.get_testfile("polygon-parcel"),
+            Path("not_existing_path"),
         ),
         (
             "intersection: output_path must not equal one of input paths",
             ValueError,
             test_helper.get_testfile("polygon-parcel"),
-            test_helper.get_testfile("polygon-zone"),
-            test_helper.get_testfile("polygon-zone"),
+            Path("not_existing_path"),
+            Path("not_existing_path"),
         ),
         (
             "intersection: input1_path not found",
@@ -1571,16 +1571,16 @@ def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
         (
             "select_two_layers: output_path must not equal one of input paths",
             ValueError,
-            test_helper.get_testfile("polygon-parcel"),
+            Path("non_existing_input.gpkg"),
             test_helper.get_testfile("polygon-zone"),
-            test_helper.get_testfile("polygon-parcel"),
+            Path("non_existing_input.gpkg"),
         ),
         (
             "select_two_layers: output_path must not equal one of input paths",
             ValueError,
             test_helper.get_testfile("polygon-parcel"),
-            test_helper.get_testfile("polygon-zone"),
-            test_helper.get_testfile("polygon-zone"),
+            Path("non_existing_input.gpkg"),
+            Path("non_existing_input.gpkg"),
         ),
         (
             "select_two_layers: input1_path not found: not_existing_path",

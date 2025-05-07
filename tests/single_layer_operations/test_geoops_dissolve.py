@@ -496,8 +496,8 @@ def test_dissolve_emptyfile(tmp_path, testfile, suffix, explodecollections):
             "output_path must not equal input_path",
             ValueError,
             {
-                "input_path": test_helper.get_testfile("polygon-parcel"),
-                "output_path": test_helper.get_testfile("polygon-parcel"),
+                "input_path": Path("nonexisting.abc"),
+                "output_path": Path("nonexisting.abc"),
             },
         ),
         (

@@ -3,6 +3,7 @@ Helper functions for all tests.
 """
 
 import os
+import re
 import tempfile
 from pathlib import Path
 from stat import S_IRGRP, S_IROTH, S_IRUSR, S_IRWXG, S_IRWXO, S_IRWXU
@@ -497,3 +498,50 @@ def assert_geodataframe_equal(
         check_crs=check_crs,
         normalize=normalize,
     )
+
+
+def plot(
+    geofiles: list[Path],
+    output_path: Path,
+    title: str | None = None,
+    clean_name: bool = True,
+):
+    # If we are running on CI server, don't plot
+    if "GITHUB_ACTIONS" in os.environ:
+        return
+
+    import matplotlib.colors as mcolors
+    from matplotlib import figure as mpl_figure
+
+    figure = mpl_figure.Figure(figsize=((len(geofiles) + 1) * 3, 3))
+    figure.subplots(1, len(geofiles) + 1, sharex=True, sharey=True)
+    if title is not None:
+        figure.suptitle(title)
+
+    colors = mcolors.TABLEAU_COLORS
+    for geofile_idx, geofile in enumerate(geofiles):
+        # Read the geofile
+        gdf = gfo.read_file(geofile)
+        if gdf is None:
+            continue
+
+        color = list(colors.keys())[geofile_idx % len(colors)]
+        figure.axes[geofile_idx].set_aspect("equal")
+        # add hatch to the last axis
+        gdf.plot(
+            ax=figure.axes[geofile_idx],
+            color=colors[color],
+            alpha=0.5,
+        )
+        gdf.plot(
+            ax=figure.axes[len(geofiles)],
+            color=colors[color],
+            alpha=0.5,
+        )
+        figure.axes[geofile_idx].set_title(geofile.stem)
+
+    if clean_name:
+        # Replace all possibly invalid characters by "_"
+        output_path = output_path.with_name(re.sub(r"[^\w_. -]", "_", output_path.name))
+
+    figure.savefig(str(output_path), dpi=72)

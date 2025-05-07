@@ -377,8 +377,8 @@ def test_buffer_force(tmp_path, geoops_module):
         (
             "buffer: output_path must not equal input_path",
             ValueError,
-            test_helper.get_testfile("polygon-parcel"),
-            test_helper.get_testfile("polygon-parcel"),
+            "not_existing_path.gpkg",
+            "not_existing_path.gpkg",
         ),
         (
             "buffer: input_path not found:",
