@@ -15,6 +15,9 @@
 
 - Don't throw error when running `create_spatial_index` on a read-only file if the index
   exists already (#686)
+- Fix `join_by_location` when using "contains" (#694)
+- Fix that on some input files spatial operations take significant time, even though
+  the output exists already and `force=False` (#696)
 
 ## 0.10.0 (2025-03-26)
 

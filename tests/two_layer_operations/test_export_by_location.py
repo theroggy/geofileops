@@ -11,14 +11,14 @@ from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
 from tests.test_helper import SUFFIXES_GEOOPS
 
-input_to_compare_with_wkts = [
+input_wkts_1 = [
     "POLYGON ((0 0, 3 0, 3 3, 0 3, 0 0))",
     "POLYGON ((10 1, 13 1, 13 4, 10 4, 10 1))",
     "POLYGON ((7 2, 8 2, 8 5, 1 5, 1 4, 7 4, 7 2))",
     "POLYGON ((7 1, 7 -2, 10 -2, 10 -1, 8 -1, 8 1, 7 1))",
 ]
 
-extra_input_to_select_from = [
+input_wkts_2 = [
     "POLYGON ((-2 4, 0 4, 0 6, -2 6, -2 4))",
     "POLYGON ((3 6, 5 6, 5 8, 3 8, 3 6))",
 ]
@@ -239,20 +239,20 @@ def test_export_by_location_query(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_select_from_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
-    "input_to_select_from_wkts",
+    "input_to_compare_with_wkts",
     [
         [
             "POLYGON ((0.5 0.5, 2.5 0.5, 2.5 2.5, 0.5 2.5, 0.5 0.5))",
-            *extra_input_to_select_from,
+            *input_wkts_2,
         ]
     ],
 )
 @pytest.mark.parametrize("subdivide_coords", [0, 10])
 @pytest.mark.parametrize(
     "spatial_relations_query, exp_featurecount",
-    [("contains is True", 1), ("contains is False", 2)],
+    [("contains is True", 1), ("contains is False", 3)],
 )
 def test_query_contains(
     tmp_path,
@@ -272,10 +272,10 @@ def test_query_contains(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
-    [["POLYGON ((1 1, 3 1, 3 3, 1 3, 1 1))", *extra_input_to_select_from]],
+    [["POLYGON ((1 1, 3 1, 3 3, 1 3, 1 1))", *input_wkts_2]],
 )
 @pytest.mark.parametrize("subdivide_coords", [0, 10])
 @pytest.mark.parametrize(
@@ -300,10 +300,10 @@ def test_query_coveredby(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
-    [["POLYGON ((-1 -1, 4 -1, 4 4, -1 4, -1 -1))", *extra_input_to_select_from]],
+    [["POLYGON ((-1 -1, 4 -1, 4 4, -1 4, -1 -1))", *input_wkts_2]],
 )
 @pytest.mark.parametrize("subdivide_coords", [0, 10])
 @pytest.mark.parametrize(
@@ -328,7 +328,7 @@ def test_query_covers(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
     [
@@ -336,7 +336,7 @@ def test_query_covers(
             "POLYGON ((4 1, 6 1, 6 3, 4 3, 4 1))",
             "POLYGON ((4 -2, 6 -2, 6 0, 4 0, 4 -2))",
             "POLYGON ((9 0, 11 0, 11 2, 9 2, 9 0))",
-            *extra_input_to_select_from,
+            *input_wkts_2,
         ]
     ],
 )
@@ -363,10 +363,10 @@ def test_query_disjoint(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
-    [["POLYGON ((0 0, 3 0, 3 3, 0 3, 0 0))", *extra_input_to_select_from]],
+    [["POLYGON ((0 0, 3 0, 3 3, 0 3, 0 0))", *input_wkts_2]],
 )
 @pytest.mark.parametrize("subdivide_coords", [0, 10])
 @pytest.mark.parametrize(
@@ -391,10 +391,10 @@ def test_query_equals(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
-    [["POLYGON ((2 1, 4 1, 4 3, 2 3, 2 1))", *extra_input_to_select_from]],
+    [["POLYGON ((2 1, 4 1, 4 3, 2 3, 2 1))", *input_wkts_2]],
 )
 @pytest.mark.parametrize("subdivide_coords", [0, 10])
 @pytest.mark.parametrize(
@@ -419,14 +419,14 @@ def test_query_intersects(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
     [
         [
             "POLYGON ((2 1, 4 1, 4 3, 2 3, 2 1))",
             "POLYGON ((2 -2, 4 -2, 4 0, 2 0, 2 -2))",
-            *extra_input_to_select_from,
+            *input_wkts_2,
         ]
     ],
 )
@@ -458,10 +458,10 @@ def test_query_intersects_true_touches_false(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
-    [["POLYGON ((2 1, 4 1, 4 3, 2 3, 2 1))", *extra_input_to_select_from]],
+    [["POLYGON ((2 1, 4 1, 4 3, 2 3, 2 1))", *input_wkts_2]],
 )
 @pytest.mark.parametrize("subdivide_coords", [0, 10])
 @pytest.mark.parametrize(
@@ -486,10 +486,10 @@ def test_query_overlaps(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
-    [["POLYGON ((3 1, 5 1, 5 3, 3 3, 3 1))", *extra_input_to_select_from]],
+    [["POLYGON ((3 1, 5 1, 5 3, 3 3, 3 1))", *input_wkts_2]],
 )
 @pytest.mark.parametrize("subdivide_coords", [0, 10])
 @pytest.mark.parametrize(
@@ -514,10 +514,10 @@ def test_query_touches(
     )
 
 
-@pytest.mark.parametrize("input_to_compare_with_wkts", [input_to_compare_with_wkts])
+@pytest.mark.parametrize("input_to_compare_with_wkts", [input_wkts_1])
 @pytest.mark.parametrize(
     "input_to_select_from_wkts",
-    [["POLYGON ((1 1, 3 1, 3 3, 1 3, 1 1))", *extra_input_to_select_from]],
+    [["POLYGON ((1 1, 3 1, 3 3, 1 3, 1 1))", *input_wkts_2]],
 )
 @pytest.mark.parametrize("subdivide_coords", [0, 10])
 @pytest.mark.parametrize(
@@ -627,6 +627,12 @@ def _test_export_by_location(
         area_inters_column_name=area_inters_column_name,
         batchsize=batchsize,
         subdivide_coords=subdivide_coords,
+    )
+
+    # Plot
+    plot_path = output_path.with_suffix(".png")
+    test_helper.plot(
+        [input_to_select_from_path, input_to_compare_with_path, output_path], plot_path
     )
 
     # Check if the output file is correctly created
