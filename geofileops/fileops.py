@@ -1449,8 +1449,8 @@ def _read_file_base_fiona(
     The "fiona" IO engine is deprecated and will be removed in the future.
     """
     warnings.warn(
-        "The geofileops configuration option GFO_IO_ENGINE is deprecated. In a future "
-        "version it will be ignored and the pyogrio engine will always be used.",
+        "Using GFO_IO_ENGINE=fiona is deprecated. In a future version this will be"
+        "ignored.",
         FutureWarning,
         stacklevel=4,
     )
@@ -1749,8 +1749,9 @@ def to_file(
     The fileformat is detected based on the filepath extension.
 
     The underlying library used to write the file can be choosen using the
-    "GFO_IO_ENGINE" environment variable. Possible values are "fiona" and "pyogrio".
-    Default engine is "pyogrio".
+    "GFO_IO_ENGINE" environment variable. Possible values are "fiona" and "pyogrio", but
+    using "fiona" is deprecated and will be ignored in a future version. The default
+    engine is "pyogrio".
 
     Args:
         gdf (gpd.GeoDataFrame): The GeoDataFrame to export to file.
@@ -1867,8 +1868,8 @@ def _to_file_fiona(
     The "fiona" IO engine is deprecated and will be removed in the future.
     """
     warnings.warn(
-        "The geofileops configuration option GFO_IO_ENGINE is deprecated. In a future "
-        "version it will be ignored and the pyogrio engine will always be used.",
+        "Using GFO_IO_ENGINE=fiona is deprecated. In a future version this will be"
+        "ignored.",
         FutureWarning,
         stacklevel=3,
     )

@@ -23,7 +23,7 @@ filterwarnings = [
     "ignore: Normalized/laundered field name",
     "ignore: Non-conformant content for record 0 in column",
     "ignore: Non-conformant content for record 1 in column",
-    "ignore: The geofileops configuration option GFO_IO_ENGINE is deprecated",
+    "ignore: Using GFO_IO_ENGINE=fiona is deprecated",
 ]
 
 [tool.ruff]
