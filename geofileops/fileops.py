@@ -1038,6 +1038,7 @@ def add_column(
         else:
             type_str = type
 
+    start = time.perf_counter()
     layerinfo = get_layerinfo(path, layer, raise_on_nogeom=False)
     layer = layerinfo.name
 
@@ -1047,6 +1048,7 @@ def add_column(
         # If column doesn't exist yet, create it
         columns_upper = [column.upper() for column in layerinfo.columns]
         if name.upper() not in columns_upper:
+            logger.info(f"Add column {name} to {path}#{layer}")
             width_str = f"({width})" if width is not None else ""
             sql_stmt = (
                 f'ALTER TABLE "{layer}" ADD COLUMN "{name}" {type_str}{width_str}'
@@ -1055,7 +1057,7 @@ def add_column(
             _ogr_util.StartTransaction(datasource)
             datasource.ExecuteSQL(sql_stmt)
         else:
-            logger.warning(f"Column {name} existed already in {path}, layer {layer}")
+            logger.warning(f"Column {name} existed already in {path}#{layer}")
 
         # If an expression was provided and update can be done, go for it...
         if expression is not None and (
@@ -1075,6 +1077,11 @@ def add_column(
         raise
     finally:
         datasource = None
+
+        # Log time taken if it was slow.
+        took = time.perf_counter() - start
+        if took > 2:  # pragma: no cover
+            logger.info(f"Ready, add_column of {name} took {took:.2f}")
 
 
 def drop_column(
@@ -1181,6 +1188,9 @@ def update_column(
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
     """  # noqa: E501
     # Init
+    logger.info(f"Update column {name} in {path}#{layer}")
+
+    start = time.perf_counter()
     layerinfo = get_layerinfo(path, layer)
     columns_upper = [column.upper() for column in layerinfo.columns]
     if layerinfo.geometrycolumn is not None:
@@ -1203,6 +1213,11 @@ def update_column(
         raise
     finally:
         datasource = None
+
+        # Log time taken if it was slow.
+        took = time.perf_counter() - start
+        if took > 2:  # pragma: no cover
+            logger.info(f"Ready, update_column of {name} took {took:.2f}")
 
 
 def read_file(
@@ -1434,8 +1449,8 @@ def _read_file_base_fiona(
     The "fiona" IO engine is deprecated and will be removed in the future.
     """
     warnings.warn(
-        "The geofileops configuration option GFO_IO_ENGINE is deprecated. In a future "
-        "version it will be ignored and the pyogrio engine will always be used.",
+        "Using GFO_IO_ENGINE=fiona is deprecated. In a future version this will be"
+        "ignored.",
         FutureWarning,
         stacklevel=4,
     )
@@ -1734,8 +1749,9 @@ def to_file(
     The fileformat is detected based on the filepath extension.
 
     The underlying library used to write the file can be choosen using the
-    "GFO_IO_ENGINE" environment variable. Possible values are "fiona" and "pyogrio".
-    Default engine is "pyogrio".
+    "GFO_IO_ENGINE" environment variable. Possible values are "fiona" and "pyogrio", but
+    using "fiona" is deprecated and will be ignored in a future version. The default
+    engine is "pyogrio".
 
     Args:
         gdf (gpd.GeoDataFrame): The GeoDataFrame to export to file.
@@ -1852,8 +1868,8 @@ def _to_file_fiona(
     The "fiona" IO engine is deprecated and will be removed in the future.
     """
     warnings.warn(
-        "The geofileops configuration option GFO_IO_ENGINE is deprecated. In a future "
-        "version it will be ignored and the pyogrio engine will always be used.",
+        "Using GFO_IO_ENGINE=fiona is deprecated. In a future version this will be"
+        "ignored.",
         FutureWarning,
         stacklevel=3,
     )
