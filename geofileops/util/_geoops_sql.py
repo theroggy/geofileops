@@ -3429,6 +3429,29 @@ def _two_layer_vector_operation(
             f"Start processing ({processing_params.nb_parallel} "
             f"parallel workers, batch size: {processing_params.batchsize})"
         )
+
+        # calculate_two_layers doesn't support explodecollections in one step:
+        # there is an extra layer copy involved.
+        # Normally explodecollections can be deferred to the appending of the
+        # partial files, but if explodecollections and there is a where_post to
+        # be applied, it needs to be applied now already. Otherwise the
+        # where_post in the append of partial files later on won't give correct
+        # results!
+        explodecollections_now = False
+        output_geometrytype_now = force_output_geometrytype
+        if explodecollections and where_post is not None:
+            explodecollections_now = True
+        if (
+            force_output_geometrytype is not None
+            and explodecollections
+            and not explodecollections_now
+        ):
+            # convert geometrytype to multitype to avoid ogr warnings
+            output_geometrytype_now = force_output_geometrytype.to_multitype
+            if "geom" in column_datatypes:
+                assert output_geometrytype_now is not None
+                column_datatypes["geom"] = output_geometrytype_now.name
+
         with _processing_util.PooledExecutorFactory(
             threadpool=_general_helper.use_threads(input1_layer.featurecount),
             max_workers=processing_params.nb_parallel,
@@ -3455,28 +3478,6 @@ def _two_layer_vector_operation(
                     batch_filter=processing_params.batches[batch_id]["batch_filter"],
                 )
                 batches[batch_id]["sqlite_stmt"] = sql_stmt
-
-                # calculate_two_layers doesn't support explodecollections in one step:
-                # there is an extra layer copy involved.
-                # Normally explodecollections can be deferred to the appending of the
-                # partial files, but if explodecollections and there is a where_post to
-                # be applied, it needs to be applied now already. Otherwise the
-                # where_post in the append of partial files later on won't give correct
-                # results!
-                explodecollections_now = False
-                output_geometrytype_now = force_output_geometrytype
-                if explodecollections and where_post is not None:
-                    explodecollections_now = True
-                if (
-                    force_output_geometrytype is not None
-                    and explodecollections
-                    and not explodecollections_now
-                ):
-                    # convert geometrytype to multitype to avoid ogr warnings
-                    output_geometrytype_now = force_output_geometrytype.to_multitype
-                    if "geom" in column_datatypes:
-                        assert output_geometrytype_now is not None
-                        column_datatypes["geom"] = output_geometrytype_now.name
 
                 # Remark: this temp file doesn't need spatial index
                 future = calculate_pool.submit(
@@ -3529,18 +3530,23 @@ def _two_layer_vector_operation(
 
                 # If there is only one tmp_partial file and it is already ok as
                 # output file, just rename/move it.
-                # Just for GPKG, don't do this, as there are small issues in the file
-                # created by spatialite that are fixed by copying with ogr2ogr.
                 if (
                     nb_batches == 1
                     and not explodecollections
                     and force_output_geometrytype is None
                     and where_post is None
-                    and tmp_output_path.suffix.lower() != ".gpkg"
                     and tmp_partial_output_path.suffix.lower()
                     == tmp_output_path.suffix.lower()
                 ):
                     gfo.move(tmp_partial_output_path, tmp_output_path)
+
+                    if tmp_output_path.suffix.lower() == ".gpkg":
+                        # If the output file is a geopackage, add gpkg_ogr_contents
+                        _sqlite_util.add_gpkg_ogr_contents(
+                            database=tmp_output_path,
+                            layer=output_layer,
+                            force_update=False,
+                        )
                 else:
                     # If there is only one batch, it is faster to create the spatial
                     # index immediately

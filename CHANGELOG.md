@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.11.0 (yyyy-mm-dd)
+
+### Improvements
+
+- Improve performance of two-layer operations using `nb_parallel=1` (#692)
+
 ## 0.10.1 (2025-05-16)
 
 ### Deprecations and compatibility notes
