@@ -247,7 +247,7 @@ class ProcessingParams:
 
     def to_json(self, path: Path):
         prepared = _general_util.prepare_for_serialize(vars(self))
-        with open(path, "w") as file:
+        with path.open("w") as file:
             file.write(json.dumps(prepared, indent=4, sort_keys=True))
 
 

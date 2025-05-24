@@ -94,7 +94,7 @@ def test_read_cpl_log(tmp_path):
         "\n",
         "logging line 3\n",
     ]
-    with open(cpl_log_path, mode="w") as file:
+    with cpl_log_path.open(mode="w") as file:
         file.writelines(test_log_lines)
 
     # Test

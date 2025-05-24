@@ -36,7 +36,7 @@ geofiletypes: dict[str, GeofileTypeInfo] = {}
 
 def _init_geofiletypes():
     geofiletypes_path = Path(__file__).resolve().parent / "geofiletypes.csv"
-    with open(geofiletypes_path) as file:
+    with geofiletypes_path.open() as file:
         # Set skipinitialspace to True so the csv can be formatted for readability
         csv.register_dialect("geofiletype_dialect", skipinitialspace=True, strict=True)
         reader = csv.DictReader(file, dialect="geofiletype_dialect")

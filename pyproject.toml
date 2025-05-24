@@ -33,38 +33,25 @@ extend-exclude = ["docs/*", "local_ignore/*"]
 
 [tool.ruff.lint]
 select = [
-    # pyflakes
-    "F",
-    # pycodestyle
-    "E",
+    "F",  # pyflakes
+    "E",  # pycodestyle
     "W",
-    # pyupgrade
-    "UP",
-    # flake8-bugbear
-    "B",
-    # flake8-debugger
-    "T10",
-    # flake8-simplify
-    # "SIM",
-    # pylint
-    "PLC",
+    "UP",  # pyupgrade
+    "B",  # flake8-bugbear
+    "PTH",  # flake8-pathlib
+    "T10",  # flake8-debugger
+    # "SIM",  # flake8-simplify
+    "PLC",  # pylint
     "PLE",
     "PLR",
     "PLW",
-    # misc lints
-    "PIE",
-    # implicit string concatenation
-    "ISC",
-    # type-checking imports
-    "TCH",
-    # comprehensions
-    "C4",
-    # Ruff-specific rules
-    "RUF",
-    # isort
-    "I",
-    # pydocstyle
-    "D",
+    "PIE",  # misc lints
+    "ISC",  # implicit string concatenation
+    "TCH",  # type-checking imports
+    "C4",  # comprehensions
+    "RUF",  # Ruff-specific rules
+    "I",  # isort
+    "D",  # pydocstyle
 ]
 
 ignore = [

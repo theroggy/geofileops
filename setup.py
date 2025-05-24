@@ -1,11 +1,13 @@
 """Setup file to package geofileops."""
 
+from pathlib import Path
+
 import setuptools
 
-with open("README.md") as fh:
+with Path("README.md").open() as fh:
     long_description = fh.read()
 
-with open("geofileops/version.txt") as file:
+with Path("geofileops/version.txt").open() as file:
     version = file.readline()
 
 setuptools.setup(

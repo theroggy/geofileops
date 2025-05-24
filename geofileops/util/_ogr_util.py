@@ -151,7 +151,7 @@ def read_cpl_log(path: Path) -> tuple[list[str], list[str]]:
     if not path.exists() or path.stat().st_size == 0:
         return ([], [])
 
-    with open(path) as logfile:
+    with path.open() as logfile:
         log_lines = logfile.readlines()
 
     # Cleanup + check for errors
@@ -633,7 +633,7 @@ def vector_translate(
         if gdal_cpl_log_path.exists():
             # Truncate the cpl log file already, because sometimes it is locked and
             # cannot be unlinked.
-            with open(gdal_cpl_log_path, "r+") as logfile:
+            with gdal_cpl_log_path.open("r+") as logfile:
                 logfile.truncate(0)  # size '0' necessary when using r+
             try:
                 gdal_cpl_log_path.unlink(missing_ok=True)

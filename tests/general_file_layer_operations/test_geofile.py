@@ -661,7 +661,7 @@ def test_copy_layer_input_open_options(tmp_path):
     # Prepare test data
     src = tmp_path / "input.csv"
     dst = tmp_path / "output.gpkg"
-    with open(src, "w") as srcfile:
+    with src.open("w") as srcfile:
         srcfile.write("POINT_ID, POINT_LAT, POINT_LON, POINT_NAME\n")
         srcfile.write('1, 50.939972761,3.888498686, "random spot"\n')
 
@@ -979,13 +979,13 @@ def test_get_crs_bad_prj(tmp_path):
     bad_prj_src = test_helper.data_dir / "crs_custom_match" / "31370_no_epsg.prj"
     bad_prj_dst = src.with_suffix(".prj")
     shutil.copy(bad_prj_src, bad_prj_dst)
-    with open(bad_prj_src) as prj_bad:
+    with bad_prj_src.open() as prj_bad:
         assert prj_bad.read() != fileops.PRJ_EPSG_31370
 
     crs = fileops.get_crs(src)
     assert crs.to_epsg() == 31370
     assert bad_prj_dst.exists()
-    with open(bad_prj_dst) as file_corrected:
+    with bad_prj_dst.open() as file_corrected:
         assert file_corrected.read() == fileops.PRJ_EPSG_31370
 
 
@@ -2118,19 +2118,22 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):
     """Strongly based on similar test in geopandas."""
 
     class FileNumber:
-        def __init__(self, tmpdir, base, ext):
-            self.tmpdir = str(tmpdir)
+        def __init__(self, tmpdir: Path, base, ext: str):
+            self.tmpdir = tmpdir
             self.base = base
             self.ext = ext
             self.fileno = 0
 
-        def __repr__(self):
-            filename = f"{self.base}{self.fileno:02d}.{self.ext}"
-            return os.path.join(self.tmpdir, filename)
+        def __repr__(self) -> str:
+            return self.format_filepath().as_posix()
 
-        def __next__(self):
+        def __next__(self) -> Path:
             self.fileno += 1
-            return repr(self)
+            return self.format_filepath()
+
+        def format_filepath(self) -> Path:
+            filename = f"{self.base}{self.fileno:02d}.{self.ext}"
+            return self.tmpdir / filename
 
     fngen = FileNumber(tmp_path, "check", suffix)
 

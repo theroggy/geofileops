@@ -147,7 +147,7 @@ def test_create_spatial_index_unsupported(tmp_path):
             }
         }
     """
-    with open(path, "w") as file:
+    with path.open("w") as file:
         file.write(geojson_data)
 
     # Test
