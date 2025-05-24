@@ -342,6 +342,12 @@ def test_vector_translate_sql_input_empty(tmp_path, input_suffix, output_suffix)
 @pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("output_suffix", test_helper.SUFFIXES_GEOOPS)
 def test_vector_translate_sql_invalid_new_output(tmp_path, input_suffix, output_suffix):
+    """When an invalid sql query is used, the output file should not be created.
+
+    Note: GDAL does create an output file without any layers in it, but apparently this
+    is not trivial and/or riskful to change, so this won't be changed:
+    https://github.com/OSGeo/gdal/issues/12284
+    """
     input_path = test_helper.get_testfile(
         "polygon-parcel", suffix=input_suffix, empty=True
     )
