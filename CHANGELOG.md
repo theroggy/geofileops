@@ -8,6 +8,10 @@
   versions + small refactor (#693)
 - Improve performance of two-layer operations using `nb_parallel=1` (#692)
 
+### Bugs fixed
+
+- Fix `copy_file` for some special vsi cases (#703)
+
 ## 0.10.1 (2025-05-16)
 
 ### Deprecations and compatibility notes

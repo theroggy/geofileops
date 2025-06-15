@@ -166,7 +166,7 @@ class GeofileInfo:
         driver (str): the relevant gdal driver for the file.
     """
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Union[str, "os.PathLike[Any]"]):
         """Constructor of Layerinfo.
 
         Args:
@@ -262,7 +262,7 @@ def get_driver(path: Union[str, "os.PathLike[Any]"]) -> str:
                 f"Path: {input_path}"
             )
 
-    # If the file exists, determine the driver based on the file.
+    # Try to determine the driver by opening the file.
     try:
         datasource = gdal.OpenEx(
             str(path), nOpenFlags=gdal.OF_VECTOR | gdal.OF_READONLY | gdal.OF_SHARED
@@ -270,9 +270,21 @@ def get_driver(path: Union[str, "os.PathLike[Any]"]) -> str:
         driver = datasource.GetDriver()
         drivername = driver.ShortName
     except Exception as ex:
-        try:
-            drivername = get_driver_for_path(path)
-        except Exception:
+        ex_str = str(ex).lower()
+        if (
+            "no such file or directory" in ex_str
+            or "not recognized as being in a supported file format" in ex_str
+            or "not recognized as a supported file format" in ex_str
+        ):
+            # If the file does not exist or if, for some cases like a csv file,
+            # it is e.g. an empty file that was not recognized yet, try to get the
+            # driver based on only the path.
+            try:
+                drivername = get_driver_for_path(path)
+            except Exception:
+                ex.args = (f"get_driver error for {path}: {ex}",)
+                raise
+        else:
             ex.args = (f"get_driver error for {path}: {ex}",)
             raise
     finally:
@@ -293,4 +305,4 @@ def get_geofileinfo(path: Union[str, "os.PathLike[Any]"]) -> GeofileInfo:
     Returns:
         GeofileInfo: _description_
     """
-    return GeofileInfo(path=Path(path))
+    return GeofileInfo(path=path)

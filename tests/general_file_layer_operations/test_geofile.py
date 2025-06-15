@@ -828,9 +828,17 @@ def test_copy_layer_to_gpkg_zip(tmp_path):
     assert_geodataframe_equal(src_gdf, dst_gdf)
 
 
-def test_copy_layer_vsi(tmp_path):
+@pytest.mark.parametrize(
+    "src",
+    [
+        f"/vsizip//vsicurl/{test_helper.data_url}/poly_shp.zip",
+        f"/vsizip//vsicurl/{test_helper.data_url}/poly_shp.zip/poly.shp",
+        f"/vsizip/{test_helper.data_dir.as_posix()}/poly_shp.zip",
+        f"/vsizip/{test_helper.data_dir.as_posix()}/poly_shp.zip/poly.shp",
+    ],
+)
+def test_copy_layer_vsi(tmp_path, src):
     # Prepare test data
-    src = f"/vsizip//vsicurl/{test_helper.data_url}/poly_shp.zip/poly.shp"
     dst = tmp_path / "output.gpkg"
 
     # copy_layer with vsi
