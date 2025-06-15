@@ -19,6 +19,7 @@ GDAL_GTE_3101 = version.parse(GDAL_BASE_VERSION) >= version.parse("3.10.1")
 GDAL_ST_311 = version.parse(GDAL_BASE_VERSION) < version.parse("3.11")
 
 GEOPANDAS_GTE_10 = version.parse(gpd.__version__) >= version.parse("1.0")
+GEOPANDAS_110 = version.parse(gpd.__version__) == version.parse("1.1.0")
 PANDAS_GTE_22 = version.parse(pd.__version__) >= version.parse("2.2")
 SHAPELY_GTE_20 = version.parse(shapely.__version__) >= version.parse("2")
 
