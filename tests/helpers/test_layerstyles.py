@@ -25,9 +25,9 @@ def test_add_get_remove_layer_styles(tmp_path):
     assert layerstyles._has_layerstyles_table(test_path)
 
     # Add layer style to "parcel" layer
-    with open(test_helper.data_dir / "polygonstyle.sld") as file:
+    with (test_helper.data_dir / "polygonstyle.sld").open() as file:
         sld = file.read()
-    with open(test_helper.data_dir / "polygonstyle.qml") as file:
+    with (test_helper.data_dir / "polygonstyle.qml").open() as file:
         qml = file.read()
     gfo.add_layerstyle(
         path=test_path,

@@ -28,7 +28,7 @@ from geofileops.util._geofileinfo import get_driver  # noqa: F401
 
 def _get_version():
     version_path = Path(__file__).resolve().parent / "version.txt"
-    with open(version_path) as file:
+    with version_path.open() as file:
         return file.readline()
 
 

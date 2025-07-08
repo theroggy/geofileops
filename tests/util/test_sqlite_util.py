@@ -15,6 +15,95 @@ from tests import test_helper
 from tests.test_helper import assert_geodataframe_equal
 
 
+def test_add_gpkg_ogr_contents(tmp_path):
+    """Add the gpkg_ogr_contents table to a GPKG file, without layer."""
+    path = tmp_path / "test.gpkg"
+    conn = sqlite_util.create_new_spatialdb(path)
+
+    # There should be no gpkg_ogr_contents table in the GPKG file yet.
+    tables = sqlite_util.get_tables(path)
+    assert "gpkg_ogr_contents" not in tables
+
+    # Add the gpkg_ogr_contents table to the GPKG file.
+    sqlite_util.add_gpkg_ogr_contents(conn, layer=None)
+    tables = sqlite_util.get_tables(path)
+    assert "gpkg_ogr_contents" in tables
+
+
+def test_add_gpkg_ogr_contents_layer_test_triggers(tmp_path):
+    """Add the gpkg_ogr_contents table and relevant triggers and check if they work."""
+    path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    layer = gfo.get_only_layer(path)
+
+    # The layer should already be registered in an gpkg_ogr_contents table.
+    ogr_contents = sqlite_util.get_gpkg_ogr_contents(path)
+    assert layer in ogr_contents
+    featurecount_orig = ogr_contents[layer]["feature_count"]
+
+    # Remove the gpkg_ogr_contents table and the relevant triggers.
+    sqlite_util.execute_sql(path, sql_stmt="DROP TABLE gpkg_ogr_contents;")
+    sqlite_util.execute_sql(
+        path, sql_stmt=f'DROP TRIGGER "trigger_insert_feature_count_{layer}";'
+    )
+    sqlite_util.execute_sql(
+        path, sql_stmt=f'DROP TRIGGER "trigger_delete_feature_count_{layer}";'
+    )
+
+    # Run add
+    sqlite_util.add_gpkg_ogr_contents(path, layer=layer)
+    ogr_contents = sqlite_util.get_gpkg_ogr_contents(path)
+    assert layer in ogr_contents
+    assert ogr_contents[layer]["feature_count"] == featurecount_orig
+
+    # Add a row to the layer and check if the feature count is updated
+    sqlite_util.execute_sql(
+        path, sql_stmt=f'INSERT INTO "{layer}"(geom) VALUES (NULL);'
+    )
+    ogr_contents = sqlite_util.get_gpkg_ogr_contents(path)
+    assert layer in ogr_contents
+    assert ogr_contents[layer]["feature_count"] == featurecount_orig + 1
+
+    # Remove a row from the layer and check if the feature count is updated
+    sqlite_util.execute_sql(
+        path, sql_stmt=f'DELETE FROM "{layer}" WHERE fid = {featurecount_orig + 1};'
+    )
+    ogr_contents = sqlite_util.get_gpkg_ogr_contents(path)
+    assert layer in ogr_contents
+    assert ogr_contents[layer]["feature_count"] == featurecount_orig
+
+
+def test_add_gpkg_ogr_contents_layer_force_update(tmp_path):
+    """Test if the force_update parameter works as intended."""
+    path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    layer = gfo.get_only_layer(path)
+
+    # The layer should already be registered in an gpkg_ogr_contents table.
+    ogr_contents = sqlite_util.get_gpkg_ogr_contents(path)
+    assert layer in ogr_contents
+    featurecount_orig = ogr_contents[layer]["feature_count"]
+
+    # Update the featurecount in the gpkg_ogr_contents table with wrong data.
+    featurecount_updated = featurecount_orig + 5
+    sql_stmt = f"""
+        UPDATE gpkg_ogr_contents
+           SET feature_count = {featurecount_updated}
+         WHERE lower(table_name) = '{layer.lower()}'
+    """
+    sqlite_util.execute_sql(path, sql_stmt=sql_stmt)
+
+    # Run add, but with force_update=False (=the default)
+    sqlite_util.add_gpkg_ogr_contents(path, layer=layer)
+    ogr_contents = sqlite_util.get_gpkg_ogr_contents(path)
+    assert layer in ogr_contents
+    assert ogr_contents[layer]["feature_count"] == featurecount_updated
+
+    # Run add, but with force_update=True
+    sqlite_util.add_gpkg_ogr_contents(path, layer=layer, force_update=True)
+    ogr_contents = sqlite_util.get_gpkg_ogr_contents(path)
+    assert layer in ogr_contents
+    assert ogr_contents[layer]["feature_count"] == featurecount_orig
+
+
 @pytest.mark.parametrize(
     "filename, filetype, crs_epsg",
     [
@@ -30,7 +119,10 @@ def test_create_new_spatialdb(tmp_path, filename, filetype, crs_epsg):
     else:
         output = tmp_path / filename
 
-    sqlite_util.create_new_spatialdb(output, crs_epsg=crs_epsg, filetype=filetype)
+    conn = sqlite_util.create_new_spatialdb(
+        output, crs_epsg=crs_epsg, filetype=filetype
+    )
+    conn.close()
 
     if filename != ":memory:":
         assert output.exists()
@@ -59,11 +151,14 @@ def test_create_new_spatialdb_error(
 
 
 @pytest.mark.parametrize("create_spatial_index", [(True), (False)])
+@pytest.mark.parametrize("create_ogr_contents", [(True), (False)])
 @pytest.mark.parametrize("output_epsg", [-1, 31370])
 @pytest.mark.filterwarnings(
     "ignore:.*Using create_spatial_index=True for a GPKG file is not recommended .*"
 )
-def test_create_table_as_sql(tmp_path, create_spatial_index, output_epsg):
+def test_create_table_as_sql(
+    tmp_path, create_spatial_index, create_ogr_contents, output_epsg
+):
     output_path = tmp_path / "output.gpkg"
     input1_path = test_helper.get_testfile(testfile="polygon-parcel", dst_dir=tmp_path)
     input2_path = test_helper.get_testfile(testfile="polygon-zone", dst_dir=tmp_path)
@@ -102,6 +197,7 @@ def test_create_table_as_sql(tmp_path, create_spatial_index, output_epsg):
         sql_stmt=sql_stmt,
         profile=sqlite_util.SqliteProfile.SPEED,
         create_spatial_index=create_spatial_index,
+        create_ogr_contents=create_ogr_contents,
     )
 
     assert output_path.exists()
@@ -109,9 +205,14 @@ def test_create_table_as_sql(tmp_path, create_spatial_index, output_epsg):
     output_info = gfo.get_layerinfo(output_path)
     assert output_info.featurecount == 7
 
-    # The "gpkg_ogr_contents" table won't be present in the output gpkg
+    # Check if the "gpkg_ogr_contents" table is present in the output gpkg if needed.
     tables = sqlite_util.get_tables(output_path)
-    assert "gpkg_ogr_contents" not in tables
+    if create_ogr_contents:
+        assert "gpkg_ogr_contents" in tables
+        gpkg_ogr_contents = sqlite_util.get_gpkg_ogr_contents(output_path)
+        assert gpkg_ogr_contents["output"]["feature_count"] is not None
+    else:
+        assert "gpkg_ogr_contents" not in tables
 
     # The bounds of the layer should typically be filled out. It won't be filled out
     # if the output_epsg is -1 and no spatial index is created.
@@ -199,6 +300,13 @@ def test_execute_sql(tmp_path):
     nb_deleted += 2
     info = gfo.get_layerinfo(test_path)
     assert info.featurecount == info_input.featurecount - nb_deleted
+
+
+def test_execute_sql_invalid(tmp_path):
+    test_path = test_helper.get_testfile(testfile="polygon-parcel", dst_dir=tmp_path)
+
+    with pytest.raises(RuntimeError, match="Error executing"):
+        sqlite_util.execute_sql(test_path, sql_stmt="INVALID SQL STATEMENT")
 
 
 def test_get_columns():

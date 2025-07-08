@@ -1,7 +1,6 @@
 name: geofileops-nightly-deps
 channels:
   - gdal-master
-  - conda-forge/label/shapely_dev
   - conda-forge
 dependencies:
   - python
@@ -9,7 +8,7 @@ dependencies:
   # required
   - cloudpickle
   - gdal
-  - geopandas-base
+  - geopandas-base =1.0
   - libspatialite
   # - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
   - numpy
@@ -22,9 +21,10 @@ dependencies:
   - shapely >=2
   # optional
   - simplification
-  # extra dependencies for pip packages
-  - geos
   # testing
   - pytest
   - pytest-cov
   - pytest-xdist
+  - pip:
+    - --pre --index-url https://pypi.anaconda.org/scientific-python-nightly-wheels/simple --extra-index-url https://pypi.fury.io/arrow-nightlies/ --extra-index-url https://pypi.org/simple
+    - geopandas >=1.1

@@ -411,6 +411,8 @@ def test_select_invalid_sql(tmp_path, suffix):
     with pytest.raises(Exception, match="Error no such column"):
         gfo.select(input_path=input_path, output_path=output_path, sql_stmt=sql_stmt)
 
+    assert not output_path.exists()
+
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("gridsize", [0.0, 0.01])

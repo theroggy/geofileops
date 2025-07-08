@@ -89,35 +89,37 @@ def test_get_driver_unsupported_suffix_driverprefix(tmp_path):
     assert gfo.get_driver(f"CSV:{unsupported_path}") == "CSV"
 
 
-def test_get_geofileinfo():
-    # Test ESRIShapefile geofiletype
-    # Test getting a geofiletype for a suffix
-    info = _geofileinfo.get_geofileinfo(".shp")
+@pytest.mark.parametrize(
+    "suffix, exp_driver, exp_is_fid_zerobased, exp_is_singlelayer, "
+    "exp_is_spatialite_based",
+    [
+        (".shp", "ESRI Shapefile", True, True, False),
+        (".gpkg", "GPKG", False, False, True),
+        (".gpKG", "GPKG", False, False, True),
+        (".sqlite", "SQLite", False, False, True),
+        (".csv", "CSV", False, True, False),
+    ],
+)
+def test_get_geofileinfo_for_suffix(
+    suffix,
+    exp_driver,
+    exp_is_fid_zerobased,
+    exp_is_singlelayer,
+    exp_is_spatialite_based,
+):
+    """Test getting a geofiletype for some common suffixes."""
+    info = _geofileinfo.get_geofileinfo(suffix)
+    assert info.driver == exp_driver
+    assert info.is_fid_zerobased == exp_is_fid_zerobased
+    assert info.is_singlelayer == exp_is_singlelayer
+    assert info.is_spatialite_based == exp_is_spatialite_based
+
+
+def test_get_geofileinfo_for_vsi():
+    """Test getting a geofiletype for a VSI path."""
+    vsi_path = f"/vsizip/vsicurl/{test_helper.data_url}/poly_shp.zip"
+    info = _geofileinfo.get_geofileinfo(vsi_path)
     assert info.driver == "ESRI Shapefile"
-    assert info.is_fid_zerobased
-    assert info.is_singlelayer
-    assert not info.is_spatialite_based
-
-    # GPKG geofiletype
-    # Test getting a geofiletype for a suffix
-    info = _geofileinfo.get_geofileinfo(".gpKG")
-    assert info.driver == "GPKG"
-    assert not info.is_fid_zerobased
-    assert not info.is_singlelayer
-    assert info.is_spatialite_based
-
-    # SQLite geofiletype
-    # Test getting a geofiletype for a suffix
-    info = _geofileinfo.get_geofileinfo(".sqlite")
-    assert info.driver == "SQLite"
-    assert not info.is_fid_zerobased
-    assert not info.is_singlelayer
-    assert info.is_spatialite_based
-
-    # CSV geofiletype
-    # Test getting a geofiletype for a suffix
-    info = _geofileinfo.get_geofileinfo(".csv")
-    assert info.driver == "CSV"
-    assert not info.is_fid_zerobased
-    assert info.is_singlelayer
-    assert not info.is_spatialite_based
+    assert info.is_fid_zerobased is True
+    assert info.is_singlelayer is True
+    assert info.is_spatialite_based is False

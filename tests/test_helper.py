@@ -287,11 +287,11 @@ def set_read_only(path: Path, read_only: bool) -> None:
 
     def _read_only(path: Path) -> None:
         # Set read-only
-        os.chmod(path, S_IRUSR | S_IRGRP | S_IROTH)
+        path.chmod(S_IRUSR | S_IRGRP | S_IROTH)
 
     def _read_write(path: Path) -> None:
         # Set read-write
-        os.chmod(path, S_IRWXU | S_IRWXG | S_IRWXO)
+        path.chmod(S_IRWXU | S_IRWXG | S_IRWXO)
 
     if path.exists():
         _read_only(path) if read_only else _read_write(path)

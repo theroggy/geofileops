@@ -17,7 +17,7 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops._compat import GEOPANDAS_GTE_10, SPATIALITE_GTE_51
+from geofileops._compat import GEOPANDAS_110, GEOPANDAS_GTE_10, SPATIALITE_GTE_51
 from geofileops.util import _general_util, _geofileinfo, _sqlite_util
 from geofileops.util import _geoops_sql as geoops_sql
 from geofileops.util._geofileinfo import GeofileInfo
@@ -447,10 +447,14 @@ def test_export_by_distance(tmp_path, testfile, suffix):
 @pytest.mark.parametrize(
     "suffix, epsg, gridsize, subdivide_coords",
     [
+        (".gpkg", 31370, 0.0, 2000),
         (".gpkg", 31370, 0.01, 2000),
         (".gpkg", 4326, 0.0, 2000),
         (".shp", 31370, 0.0, 10),
     ],
+)
+@pytest.mark.skipif(
+    GEOPANDAS_110, reason="a bug in geopandas 1.1.0 causes this test to fail"
 )
 def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords):
     # Prepare test data
@@ -499,6 +503,11 @@ def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords):
     # Remove rows where geometry is empty or None
     exp_gdf = exp_gdf[~exp_gdf.geometry.isna()]
     exp_gdf = exp_gdf[~exp_gdf.geometry.is_empty]
+
+    # If running locally, save the expected output for comparison
+    if "GITHUB_ACTIONS" not in os.environ:
+        exp_path = tmp_path / "expected.gpkg"
+        exp_gdf.to_file(exp_path)
 
     # If input was subdivided, the output geometries will have some extra points
     check_geom_tolerance = 0.0
