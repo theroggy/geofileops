@@ -22,6 +22,13 @@ from geofileops.util import (
     geodataframe_util,
 )
 
+try:
+    import matplotlib.colors as mcolors
+    from matplotlib import figure as mpl_figure
+except ImportError:
+    mcolors = None
+    mpl_figure = None
+
 data_dir = Path(__file__).parent.resolve() / "data"
 data_url = "https://raw.githubusercontent.com/geofileops/geofileops/main/tests/data"
 
@@ -510,8 +517,11 @@ def plot(
     if "GITHUB_ACTIONS" in os.environ:
         return
 
-    import matplotlib.colors as mcolors
-    from matplotlib import figure as mpl_figure
+    if mpl_figure is None or mcolors is None:
+        raise ImportError(
+            "matplotlib is not installed, but needed to plot geofiles. "
+            "Please install matplotlib."
+        )
 
     figure = mpl_figure.Figure(figsize=((len(geofiles) + 1) * 3, 3))
     figure.subplots(1, len(geofiles) + 1, sharex=True, sharey=True)

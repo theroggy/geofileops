@@ -5,6 +5,7 @@ import logging
 import logging.config
 import math
 import multiprocessing
+import re
 import shutil
 import string
 import warnings
@@ -347,7 +348,7 @@ def makevalid(
 
         # If we want a specific geometrytype, only extract the relevant type
         if force_output_geometrytype is not GeometryType.GEOMETRYCOLLECTION:
-            primitivetypeid = force_output_geometrytype.to_primitivetype.value
+            primitivetypeid = force_output_geometrytype.to_primitivetype.value  # type: ignore[union-attr]
             operation = f"ST_CollectionExtract({operation}, {primitivetypeid})"
 
     # Now we can prepare the entire statement
@@ -2282,8 +2283,6 @@ def _prepare_spatial_relation_filter(query: str) -> str:
     }
 
     # Parse query and replace things that need to be replaced
-    import re
-
     query_tokens = re.split("([ =()])", query)
 
     query_tokens_prepared = []
@@ -3447,7 +3446,7 @@ def _two_layer_vector_operation(
             and not explodecollections_now
         ):
             # convert geometrytype to multitype to avoid ogr warnings
-            output_geometrytype_now = force_output_geometrytype.to_multitype
+            output_geometrytype_now = force_output_geometrytype.to_multitype  # type: ignore[union-attr]
             if "geom" in column_datatypes:
                 assert output_geometrytype_now is not None
                 column_datatypes["geom"] = output_geometrytype_now.name

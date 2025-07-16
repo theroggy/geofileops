@@ -1,7 +1,11 @@
 """Some performance tests in context of processing many small files."""
 
+import cProfile
+import io
+import pstats
 import urllib.request
 import warnings
+from pstats import SortKey
 from time import perf_counter
 
 from osgeo import gdal
@@ -53,11 +57,6 @@ def test_perf_gfo_buffer(tmp_path):
     urllib.request.urlretrieve(remote_src, input)
 
     # Test!
-    import cProfile
-    import io
-    import pstats
-    from pstats import SortKey
-
     output = tmp_path / "output.gpkg"
     start = perf_counter()
 
@@ -85,11 +84,6 @@ def test_perf_gfo_intersection(tmp_path):
     gfo.copy(input1, input2)
 
     # Test!
-    import cProfile
-    import io
-    import pstats
-    from pstats import SortKey
-
     output = tmp_path / "output.gpkg"
     start = perf_counter()
 

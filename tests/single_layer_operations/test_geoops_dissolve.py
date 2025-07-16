@@ -15,7 +15,7 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops.util import _general_util, _geofileinfo
+from geofileops.util import _general_util, _geofileinfo, _geoops_sql
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
 from tests.test_helper import (
@@ -552,7 +552,6 @@ def test_dissolve_invalid_params(
         if sql_singlethread:
             if nb_squarish_tiles > 1:
                 pytest.skip("nb_squarish_tiles not relevant for dissolve_singlethread")
-            from geofileops.util import _geoops_sql
 
             _geoops_sql.dissolve_singlethread(
                 input_path=input_path,
