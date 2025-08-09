@@ -25,17 +25,27 @@ def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
             suffixed with a number to make the directory name unique. If a "/" is part
             of the base_dirname a subdirectory will be created: e.g. "foo/bar".
         parent_dir (Path, optional): The dir to create the tempdir in. If None, the
-            system temp dir is used. Defaults to None.
+            directory specified in the environment variable `GFO_TMPDIR` is used. If
+            that does not exist, the directory returned by :func:`tempfile.gettempdir`
+            is used. Defaults to None.
 
     Raises:
-        Exception: if it wasn't possible to create the temp dir because there
+        RuntimeError: if it wasn't possible to create the temp dir because there
             wasn't found a unique directory name.
 
     Returns:
         Path: the path to the temp dir created.
     """
     if parent_dir is None:
-        parent_dir = Path(tempfile.gettempdir())
+        tmp_dir = os.environ.get("GFO_TMPDIR")
+        if tmp_dir is None:
+            tmp_dir = tempfile.gettempdir()
+        elif tmp_dir == "":
+            raise RuntimeError(
+                "GFO_TMPDIR='' environment variable found which is not supported."
+            )
+
+        parent_dir = Path(tmp_dir)
 
     for i in range(1, 999999):
         try:
@@ -45,7 +55,7 @@ def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
         except FileExistsError:
             continue
 
-    raise Exception(
+    raise RuntimeError(
         f"Wasn't able to create a temporary dir with basedir: "
         f"{parent_dir / base_dirname}"
     )

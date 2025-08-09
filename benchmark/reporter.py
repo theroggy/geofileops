@@ -27,7 +27,7 @@ def generate_reports(results_path: Path, output_dir: Path):
     benchmark_df = pd.read_csv(results_path)
 
     def format_run_details(input: dict) -> str:
-        if input is None or input == np.nan:
+        if input is None or input == np.nan:  # noqa: PLW0177
             return ""
         if isinstance(input, str):
             input = ast.literal_eval(input)

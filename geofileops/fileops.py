@@ -36,6 +36,11 @@ from geofileops.util import (
     _ogr_util,
 )
 
+try:
+    import fiona
+except ImportError:
+    fiona = None
+
 logger = logging.getLogger(__name__)
 
 # Enable exceptions for GDAL
@@ -1545,7 +1550,11 @@ def _read_file_base_fiona(
         float_cols = list(result_gdf.select_dtypes(["float64"]).columns)
         if len(float_cols) > 0:
             # Check for all float columns found if they should be object columns instead
-            import fiona
+            if fiona is None:
+                raise ImportError(
+                    "fiona is not installed, but needed to read the file with"
+                    " GFO_IO_ENGINE=fiona. Please install fiona."
+                )
 
             with fiona.open(path, layer=layer) as collection:
                 assert collection.schema is not None
@@ -1815,7 +1824,7 @@ def to_file(
             raise ValueError(
                 f"Unsupported force_output_geometrytype: {force_output_geometrytype}"
             ) from None
-    if force_output_geometrytype is not None and force_output_geometrytype.is_multitype:
+    if force_output_geometrytype is not None and force_output_geometrytype.is_multitype:  # type: ignore[union-attr]
         force_multitype = True
 
     engine = ConfigOptions.io_engine
