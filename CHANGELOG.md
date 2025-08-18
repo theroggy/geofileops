@@ -13,6 +13,8 @@
 ### Bugs fixed
 
 - Fix `copy_file` for some special vsi cases (#703)
+- Fix handling `None` values for environment variables in the `gfo.TempEnv` context
+  manager (#710)
 
 ## 0.10.1 (2025-05-16)
 

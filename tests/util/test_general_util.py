@@ -6,6 +6,8 @@ import datetime
 import os
 import time
 
+import pytest
+
 import geofileops as gfo
 from geofileops.util import _general_util
 
@@ -41,22 +43,45 @@ def test_format_progress():
             print(message)
 
 
-def test_TempEnv():
-    test_var1 = "TEST_ENV_VARIABLE1"
-    test_var2 = "TEST_ENV_VARIABLE2"
-    test_var1_value_context = 1234
-    test_var2_value_orig = "test2_value_orig"
-    test_var2_value_context = "test2_value_context"
+@pytest.mark.parametrize(
+    "key, value_orig, value_context, expected_context",
+    [
+        ("INT_IN_CONTEXT", "NUMERIC_VALUE_orig", 1234, "1234"),
+        ("STRING_IN_CONTEXT", None, "STRING_VALUE_context", "STRING_VALUE_context"),
+        ("NONE_IN_CONTEXT", "NONE_VALUE_orig", None, None),
+        ("NONE_ALWAYS", None, None, None),
+    ],
+)
+def test_TempEnv(key, value_orig, value_context, expected_context):
+    """Test TempEnv context manager.
 
-    assert test_var1 not in os.environ
-    assert test_var2 not in os.environ
-    os.environ[test_var2] = test_var2_value_orig
+    This test checks if the environment variables are set correctly in the context
+    and restored after the context ends.
 
-    with gfo.TempEnv(
-        {test_var1: test_var1_value_context, test_var2: test_var2_value_context}
-    ):
-        assert os.environ[test_var1] == str(test_var1_value_context)
-        assert os.environ[test_var2] == test_var2_value_context
+    Also checks if multiple environment variables can be set in the context.
+    """
+    # Set the original value in the environment variable if needed
+    assert key not in os.environ
+    if value_orig is not None:
+        os.environ[key] = value_orig
 
-    assert test_var1 not in os.environ
-    assert os.environ[test_var2] == test_var2_value_orig
+    # Test with 2 environment variables as TempEnv should support multiple keys
+    key2 = "SECOND_KEY"
+    value2_orig = "SECOND_VALUE_orig"
+    value2_context = "SECOND_VALUE_context"
+    os.environ[key2] = value2_orig
+
+    # Check if the environment variables are properly set in the context
+    with gfo.TempEnv({key: value_context, key2: value2_context}):
+        if value_context is not None:
+            assert os.environ[key] == expected_context
+        else:
+            assert key not in os.environ
+        assert os.environ[key2] == value2_context
+
+    # Check if the environment variables are restored after the context
+    if value_orig is not None:
+        assert os.environ[key] == value_orig
+    else:
+        assert key not in os.environ
+    assert os.environ[key2] == value2_orig
