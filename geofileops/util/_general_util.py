@@ -184,6 +184,8 @@ class TempEnv:
     Existing values for variables are backed up and reset when the scope is left,
     variables that didn't exist before are deleted again.
 
+    If value is None, the environment variable is deleted within the context.
+
     Args:
         envs (Dict[str, Any]): dict with environment variables to set.
     """
@@ -200,7 +202,11 @@ class TempEnv:
                 self._envs_backup[name] = os.environ[name]
 
             # Set env variable to value
-            os.environ[name] = str(value)
+            if value is None:
+                if name in os.environ:
+                    del os.environ[name]
+            else:
+                os.environ[name] = str(value)
 
     def __exit__(self, type, value, traceback):
         # Set variables that were backed up back to original value

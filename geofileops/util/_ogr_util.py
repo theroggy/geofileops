@@ -497,8 +497,11 @@ def vector_translate(
     input_has_geometry_attribute = False
     try:
         # Till gdal 3.10 datetime columns can be interpreted wrongly with arrow.
-        if _compat.GDAL_ST_311 and "OGR2OGR_USE_ARROW_API" not in config_options:
-            config_options["OGR2OGR_USE_ARROW_API"] = False
+        # Additionally, enabling arrow seems to lead to (rare) random crashes, so
+        # for now, disable it by default.
+        use_arrow_key = "OGR2OGR_USE_ARROW_API"
+        if use_arrow_key not in config_options and use_arrow_key not in os.environ:
+            config_options[use_arrow_key] = False
 
         # Go!
         with set_config_options(config_options):

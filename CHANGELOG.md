@@ -9,10 +9,15 @@
 - Improve performance of two-layer operations using `nb_parallel=1` (#692)
 - Support to specify the directory used by geofileops to put temporary files via an
   environment variable (GFO_TMPDIR) (#707)
+- Add checks on invalid values in `ConfigOptions` (#711)
+- Improve performance of `makevalid` by using `apply_vectorized` under the hood (#713)
 
 ### Bugs fixed
 
 - Fix `copy_file` for some special vsi cases (#703)
+- Fix handling `None` values for environment variables in the `gfo.TempEnv` context
+  manager (#710)
+- Disable arrow in `gdal.VectorTranslate` to avoid random crashes (#714)
 
 ## 0.10.1 (2025-05-16)
 

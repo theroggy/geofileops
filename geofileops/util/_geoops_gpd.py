@@ -581,7 +581,7 @@ def makevalid(
         ) or input_layer.geometrytypename.startswith(force_output_geometrytype):
             keep_collapsed = False
 
-    apply(
+    apply_vectorized(
         input_path=Path(input_path),
         output_path=Path(output_path),
         func=lambda geom: pygeoops.make_valid(
