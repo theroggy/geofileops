@@ -7,18 +7,15 @@ from geofileops.util import _general_util
 
 
 @pytest.mark.parametrize(
-    "worker_type, input_layer_featurecount",
-    [("process", 1), ("thread", 101), ("auto", 1), ("auto", 100), ("auto", 101)],
+    "worker_type, input_layer_featurecount, expected",
+    [
+        ("processes", 1, "processes"),
+        ("threads", 101, "threads"),
+        ("auto", 1, "threads"),
+        ("auto", 100, "threads"),
+        ("auto", 101, "processes"),
+    ],
 )
-def test_use_threads(worker_type, input_layer_featurecount):
-    if worker_type == "process":
-        expected = False
-    elif worker_type == "thread":
-        expected = True
-    elif input_layer_featurecount <= 100:
-        expected = True
-    else:
-        expected = False
-
+def test_worker_type_to_use(worker_type, input_layer_featurecount, expected):
     with _general_util.TempEnv({"GFO_WORKER_TYPE": worker_type}):
-        assert _general_helper.use_threads(input_layer_featurecount) == expected
+        assert _general_helper.worker_type_to_use(input_layer_featurecount) == expected

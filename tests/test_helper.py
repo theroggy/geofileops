@@ -26,8 +26,8 @@ try:
     import matplotlib.colors as mcolors
     from matplotlib import figure as mpl_figure
 except ImportError:
-    mcolors = None
-    mpl_figure = None
+    mcolors = None  # type: ignore[assignment]
+    mpl_figure = None  # type: ignore[assignment]
 
 data_dir = Path(__file__).parent.resolve() / "data"
 data_url = "https://raw.githubusercontent.com/geofileops/geofileops/main/tests/data"

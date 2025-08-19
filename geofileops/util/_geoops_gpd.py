@@ -798,14 +798,17 @@ def _apply_geooperation_to_layer(
         assert process_params.batches is not None
 
         # Start processing
+        worker_type = _general_helper.worker_type_to_use(
+            process_params.nb_rows_to_process
+        )
         logger.info(
             f"Start processing ({process_params.nb_parallel} "
-            f"parallel workers, batch size: {process_params.batchsize})"
+            f"{worker_type}, batch size: {process_params.batchsize})"
         )
         with _processing_util.PooledExecutorFactory(
-            threadpool=_general_helper.use_threads(process_params.nb_rows_to_process),
+            worker_type=worker_type,
             max_workers=process_params.nb_parallel,
-            initializer=_processing_util.initialize_worker(),
+            initializer=_processing_util.initialize_worker(worker_type),
         ) as calculate_pool:
             # Prepare output filename
             tmp_output_path = tmp_dir / output_path.name
@@ -1663,11 +1666,12 @@ def _dissolve_polygons_pass(
     # Make sure the input file has a spatial index
     gfo.create_spatial_index(input_path, layer=input_layer, exist_ok=True)
 
-    # Start calculation in parallel
+    # Start calculation in parallel# Start processing
+    worker_type = _general_helper.worker_type_to_use(input_layer.featurecount)
     with _processing_util.PooledExecutorFactory(
-        threadpool=_general_helper.use_threads(input_layer.featurecount),
+        worker_type=worker_type,
         max_workers=nb_parallel,
-        initializer=_processing_util.initialize_worker(),
+        initializer=_processing_util.initialize_worker(worker_type),
     ) as calculate_pool:
         # Prepare output filename
         tempdir = output_onborder_path.parent

@@ -606,7 +606,7 @@ def test_dissolve_polygons_groupby_None(tmp_path):
     )
 
 
-@pytest.mark.parametrize("worker_type", ["thread", "process"])
+@pytest.mark.parametrize("worker_type", ["threads", "processes"])
 def test_dissolve_polygons_process_threads(tmp_path, worker_type):
     """
     Test dissolve polygons with different worker types.
@@ -816,7 +816,7 @@ def test_dissolve_polygons_aggcolumns_columns(tmp_path, suffix):
     groupby_columns = ["GEWASgroep"]
 
     # Force use of processes as workers
-    with gfo.TempEnv({"GFO_WORKER_TYPE": "process"}):
+    with gfo.TempEnv({"GFO_WORKER_TYPE": "processes"}):
         gfo.dissolve(
             input_path=input_path,
             output_path=output_path,

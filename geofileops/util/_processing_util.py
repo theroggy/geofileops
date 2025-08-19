@@ -7,34 +7,43 @@ from concurrent import futures
 
 import psutil
 
+WORKER_TYPES = {"threads", "processes"}
+
 
 class PooledExecutorFactory:
-    """Context manager to create an Executor.
+    """Context manager to create a pooled executor.
 
     Args:
-        threadpool (bool, optional): True to get a ThreadPoolExecutor,
-            False to get a ProcessPoolExecutor. Defaults to True.
-        max_workers (int, optional): Max number of workers.
+        worker_type (str, optional): type of executor pool to create.
+            "threads" for a ThreadPoolExecutor, "processes" for a ProcessPoolExecutor.
+        max_workers (int, optional): Maximum number of workers.
             Defaults to None to get automatic determination.
         initializer (function, optional): Function that does initialisations.
         mp_context (BaseContext, optional): multiprocessing context if processes are
-            used. If None "spawn" will be used for ALL platforms to avoid risks to
+            used. If None, "forkserver" will be used on linux to avoid risks on getting
             deadlocks. Defaults to None.
 
     """
 
     def __init__(
         self,
-        threadpool: bool = True,
+        worker_type: str = "processes",
         max_workers=None,
         initializer=None,
         mp_context: multiprocessing.context.BaseContext | None = None,
     ):
-        self.threadpool = threadpool
+        self.worker_type = worker_type.lower()
+        if self.worker_type not in WORKER_TYPES:
+            raise ValueError(
+                f"Invalid worker_type: {self.worker_type}. "
+                f"Must be one of {WORKER_TYPES}."
+            )
+
         if max_workers is not None and os.name == "nt":
             self.max_workers = min(max_workers, 61)
         else:
             self.max_workers = max_workers
+
         self.initializer = initializer
         self.mp_context = mp_context
         if mp_context is None and os.name not in {"nt", "darwin"}:
@@ -43,16 +52,22 @@ class PooledExecutorFactory:
         self.pool: futures.Executor | None = None
 
     def __enter__(self) -> futures.Executor:
-        if self.threadpool:
+        if self.worker_type == "threads":
             self.pool = futures.ThreadPoolExecutor(
                 max_workers=self.max_workers, initializer=self.initializer
             )
-        else:
+        elif self.worker_type == "processes":
             self.pool = futures.ProcessPoolExecutor(
                 max_workers=self.max_workers,
                 initializer=self.initializer,
                 mp_context=self.mp_context,
             )
+        else:
+            raise ValueError(
+                f"Invalid worker_type: {self.worker_type}. "
+                f"Must be one of {WORKER_TYPES}."
+            )
+
         return self.pool
 
     def __exit__(self, type, value, traceback):
@@ -60,11 +75,30 @@ class PooledExecutorFactory:
             self.pool.shutdown(wait=True)
 
 
-def initialize_worker():
-    # We don't want the workers to block the entire system, so make them nice
+def initialize_worker(worker_type: str):
+    """Some default inits.
+
+    Following things are done:
+    - Set the worker process priority low so the workers don't block the system.
+
+    Args:
+        worker_type (str): The type of worker to initialize.
+            "threads" for thread pool, "processes" for process pool.
+    """
+    worker_type = worker_type.lower()
+    if worker_type not in WORKER_TYPES:
+        raise ValueError(
+            f"Invalid worker_type: {worker_type}. Must be one of {WORKER_TYPES}."
+        )
+
+    # We don't want the workers to block the entire system, so make the workers nice
     # if they aren't quite nice already.
-    # Remark: on linux, depending on system settings it is not possible to
-    # decrease niceness, even if it was you who niced before.
+    #
+    # Remarks:
+    #   - on linux, depending on system settings it is not possible to decrease
+    #     niceness, even if it was you who niced before.
+    #   - we are setting the niceness of the process here, so in case of
+    #     `worker_type=threads` the main thread/process will also be impacted.
     nice_value = 15
     if getprocessnice() < nice_value:
         setprocessnice(nice_value)

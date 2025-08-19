@@ -650,6 +650,7 @@ def _single_layer_vector_operation(
         # Add application of gridsize around sql_template if specified
         if geom_selected and gridsize != 0.0:
             assert force_output_geometrytype is not None
+            assert isinstance(force_output_geometrytype, GeometryType)
             gridsize_op = _format_apply_gridsize_operation(
                 geometrycolumn=f"sub_gridsize.{input_layer.geometrycolumn}",
                 gridsize=gridsize,
@@ -718,19 +719,19 @@ def _single_layer_vector_operation(
             batch_filter="{batch_filter}",
         )
 
-        logger.info(
-            f"Start processing ({processing_params.nb_parallel} "
-            f"parallel workers, batch size: {processing_params.batchsize})"
-        )
-
         # Prepare temp output filename
         tmp_output_path = tempdir / output_path.name
 
         # Processing in threads is 2x faster for small datasets (on Windows)
+        worker_type = _general_helper.worker_type_to_use(input_layer.featurecount)
+        logger.info(
+            f"Start processing ({processing_params.nb_parallel} "
+            f"{worker_type}, batch size: {processing_params.batchsize})"
+        )
         with _processing_util.PooledExecutorFactory(
-            threadpool=_general_helper.use_threads(input_layer.featurecount),
+            worker_type=worker_type,
             max_workers=processing_params.nb_parallel,
-            initializer=_processing_util.initialize_worker(),
+            initializer=_processing_util.initialize_worker(worker_type),
         ) as calculate_pool:
             batches: dict[int, dict] = {}
             future_to_batch_id = {}
@@ -3163,6 +3164,7 @@ def _two_layer_vector_operation(
             force_output_geometrytype = input1_layer.geometrytype
         else:
             raise ValueError(f"unsupported {force_output_geometrytype=}")
+    assert isinstance(force_output_geometrytype, GeometryType | type(None))
 
     # For columns params, if a string is passed, convert to list
     if isinstance(input1_columns, str):
@@ -3424,11 +3426,6 @@ def _two_layer_vector_operation(
 
         # Calculate
         # ---------
-        logger.info(
-            f"Start processing ({processing_params.nb_parallel} "
-            f"parallel workers, batch size: {processing_params.batchsize})"
-        )
-
         # calculate_two_layers doesn't support explodecollections in one step:
         # there is an extra layer copy involved.
         # Normally explodecollections can be deferred to the appending of the
@@ -3451,10 +3448,15 @@ def _two_layer_vector_operation(
                 assert output_geometrytype_now is not None
                 column_datatypes["geom"] = output_geometrytype_now.name
 
+        worker_type = _general_helper.worker_type_to_use(input1_layer.featurecount)
+        logger.info(
+            f"Start processing ({processing_params.nb_parallel} "
+            f"{worker_type}, batch size: {processing_params.batchsize})"
+        )
         with _processing_util.PooledExecutorFactory(
-            threadpool=_general_helper.use_threads(input1_layer.featurecount),
+            worker_type=worker_type,
             max_workers=processing_params.nb_parallel,
-            initializer=_processing_util.initialize_worker(),
+            initializer=_processing_util.initialize_worker(worker_type),
         ) as calculate_pool:
             # Start looping
             batches: dict[int, dict] = {}

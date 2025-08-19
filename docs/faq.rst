@@ -60,9 +60,9 @@ variables:
 - `GFO_WORKER_TYPE`: the type of worker to use for parallel processing.
   Valid options are:
   
-    - **"process"**: batches are processed in parallel processes. This typically enables
+    - **"processes"**: batches are processed in parallel processes. This typically enables
       true concurrency so all CPU cores can be optimally used.
-    - **"thread"**: batches are processed in parallel threads. Due to the python "Global
+    - **"threads"**: batches are processed in parallel threads. Due to the python "Global
       Interpreter Lock" (GIL), the amount of actual concurrency depends on how the
       operation is implemented.
     - **"auto"**: for small files threads are used, for larger files processes. At the
