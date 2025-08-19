@@ -35,8 +35,8 @@ class ConfigOptions:
         supported_values = ["raise", "warn"]
         if value_cleaned not in supported_values:
             raise ValueError(
-                f"invalid value for configoption <GFO_ON_DATA_ERROR>: {value}, should "
-                f"be one of {supported_values}"
+                f"invalid value for configoption <GFO_ON_DATA_ERROR>: '{value}', "
+                f"should be one of {supported_values}"
             )
 
         return value_cleaned
@@ -44,7 +44,15 @@ class ConfigOptions:
     @classproperty
     def io_engine(cls):
         """The IO engine to use."""
-        return os.environ.get("GFO_IO_ENGINE", default="pyogrio").strip().lower()
+        io_engine = os.environ.get("GFO_IO_ENGINE", default="pyogrio").strip().lower()
+        supported_values = ["pyogrio", "fiona"]
+        if io_engine not in supported_values:
+            raise ValueError(
+                f"invalid value for configoption <GFO_IO_ENGINE>: '{io_engine}', "
+                f"should be one of {supported_values}"
+            )
+
+        return io_engine
 
     @classproperty
     def remove_temp_files(cls) -> bool:
@@ -67,7 +75,15 @@ class ConfigOptions:
         Returns:
             str: the type of workers to use. Defaults to "auto".
         """
-        return os.environ.get("GFO_WORKER_TYPE", default="auto").strip().lower()
+        worker_type = os.environ.get("GFO_WORKER_TYPE", default="auto").strip().lower()
+        supported_values = ["thread", "process", "auto"]
+        if worker_type not in supported_values:
+            raise ValueError(
+                f"invalid value for configoption <GFO_WORKER_TYPE>: '{worker_type}', "
+                f"should be one of {supported_values}"
+            )
+
+        return worker_type
 
 
 def get_bool(key: str, default: bool) -> bool:

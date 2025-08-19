@@ -38,7 +38,7 @@ jobs:
             python: "3.12"
             
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Conda environment with Micromamba
         uses: mamba-org/setup-micromamba@v2

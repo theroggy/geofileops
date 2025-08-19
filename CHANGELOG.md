@@ -9,6 +9,7 @@
 - Improve performance of two-layer operations using `nb_parallel=1` (#692)
 - Support to specify the directory used by geofileops to put temporary files via an
   environment variable (GFO_TMPDIR) (#707)
+- Add checks on invalid values in `ConfigOptions` (#711)
 
 ### Bugs fixed
 

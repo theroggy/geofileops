@@ -49,19 +49,71 @@ def test_get_bool_invalidvalue():
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    [("TRUE", True), ("FALSE", False), (None, True)],
+    "key, value, expected",
+    [
+        ("GFO_IO_ENGINE", "PYOgrio", "pyogrio"),
+        ("GFO_IO_ENGINE", "FIOna", "fiona"),
+        ("GFO_IO_ENGINE", None, "pyogrio"),
+        ("GFO_ON_DATA_ERROR", "RAIse", "raise"),
+        ("GFO_ON_DATA_ERROR", "WARn", "warn"),
+        ("GFO_ON_DATA_ERROR", None, "raise"),
+        ("GFO_REMOVE_TEMP_FILES", "TRUe", True),
+        ("GFO_REMOVE_TEMP_FILES", "FALse", False),
+        ("GFO_REMOVE_TEMP_FILES", None, True),
+        ("GFO_WORKER_TYPE", "THRead", "thread"),
+        ("GFO_WORKER_TYPE", "PROcess", "process"),
+        ("GFO_WORKER_TYPE", "AUTo", "auto"),
+        ("GFO_WORKER_TYPE", None, "auto"),
+    ],
 )
-def test_remove_temp_files(value, expected):
-    test_key = "GFO_REMOVE_TEMP_FILES"
-    if value is None:
-        if test_key in os.environ:
-            del os.environ[test_key]
-    else:
-        os.environ[test_key] = value
+def test_configoptions(key, value, expected):
+    """Test all ConfigOptions class properties."""
+    with gfo.TempEnv({key: value}):
+        if key == "GFO_IO_ENGINE":
+            result = ConfigOptions.io_engine
+        elif key == "GFO_ON_DATA_ERROR":
+            result = ConfigOptions.on_data_error
+        elif key == "GFO_REMOVE_TEMP_FILES":
+            result = ConfigOptions.remove_temp_files
+        elif key == "GFO_WORKER_TYPE":
+            result = ConfigOptions.worker_type
+        else:
+            raise ValueError(f"Unexpected key: {key}")
 
-    result = ConfigOptions.remove_temp_files
-    if test_key in os.environ:
-        del os.environ[test_key]
+    assert result == expected
 
-    assert result is expected
+
+@pytest.mark.parametrize(
+    "key, invalid_value, expected_error",
+    [
+        ("GFO_IO_ENGINE", "invalid", "invalid value for configoption <GFO_IO_ENGINE>"),
+        (
+            "GFO_ON_DATA_ERROR",
+            "invalid",
+            "invalid value for configoption <GFO_ON_DATA_ERROR>",
+        ),
+        (
+            "GFO_REMOVE_TEMP_FILES",
+            "invalid",
+            "invalid value for bool configoption <GFO_REMOVE_TEMP_FILES>",
+        ),
+        (
+            "GFO_WORKER_TYPE",
+            "invalid",
+            "invalid value for configoption <GFO_WORKER_TYPE>",
+        ),
+    ],
+)
+def test_configoptions_invalid(key, invalid_value, expected_error):
+    with gfo.TempEnv({key: invalid_value}):
+        with pytest.raises(ValueError, match=expected_error):
+            if key == "GFO_IO_ENGINE":
+                _ = ConfigOptions.io_engine
+            elif key == "GFO_ON_DATA_ERROR":
+                _ = ConfigOptions.on_data_error
+            elif key == "GFO_REMOVE_TEMP_FILES":
+                _ = ConfigOptions.remove_temp_files
+            elif key == "GFO_WORKER_TYPE":
+                _ = ConfigOptions.worker_type
+            else:
+                raise ValueError(f"Unexpected key: {key}")
