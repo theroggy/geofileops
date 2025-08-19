@@ -68,15 +68,15 @@ class ConfigOptions:
         """The type of workers to use for parallel processing.
 
         Supported values (case insensitive):
-            - "thread": use threads when processing in parallel.
-            - "process": use processes when processing in parallel.
+            - "threads": use threads when processing in parallel.
+            - "processes": use processes when processing in parallel.
             - "auto": determine the type automatically.
 
         Returns:
             str: the type of workers to use. Defaults to "auto".
         """
         worker_type = os.environ.get("GFO_WORKER_TYPE", default="auto").strip().lower()
-        supported_values = ["thread", "process", "auto"]
+        supported_values = ["threads", "processes", "auto"]
         if worker_type not in supported_values:
             raise ValueError(
                 f"invalid value for configoption <GFO_WORKER_TYPE>: '{worker_type}', "

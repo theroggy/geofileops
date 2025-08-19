@@ -150,7 +150,7 @@ def basic_combinations_to_test(
 
 
 @pytest.mark.parametrize("suffix_input", SUFFIXES_GEOOPS_INPUT)
-@pytest.mark.parametrize("worker_type", ["thread", "process"])
+@pytest.mark.parametrize("worker_type", ["threads", "processes"])
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
 def test_buffer(tmp_path, suffix_input, worker_type, geoops_module):
     """Buffer minimal test."""
@@ -332,8 +332,8 @@ def test_buffer_force(tmp_path, geoops_module):
     output_path = tmp_path / f"{input_path.stem}-output{input_path.suffix}"
     assert not output_path.exists()
 
-    # Use "process" worker type to test this as well
-    with _general_util.TempEnv({"GFO_WORKER_TYPE": "process"}):
+    # Use "processes" worker type to test this as well
+    with _general_util.TempEnv({"GFO_WORKER_TYPE": "processes"}):
         geoops.buffer(
             input_path=input_path,
             output_path=output_path,

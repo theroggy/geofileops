@@ -11,6 +11,7 @@
   environment variable (GFO_TMPDIR) (#707)
 - Add checks on invalid values in `ConfigOptions` (#711)
 - Improve performance of `makevalid` by using `apply_vectorized` under the hood (#713)
+- Add worker_type used to progress logging (#715)
 
 ### Bugs fixed
 
