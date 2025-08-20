@@ -7,18 +7,23 @@
 - Ensure that the featurecount is properly cached in GPKG files, also for older GDAL
   versions + small refactor (#693)
 - Improve performance of two-layer operations using `nb_parallel=1` (#692)
+- Add checks on invalid values in `ConfigOptions` (#711)
+- Add worker_type used to progress logging (#715)
+
+## 0.10.2 (2025-08-20)
+
+### Improvements
+
+- Improve performance of `makevalid` by using `apply_vectorized` under the hood (#713)
 - Support to specify the directory used by geofileops to put temporary files via an
   environment variable (GFO_TMPDIR) (#707)
-- Add checks on invalid values in `ConfigOptions` (#711)
-- Improve performance of `makevalid` by using `apply_vectorized` under the hood (#713)
-- Add worker_type used to progress logging (#715)
 
 ### Bugs fixed
 
+- Disable arrow in `gdal.VectorTranslate` to avoid random crashes (#714)
 - Fix `copy_file` for some special vsi cases (#703)
 - Fix handling `None` values for environment variables in the `gfo.TempEnv` context
   manager (#710)
-- Disable arrow in `gdal.VectorTranslate` to avoid random crashes (#714)
 
 ## 0.10.1 (2025-05-16)
 
