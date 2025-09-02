@@ -4,7 +4,6 @@ Helper functions for all tests.
 
 import os
 import re
-import tempfile
 from pathlib import Path
 from stat import S_IRGRP, S_IROTH, S_IRUSR, S_IRWXG, S_IRWXO, S_IRWXU
 
@@ -113,7 +112,7 @@ def prepare_test_file(
 ) -> Path:
     # Tmp dir
     if use_cachedir is True:
-        tmp_cache_dir = Path(tempfile.gettempdir()) / "geofileops_test_data"
+        tmp_cache_dir = _io_util.get_tempdir() / "geofileops_test_data"
         tmp_cache_dir.mkdir(parents=True, exist_ok=True)
     else:
         tmp_cache_dir = output_dir
@@ -194,7 +193,7 @@ def _get_testfile(
 
     # Prepare destination location
     if dst_dir is None:
-        dst_dir = Path(tempfile.gettempdir()) / "geofileops_test_data"
+        dst_dir = _io_util.get_tempdir() / "geofileops_test_data"
     assert isinstance(dst_dir, Path)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
@@ -346,25 +345,6 @@ class TestData:
     polygon_small_island = sh_geom.Polygon(
         shell=[(40, 40), (40, 50), (41, 50), (50, 50), (50, 40), (40, 40)],
         holes=[[(42, 42), (42, 43), (43, 43), (43, 42), (42, 42)]],
-    )
-
-
-def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
-    # Parent
-    if parent_dir is None:
-        parent_dir = Path(tempfile.gettempdir())
-
-    for i in range(1, 999999):
-        try:
-            tempdir = parent_dir / f"{base_dirname}_{i:06d}"
-            tempdir.mkdir(parents=True)
-            return Path(tempdir)
-        except FileExistsError:
-            continue
-
-    raise Exception(
-        "Wasn't able to create a temporary dir with basedir: "
-        f"{parent_dir / base_dirname}"
     )
 
 

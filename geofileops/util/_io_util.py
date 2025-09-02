@@ -12,7 +12,7 @@ import geofileops as gfo
 
 
 def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
-    """Creates a new tempdir in the default temp location.
+    """Creates a new temporary directory.
 
     Remark: the temp dir won't be cleaned up automatically!
 
@@ -37,15 +37,7 @@ def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
         Path: the path to the temp dir created.
     """
     if parent_dir is None:
-        tmp_dir = os.environ.get("GFO_TMPDIR")
-        if tmp_dir is None:
-            tmp_dir = tempfile.gettempdir()
-        elif tmp_dir == "":
-            raise RuntimeError(
-                "GFO_TMPDIR='' environment variable found which is not supported."
-            )
-
-        parent_dir = Path(tmp_dir)
+        parent_dir = get_tempdir()
 
     for i in range(1, 999999):
         try:
@@ -59,6 +51,23 @@ def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
         f"Wasn't able to create a temporary dir with basedir: "
         f"{parent_dir / base_dirname}"
     )
+
+
+def get_tempdir() -> Path:
+    """Returns the path to the geofileops temporary directory.
+
+    Returns:
+        Path: The path to the temporary directory.
+    """
+    tmp_dir = os.environ.get("GFO_TMPDIR")
+    if tmp_dir is None:
+        tmp_dir = tempfile.gettempdir()
+    elif tmp_dir == "":
+        raise RuntimeError(
+            "GFO_TMPDIR='' environment variable found which is not supported."
+        )
+
+    return Path(tmp_dir)
 
 
 def get_tempfile_locked(
@@ -92,7 +101,7 @@ def get_tempfile_locked(
     """
     # If no dir specified, use default temp dir
     if tempdir is None:
-        tempdir = Path(tempfile.gettempdir())
+        tempdir = get_tempdir()
     if dirname is not None:
         tempdir = tempdir / dirname
         tempdir.mkdir(parents=True, exist_ok=True)
