@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import time
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
@@ -477,6 +478,108 @@ def get_columns(
         logger.info(f"get_columns ready, took {time_taken:.2f} seconds")
 
     return columns
+
+
+def copy_table(
+    input_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
+    input_table: str,
+    output_table: str,
+    columns: Iterable[str] | None = None,
+    where: str | None = None,
+    preserve_fid: bool = False,
+    profile: SqliteProfile = SqliteProfile.DEFAULT,
+) -> None:
+    """Copy data from one to another table.
+
+    Notes:
+        - At the moment only appending to an existing table is supported.
+        - At the moment only copying from one sqlite file to another is supported.
+
+    Args:
+        input_path (PathLike): The path to the input SQLite database.
+        output_path (PathLike): The path to the output SQLite database.
+        input_table (str): The name of the input table.
+        output_table (str): The name of the output table.
+        columns (Iterable[str] | None, optional): The list of columns to copy. If None,
+            all columns will be copied.
+        where (str | None, optional): An optional SQL WHERE clause to filter the rows
+            to copy. Defaults to None.
+        preserve_fid (bool, optional): Whether to preserve values in the input FID
+            column. Defaults to False.
+        profile (SqliteProfile, optional): The SQLite profile to use.
+            Defaults to SqliteProfile.DEFAULT.
+    """
+    # copy_table only supports local paths... so we can just use Path
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+    if not input_path.exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    if not output_path.exists():
+        raise FileNotFoundError(f"Output file not found: {output_path}")
+    if input_path.resolve() == output_path.resolve():
+        raise ValueError(f"Input and output paths cannot be the same: {input_path}")
+
+    conn = sqlite3.connect(str(output_path), uri=True)
+
+    # Execute the insert statement
+    sql = None
+    try:
+        load_spatialite(conn)
+
+        if Path(output_path).suffix.lower() == ".gpkg":
+            sql = "SELECT EnableGpkgMode();"
+            conn.execute(sql)
+
+        # Attach the input database
+        sql = "ATTACH DATABASE ? AS input_db"
+        dbSpec = (str(input_path),)
+        conn.execute(sql, dbSpec)
+
+        # Set some default performance options
+        database_names = ["main", "input_db"]
+        set_performance_options(conn, profile, database_names)
+
+        # Start transaction manually needed for performance
+        sql = "BEGIN TRANSACTION;"
+        conn.execute(sql)
+
+        if columns is None:
+            # If the columns are not specified, determine them from the input table.
+            # If the input layer has fewer columns than the output, those columns will
+            # simply get the default values...
+            # If the fid should not be preserved, don't include it in the column list
+            column_filter = "" if preserve_fid else "WHERE lower(name) <> 'fid'"
+            sql = f"""
+                SELECT name
+                FROM pragma_table_info('{input_table}', 'input_db')
+                {column_filter};
+            """
+            columns = [value[0] for value in conn.execute(sql).fetchall()]
+
+        elif preserve_fid and "fid" not in [col.lower() for col in columns]:
+            # If preserve_fid is asked, the fid should be in the list of columns.
+            columns = list(columns)
+            columns.append("fid")
+
+        columns_str = ", ".join([f'"{col}"' for col in columns])
+        where_clause = f"WHERE {where}" if where else ""
+        sql = f"""
+            INSERT INTO main."{output_table}"
+                ({columns_str})
+            SELECT {columns_str}
+              FROM input_db."{input_table}"
+             {where_clause};
+        """
+        conn.execute(sql)
+
+        conn.commit()
+    except Exception as ex:  # pragma: no cover
+        conn.rollback()
+
+        raise RuntimeError(f"Error {ex} executing {sql}") from ex
+    finally:
+        conn.close()
 
 
 def create_table_as_sql(

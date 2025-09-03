@@ -11,11 +11,12 @@ def main():
         # "join_by_location_intersects",
         # "clip",
         # "intersection",
-        "intersection_complexpoly_agri",
+        # "intersection_complexpoly_agri",
         # "intersection_complexpoly_complexpoly",
         # "intersection_gridsize",
         # "symmetric_difference_complexpolys_agri",
         # "union",
+        "buffer_spatialite",
     ]
     # Run all bechmark functions
     # functions_to_run = None

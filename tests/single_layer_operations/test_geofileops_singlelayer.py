@@ -13,7 +13,7 @@ import shapely
 from shapely import MultiPolygon, Polygon
 
 from geofileops import GeometryType, fileops, geoops
-from geofileops._compat import SPATIALITE_GTE_51
+from geofileops._compat import GDAL_GTE_39, SPATIALITE_GTE_51
 from geofileops.util import _general_util, _geofileinfo, _geoops_sql, _geopath_util
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
@@ -197,6 +197,16 @@ def test_buffer_basic(
     dimensions,
 ):
     """Buffer basics are available both in the gpd and sql implementations."""
+    if (
+        not GDAL_GTE_39
+        and dimensions == "XYZ"
+        and suffix == ".gpkg"
+        and geoops_module != "_geoops_gpd"
+    ):
+        pytest.xfail(
+            "GDAL < 3.9 (at least) writes 3D geometries even though "
+            "force_geometrytype='MULTIPOLYGON' for buffer operation."
+        )
     # Prepare test data
     input_path = test_helper.get_testfile(
         testfile, suffix=suffix, epsg=epsg, empty=empty_input, dimensions=dimensions

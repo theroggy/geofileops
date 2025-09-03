@@ -161,7 +161,7 @@ def dissolve_groupby(tmp_dir: Path) -> RunResult:
     gfo.dissolve(
         input_path,
         output_path,
-        groupby_columns=["GEWASGROEP"],
+        groupby_columns=["LANDBSTR"],
         explodecollections=True,
         nb_parallel=nb_parallel,
         force=True,
@@ -171,7 +171,7 @@ def dissolve_groupby(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="dissolve_groupby",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=("dissolve on {input_descr}, groupby=[GEWASGROEP]"),
+        operation_descr=("dissolve on {input_descr}, groupby=[LANDBSTR]"),
         run_details={"nb_cpu": nb_parallel},
     )
 

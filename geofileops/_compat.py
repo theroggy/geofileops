@@ -15,6 +15,7 @@ gdal.UseExceptions()
 # must be dropped for the version checks here.
 GDAL_BASE_VERSION = version.parse(gdal.__version__.split("-")[0]).base_version
 GDAL_GTE_38 = version.parse(GDAL_BASE_VERSION) >= version.parse("3.8")
+GDAL_GTE_39 = version.parse(GDAL_BASE_VERSION) >= version.parse("3.9")
 GDAL_GTE_3101 = version.parse(GDAL_BASE_VERSION) >= version.parse("3.10.1")
 GDAL_ST_311 = version.parse(GDAL_BASE_VERSION) < version.parse("3.11")
 

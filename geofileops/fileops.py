@@ -34,6 +34,7 @@ from geofileops.util import (
     _io_util,
     _ogr_sql_util,
     _ogr_util,
+    _sqlite_util,
 )
 
 try:
@@ -2701,20 +2702,10 @@ def copy_layer(
         # creation option regarding spatial index creation should not be passed.
         create_spatial_index = None
 
-    if dst_layer is None:
-        dst_layer = get_default_layer(dst)
-
     # Check/clean input params
     if isinstance(columns, str):
         # If a string is passed, convert to list
         columns = [columns]
-
-    options = _ogr_util._prepare_gdal_options(options)
-    if (
-        create_spatial_index is not None
-        and "LAYER_CREATION.SPATIAL_INDEX" not in options
-    ):
-        options["LAYER_CREATION.SPATIAL_INDEX"] = create_spatial_index
 
     if where is not None:
         if not isinstance(src_layer, LayerInfo):
@@ -2727,13 +2718,65 @@ def copy_layer(
             path=src, layer=src_layer, sql_stmt=sql_stmt, columns=columns
         )
 
-    # When creating/appending to a shapefile, some extra things need to be done/checked.
+    if dst_layer is None:
+        dst_layer = get_default_layer(dst)
+    src_layername = src_layer.name if isinstance(src_layer, LayerInfo) else src_layer
+
+    # If the source and destination files are GeoPackages, and it involves a simple data
+    # copy, it is faster to copy the data directly in sqlite instead of via GDAL.
+    if (
+        access_mode == "append"
+        and Path(src).suffix.lower() == ".gpkg"
+        and Path(dst).suffix.lower() == ".gpkg"
+        and not sql_stmt
+        and (sql_dialect is None or sql_dialect == "SQLITE")
+        and not explodecollections
+        and not reproject
+        and force_output_geometrytype is None
+        and dst_dimensions is None
+        and (options is None or len(options) == 0)
+        and src_crs is None
+        and dst_crs is None
+        and Path(src).exists()
+        and Path(dst).exists()
+        and ConfigOptions.copy_layer_sqlite_direct
+    ):
+        # TODO: sql_stmt?, access_mode="create", create_spatial_index, dst_crs?
+        # TODO: create gfo config option to disable?
+        try:
+            name = src_layername if src_layername is not None else get_only_layer(src)
+            preserve_fid_local = preserve_fid if preserve_fid is not None else False
+            _sqlite_util.copy_table(
+                input_path=src,
+                output_path=dst,
+                input_table=name,
+                output_table=dst_layer,
+                columns=columns,
+                where=where,
+                preserve_fid=preserve_fid_local,
+            )
+            return
+
+        except Exception as ex:
+            logger.info(
+                f"Failed to copy data directly in sqlite, retry with gdal: {ex}"
+            )
+
+    options = _ogr_util._prepare_gdal_options(options)
+    if (
+        create_spatial_index is not None
+        and "LAYER_CREATION.SPATIAL_INDEX" not in options
+    ):
+        options["LAYER_CREATION.SPATIAL_INDEX"] = create_spatial_index
+
+    # When destination is a shapefile, some extra things need to be done/checked.
     if sql_stmt is None and Path(dst).suffix.lower() == ".shp":
         # If the destination file doesn't exist yet, and the source file has
         # geometrytype "Geometry", raise because type is not supported by shp (and will
         # default to linestring).
         if not isinstance(src_layer, LayerInfo):
             src_layer = get_layerinfo(src, src_layer, raise_on_nogeom=False)
+            src_layername = src_layer.name
         if (
             force_output_geometrytype is None
             and src_layer.geometrytypename in ["GEOMETRY", "GEOMETRYCOLLECTION"]
@@ -2769,7 +2812,6 @@ def copy_layer(
         columns = None
 
     # Go!
-    src_layername = src_layer.name if isinstance(src_layer, LayerInfo) else src_layer
     translate_info = _ogr_util.VectorTranslateInfo(
         input_path=src,
         output_path=dst,
