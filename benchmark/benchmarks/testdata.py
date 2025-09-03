@@ -1,7 +1,6 @@
 """Module to prepare test data for benchmarking geo operations."""
 
 import enum
-import itertools
 import logging
 import pprint
 import shutil
@@ -11,6 +10,7 @@ import zipfile
 from pathlib import Path
 
 import geopandas as gpd
+import pyproj
 import shapely
 import shapely.affinity
 
@@ -92,92 +92,134 @@ class TestFile(enum.Enum):
 
 def create_testfile(
     bbox: tuple[float, float, float, float],
-    crs: str = "epsg:31370",
-    nb_points: int = 20_000,
-    nb_polygons_x: int = 10,
-    nb_polygons_y: int = 1,
-    poly_width: int = 15000,
-    poly_height: int = 15000,
+    geoms: int,
+    polys_per_geom: int,
+    points_per_poly: int,
+    poly_width: int = 15_000,
+    poly_height: int = 15_000,
+    crs: int | str | pyproj.CRS | None = None,
     dst_dir: Path | None = None,
 ) -> tuple[Path, str]:
     """Creates a test file.
 
     Args:
         bbox (tuple[float, float, float, float]): the bounding box of the test file.
-        crs (str): the crs of the test file. Defaults to "epsg:31370".
-        nb_points (int): indication of the number of points the complex polygons
-            should consist of. Defaults to 20.000.
-        nb_polygons_x (int): the number of polygons in the x direction. Defaults to 10.
-        nb_polygons_y (int): the number of polygons in the y direction. Defaults to 1.
-        poly_width (int): the width of the polygons. Defaults to 15000.
-        poly_height (int): the height of the polygons. Defaults to 15000.
+        geoms (int): the number of geometries to generate.
+        polys_per_geom (int): the number of polygons to use per geometry. If > 1,
+            MultiPolygons will be created.
+        points_per_poly (int): indication of the number of points each polygon should
+            consist of.
+        poly_width (float): the width of the polygons. Defaults to 30000.
+        poly_height (float): the height of the polygons. Defaults to 30000.
+        crs (str): the crs of the test file. Defaults to None.
         dst_dir (Path): the directory to write the file to.
 
     Returns:
         tuple[Path, str]: The path to the file + a description of the test file.
     """
-    basename = (
-        f"custom_polys_{nb_polygons_x * nb_polygons_y}polys_{nb_points}pnts_"
-        f"{bbox[0]}-{bbox[1]}-{bbox[2]}-{bbox[3]}.gpkg"
-    )
+    # Format file name
+    if polys_per_geom == 1:
+        poly_str = f"{geoms}polys({points_per_poly}pnts)"
+    else:
+        poly_str = f"{geoms}multis({polys_per_geom}polys({points_per_poly}pnts))"
+    basename = f"testfile_{poly_str}_{bbox[0]}-{bbox[1]}-{bbox[2]}-{bbox[3]}.gpkg"
     testfile_path = _prepare_dst_path(basename, dst_dir=dst_dir)
 
-    descr_template = "complex polys ({nb_polys} * {nb_coords_str} coords)"
+    # Format file description
+    if points_per_poly > 1000:
+        nb_points_str = f"{int(points_per_poly / 1000)}k"
+    else:
+        nb_points_str = f"{points_per_poly}"
 
+    if polys_per_geom == 1:
+        descr = f"{geoms} polys of {nb_points_str} coords"
+    else:
+        descr = f"{geoms} multipolys of {polys_per_geom} * {nb_points_str} coords"
+
+    # If the files exists already, return
     if testfile_path.exists():
-        polys_gdf = gpd.read_file(testfile_path, engine="pyogrio")
-        nb_coords = shapely.get_num_coordinates(polys_gdf.iloc[0])
-        nb_polys = len(polys_gdf)
-        descr = descr_template.format(nb_polys=nb_polys, nb_coords=nb_coords)
-
         return (testfile_path, descr)
 
-    # Test if the bbox is big enough for the polygons
+    # Determine the number of polygons we can generate per row and column
+    poly_width_step = poly_width + poly_width * 0.1
+    poly_height_step = poly_height + poly_height * 0.1
+
     bbox_width = bbox[2] - bbox[0]
-    if poly_width * nb_polygons_x > bbox_width:
-        raise ValueError(
-            f"{bbox_width=} is too small for {nb_polygons_x=} with {poly_width=}"
-        )
+    if poly_width > bbox_width:
+        raise ValueError(f"{bbox_width=} is too small for {poly_width=}")
+    max_poly_x = int(bbox_width / poly_width_step)
+
     bbox_height = bbox[3] - bbox[1]
-    if poly_height * nb_polygons_y > bbox_height:
+    if poly_height > bbox_height:
+        raise ValueError(f"{bbox_height=} is too small for {poly_height=}")
+    max_poly_y = int(bbox_height / poly_height_step)
+
+    if polys_per_geom > max_poly_x * max_poly_y:
         raise ValueError(
-            f"{bbox_height=} is too small for {nb_polygons_y} with {poly_height=}"
+            f"{polys_per_geom=} is too large for {max_poly_x=} * {max_poly_y=} as "
+            "parts of a multipolygon cannot intersect"
         )
 
     # Create the polygons asked for
     logger.info(
-        f"create file with {nb_polygons_x * nb_polygons_y} polys of ~{nb_points} points"
+        f"create file with {geoms} (multi)polys of "
+        f"{polys_per_geom} * ~{nb_points_str} points"
     )
-    poly_complex = _create_complex_poly_points(
+
+    # Create a single complex polygon that we can reuse to create all others...
+    poly = _create_complex_poly_points(
         xmin=bbox[0],
         ymin=bbox[1],
         width=poly_width,
         height=poly_height,
-        nb_points=nb_points,
+        nb_points=points_per_poly,
     )
 
-    step_x = int(bbox_width // nb_polygons_x)
-    step_y = int(bbox_height // nb_polygons_y)
-    polys = [
-        shapely.affinity.translate(poly_complex, xoff=xoff, yoff=yoff)
-        for xoff, yoff in itertools.product(
-            range(0, (nb_polygons_x * step_x), step_x),
-            range(0, (nb_polygons_y * step_y), step_y),
-        )
-    ]
-    complex_gdf = gpd.GeoDataFrame(geometry=polys, crs="epsg:31370")
-    complex_gdf.to_file(testfile_path, engine="pyogrio")
-    nb_coords = shapely.get_num_coordinates(polys[0])
-    nb_polys = len(polys)
+    # Create the polygons. If many are asked, they can overlap, but for performance
+    # testing that should not matter.
+    result = []
+    x = 0
+    y = 0
+    for _ in range(geoms):
+        if polys_per_geom == 1:
+            xoff = x * poly_width_step
+            yoff = y * poly_height_step
+            result.append(shapely.affinity.translate(poly, xoff=xoff, yoff=yoff))
 
-    # Format the description
-    if nb_coords > 1000:
-        nb_coords_str = f"{int(nb_coords / 1000)}k"
-    else:
-        nb_coords_str = f"{nb_coords}"
-    descr = descr_template.format(nb_polys=nb_polys, nb_coords_str=nb_coords_str)
+            x, y = _move_xy(x, y, max_poly_x, max_poly_y)
+            continue
+
+        # Multipolygons asked, so create them
+        polys = []
+        for _ in range(polys_per_geom):
+            xoff = x * poly_width_step
+            yoff = y * poly_height_step
+            polys.append(shapely.affinity.translate(poly, xoff=xoff, yoff=yoff))
+
+            # Move to next polygon
+            x, y = _move_xy(x, y, max_poly_x, max_poly_y)
+
+        result.append(shapely.MultiPolygon(polys))
+
+    # Write all geometries to a file
+    complex_gdf = gpd.GeoDataFrame(geometry=result, crs=crs)
+    complex_gdf.to_file(testfile_path, engine="pyogrio")
 
     return (testfile_path, descr)
+
+
+def _move_xy(x, y, max_x, max_y):
+    # Move to next location in the grid
+    if x >= max_x:
+        x = 0
+        y += 1
+    elif y >= max_y:
+        y = 0
+        x = 0
+    else:
+        x += 1
+
+    return x, y
 
 
 def _create_complex_poly_points(
@@ -345,8 +387,11 @@ def _download_samplefile(url: str, dst_name: str, dst_dir: Path | None = None) -
     # just download
     url_path = Path(url)
     if url_path.suffix.lower() == dst_path.suffix.lower():
-        logger.info(f"Download to {dst_path}")
-        urllib.request.urlretrieve(url, dst_path)
+        logger.info(f"Download/copy to {dst_path}")
+        if url.startswith("http"):
+            urllib.request.urlretrieve(url, dst_path)
+        else:
+            shutil.copy(url, dst_path)
     else:
         # The file downloaded is different that the destination wanted, so some
         # converting will need to be done
@@ -360,8 +405,11 @@ def _download_samplefile(url: str, dst_name: str, dst_dir: Path | None = None) -
 
             # Download file
             tmp_path = tmp_dir / f"{dst_path.stem}{url_path.suffix.lower()}"
-            logger.info(f"Download tmp data to {tmp_path}")
-            urllib.request.urlretrieve(url, tmp_path)
+            logger.info(f"Download/copy tmp data to {tmp_path}")
+            if url.startswith("http"):
+                urllib.request.urlretrieve(url, tmp_path)
+            else:
+                shutil.copy(url, tmp_path)
 
             # If the temp file is a .zip file, unzip to dir
             if tmp_path.suffix == ".zip":

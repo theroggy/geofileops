@@ -7,13 +7,17 @@ import multiprocessing
 from datetime import datetime
 from pathlib import Path
 
+import shapely
+
 import geofileops as gfo
 from benchmark.benchmarker import RunResult
 from benchmark.benchmarks import testdata
 from geofileops.util import _geoops_gpd, _geoops_sql
 
 logger = logging.getLogger(__name__)
-nb_parallel = min(multiprocessing.cpu_count(), 12)
+nb_complex_polys = 12
+nb_complex_polys_coords = 100_000
+nb_parallel = min(multiprocessing.cpu_count(), nb_complex_polys)
 
 
 def _get_package() -> str:
@@ -90,8 +94,8 @@ def buffer_gridsize_spatialite(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="buffer_gridsize_spatialite",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=(f"buffer with gridsize 0.1 on {input_descr}"),
-        run_details={"nb_cpu": multiprocessing.cpu_count()},
+        operation_descr=f"buffer with gridsize 0.1 on {input_descr}",
+        run_details={"nb_cpu": nb_parallel},
     )
 
     # Cleanup and return
@@ -161,7 +165,7 @@ def dissolve_groupby(tmp_dir: Path) -> RunResult:
     gfo.dissolve(
         input_path,
         output_path,
-        groupby_columns=["LANDBSTR"],
+        groupby_columns=["GWSGRPH_LB"],
         explodecollections=True,
         nb_parallel=nb_parallel,
         force=True,
@@ -171,7 +175,7 @@ def dissolve_groupby(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation="dissolve_groupby",
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=("dissolve on {input_descr}, groupby=[LANDBSTR]"),
+        operation_descr=f"dissolve on {input_descr}, groupby=[GWSGRPH_LB]",
         run_details={"nb_cpu": nb_parallel},
     )
 
@@ -252,9 +256,16 @@ def export_by_location_intersects_complexpoly(tmp_dir: Path) -> RunResult:
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
     input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    bbox = gfo.get_layerinfo(input1_path).total_bounds
+    info1 = gfo.get_layerinfo(input1_path)
+    bbox = shapely.box(*info1.total_bounds).buffer(-10_000, join_style="mitre").bounds
+    crs = info1.crs
     input2_path, input2_descr = testdata.create_testfile(
-        bbox=bbox, nb_points=300_000, dst_dir=tmp_dir
+        bbox=bbox,
+        geoms=3,
+        polys_per_geom=4,
+        points_per_poly=300_000,
+        crs=crs,
+        dst_dir=tmp_dir,
     )
 
     # Go!
@@ -321,10 +332,17 @@ def intersection_complexpoly_agri(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input2_path, input2_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    bbox = gfo.get_layerinfo(input2_path).total_bounds
-    input1_path, input1_descr = testdata.create_testfile(
-        bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    info1 = gfo.get_layerinfo(input1_path)
+    bbox = shapely.box(*info1.total_bounds).buffer(-10_000, join_style="mitre").bounds
+    crs = info1.crs
+    input2_path, input2_descr = testdata.create_testfile(
+        bbox=bbox,
+        geoms=3,
+        polys_per_geom=4,
+        points_per_poly=30_000,
+        crs=crs,
+        dst_dir=tmp_dir,
     )
 
     # Go!
@@ -357,12 +375,13 @@ def intersection_complexpoly_complexpoly(tmp_dir: Path) -> RunResult:
 
     bbox = (30_000.123, 170_000.123, 250_000, 250_000)
     input1_path, input1_descr = testdata.create_testfile(
-        bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
+        bbox=bbox, geoms=3, polys_per_geom=4, points_per_poly=30_000, dst_dir=tmp_dir
     )
     bbox = (31_000.123, 171_000.123, 250_000, 250_000)
     input2_path, input2_descr = testdata.create_testfile(
-        bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
+        bbox=bbox, geoms=3, polys_per_geom=4, points_per_poly=30_000, dst_dir=tmp_dir
     )
+
     # Go!
     start_time = datetime.now()
     output_path = tmp_dir / f"{input1_path.stem}_inters_{input2_path.stem}.gpkg"
@@ -558,9 +577,16 @@ def symmetric_difference_complexpolys_agri(tmp_dir: Path) -> RunResult:
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
     input2_path, input2_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
-    bbox = gfo.get_layerinfo(input2_path).total_bounds
+    info2 = gfo.get_layerinfo(input2_path)
+    bbox = shapely.box(*info2.total_bounds).buffer(-10_000, join_style="mitre").bounds
+    crs = info2.crs
     input1_path, input1_descr = testdata.create_testfile(
-        bbox=bbox, nb_points=50_000, dst_dir=tmp_dir
+        bbox=bbox,
+        geoms=3,
+        polys_per_geom=4,
+        points_per_poly=30_000,
+        crs=crs,
+        dst_dir=tmp_dir,
     )
 
     # Go!
