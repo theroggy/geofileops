@@ -13,6 +13,31 @@ class ConfigOptions:
     """
 
     @classproperty
+    def copy_layer_sqlite_direct(cls) -> bool:
+        """Should copy_layer use sqlite directly when possible.
+
+        This is significantly faster than using GDAL for large datasets. At the moment
+        only used for .gpkg files.
+
+        Returns:
+            bool: True to use sqlite directly to copy layers. Defaults to True.
+        """
+        return get_bool("GFO_COPY_LAYER_SQLITE_DIRECT", default=True)
+
+    @classproperty
+    def io_engine(cls):
+        """The IO engine to use."""
+        io_engine = os.environ.get("GFO_IO_ENGINE", default="pyogrio").strip().lower()
+        supported_values = ["pyogrio", "fiona"]
+        if io_engine not in supported_values:
+            raise ValueError(
+                f"invalid value for configoption <GFO_IO_ENGINE>: '{io_engine}', "
+                f"should be one of {supported_values}"
+            )
+
+        return io_engine
+
+    @classproperty
     def on_data_error(cls) -> str:
         """The preferred action when a data error occurs.
 
@@ -40,19 +65,6 @@ class ConfigOptions:
             )
 
         return value_cleaned
-
-    @classproperty
-    def io_engine(cls):
-        """The IO engine to use."""
-        io_engine = os.environ.get("GFO_IO_ENGINE", default="pyogrio").strip().lower()
-        supported_values = ["pyogrio", "fiona"]
-        if io_engine not in supported_values:
-            raise ValueError(
-                f"invalid value for configoption <GFO_IO_ENGINE>: '{io_engine}', "
-                f"should be one of {supported_values}"
-            )
-
-        return io_engine
 
     @classproperty
     def remove_temp_files(cls) -> bool:

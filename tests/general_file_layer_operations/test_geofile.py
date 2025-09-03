@@ -831,23 +831,27 @@ def test_copy_layer_to_gpkg_zip(tmp_path):
 @pytest.mark.parametrize(
     "src",
     [
+        f"{test_helper.data_dir.as_posix()}/polygon-parcel.gpkg",
+        f"/vsicurl/{test_helper.data_url}/polygon-parcel.gpkg",
         f"/vsizip//vsicurl/{test_helper.data_url}/poly_shp.zip",
         f"/vsizip//vsicurl/{test_helper.data_url}/poly_shp.zip/poly.shp",
         f"/vsizip/{test_helper.data_dir.as_posix()}/poly_shp.zip",
         f"/vsizip/{test_helper.data_dir.as_posix()}/poly_shp.zip/poly.shp",
     ],
 )
-def test_copy_layer_vsi(tmp_path, src):
-    # Prepare test data
-    dst = tmp_path / "output.gpkg"
+def test_copy_layer_vsi(src):
+    dst = "/vsimem/output.gpkg"
 
-    # copy_layer with vsi
-    gfo.copy_layer(src, dst)
+    try:
+        # copy_layer with vsi
+        gfo.copy_layer(src, dst)
 
-    # Now compare source and dst file
-    src_layerinfo = gfo.get_layerinfo(src)
-    dst_layerinfo = gfo.get_layerinfo(dst)
-    assert src_layerinfo.featurecount == dst_layerinfo.featurecount
+        # Now compare source and dst file
+        src_layerinfo = gfo.get_layerinfo(src)
+        dst_layerinfo = gfo.get_layerinfo(dst)
+        assert src_layerinfo.featurecount == dst_layerinfo.featurecount
+    finally:
+        gdal.Unlink(dst)
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)

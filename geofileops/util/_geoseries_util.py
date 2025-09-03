@@ -43,7 +43,7 @@ def get_geometrytypes(
     geom_types_2D = input_geoseries[~input_geoseries.has_z].geom_type.unique()
     geom_types_2D = [gtype for gtype in geom_types_2D if gtype is not None]
     geom_types_3D = input_geoseries[input_geoseries.has_z].geom_type.unique()
-    geom_types_3D = ["3D " + gtype for gtype in geom_types_3D if gtype is not None]
+    geom_types_3D = [f"{gtype}Z" for gtype in geom_types_3D if gtype is not None]
     geom_types = geom_types_3D + geom_types_2D
 
     if len(geom_types) == 0:

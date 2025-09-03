@@ -104,6 +104,89 @@ def test_add_gpkg_ogr_contents_layer_force_update(tmp_path):
     assert ogr_contents[layer]["feature_count"] == featurecount_orig
 
 
+def test_copy_table(tmp_path):
+    """Test the copy_table function."""
+    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    layer = gfo.get_only_layer(input_path)
+    info = gfo.get_layerinfo(input_path, layer)
+    output_path = tmp_path / "output.gpkg"
+    gfo.copy(input_path, output_path)
+
+    # Append the layer to itself
+    sqlite_util.copy_table(
+        input_path=input_path,
+        output_path=output_path,
+        input_table=layer,
+        output_table=layer,
+    )
+
+    # Check if the rows were appended
+    result = gfo.read_file(output_path)
+    assert info.featurecount * 2 == len(result)
+
+
+def test_copy_table_columns(tmp_path):
+    """Test the copy_table function, but only copy some columns.
+
+    The columns that are not copied will be NULL in the output file.
+    """
+    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    layer = gfo.get_only_layer(input_path)
+    info = gfo.get_layerinfo(input_path, layer)
+    output_path = tmp_path / "output.gpkg"
+    gfo.copy(input_path, output_path)
+
+    # Append the layer to itself, but only copy the 'geom' column
+    sqlite_util.copy_table(
+        input_path=input_path,
+        output_path=output_path,
+        input_table=layer,
+        output_table=layer,
+        columns=["geom", "OIDN"],
+    )
+
+    # Check if the rows were appended
+    result = gfo.read_file(output_path)
+    assert info.featurecount * 2 == len(result)
+    # For all appended rows, the columns that were not copied should be NULL
+    for column in result.columns:
+        if column in ("geometry", "OIDN"):
+            assert result[column].iloc[info.featurecount :].notnull().all()
+        else:
+            assert result[column].iloc[info.featurecount :].isnull().all()
+
+
+def test_copy_table_error(tmp_path):
+    """Test error handling in the copy_table function."""
+    test_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    layer = gfo.get_only_layer(test_path)
+
+    with pytest.raises(ValueError, match="Input and output paths cannot be the same"):
+        sqlite_util.copy_table(
+            input_path=test_path,
+            output_path=test_path,
+            input_table=layer,
+            output_table=layer,
+        )
+
+    # Both input and output files should exist
+    not_existing_path = tmp_path / "not_existing_file.gpkg"
+    with pytest.raises(FileNotFoundError, match="Input file not found"):
+        sqlite_util.copy_table(
+            input_path=not_existing_path,
+            output_path=test_path,
+            input_table=layer,
+            output_table=layer,
+        )
+    with pytest.raises(FileNotFoundError, match="Output file not found"):
+        sqlite_util.copy_table(
+            input_path=test_path,
+            output_path=not_existing_path,
+            input_table=layer,
+            output_table=layer,
+        )
+
+
 @pytest.mark.parametrize(
     "filename, filetype, crs_epsg",
     [

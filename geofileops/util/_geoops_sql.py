@@ -81,7 +81,7 @@ def buffer(
               {{batch_filter}}
     """
 
-    # Buffer operation always results in polygons...
+    # Buffer operation always results in 2D polygons...
     if explodecollections:
         force_output_geometrytype = GeometryType.POLYGON
     else:
@@ -808,28 +808,29 @@ def _single_layer_vector_operation(
                     continue
 
                 if (
-                    nb_batches == 1
-                    and tmp_partial_output_path.suffix == tmp_output_path.suffix
+                    tmp_partial_output_path.suffix == tmp_output_path.suffix
                     and where_post is None
+                    and not tmp_output_path.exists()
                 ):
-                    # If there is only one batch
+                    # If it is the first partial file
                     #   + partial file is already is correct file format
                     #   + no more where_post needs to be applied
-                    # -> just rename partial file, because it is already OK.
+                    # -> just rename partial file, as that's faster than copy_layer.
                     gfo.move(tmp_partial_output_path, tmp_output_path)
                 else:
-                    # Append partial file to full destination file
+                    # Copy partial file contents to full tmp output file
                     if where_post is not None:
                         info = gfo.get_layerinfo(tmp_partial_output_path, output_layer)
                         where_post = where_post.format(
                             geometrycolumn=info.geometrycolumn
                         )
+
+                    # force_output_geometrytype and explodecollections have already been
+                    # applied during calculation, so need to apply it here anymore.
                     fileops.copy_layer(
                         src=tmp_partial_output_path,
                         dst=tmp_output_path,
                         write_mode="append",
-                        explodecollections=explodecollections,
-                        force_output_geometrytype=force_output_geometrytype,
                         where=where_post,
                         create_spatial_index=False,
                         preserve_fid=preserve_fid,
@@ -3023,6 +3024,7 @@ def union(
             input1_subdivided_path=input1_subdivided_path,
             input2_subdivided_path=input2_subdivided_path,
         )
+        # Note: append will never create an index on an already existing layer.
         fileops.copy_layer(
             src=diff2_output_path,
             dst=intersection_output_path,
@@ -3430,23 +3432,21 @@ def _two_layer_vector_operation(
         # there is an extra layer copy involved.
         # Normally explodecollections can be deferred to the appending of the
         # partial files, but if explodecollections and there is a where_post to
-        # be applied, it needs to be applied now already. Otherwise the
-        # where_post in the append of partial files later on won't give correct
-        # results!
-        explodecollections_now = False
-        output_geometrytype_now = force_output_geometrytype
-        if explodecollections and where_post is not None:
-            explodecollections_now = True
-        if (
-            force_output_geometrytype is not None
-            and explodecollections
-            and not explodecollections_now
-        ):
-            # convert geometrytype to multitype to avoid ogr warnings
-            output_geometrytype_now = force_output_geometrytype.to_multitype  # type: ignore[union-attr]
-            if "geom" in column_datatypes:
-                assert output_geometrytype_now is not None
-                column_datatypes["geom"] = output_geometrytype_now.name
+        # be applied, it needs to be applied during calculation already.
+        # Otherwise the where_post in the append of partial files later on
+        # won't give correct results!
+        explode_calc = True if explodecollections and where_post is not None else False
+        explode_append = True if explodecollections and not explode_calc else False
+
+        # Apply the geometrytype already during calculation
+        output_geometrytype_calc = force_output_geometrytype
+        if output_geometrytype_calc is not None and "geom" in column_datatypes:
+            column_datatypes["geom"] = output_geometrytype_calc.name
+        output_geometrytype_append = (
+            force_output_geometrytype
+            if explode_append or output_path.suffix == ".shp"
+            else None
+        )
 
         worker_type = _general_helper.worker_type_to_use(input1_layer.featurecount)
         logger.info(
@@ -3487,8 +3487,8 @@ def _two_layer_vector_operation(
                     output_path=tmp_partial_output_path,
                     sql_stmt=sql_stmt,
                     output_layer=output_layer,
-                    explodecollections=explodecollections_now,
-                    force_output_geometrytype=output_geometrytype_now,
+                    explodecollections=explode_calc,
+                    force_output_geometrytype=output_geometrytype_calc,
                     output_crs=output_crs,
                     use_ogr=use_ogr,
                     create_spatial_index=False,
@@ -3529,20 +3529,21 @@ def _two_layer_vector_operation(
                     logger.warning(f"Result file {tmp_partial_output_path} not found")
                     continue
 
-                # If there is only one tmp_partial file and it is already ok as
-                # output file, just rename/move it.
+                # If this is the first partial file (no tmp output file yet), just
+                # rename/move it as that is faster.
                 if (
-                    nb_batches == 1
-                    and not explodecollections
-                    and force_output_geometrytype is None
+                    not explodecollections
+                    and output_geometrytype_append is None
                     and where_post is None
                     and tmp_partial_output_path.suffix.lower()
                     == tmp_output_path.suffix.lower()
+                    and not tmp_output_path.exists()
                 ):
                     gfo.move(tmp_partial_output_path, tmp_output_path)
 
                     if tmp_output_path.suffix.lower() == ".gpkg":
-                        # If the output file is a geopackage, add gpkg_ogr_contents
+                        # If the output file is a geopackage, make sure
+                        # gpkg_ogr_contents exists
                         _sqlite_util.add_gpkg_ogr_contents(
                             database=tmp_output_path,
                             layer=output_layer,
@@ -3561,8 +3562,8 @@ def _two_layer_vector_operation(
                         src_layer=output_layer,
                         dst_layer=output_layer,
                         write_mode="append",
-                        explodecollections=explodecollections,
-                        force_output_geometrytype=force_output_geometrytype,
+                        explodecollections=explode_append,
+                        force_output_geometrytype=output_geometrytype_append,
                         where=where_post,
                         create_spatial_index=create_spatial_index,
                         preserve_fid=False,

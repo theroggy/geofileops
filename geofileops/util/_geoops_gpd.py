@@ -843,6 +843,7 @@ def _apply_geooperation_to_layer(
                     output_layer=output_layer,
                     where=batch_filter,
                     explodecollections=explodecollections,
+                    force_output_geometrytype=force_output_geometrytype,
                     gridsize=gridsize,
                     keep_empty_geoms=keep_empty_geoms,
                     preserve_fid=preserve_fid,
@@ -879,14 +880,12 @@ def _apply_geooperation_to_layer(
                         tmp_partial_output_path.exists()
                         and tmp_partial_output_path.stat().st_size > 0
                     ):
-                        # Remark: because force_output_geometrytype for GeoDataFrame
-                        # operations is (a lot) more limited than gdal-based, use the
-                        # gdal version via _append_to_nolock.
+                        # Remark: force_output_geometrytype and explodecollections have
+                        # already been applied in the calculation step.
                         if (
-                            nb_batches == 1
-                            and force_output_geometrytype is None
+                            where_post is None
                             and tmp_partial_output_path.suffix == tmp_output_path.suffix
-                            and where_post is None
+                            and not tmp_output_path.exists()
                         ):
                             gfo.move(tmp_partial_output_path, tmp_output_path)
                         else:
@@ -896,9 +895,7 @@ def _apply_geooperation_to_layer(
                                 src_layer=output_layer,
                                 dst_layer=output_layer,
                                 write_mode="append",
-                                explodecollections=explodecollections,
                                 create_spatial_index=False,
-                                force_output_geometrytype=force_output_geometrytype,
                                 where=where_post,
                                 preserve_fid=preserve_fid,
                             )
@@ -946,6 +943,7 @@ def _apply_geooperation(
     columns: list[str] | None = None,
     where=None,
     explodecollections: bool = False,
+    force_output_geometrytype: GeometryType | str | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     preserve_fid: bool = False,
@@ -1032,11 +1030,11 @@ def _apply_geooperation(
 
     # If the result is empty, and no output geometrytype specified, use input
     # geometrytype
-    force_output_geometrytype = None
-    if len(data_gdf) == 0:
-        force_output_geometrytype = input_layer.geometrytype
-        if not explodecollections:
-            force_output_geometrytype = force_output_geometrytype.to_multitype
+    if force_output_geometrytype is None and len(data_gdf) == 0:
+        if explodecollections:
+            force_output_geometrytype = input_layer.geometrytype.to_singletype
+        else:
+            force_output_geometrytype = input_layer.geometrytype.to_multitype
 
     # If the index is still unique, save it to fid column so to_file can save it
     if preserve_fid:
@@ -1409,6 +1407,7 @@ def dissolve(
                     output_tmp_path,
                     dst_layer=output_layer,
                     write_mode="append",
+                    preserve_fid=False,
                 )
 
             # If there is a result...
@@ -1758,15 +1757,22 @@ def _dissolve_polygons_pass(
                         output_notonborder_tmp_partial_path.exists()
                         and output_notonborder_tmp_partial_path.stat().st_size > 0
                     ):
-                        fileops.copy_layer(
-                            src=output_notonborder_tmp_partial_path,
-                            dst=output_notonborder_path,
-                            src_layer=output_layer,
-                            dst_layer=output_layer,
-                            write_mode="append",
-                            create_spatial_index=False,
-                        )
-                        gfo.remove(output_notonborder_tmp_partial_path)
+                        if not output_notonborder_path.exists():
+                            fileops.move(
+                                src=output_notonborder_tmp_partial_path,
+                                dst=output_notonborder_path,
+                            )
+                        else:
+                            fileops.copy_layer(
+                                src=output_notonborder_tmp_partial_path,
+                                dst=output_notonborder_path,
+                                src_layer=output_layer,
+                                dst_layer=output_layer,
+                                write_mode="append",
+                                create_spatial_index=False,
+                                preserve_fid=False,
+                            )
+                            gfo.remove(output_notonborder_tmp_partial_path)
 
                     # If calculate gave onborder results, append to output
                     output_onborder_tmp_partial_path = batches[batch_id][
@@ -1776,15 +1782,22 @@ def _dissolve_polygons_pass(
                         output_onborder_tmp_partial_path.exists()
                         and output_onborder_tmp_partial_path.stat().st_size > 0
                     ):
-                        fileops.copy_layer(
-                            src=output_onborder_tmp_partial_path,
-                            dst=output_onborder_path,
-                            src_layer=output_layer,
-                            dst_layer=output_layer,
-                            write_mode="append",
-                            create_spatial_index=False,
-                        )
-                        gfo.remove(output_onborder_tmp_partial_path)
+                        if not output_onborder_path.exists():
+                            fileops.move(
+                                src=output_onborder_tmp_partial_path,
+                                dst=output_onborder_path,
+                            )
+                        else:
+                            fileops.copy_layer(
+                                src=output_onborder_tmp_partial_path,
+                                dst=output_onborder_path,
+                                src_layer=output_layer,
+                                dst_layer=output_layer,
+                                write_mode="append",
+                                create_spatial_index=False,
+                                preserve_fid=False,
+                            )
+                            gfo.remove(output_onborder_tmp_partial_path)
 
             except Exception as ex:
                 batch_id = future_to_batch_id[future]
