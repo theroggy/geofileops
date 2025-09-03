@@ -75,3 +75,23 @@ Name: 0, dtype: int32 coords)",47.468376,{'nb_cpu': 12}
 2025-09-03 16:27:46.036300,geofileops,0.10.2,makevalid_spatialite,makevalid_spatialite on agri parcels (515k polys),10.202266,{'nb_cpu': 12}
 2025-09-03 16:28:37.366967,geofileops,0.10.2,symmetric_difference_complexpolys_agri,symmetric_difference_complexpolys_agri between 3 multipolys of 4 * 30k coords and agri parcels (515k polys),51.255259,{'nb_cpu': 12}
 2025-09-03 16:30:15.834446,geofileops,0.10.2,union,union between agri parcels (521k polys) and agri parcels (521k polys),98.398466,{'nb_cpu': 12}
+2025-09-03 16:39:37.474387,geofileops,0.11.0.dev3,buffer,buffer on agri parcels (515k polys),12.167648,{'nb_cpu': 12}
+2025-09-03 16:39:50.897945,geofileops,0.11.0.dev3,buffer_gpd,buffer on agri parcels (515k polys),13.289273,{'nb_cpu': 12}
+2025-09-03 16:40:08.182116,geofileops,0.11.0.dev3,buffer_gridsize_spatialite,buffer with gridsize 0.1 on agri parcels (515k polys),17.143069,{'nb_cpu': 12}
+2025-09-03 16:40:19.773960,geofileops,0.11.0.dev3,buffer_spatialite,buffer on agri parcels (515k polys),11.489523,{'nb_cpu': 12}
+2025-09-03 16:40:40.082367,geofileops,0.11.0.dev3,clip,clip between agri parcels (515k polys) and agri parcels (521k polys),20.18178,{'nb_cpu': 12}
+2025-09-03 16:41:05.678508,geofileops,0.11.0.dev3,dissolve_groupby,"dissolve on agri parcels (515k polys), groupby=[GWSGRPH_LB]",25.596141,{'nb_cpu': 12}
+2025-09-03 16:41:30.636029,geofileops,0.11.0.dev3,dissolve,dissolve on agri parcels (515k polys),24.921295,{'nb_cpu': 12}
+2025-09-03 16:41:38.804981,geofileops,0.11.0.dev3,export_by_location_intersects,export_by_location_intersects between agri parcels (515k polys) and agri parcels (521k polys) ,8.126758,{'nb_cpu': 12}
+2025-09-03 16:43:35.194797,geofileops,0.11.0.dev3,export_by_location_intersects_complexpoly,export_by_location_intersects_complexpoly between agri parcels (515k polys) and 3 multipolys of 4 * 300k coords,116.319714,{'nb_cpu': 12}
+2025-09-03 16:43:55.693501,geofileops,0.11.0.dev3,intersection,intersection between agri parcels (515k polys) and agri parcels (521k polys),20.464737,{'nb_cpu': 12}
+2025-09-03 16:44:08.461282,geofileops,0.11.0.dev3,intersection_complexpoly_agri,intersection_complexpoly_agri between agri parcels (515k polys) and 3 multipolys of 4 * 30k coords,12.6741,{'nb_cpu': 12}
+2025-09-03 16:44:13.919421,geofileops,0.11.0.dev3,intersection_complexpoly_complexpoly,intersection_complexpoly_complexpoly between 3 multipolys of 4 * 30k coords and 3 multipolys of 4 * 30k coords,5.455402,{'nb_cpu': 12}
+2025-09-03 16:44:38.083444,geofileops,0.11.0.dev3,intersection_gridsize,intersection_gridsize 0.001 between agri parcels (515k polys) and agri parcels (521k polys),24.143294,{'nb_cpu': 12}
+2025-09-03 16:44:59.068051,geofileops,0.11.0.dev3,join_by_location_intersects,join_by_location_intersects between agri parcels (515k polys) and agri parcels (521k polys),20.889679,{'nb_cpu': 12}
+2025-09-03 16:45:06.741156,geofileops,0.11.0.dev3,makevalid_gpd,makevalid_gpd on agri parcels (515k polys),7.420596,{'nb_cpu': 12}
+2025-09-03 16:45:17.727896,geofileops,0.11.0.dev3,makevalid_gridsize_gpd,makevalid_gridsize_gpd on agri parcels (515k polys),10.92624,{'nb_cpu': 12}
+2025-09-03 16:45:27.774210,geofileops,0.11.0.dev3,makevalid_gridsize_spatialite,makevalid_gridsize_spatialite on agri parcels (515k polys),9.987247,{'nb_cpu': 12}
+2025-09-03 16:45:35.285993,geofileops,0.11.0.dev3,makevalid_spatialite,makevalid_spatialite on agri parcels (515k polys),7.459407,{'nb_cpu': 12}
+2025-09-03 16:46:21.731024,geofileops,0.11.0.dev3,symmetric_difference_complexpolys_agri,symmetric_difference_complexpolys_agri between 3 multipolys of 4 * 30k coords and agri parcels (515k polys),46.372229,{'nb_cpu': 12}
+2025-09-03 16:47:52.257676,geofileops,0.11.0.dev3,union,union between agri parcels (521k polys) and agri parcels (521k polys),90.45934,{'nb_cpu': 12}
