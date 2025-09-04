@@ -91,6 +91,13 @@ def initialize_worker(worker_type: str):
             f"Invalid worker_type: {worker_type}. Must be one of {WORKER_TYPES}."
         )
 
+    # Reduce OpenMP threads to avoid unnecessary inflated committed memory when using
+    # multiprocessing.
+    # Should work for any numeric library used (openblas, mkl,...).
+    # Ref: https://stackoverflow.com/questions/77764228/pandas-scipy-high-commit-memory-usage-windows
+    if os.environ.get("OMP_NUM_THREADS") is None:
+        os.environ["OMP_NUM_THREADS"] = "1"
+
     # We don't want the workers to block the entire system, so make the workers nice
     # if they aren't quite nice already.
     #
