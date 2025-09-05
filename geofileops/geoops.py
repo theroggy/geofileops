@@ -1859,6 +1859,7 @@ def clip(
     where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    subdivide_coords: int = 7500,
     force: bool = False,
 ):
     """Clip the input layer with the clip layer.
@@ -1912,7 +1913,12 @@ def clip(
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
-        force (bool, optional): overwrite existing output file(s).
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about ``subdivide_coords`` coordinates during processing which
+            can offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 7500.
+        force (bool, optional): True to overwrite existing output file(s).
             Defaults to False.
 
     See Also:

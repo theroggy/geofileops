@@ -4,6 +4,7 @@
 
 ### Improvements
 
+- Improve performance of clip with a complex clip layer (#740)
 - Improve performance of most operations by using a direct gpkg to gpkg append via
   sqlite where possible (#728)
 - Improve performance of the check + the subdivide if input files contain complex
@@ -14,6 +15,7 @@
 - Add checks on invalid values in `ConfigOptions` (#711)
 - Add worker_type used to progress logging (#715)
 - Write gdal log files to `GFO_TMPDIR` if specified (#727)
+- Reduce memory being committed on hardware with many cores (#717)
 
 ## 0.10.2 (2025-08-20)
 

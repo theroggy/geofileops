@@ -897,12 +897,15 @@ def clip(
     where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    subdivide_coords: int = 7500,
     force: bool = False,
     input_columns_prefix: str = "",
     output_with_spatial_index: bool | None = None,
 ):
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return
+
+    operation_name = "clip"
 
     # In the query, important to only extract the geometry types that are expected
     if not isinstance(input_layer, LayerInfo):
@@ -914,6 +917,21 @@ def clip(
     force_output_geometrytype = input_layer.geometrytype
     if not explodecollections and force_output_geometrytype is not GeometryType.POINT:
         force_output_geometrytype = force_output_geometrytype.to_multitype
+
+    # Subdivide the clip layer if applicable to speed up further processing.
+    tmp_dir = _io_util.create_tempdir(f"geofileops/{operation_name}")
+    clip_subdivided_path = _subdivide_layer(
+        path=clip_path,
+        layer=clip_layer,
+        output_path=tmp_dir / "subdivided/clip_layer.gpkg",
+        subdivide_coords=subdivide_coords,
+        keep_fid=True,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        operation_prefix=f"{operation_name}/",
+    )
+    if clip_subdivided_path is not None:
+        clip_path = clip_subdivided_path
 
     # Prepare sql template for this operation
     # Remarks:
@@ -972,7 +990,7 @@ def clip(
         input2_path=clip_path,
         output_path=output_path,
         sql_template=sql_template,
-        operation_name="clip",
+        operation_name=operation_name,
         input1_layer=input_layer,
         input1_columns=input_columns,
         input1_columns_prefix=input_columns_prefix,
