@@ -54,6 +54,13 @@ variables:
   to the data OF THE ENTIRE TILE being "dropped", so use with care! Defaults to "raise".
 - `GFO_REMOVE_TEMP_FILES`: whether to remove temp files being created after use, e.g.
   for debugging purposes. Valid values are e.g. "TRUE" or "FALSE". Defaults to "TRUE".
+- `GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION`: if the input file is being checked for
+  complex geometries during a subdivide operation in parallel, this value indicates the
+  fraction of rows to be checked. E.g. if set to 5, 1 out of 5 rows will be checked.
+  Defaults to 5.
+- `GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS`: if the input file to be checked for complex
+  geometries during a subdivide operation has more rows than this value, the check will
+  be done in parallel. Defaults to 500000.
 - `GFO_TMPDIR`: directory to be used by geofileops to put temporary files. If not
   specified, defaults to the default python temp directory as returned by
   `tempfile.gettempdir <https://docs.python.org/3/library/tempfile.html#tempfile.gettempdir>`_.

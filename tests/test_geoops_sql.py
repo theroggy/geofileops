@@ -139,6 +139,29 @@ def test_subdivide_layer(
 
 
 @pytest.mark.parametrize(
+    "nb_rows, fraction", [("1000", "1"), ("10", "5"), ("10", "1"), (None, None)]
+)
+def test_subdivide_layer_check_parallel(tmp_path, nb_rows, fraction):
+    path = test_helper.get_testfile("polygon-parcel")
+    layer = gfo.get_layerinfo(path)
+
+    envs = {
+        "GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION": fraction,
+        "GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS": nb_rows,
+    }
+    with gfo.TempEnv(envs):
+        result = _geoops_sql._subdivide_layer(
+            path=path,
+            layer=layer,
+            output_path=tmp_path,
+            subdivide_coords=1,
+            keep_fid=False,
+        )
+
+    assert result is not None
+
+
+@pytest.mark.parametrize(
     (
         "query, "
         "subdivided, "

@@ -3,6 +3,7 @@ Tests for functionalities in geoseries_util.
 """
 
 import geopandas as gpd
+import numpy as np
 import pytest
 import shapely
 import shapely.geometry as sh_geom
@@ -287,3 +288,76 @@ def test_set_precision(geometry, exp_geometry, raise_on_topoerror):
         assert result.tolist() == exp_geometry
     else:
         assert result == exp_geometry
+
+
+@pytest.mark.parametrize(
+    "geom, num_coords_max, exp_nb_parts",
+    [
+        (None, 2, None),
+        (test_helper.TestData.multipolygon, 5, 5),
+        (test_helper.TestData.polygon_with_island, 5, 4),
+        (test_helper.TestData.linestring, 2, 2),
+        (test_helper.TestData.point, 1, 1),
+        (test_helper.TestData.geometrycollection, 5, 11),
+    ],
+)
+@pytest.mark.skipif(
+    not compat.GEOS_GTE_313, reason="Proper normalize requires GEOS >= 3.13"
+)
+def test_subdivide(geom, num_coords_max, exp_nb_parts):
+    """Test subdivide function."""
+    result = _geoseries_util.subdivide(geom, num_coords_max=num_coords_max)
+
+    if geom is None:
+        assert result is None
+        return
+
+    if not isinstance(geom, shapely.Point):
+        assert isinstance(result, shapely.GeometryCollection)
+        assert len(result.geoms) == exp_nb_parts
+
+    # Check that the union of all parts is equal to the original geometry
+    union = shapely.union_all(result)
+    assert shapely.equals(union.normalize(), geom.normalize())
+
+
+@pytest.mark.parametrize(
+    "geom, num_coords_max, exp_nb_parts",
+    [
+        (None, 2, None),
+        (test_helper.TestData.multipolygon, 5, 5),
+        (np.array([test_helper.TestData.multipolygon]), 5, 5),
+        (
+            np.array(
+                [
+                    test_helper.TestData.multipolygon,
+                    test_helper.TestData.polygon_with_island,
+                ]
+            ),
+            5,
+            5,
+        ),
+    ],
+)
+def test_subdivide_vectorized(geom, num_coords_max, exp_nb_parts):
+    """Test vectorized subdivide function."""
+    result = _geoseries_util.subdivide_vectorized(geom, num_coords_max=num_coords_max)
+
+    if geom is None:
+        assert result is None
+        return
+
+    if isinstance(geom, np.ndarray):
+        assert isinstance(result, np.ndarray)
+        assert len(result) == len(geom)
+        result = result[0]
+        exp_union_result = geom[0]
+    else:
+        exp_union_result = geom
+
+    assert isinstance(result, shapely.GeometryCollection)
+    assert len(result.geoms) == exp_nb_parts
+
+    # Check that the union of all parts is equal to the original geometry
+    union = shapely.union_all(result)
+    assert shapely.equals(union, exp_union_result)

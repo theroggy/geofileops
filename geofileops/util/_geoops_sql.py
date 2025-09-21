@@ -5,9 +5,11 @@ import logging
 import logging.config
 import math
 import multiprocessing
+import os
 import re
 import shutil
 import string
+import time
 import warnings
 from collections.abc import Iterable
 from concurrent import futures
@@ -17,9 +19,6 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-import pygeoops
-import shapely
-import shapely.geometry.base
 
 import geofileops as gfo
 from geofileops import GeometryType, LayerInfo, PrimitiveType, fileops
@@ -30,6 +29,7 @@ from geofileops.util import (
     _general_util,
     _geofileinfo,
     _geoops_gpd,
+    _geoseries_util,
     _io_util,
     _ogr_sql_util,
     _ogr_util,
@@ -1313,7 +1313,8 @@ def _subdivide_layer(
         layer (str, LayerInfo): layer in the file to be subdivided.
         output_path (Path): the path to create the subdivided file in. If the directory
             doesn't exist yet, it is created.
-        subdivide_coords (int): number of coordinates to aim for.
+        subdivide_coords (int): number of coordinates to aim for. A layer is subdivided
+            if it has at least 1 geometry with > `subdivide_coords` * 2 coordinates.
         keep_fid (bool): True to retain the fid column in the output file.
         nb_parallel (int, optional): _description_. Defaults to -1.
         batchsize (int, optional): _description_. Defaults to -1.
@@ -1331,101 +1332,30 @@ def _subdivide_layer(
     if layer.geometrytype == GeometryType.POINT:
         return None
 
-    # If layer has complex geometries, subdivide them.
-    complexgeom_sql = f"""
-        SELECT 1
-          FROM "{layer.name}" layer
-         WHERE ST_NPoints({layer.geometrycolumn}) > {subdivide_coords}
-         LIMIT 1
-    """
-    logger.info(
-        f"Check if complex geometries in {path.name}/{layer.name} (> {subdivide_coords}"
-        " coords)"
-    )
-    complexgeom_df = gfo.read_file(path, sql_stmt=complexgeom_sql, sql_dialect="SQLITE")
-    if len(complexgeom_df) <= 0:
+    has_complex_geoms = _has_complex_geoms(path, layer, subdivide_coords)
+    if not has_complex_geoms:
         return None
-
-    logger.info("Subdivide needed: complex geometries found")
-
-    # Do subdivide using python function, because all spatialite options didn't
-    # seem to work.
-    # Check out commits in https://github.com/geofileops/geofileops/pull/433
-    def subdivide(geom, num_coords_max):
-        if geom is None or geom.is_empty:
-            return geom
-
-        if isinstance(geom, shapely.geometry.base.BaseMultipartGeometry):
-            # Simple single geometry
-            result = shapely.get_parts(
-                pygeoops.subdivide(geom, num_coords_max=num_coords_max)
-            )
-        else:
-            geom = shapely.get_parts(geom)
-            if len(geom) == 1:
-                # There was only one geometry in the multigeometry
-                result = shapely.get_parts(
-                    pygeoops.subdivide(geom[0], num_coords_max=num_coords_max)
-                )
-            else:
-                to_subdivide = shapely.get_num_coordinates(geom) > num_coords_max
-                if np.any(to_subdivide):
-                    subdivided = np.concatenate(
-                        [
-                            shapely.get_parts(
-                                pygeoops.subdivide(g, num_coords_max=num_coords_max)
-                            )
-                            for g in geom[to_subdivide]
-                        ]
-                    )
-                    result = np.concatenate([subdivided, geom[~to_subdivide]])
-                else:
-                    result = geom
-
-        if result is None:
-            return None
-        if not hasattr(result, "__len__"):
-            return result
-        if len(result) == 1:
-            return result[0]
-
-        # Explode because
-        #   - they will be exploded anyway by spatialite.ST_Collect
-        #   - spatialite.ST_AsBinary and/or spatialite.ST_GeomFromWkb don't seem
-        #     to handle nested collections well.
-        return shapely.geometrycollections(result)
-
-    def subdivide_vectorized(geom, num_coords_max):
-        if geom is None:
-            return None
-
-        if not hasattr(geom, "__len__"):
-            return subdivide(geom, num_coords_max)
-
-        to_subdivide = shapely.get_num_coordinates(geom) > num_coords_max
-        geom[to_subdivide] = np.array(
-            [subdivide(g, num_coords_max=num_coords_max) for g in geom[to_subdivide]]
-        )
-
-        return geom
 
     # Keep the fid column if needed
     columns = ["fid"] if keep_fid else []
 
+    # Subdividing can be a relatively expensive operation, so use min_rows_per_batch=1.
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _geoops_gpd.apply_vectorized(
         input_path=path,
         input_layer=layer,
         output_path=output_path,
         output_layer=layer.name,
-        func=lambda geom: subdivide_vectorized(geom, num_coords_max=subdivide_coords),
+        func=lambda geom: _geoseries_util.subdivide_vectorized(
+            geom, num_coords_max=subdivide_coords
+        ),
         operation_name=f"{operation_prefix}subdivide",
         columns=columns,
         explodecollections=True,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         parallelization_config=_geoops_gpd.ParallelizationConfig(
-            bytes_per_row=2000, max_rows_per_batch=50000
+            bytes_per_row=2000, max_rows_per_batch=50000, min_rows_per_batch=1
         ),
     )
     if keep_fid:
@@ -1435,6 +1365,99 @@ def _subdivide_layer(
         fileops.execute_sql(output_path, sql_stmt=sql_create_index)
 
     return output_path
+
+
+def _has_complex_geoms(path: Path, layer: LayerInfo, max_coords: int) -> bool:
+    """Check if a layer has complex geometries.
+
+    A layer is considered to have complex geometries if any of its geometries
+    have more than `max_coords` coordinates.
+
+    Parameters:
+        path (Path): The path to the data file.
+        layer (LayerInfo): The layer information.
+        max_coords (int): The number of coordinates to check against.
+
+    Returns:
+        bool: True if the layer has complex geometries, False otherwise.
+    """
+    start = time.perf_counter()
+
+    sql_template = f"""
+        SELECT 1 FROM "{layer.name}" layer
+         WHERE 1=1
+           {{batch_filter}}
+           AND ST_NPoints({layer.geometrycolumn}) > {max_coords}
+         LIMIT 1
+    """
+    complex_found = False
+    if layer.featurecount < ConfigOptions.subdivide_check_parallel_rows:
+        # For small files, simple check
+        logger.info(
+            f"Check for complex geometries in {path.name}/{layer.name} "
+            f"(> {max_coords} coords)"
+        )
+        sql = sql_template.format(batch_filter="")
+        complexgeom_df = gfo.read_file(path, sql_stmt=sql, sql_dialect="SQLITE")
+        if len(complexgeom_df) > 0:
+            complex_found = True
+
+    else:
+        # For large files, check for complex geometries in parallel + check a fraction
+        # of all rows.
+        nb_parallel = 4
+        fraction_to_check = ConfigOptions.subdivide_check_parallel_fraction
+        logger.info(
+            f"Check for complex geometries in 1/{fraction_to_check} rows in "
+            f"{path.name}/{layer.name} (> {max_coords} coords)"
+        )
+        processing_params = _prepare_processing_params(
+            input1_path=path,
+            input1_layer=layer,
+            input1_layer_alias="layer",
+            nb_parallel=nb_parallel,
+            batchsize=math.ceil(layer.featurecount / (nb_parallel * fraction_to_check)),
+        )
+        # If None is returned, just stop.
+        if processing_params is None or processing_params.batches is None:
+            return False
+
+        # On windows, use threads as processes have too much overhead
+        worker_type = "threads" if os.name == "nt" else "processes"
+        with _processing_util.PooledExecutorFactory(
+            worker_type=worker_type,
+            max_workers=processing_params.nb_parallel,
+            initializer=_processing_util.initialize_worker(worker_type, 0),
+        ) as pool:
+            process_futures = []
+            for batch_id, batch_info in processing_params.batches.items():
+                if batch_id % fraction_to_check != 0:
+                    # Only check a fraction of the batches
+                    continue
+
+                sql = sql_template.format(batch_filter=batch_info["batch_filter"])
+                process_futures.append(
+                    pool.submit(
+                        fileops.read_file,
+                        path,
+                        sql_stmt=sql,
+                        sql_dialect="SQLITE",
+                    )
+                )
+
+            # If any batch contains complex geometries, we can stop already
+            for future in futures.as_completed(process_futures):
+                result = future.result()
+                if len(result) > 0:
+                    complex_found = True
+                    pool.shutdown(wait=True, cancel_futures=True)
+                    break
+
+    took = time.perf_counter() - start
+    if took > 0:
+        logger.info(f"{complex_found=}, check took {took:.2f}s")
+
+    return complex_found
 
 
 def export_by_location(
@@ -1705,7 +1728,7 @@ def intersection(  # noqa: D417
     where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 7500,
+    subdivide_coords: int = 15000,
     force: bool = False,
     output_with_spatial_index: bool | None = None,
     operation_prefix: str = "",
@@ -3901,8 +3924,8 @@ def _convert_to_spatialite_based(
 def _prepare_processing_params(
     input1_path: Path,
     input1_layer: LayerInfo,
-    tempdir: Path,
-    nb_parallel: int,
+    tempdir: Path | None = None,
+    nb_parallel: int = -1,
     batchsize: int = -1,
     input1_layer_alias: str | None = None,
     input1_is_subdivided: bool = False,
@@ -4032,7 +4055,9 @@ def _prepare_processing_params(
         batches=batches,
         batchsize=int(nb_rows_input_layer / len(batches)),
     )
-    returnvalue.to_json(tempdir / "processing_params.json")
+    if tempdir is not None:
+        returnvalue.to_json(tempdir / "processing_params.json")
+
     return returnvalue
 
 

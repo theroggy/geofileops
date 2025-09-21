@@ -75,16 +75,21 @@ class PooledExecutorFactory:
             self.pool.shutdown(wait=True)
 
 
-def initialize_worker(worker_type: str):
+def initialize_worker(worker_type: str, nice_value: int = 15):
     """Some default inits.
 
     Following things are done:
-    - Set the worker process priority low so the workers don't block the system.
-    - Reduce OpenMP threads to avoid committed memory getting very high.
+    - Set the worker process priority low (to `nice_value`) so the workers don't block
+      the system.
+    - Reduce OpenMP threads to avoid committed memory getting very high. You can specify
+      the number of threads using the environment variable `GFO_WORKER_OMP_NUM_THREADS`.
 
     Args:
         worker_type (str): The type of worker to initialize.
             "threads" for thread pool, "processes" for process pool.
+        nice_value (int, optional): The niceness value to set for the worker. 19 is the
+            maximum niceness (lowest priority), and -20 is the minimum
+            (highest priority). Defaults to 15.
     """
     worker_type = worker_type.lower()
     if worker_type not in WORKER_TYPES:
@@ -108,7 +113,6 @@ def initialize_worker(worker_type: str):
     #     niceness, even if it was you who niced before.
     #   - we are setting the niceness of the process here, so in case of
     #     `worker_type=threads` the main thread/process will also be impacted.
-    nice_value = 15
     if getprocessnice() < nice_value:
         setprocessnice(nice_value)
 

@@ -76,6 +76,29 @@ class ConfigOptions:
         return get_bool("GFO_REMOVE_TEMP_FILES", default=True)
 
     @classproperty
+    def subdivide_check_parallel_fraction(cls) -> int:
+        """For a file being checked in parallel, the fraction of features to check.
+
+        Returns:
+            int: The fraction of features to check for subdivision. Defaults to 5.
+        """
+        fraction = os.environ.get("GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION", default="5")
+
+        return int(fraction)
+
+    @classproperty
+    def subdivide_check_parallel_rows(cls) -> int:
+        """If a file has more rows, check if subdivide is needed in parallel.
+
+        Returns:
+            int: The minimum number of rows a file must have to check for subdivision in
+                parallel. Defaults to 500000.
+        """
+        rows = os.environ.get("GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS", default="500000")
+
+        return int(rows)
+
+    @classproperty
     def worker_type(cls) -> str:
         """The type of workers to use for parallel processing.
 
