@@ -27,7 +27,8 @@ from tests.test_helper import SUFFIXES_GEOOPS, TESTFILES, assert_geodataframe_eq
 
 @pytest.mark.parametrize("testfile", TESTFILES)
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
-def test_clip(tmp_path, testfile, suffix):
+@pytest.mark.parametrize("subdivide_coords", [0, 5])
+def test_clip(tmp_path, testfile, suffix, subdivide_coords):
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
     clip_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
@@ -39,6 +40,7 @@ def test_clip(tmp_path, testfile, suffix):
         output_path=str(output_path),
         where_post=None,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
     )
 
     # Compare result with geopandas
