@@ -51,8 +51,16 @@ def test_clip(tmp_path, testfile, suffix, subdivide_coords):
     input_gdf = gfo.read_file(input_path)
     clip_gdf = gfo.read_file(clip_path)
     output_gpd_gdf = gpd.clip(input_gdf, clip_gdf, keep_geom_type=True)
+
+    # If input was subdivided, the output geometries will have some extra points
+    check_geom_tolerance = 0.0 if subdivide_coords == 0 else 1e-9
     assert_geodataframe_equal(
-        output_gdf, output_gpd_gdf, promote_to_multi=True, sort_values=True
+        output_gdf,
+        output_gpd_gdf,
+        normalize=True,
+        promote_to_multi=True,
+        sort_values=True,
+        check_geom_tolerance=check_geom_tolerance,
     )
 
 

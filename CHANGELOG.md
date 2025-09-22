@@ -9,6 +9,7 @@
   sqlite where possible (#728)
 - Improve performance of the subdividividing used in many operations (#730)
 - Improve performance of two-layer operations using `nb_parallel=1` (#692)
+- Alternative query for clip + default subdivide_coords to 15000 (#450)
 - Ensure that the featurecount is properly cached in GPKG files, also for older GDAL
   versions + small refactor (#693)
 - Add checks on invalid values in `ConfigOptions` (#711)

@@ -897,7 +897,7 @@ def clip(
     where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 7500,
+    subdivide_coords: int = 15000,
     force: bool = False,
     input_columns_prefix: str = "",
     output_with_spatial_index: bool | None = None,
@@ -935,51 +935,38 @@ def clip(
 
     # Prepare sql template for this operation
     # Remarks:
-    # - ST_intersection(geometry , NULL) gives NULL as result! -> hence the CASE
-    # - use of the with instead of an inline view is a lot faster
+    # - ST_intersection(geometry , NULL) gives NULL as result
     # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening e.g.
     #   "geom IS NOT NULL" leads to geom operation to be calculated twice!
-    # - WHERE geom IS NOT NULL to avoid rows with a NULL geom, they give issues in
-    #   later operations.
     input1_layer_rtree = "rtree_{input1_layer}_{input1_geometrycolumn}"
     input2_layer_rtree = "rtree_{input2_layer}_{input2_geometrycolumn}"
+
     sql_template = f"""
-        SELECT * FROM
-          ( WITH layer2_unioned AS (
-              SELECT layer1.rowid AS layer1_rowid
-                    ,ST_union(layer2.{{input2_geometrycolumn}}) AS geom
-                FROM {{input1_databasename}}."{{input1_layer}}" layer1
-                JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-                  ON layer1.fid = layer1tree.id
-                JOIN {{input2_databasename}}."{{input2_layer}}" layer2
-                JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                  ON layer2.fid = layer2tree.id
-               WHERE 1=1
-                 {{batch_filter}}
-                 AND layer1tree.minx <= layer2tree.maxx
-                 AND layer1tree.maxx >= layer2tree.minx
-                 AND layer1tree.miny <= layer2tree.maxy
-                 AND layer1tree.maxy >= layer2tree.miny
-                 AND ST_Intersects(
-                        layer1.{{input1_geometrycolumn}},
-                        layer2.{{input2_geometrycolumn}}) = 1
-                 --AND ST_Touches(
-                 --       layer1.{{input1_geometrycolumn}},
-                 --       layer2.{{input2_geometrycolumn}}) = 0
-               GROUP BY layer1.rowid
-               LIMIT -1 OFFSET 0
-            )
-            SELECT CASE WHEN layer2_unioned.geom IS NULL THEN NULL
-                        ELSE ST_CollectionExtract(
-                               ST_intersection(layer1.{{input1_geometrycolumn}},
-                                               layer2_unioned.geom), {primitivetypeid})
-                   END as geom
-                  {{layer1_columns_prefix_alias_str}}
-              FROM {{input1_databasename}}."{{input1_layer}}" layer1
-              JOIN layer2_unioned ON layer1.rowid = layer2_unioned.layer1_rowid
-             WHERE 1=1
-               {{batch_filter}}
-             LIMIT -1 OFFSET 0
+        SELECT * FROM (
+          SELECT ( SELECT ST_CollectionExtract(
+                            ST_intersection(
+                                layer1.{{input1_geometrycolumn}},
+                                    ST_Union(layer2_sub.{{input2_geometrycolumn}})),
+                            {primitivetypeid}
+                          ) AS geom_clipped
+                       FROM {{input1_databasename}}."{input1_layer_rtree}" layer1tree
+                       JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
+                       JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                         ON layer2_sub.rowid = layer2tree.id
+                      WHERE layer1tree.id = layer1.rowid
+                        AND layer1tree.minx <= layer2tree.maxx
+                        AND layer1tree.maxx >= layer2tree.minx
+                        AND layer1tree.miny <= layer2tree.maxy
+                        AND layer1tree.maxy >= layer2tree.miny
+                        AND ST_intersects(layer1.{{input1_geometrycolumn}},
+                                          layer2_sub.{{input2_geometrycolumn}}) = 1
+                      LIMIT -1 OFFSET 0
+                 ) AS geom
+                {{layer1_columns_prefix_alias_str}}
+            FROM {{input1_databasename}}."{{input1_layer}}" layer1
+           WHERE 1=1
+             {{batch_filter}}
+           LIMIT -1 OFFSET 0
           )
          WHERE geom IS NOT NULL
     """
