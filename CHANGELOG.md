@@ -17,6 +17,11 @@
 - Write gdal log files to `GFO_TMPDIR` if specified (#727)
 - Reduce memory being committed on hardware with many cores (#739, #717)
 
+### Bugs fixed
+
+- `copy_layer` should give an error if `src_layer` is not specified for multi-layer src
+  files (#745)
+
 ## 0.10.2 (2025-08-20)
 
 ### Improvements

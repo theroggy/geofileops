@@ -191,6 +191,97 @@ def test_cmp(tmp_path, suffix, keep_permissions):
     assert gfo.cmp(src2, dst) is False
 
 
+@pytest.mark.parametrize(
+    "columns, spatial_index, output_layer, output_suffix",
+    [
+        (None, None, None, ".gpkg"),
+        (None, None, None, ".shp"),
+        (["OIDN", "UIDN"], False, "custom", ".gpkg"),
+        (["OIDN"], True, None, ".shp"),
+    ],
+)
+def test_concat(tmp_path, columns, spatial_index, output_layer, output_suffix):
+    """Test the concat function."""
+    # Prepare test data
+    input1 = test_helper.get_testfile("polygon-parcel")
+    input2 = test_helper.get_testfile("polygon-twolayers")
+    output = tmp_path / f"output{output_suffix}"
+
+    # Test
+    gfo.concat(
+        [input1, input1, input2],
+        output,
+        input_layers=[None, "parcels", "parcels"],
+        output_layer=output_layer,
+        columns=columns,
+        spatial_index=spatial_index,
+    )
+
+    # Now check dst file
+    input1_layerinfo = gfo.get_layerinfo(input1)
+    input2_layerinfo = gfo.get_layerinfo(input2, layer="parcels")
+    output_layerinfo = gfo.get_layerinfo(output)
+
+    exp_featurecount = input1_layerinfo.featurecount * 2 + input2_layerinfo.featurecount
+    assert output_layerinfo.featurecount == exp_featurecount
+    exp_nb_columns = len(input1_layerinfo.columns) if columns is None else len(columns)
+    assert len(output_layerinfo.columns) == exp_nb_columns
+    assert output_layerinfo.geometrytypename == input1_layerinfo.geometrytypename
+
+    exp_layer = (
+        output_layer if output_layer is not None else fileops.get_default_layer(output)
+    )
+    assert output_layerinfo.name == exp_layer
+
+    exp_spatial_index = (
+        spatial_index
+        if spatial_index is not None
+        else _geofileinfo.get_geofileinfo(output).default_spatial_index
+    )
+    assert gfo.has_spatial_index(output) is exp_spatial_index
+
+
+def test_concat_existing_output(tmp_path):
+    """Test the concat function with an existing output file."""
+    # Prepare test data
+    input = test_helper.get_testfile("polygon-parcel")
+    output = tmp_path / "output.gpkg"
+    output.touch()
+
+    # Test
+    gfo.concat([input, input], output)
+
+    # The test file should not be overwritten/changed.
+    assert output.stat().st_size == 0
+
+
+def test_concat_explodecollections(tmp_path):
+    """Test the concat function with explodecollections."""
+    # Prepare test data
+    input = test_helper.get_testfile("polygon-parcel")
+    input_expl = tmp_path / "input_exploded.gpkg"
+    gfo.copy_layer(input, input_expl, explodecollections=True)
+
+    # Test
+    output = tmp_path / "output.gpkg"
+    gfo.concat([input_expl, input_expl], output, explodecollections=True)
+
+    # Now check the result file
+    input_info = gfo.get_layerinfo(input)
+    input_expl_info = gfo.get_layerinfo(input_expl)
+    output_info = gfo.get_layerinfo(output)
+
+    # Make sure the input file contains multipolygons
+    assert input_info.geometrytypename == "MULTIPOLYGON"
+    assert input_info.featurecount < input_expl_info.featurecount
+
+    exp_featurecount = input_expl_info.featurecount * 2
+    assert output_info.featurecount == exp_featurecount
+    exp_nb_column = len(input_expl_info.columns)
+    assert len(output_info.columns) == exp_nb_column
+    assert output_info.geometrytypename == "POLYGON"
+
+
 def test_convert(tmp_path):
     """Test the convert function.
 
@@ -645,6 +736,11 @@ def test_copy_layer_force_output_geometrytype(tmp_path, testfile, force_geometry
             ValueError,
             "append parameter is deprecated, use write_mode",
         ),
+        (
+            {"src": test_helper.get_testfile("polygon-twolayers")},
+            ValueError,
+            "input has > 1 layers: a layer must be specified",
+        ),
     ],
 )
 def test_copy_layer_errors(tmp_path, kwargs, exp_ex, exp_error):
@@ -826,6 +922,26 @@ def test_copy_layer_to_gpkg_zip(tmp_path):
     src_gdf = gfo.read_file(src)
     dst_gdf = gfo.read_file(dst)
     assert_geodataframe_equal(src_gdf, dst_gdf)
+
+
+def test_copy_layer_twolayers(tmp_path):
+    src = test_helper.get_testfile("polygon-twolayers")
+
+    # Test first layer
+    dst_parcels = tmp_path / "output_parcels.gpkg"
+    gfo.copy_layer(src, dst_parcels, src_layer="parcels")
+    layerinfo_parcels = gfo.get_layerinfo(dst_parcels)
+    assert layerinfo_parcels.featurecount == 48
+    assert layerinfo_parcels.name == "output_parcels"
+    assert len(layerinfo_parcels.columns) == 11
+
+    # Test second layer
+    dst_zones = tmp_path / "output_zones.gpkg"
+    gfo.copy_layer(src, dst_zones, src_layer="zones")
+    layerinfo_zones = gfo.get_layerinfo(dst_zones)
+    assert layerinfo_zones.featurecount == 5
+    assert layerinfo_zones.name == "output_zones"
+    assert len(layerinfo_zones.columns) == 1
 
 
 @pytest.mark.parametrize(
@@ -1223,7 +1339,9 @@ def test_get_layerinfo_twolayers():
     assert len(layerinfo.columns) == 1
 
     # Test error if no layer specified
-    with pytest.raises(ValueError, match="input has > 1 layer, but no layer specified"):
+    with pytest.raises(
+        ValueError, match="input has > 1 layers: a layer must be specified"
+    ):
         layerinfo = gfo.get_layerinfo(src)
 
 
@@ -1255,7 +1373,9 @@ def test_get_only_layer_two_layers():
     src = test_helper.get_testfile("polygon-twolayers")
     layers = gfo.listlayers(src)
     assert len(layers) == 2
-    with pytest.raises(ValueError, match="input has > 1 layer, but no layer specified"):
+    with pytest.raises(
+        ValueError, match="input has > 1 layers: a layer must be specified"
+    ):
         _ = gfo.get_only_layer(src)
 
 
@@ -1795,7 +1915,7 @@ def test_fill_out_sql_placeholders():
         (
             None,
             'SELECT * FROM "{input_layer}"',
-            "input has > 1 layer, but no layer specified",
+            "input has > 1 layers: a layer must be specified",
         ),
     ],
 )

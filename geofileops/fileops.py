@@ -89,6 +89,85 @@ PRJ_EPSG_31370 = (
 )
 
 
+def concat(
+    input_paths: Iterable[Union[str, "os.PathLike[Any]"]],
+    output_path: Union[str, "os.PathLike[Any]"],
+    input_layers: Iterable[str | None] | None = None,
+    output_layer: str | None = None,
+    columns: Iterable[str] | None = None,
+    explodecollections: bool = False,
+    spatial_index: bool | None = None,
+    force: bool = False,
+):
+    """Concatenate multiple geofiles into one output geofile.
+
+    Args:
+        input_paths (Iterable[PathLike]): the paths to the files to concatenate.
+        output_path (PathLike): the path to the output file.
+        input_layers (Iterable[str | None], optional): the layer names to use in the
+            input files. The layer names don't need to be specified for input files that
+            only contain a single layer. Defaults to None.
+        output_layer (str, optional): the layer name to use in the output file. If not
+            specified, the default layer name is used. Defaults to None.
+        columns (Iterable[str], optional): the columns to keep in the output file.
+            If not specified, all columns are kept. Defaults to None.
+        explodecollections (bool, optional): True to explode geometry collections
+            into separate features. Defaults to False.
+        spatial_index (bool, optional): True to create a spatial index on the
+            destination file/layer. If None, the default behaviour by gdal for that file
+            type is respected. Defaults to None.
+        force (bool, optional): True to overwrite the output file if it already exists.
+    """
+    # Validate + cleanup input parameters
+    input_paths = list(input_paths)
+    if input_layers is None:
+        input_layers = [None] * len(input_paths)
+    else:
+        input_layers = list(input_layers)
+        if len(input_layers) != len(input_paths):
+            raise ValueError(
+                "src_layers must have the same length as the src file list if specified"
+            )
+    if _vsi_exists(output_path) and not force:
+        logger.info(f"Destination file already exists, so stop: {output_path}")
+        return
+
+    # Concat all files
+    tmp_dir = _io_util.create_tempdir("concat")
+    tmp_dst = tmp_dir / Path(output_path).name
+    is_first = True
+    for src_path, src_layer in zip(input_paths, input_layers):
+        if is_first:
+            force_local = force
+            write_mode = "create"
+        else:
+            force_local = False
+            write_mode = "append"
+
+        copy_layer(
+            src=src_path,
+            dst=tmp_dst,
+            write_mode=write_mode,
+            src_layer=src_layer,
+            dst_layer=output_layer,
+            columns=columns,
+            explodecollections=explodecollections,
+            create_spatial_index=False,
+            force=force_local,
+        )
+
+        if is_first:
+            is_first = False
+
+    # Add a spatial index if needed
+    if spatial_index is None:
+        spatial_index = _geofileinfo.get_geofileinfo(tmp_dst).default_spatial_index
+    if spatial_index:
+        create_spatial_index(tmp_dst, output_layer)
+
+    move(tmp_dst, output_path)
+
+
 def listlayers(
     path: Union[str, "os.PathLike[Any]"], only_spatial_layers: bool = True
 ) -> list[str]:
@@ -527,7 +606,9 @@ def _get_only_layer(datasource: gdal.Dataset) -> ogr.Layer:
         if len(layers) == 1:
             return datasource.GetLayer(layers[0])
         else:
-            raise ValueError(f"input has > 1 layer, but no layer specified: {layers}")
+            raise ValueError(
+                f"input has > 1 layers: a layer must be specified: {layers}"
+            )
 
 
 def get_default_layer(path: Union[str, "os.PathLike[Any]"]) -> str:
@@ -2592,8 +2673,10 @@ def copy_layer(
         src (PathLike): The source path. |GDAL_vsi| paths are also supported.
         dst (PathLike): The destination path. |GDAL_vsi| paths can be used for handlers
             with write support.
-        src_layer (str, optional): The source layer. If None and there is only
-            one layer in the src file, that layer is taken. Defaults to None.
+        src_layer (str, optional): The source layer. If the source contains a single
+            layer, that layer will be taken if `src_layer` is None. If it contains
+            multiple layers, `src_layer` is mandatory unless `sql_stmt` is specified.
+            Defaults to None.
         dst_layer (str, optional): The destination layer. If None, the destination file
             stem is taken as layer name. Defaults to None.
         write_mode (str, optional): The write mode. Defaults to "create". Valid values:
