@@ -287,6 +287,8 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
         (".gpkg", 31370, True, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg", 31370, False, ["gewasGROEP"], False, 0.01, WHERE_AREA_GT_5000, 4),
         (".gpkg", 31370, False, ["gewasGROEP"], True, 0.01, WHERE_AREA_GT_5000, 13),
+        (".gpkg", 31370, False, ["gewasGROEP"], False, 0.0, WHERE_AREA_GT_5000, 4),
+        (".gpkg", 31370, False, ["gewasGROEP"], True, 0.0, WHERE_AREA_GT_5000, 13),
         (".gpkg", 31370, False, [], True, 0.0, None, 24),
         (".gpkg", 31370, False, None, False, 0.0, None, 1),
         (".gpkg", 4326, False, ["GEWASGROEP"], True, 0.0, None, 26),

@@ -8,6 +8,7 @@
 - Improve performance of most operations by using a direct gpkg to gpkg append via
   sqlite where possible (#728)
 - Improve performance of the subdividividing used in many operations (#730)
+- Improve performance of `dissolve` (#748)
 - Improve performance of two-layer operations using `nb_parallel=1` (#692)
 - Alternative query for clip + default subdivide_coords to 15000 (#450)
 - Ensure that the featurecount is properly cached in GPKG files, also for older GDAL
