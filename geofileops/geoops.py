@@ -1126,7 +1126,7 @@ def dissolve(
         explodecollections (bool): True to output only simple geometries. If
             False, this can result in huge geometries for large files,
             especially if no ``groupby_columns`` are specified.
-        groupby_columns (Union[List[str], str], optional): columns (case insensitive) to
+        groupby_columns (list[str] or str, optional): columns (case insensitive) to
             group on while aggregating. Defaults to None, resulting in a spatial union
             of all geometries that touch.
         agg_columns (dict, optional): columns to aggregate based on
@@ -1204,15 +1204,6 @@ def dissolve(
     # Init
     if tiles_path is not None:
         tiles_path = Path(tiles_path)
-
-    # Standardize parameter to simplify the rest of the code
-    if groupby_columns is not None:
-        if isinstance(groupby_columns, str):
-            # If a string is passed, convert to list
-            groupby_columns = [groupby_columns]
-        elif len(groupby_columns) == 0:
-            # If an empty list of geometry columns is passed, convert it to None
-            groupby_columns = None
 
     logger = logging.getLogger("geofileops.dissolve")
     logger.info(f"Start, on {input_path} to {output_path}")

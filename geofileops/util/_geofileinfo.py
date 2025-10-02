@@ -210,7 +210,7 @@ class GeofileInfo:
 
     @property
     def default_spatial_index(self) -> bool:
-        """Returns True if this geofile can only have one layer."""
+        """Returns True if this file type gets a spatial index by default."""
         if self.geofiletype_info is not None:
             return self.geofiletype_info.default_spatial_index
         else:

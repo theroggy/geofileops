@@ -8,6 +8,7 @@
 - Improve performance of most operations by using a direct gpkg to gpkg append via
   sqlite where possible (#728)
 - Improve performance of the subdividividing used in most two-layer operations (#730)
+- Improve performance of `dissolve` (#748)
 - Improve performance of two-layer operations using `nb_parallel=1` (#692)
 - Alternative query for clip + default subdivide_coords to 15000 (#450)
 - Ensure that the featurecount is properly cached in GPKG files, also for older GDAL
@@ -16,6 +17,11 @@
 - Add worker_type used to progress logging (#715)
 - Write gdal log files to `GFO_TMPDIR` if specified (#727)
 - Reduce memory being committed on hardware with many cores (#739, #717)
+
+### Bugs fixed
+
+- `copy_layer` should give an error if `src_layer` is not specified for multi-layer src
+  files (#745)
 
 ## 0.10.2 (2025-08-20)
 

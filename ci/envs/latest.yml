@@ -1,6 +1,7 @@
 name: geofileops-latest
 channels:
   - conda-forge
+  - conda-forge/label/python_rc
 dependencies:
   - python
   - pip
