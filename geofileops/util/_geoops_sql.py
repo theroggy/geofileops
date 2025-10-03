@@ -22,7 +22,6 @@ import pandas as pd
 
 import geofileops as gfo
 from geofileops import GeometryType, LayerInfo, PrimitiveType, fileops
-from geofileops._compat import SPATIALITE_GTE_51
 from geofileops.helpers import _general_helper, _parameter_helper
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
@@ -329,27 +328,14 @@ def makevalid(
     # ----------------------------------------------
     # Only apply makevalid if the geometry is truly invalid, this is faster.
     # GEOSMakeValid crashes with EMPTY input, so check this first.
-    if SPATIALITE_GTE_51:
-        operation = """
-            IIF({geometrycolumn} IS NULL OR ST_IsEmpty({geometrycolumn}) <> 0,
-                NULL,
-                IIF(ST_IsValid({geometrycolumn}) = 1,
-                    {geometrycolumn},
-                    GEOSMakeValid({geometrycolumn}, 0)
-               )
-            )"""
-    else:
-        # Prepare sql template for this operation
-        operation = """
+    operation = """
+        IIF({geometrycolumn} IS NULL OR ST_IsEmpty({geometrycolumn}) <> 0,
+            NULL,
             IIF(ST_IsValid({geometrycolumn}) = 1,
                 {geometrycolumn},
-                ST_MakeValid({geometrycolumn})
-            )"""
-
-        # If we want a specific geometrytype, only extract the relevant type
-        if force_output_geometrytype is not GeometryType.GEOMETRYCOLLECTION:
-            primitivetypeid = force_output_geometrytype.to_primitivetype.value  # type: ignore[union-attr]
-            operation = f"ST_CollectionExtract({operation}, {primitivetypeid})"
+                GEOSMakeValid({geometrycolumn}, 0)
+            )
+        )"""
 
     # Now we can prepare the entire statement
     sql_template = f"""
@@ -2393,15 +2379,11 @@ def join_nearest(
     if input2_layer is None:
         input2_layer = gfo.get_only_layer(input2_path)
 
-    # If spatialite >= 5.1, check some more parameters
-    if SPATIALITE_GTE_51:
-        if distance is None:
-            raise ValueError("distance is mandatory with spatialite >= 5.1")
-        if expand is None:
-            raise ValueError("expand is mandatory with spatialite >= 5.1")
-        expand_int = 1 if expand else False
-    elif expand is not None and not expand:
-        raise ValueError("expand=False is not supported with spatialite < 5.1")
+    if distance is None:
+        raise ValueError("distance is mandatory with spatialite >= 5.1")
+    if expand is None:
+        raise ValueError("expand is mandatory with spatialite >= 5.1")
+    expand_int = 1 if expand else False
 
     # Prepare input files
     # To use knn index, the input layers need to be in sqlite file format
@@ -2438,43 +2420,26 @@ def join_nearest(
         )
 
     # Remark: the 2 input layers need to be in one file!
-    if SPATIALITE_GTE_51:
-        sql_template = f"""
-            SELECT layer1.{{input1_geometrycolumn}} as geom
-                  {{layer1_columns_prefix_alias_str}}
-                  {{layer2_columns_prefix_alias_str}}
-                  ,k.pos
-                  ,ST_Distance(
-                    layer1.{{input1_geometrycolumn}}, layer2.{{input2_geometrycolumn}}
-                  ) AS distance
-                  ,k.distance_crs
-              FROM "{{input1_layer}}" layer1
-              JOIN knn2 k
-              JOIN "{{input2_layer}}" layer2 ON layer2.rowid = k.fid
-             WHERE f_table_name = '{{input2_layer}}'
-               AND f_geometry_column = '{{input2_geometrycolumn}}'
-               AND ref_geometry = ST_Centroid(layer1.{{input1_geometrycolumn}})
-               AND radius = {distance}
-               AND max_items = {nb_nearest}
-               AND expand = {expand_int}
-               {{batch_filter}}
-        """
-    else:
-        sql_template = f"""
-            SELECT layer1.{{input1_geometrycolumn}} as geom
-                  {{layer1_columns_prefix_alias_str}}
-                  {{layer2_columns_prefix_alias_str}}
-                  ,k.pos, k.distance
-              FROM {{input1_databasename}}."{{input1_layer}}" layer1
-              JOIN {{input2_databasename}}.knn k
-              JOIN {{input2_databasename}}."{{input2_layer}}" layer2
-                ON layer2.rowid = k.fid
-             WHERE k.f_table_name = '{{input2_layer}}'
-               AND k.f_geometry_column = '{{input2_geometrycolumn}}'
-               AND k.ref_geometry = layer1.{{input1_geometrycolumn}}
-               AND k.max_items = {nb_nearest}
-               {{batch_filter}}
-        """
+    sql_template = f"""
+        SELECT layer1.{{input1_geometrycolumn}} as geom
+                {{layer1_columns_prefix_alias_str}}
+                {{layer2_columns_prefix_alias_str}}
+                ,k.pos
+                ,ST_Distance(
+                layer1.{{input1_geometrycolumn}}, layer2.{{input2_geometrycolumn}}
+                ) AS distance
+                ,k.distance_crs
+            FROM "{{input1_layer}}" layer1
+            JOIN knn2 k
+            JOIN "{{input2_layer}}" layer2 ON layer2.rowid = k.fid
+            WHERE f_table_name = '{{input2_layer}}'
+            AND f_geometry_column = '{{input2_geometrycolumn}}'
+            AND ref_geometry = ST_Centroid(layer1.{{input1_geometrycolumn}})
+            AND radius = {distance}
+            AND max_items = {nb_nearest}
+            AND expand = {expand_int}
+            {{batch_filter}}
+    """
 
     return _two_layer_vector_operation(
         input1_path=input1_tmp_path,
@@ -3398,27 +3363,20 @@ def _two_layer_vector_operation(
 
         # Apply gridsize if it is specified
         if gridsize != 0.0:
-            if SPATIALITE_GTE_51:
-                # Spatialite >= 5.1 available, so we can try ST_ReducePrecision first,
-                # which should be faster.
-                # ST_ReducePrecision seems to crash on EMPTY geometry, so check
-                # ST_IsEmpty not being 0 (result can be -1, 0 or 1).
-                gridsize_op = f"""
-                    IIF(sub_gridsize.geom IS NULL OR ST_IsEmpty(sub_gridsize.geom) <> 0,
-                        NULL,
-                        IFNULL(
-                            ST_ReducePrecision(sub_gridsize.geom, {gridsize}),
-                            ST_GeomFromWKB(GFO_ReducePrecision(
-                                ST_AsBinary(sub_gridsize.geom), {gridsize}
-                            ))
-                        )
+            # Try ST_ReducePrecision first, which should be faster.
+            # ST_ReducePrecision seems to crash on EMPTY geometry, so check
+            # ST_IsEmpty not being 0 (result can be -1, 0 or 1).
+            gridsize_op = f"""
+                IIF(sub_gridsize.geom IS NULL OR ST_IsEmpty(sub_gridsize.geom) <> 0,
+                    NULL,
+                    IFNULL(
+                        ST_ReducePrecision(sub_gridsize.geom, {gridsize}),
+                        ST_GeomFromWKB(GFO_ReducePrecision(
+                            ST_AsBinary(sub_gridsize.geom), {gridsize}
+                        ))
                     )
-                """
-            else:
-                gridsize_op = (
-                    "ST_GeomFromWKB(GFO_ReducePrecision("
-                    f"ST_AsBinary(sub_gridsize.geom), {gridsize}))"
                 )
+            """
 
             # All columns need to be specified
             # Remark:
@@ -4407,38 +4365,19 @@ def dissolve_singlethread(
 def _format_apply_gridsize_operation(
     geometrycolumn: str, gridsize: float, force_output_geometrytype: GeometryType
 ) -> str:
-    if SPATIALITE_GTE_51:
-        # ST_ReducePrecision and GeosMakeValid only available for spatialite >= 5.1
-        # Retry with applying makevalid.
-        # It is not possible to return the original geometry if error stays after
-        # makevalid, because spatialite functions return NULL for failures as well as
-        # when the result is correctly NULL, so not possible to make the distinction.
-        # ST_ReducePrecision seems to crash on EMPTY geometry, so check ST_IsEmpty not
-        # being 0 (result can be -1, 0 or 1).
-        gridsize_op = f"""
-            IIF({geometrycolumn} IS NULL OR ST_IsEmpty({geometrycolumn}) <> 0,
-                NULL,
-                IFNULL(
-                    ST_ReducePrecision({geometrycolumn}, {gridsize}),
-                    ST_ReducePrecision(GeosMakeValid({geometrycolumn}, 0), {gridsize})
-                )
+    # It is not possible to return the original geometry if error stays after
+    # makevalid, because spatialite functions return NULL for failures as well as
+    # when the result is correctly NULL, so not possible to make the distinction.
+    # ST_ReducePrecision seems to crash on EMPTY geometry, so check ST_IsEmpty not
+    # being 0 (result can be -1, 0 or 1).
+    gridsize_op = f"""
+        IIF({geometrycolumn} IS NULL OR ST_IsEmpty({geometrycolumn}) <> 0,
+            NULL,
+            IFNULL(
+                ST_ReducePrecision({geometrycolumn}, {gridsize}),
+                ST_ReducePrecision(GeosMakeValid({geometrycolumn}, 0), {gridsize})
             )
-        """
-    else:
-        # Apply snaptogrid, but this results in invalid geometries, so also
-        # Makevalid.
-        gridsize_op = f"ST_MakeValid(SnapToGrid({geometrycolumn}, {gridsize}))"
-
-        # SnapToGrid + ST_MakeValid can result in collapsed (pieces of)
-        # geometries, so finally apply collectionextract as well.
-        if force_output_geometrytype is None:
-            warnings.warn(
-                "a gridsize is specified but no force_output_geometrytype, "
-                "this can result in inconsistent geometries in the output",
-                stacklevel=3,
-            )
-        else:
-            primitivetypeid = force_output_geometrytype.to_primitivetype.value
-            gridsize_op = f"ST_CollectionExtract({gridsize_op}, {primitivetypeid})"
+        )
+    """
 
     return gridsize_op

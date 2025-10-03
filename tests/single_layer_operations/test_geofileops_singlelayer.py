@@ -13,7 +13,7 @@ import shapely
 from shapely import MultiPolygon, Polygon
 
 from geofileops import GeometryType, fileops, geoops
-from geofileops._compat import GDAL_GTE_39, SPATIALITE_GTE_51
+from geofileops._compat import GDAL_GTE_39
 from geofileops.util import _general_util, _geofileinfo, _geoops_sql, _geopath_util
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
@@ -958,11 +958,7 @@ def test_makevalid_gridsize(tmp_path, geoops_module, gridsize, keep_empty_geoms)
         expected_featurecount -= 1
         # With gridsize specified, a sliver polygon is removed as well
         if gridsize > 0.0:
-            # If sql based and spatialite < 5.1, the sliver isn't cleaned up...
-            if not (
-                not SPATIALITE_GTE_51 and geoops_module == "geofileops.util._geoops_sql"
-            ):
-                expected_featurecount -= 1
+            expected_featurecount -= 1
 
     set_geoops_module(geoops_module)
 
