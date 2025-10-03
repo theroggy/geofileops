@@ -27,4 +27,3 @@ SHAPELY_GTE_20 = version.parse(shapely.__version__) >= version.parse("2")
 
 sqlite3_spatialite_version_info = _sqlite_util.spatialite_version_info()
 sqlite3_spatialite_version = sqlite3_spatialite_version_info["spatialite_version"]
-SPATIALITE_GTE_51 = version.parse(sqlite3_spatialite_version) >= version.parse("5.1")
