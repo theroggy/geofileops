@@ -1831,9 +1831,9 @@ def simplify(
         )
 
 
-# ------------------------
-# Operations on two layers
-# ------------------------
+# -----------------------------
+# Operations on multiple layers
+# -----------------------------
 
 
 def clip(
@@ -1941,6 +1941,117 @@ def clip(
         subdivide_coords=subdivide_coords,
         force=force,
     )
+
+
+def concat(
+    input_paths: list[Union[str, "os.PathLike[Any]"]],
+    output_path: Union[str, "os.PathLike[Any]"],
+    input_layers: list[str | None] | str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
+    explodecollections: bool = False,
+    create_spatial_index: bool | None = None,
+    force: bool = False,
+):
+    """Concatenate multiple geofiles into one output geofile.
+
+    The input files will be appended one after the other in the output file, so only
+    output file types that support appending are supported.
+
+    By default, all columns in any of the input files are retained. If columns are not
+    present in some input files, the values of these columns will be NULL for those
+    rows. If you want to retain only a subset of the columns, specify these in the
+    ``columns`` parameter.
+
+    Args:
+        input_paths (list[PathLike]): the paths to the files to concatenate.
+        output_path (PathLike): the path to the output file.
+        input_layers (list[str | None] | str, optional): the layer names to use in the
+            input files. The layer names can be None for input files that only contain a
+            single layer. If a single value is specified, this value is used for all
+            input files. Defaults to None.
+        output_layer (str, optional): the layer name to use in the output file. If not
+            specified, the default layer name is used. Defaults to None.
+        columns (list[str], optional): the columns to keep in the output file.
+            If None, all columns present in the first input file are retained.
+            Defaults to None.
+        explodecollections (bool, optional): True to explode geometry collections
+            into separate features. Defaults to False.
+        create_spatial_index (bool, optional): True to create a spatial index on the
+            output file/layer. If None, the default behaviour by gdal for that file
+            type is respected. Defaults to None.
+        force (bool, optional): True to overwrite the output file if it already exists.
+    """
+    # Validate + cleanup input parameters
+    logger = logging.getLogger("geofileops.concat")
+    if input_layers is None or isinstance(input_layers, str):
+        input_layers = [input_layers] * len(input_paths)
+    elif len(input_layers) != len(input_paths):
+        raise ValueError(
+            "input_layers must have the same length as input_paths if it is a list"
+        )
+    output_path = Path(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
+    if create_spatial_index is None:
+        output_geofileinfo = _geofileinfo.get_geofileinfo(output_path)
+        create_spatial_index = output_geofileinfo.default_spatial_index
+
+    logger.info(f"Start concat to {output_path}")
+
+    start_time = datetime.now()
+    tmp_dir = _io_util.create_tempdir("geofileops/concat")
+    try:
+        # Loop over all files and copy_layer them one by one together.
+        tmp_dst = tmp_dir / output_path.name
+        is_first = True
+        for src_path, src_layer in zip(input_paths, input_layers):
+            # This first file will be created, the others appended
+            if is_first:
+                force_local = force
+                write_mode = "create"
+            else:
+                force_local = False
+                write_mode = "append_add_fields"
+
+            # The columns specified should only be columns present in the file,
+            # otherwise the output is invalid.
+            if columns is None or len(columns) == 0:
+                columns_local = columns
+            else:
+                src_info = fileops.get_layerinfo(src_path, layer=src_layer)
+                src_columns_lower = {col.lower() for col in src_info.columns}
+                columns_local = [
+                    col for col in columns if col.lower() in src_columns_lower
+                ]
+
+            fileops.copy_layer(
+                src=src_path,
+                dst=tmp_dst,
+                write_mode=write_mode,
+                src_layer=src_layer,
+                dst_layer=output_layer,
+                columns=columns_local,
+                explodecollections=explodecollections,
+                create_spatial_index=False,
+                force=force_local,
+            )
+
+            if is_first:
+                is_first = False
+
+        # Add a spatial index if needed
+        if create_spatial_index:
+            fileops.create_spatial_index(tmp_dst, output_layer)
+
+        fileops.move(tmp_dst, output_path)
+
+    finally:
+        if ConfigOptions.remove_temp_files:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+    logger.info(f"Ready, took {datetime.now() - start_time}")
 
 
 def difference(

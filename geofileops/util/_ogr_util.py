@@ -526,6 +526,7 @@ def vector_translate(
 
             # if sql_stmt is None, input_layers must be specified if the input file has
             # multiple layers.
+            # If there is only one layer, use that one.
             if sql_stmt is None and input_layers is None:
                 nb_layers = input_ds.GetLayerCount()
                 if nb_layers == 1:
@@ -534,6 +535,28 @@ def vector_translate(
                     raise ValueError(
                         f"input has > 1 layers: a layer must be specified: {input_path}"
                     )
+
+            # If appending with add_fields, VectorTranslate does not give an error when
+            # the columns don't match, but the output is not correct, so check here.
+            # Apparently with older versions of GDAL (3.8) the check isn't done either
+            # when creating a new file, so do the check always.
+            if (
+                columns is not None
+                and len(list(columns)) > 0
+                and input_layers is not None
+            ):
+                datasource_layer = input_ds.GetLayerByName(input_layers[0])
+                layer_defn = datasource_layer.GetLayerDefn()
+                columns_input = [
+                    layer_defn.GetFieldDefn(i).GetName().lower()
+                    for i in range(layer_defn.GetFieldCount())
+                ]
+                for column in columns:
+                    if column.lower() not in columns_input:
+                        raise ValueError(
+                            f"Field '{column}' not found in source layer "
+                            f"{input_path}#{input_layers[0]}"
+                        )
 
             # If output_srs is not specified and the result has 0 rows, gdal creates the
             # output file without srs.
@@ -582,6 +605,8 @@ def vector_translate(
                         input_has_geom_attribute = True
                     elif field_name_lower == "geometry":
                         input_has_geometry_attribute = True
+
+            datasource_layer = None
 
             # Consolidate all parameters
             # First take copy of args, because gdal.VectorTranslateOptions adds all
