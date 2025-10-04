@@ -250,6 +250,7 @@ class VectorTranslateInfo:
         warp: dict | None = None,
         preserve_fid: bool | None = None,
         dst_dimensions: str | None = None,
+        add_fields: bool = False,
     ):
         self.input_path = input_path
         self.output_path = output_path
@@ -272,6 +273,7 @@ class VectorTranslateInfo:
         self.warp = warp
         self.preserve_fid = preserve_fid
         self.dst_dimensions = dst_dimensions
+        self.add_fields = add_fields
 
 
 def vector_translate_by_info(info: VectorTranslateInfo):
@@ -297,6 +299,7 @@ def vector_translate_by_info(info: VectorTranslateInfo):
         warp=info.warp,
         preserve_fid=info.preserve_fid,
         dst_dimensions=info.dst_dimensions,
+        add_fields=info.add_fields,
     )
 
 
@@ -322,6 +325,7 @@ def vector_translate(
     warp: dict | None = None,
     preserve_fid: bool | None = None,
     dst_dimensions: str | None = None,
+    add_fields: bool = False,
 ) -> bool:
     # API Doc of VectorTranslateOptions:
     #   https://gdal.org/en/stable/api/python/utilities.html#osgeo.gdal.VectorTranslateOptions
@@ -594,7 +598,7 @@ def vector_translate(
                 SQLDialect=sql_dialect,
                 where=where,
                 selectFields=None,
-                addFields=False,
+                addFields=add_fields,
                 forceNullable=False,
                 spatFilter=spatial_filter,
                 spatSRS=None,

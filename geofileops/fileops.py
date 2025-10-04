@@ -2692,6 +2692,11 @@ def copy_layer(
                 layer already exists. If not, the file and/or layer will be created.
                 If the file already contains layers named differently than the default
                 layer name for the file, `dst_layer` becomes mandatory.
+            - "append_add_fields": append the source layer to the destination layer,
+                adding fields from the source layer that are not present in the
+                destination layer. If the layer doesn't exist, it will be created.
+                If the file already contains layers named differently than the default
+                layer name for the file, `dst_layer` becomes mandatory.
 
         src_crs (Union[str, int], optional): an epsg int or anything supported
             by the OGRSpatialReference.SetFromUserInput() call, which includes
@@ -2772,7 +2777,8 @@ def copy_layer(
         )
         write_mode = "append"
 
-    # Determine the access mode
+    # Determine the access mode and whether to add missing fields when appending
+    add_fields = False
     access_mode = _determine_access_mode(dst, dst_layer, write_mode, force)
     if access_mode is None:
         # The file/layer exists already and force is false, so we can return
@@ -2784,6 +2790,8 @@ def copy_layer(
         # As we will actually be appending to an existing layer, the layer
         # creation option regarding spatial index creation should not be passed.
         create_spatial_index = None
+        if write_mode == "append_add_fields":
+            add_fields = True
 
     # Check/clean input params
     if isinstance(columns, str):
@@ -2809,6 +2817,7 @@ def copy_layer(
     # copy, it is faster to copy the data directly in sqlite instead of via GDAL.
     if (
         access_mode == "append"
+        and not add_fields
         and Path(src).suffix.lower() == ".gpkg"
         and Path(dst).suffix.lower() == ".gpkg"
         and not sql_stmt
@@ -2825,7 +2834,6 @@ def copy_layer(
         and ConfigOptions.copy_layer_sqlite_direct
     ):
         # TODO: sql_stmt?, access_mode="create", create_spatial_index, dst_crs?
-        # TODO: create gfo config option to disable?
         try:
             name = src_layername if src_layername is not None else get_only_layer(src)
             preserve_fid_local = preserve_fid if preserve_fid is not None else False
@@ -2914,6 +2922,7 @@ def copy_layer(
         options=options,
         preserve_fid=preserve_fid,
         dst_dimensions=dst_dimensions,
+        add_fields=add_fields,
     )
     _ogr_util.vector_translate_by_info(info=translate_info)
 
@@ -3008,7 +3017,7 @@ def _determine_access_mode(
         else:
             return "update"
 
-    elif write_mode == "append":
+    elif write_mode in ("append", "append_add_fields"):
         layers = try_listlayers(dst, only_spatial_layers=False)
         if layers is None:
             # The file doesn't seem to exist yet... just continue, the file and layer
@@ -3022,16 +3031,17 @@ def _determine_access_mode(
             dst_layer = get_default_layer(dst)
             if dst_layer not in layers:
                 raise ValueError(
-                    "dst_layer is required when write_mode is 'append' and "
-                    "there are already other layers than the default layername."
+                    "dst_layer is required when write_mode is 'append' or "
+                    "'append_add_fields' and there are already other layers than the "
+                    "default layername."
                 )
             return "append"
 
         elif dst_layer is None:
             # No dst_layer specified and multiple layers: raise error
             raise ValueError(
-                "dst_layer is required when write_mode is 'append' and "
-                "there are multiple other layers."
+                "dst_layer is required when write_mode is 'append' or "
+                "'append_add_fields' and there are multiple other layers."
             )
         elif dst_layer in layers:
             return "append"
