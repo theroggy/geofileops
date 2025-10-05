@@ -14,7 +14,18 @@ from tests.test_helper import SUFFIXES_GEOOPS
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
-def test_clip_by_geometry(tmp_path, suffix):
+@pytest.mark.parametrize(
+    "clip_geometry, exp_featurecount",
+    [
+        (
+            "Polygon ((156072 196691, 156036 196836, 156326 196927, 156368 196750, "
+            "156072 196691))",
+            22,
+        ),
+        ((156036, 196691, 156368, 196927), 25),
+    ],
+)
+def test_clip_by_geometry(tmp_path, suffix, clip_geometry, exp_featurecount):
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
@@ -23,12 +34,8 @@ def test_clip_by_geometry(tmp_path, suffix):
 
     # Do operation
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
-    clip_wkt = (
-        "Polygon ((156072 196691, 156036 196836, 156326 196927, 156368 196750, "
-        "156072 196691))"
-    )
     gfo.clip_by_geometry(
-        input_path=input_path, output_path=output_path, clip_geometry=clip_wkt
+        input_path=input_path, output_path=output_path, clip_geometry=clip_geometry
     )
 
     # Now check if the output file is correctly created
@@ -37,9 +44,12 @@ def test_clip_by_geometry(tmp_path, suffix):
     assert gfo.has_spatial_index(output_path) is exp_spatial_index
     layerinfo_orig = gfo.get_layerinfo(input_path)
     layerinfo_output = gfo.get_layerinfo(output_path)
-    assert layerinfo_output.featurecount == 22
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
+    if suffix == ".shp" and not isinstance(clip_geometry, str):
+        # Shapefile includes an null geometry feature with GDAL <= 3.11.4
+        pytest.xfail(reason="Shapefile output includes an extra null geometry feature")
+    assert layerinfo_output.featurecount == exp_featurecount
 
     # Now check the contents of the result file
     output_gdf = gfo.read_file(output_path, fid_as_index=preserve_fid)
@@ -47,7 +57,10 @@ def test_clip_by_geometry(tmp_path, suffix):
 
     # Check if the fid was properly retained if relevant
     if preserve_fid:
-        assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 10]
+        if isinstance(clip_geometry, str):
+            assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 10]
+        else:
+            assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 8]
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
