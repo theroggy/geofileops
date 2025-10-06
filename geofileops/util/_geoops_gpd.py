@@ -1179,7 +1179,7 @@ def dissolve(
 
         # First take a deep copy, as values can be changed further on to treat columns
         # case insensitive
-        agg_columns = json.loads(json.dumps(agg_columns))
+        agg_columns = copy.deepcopy(agg_columns)
         if "json" in agg_columns:
             if agg_columns["json"] is None:
                 agg_columns["json"] = [
@@ -1995,6 +1995,7 @@ def _dissolve_polygons(
         perfinfo["time_clip"] = (datetime.now() - start_clip).total_seconds()
 
     # Set empty geometries to None
+    assert isinstance(diss_gdf.geometry, gpd.GeoSeries)
     diss_gdf.loc[diss_gdf.geometry.is_empty, diss_gdf.geometry.name] = None
 
     if not keep_empty_geoms:
