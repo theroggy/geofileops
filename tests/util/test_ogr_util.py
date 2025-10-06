@@ -162,6 +162,24 @@ def test_RollbackTransaction_None():
     assert not _ogr_util.RollbackTransaction(None)
 
 
+@pytest.mark.parametrize("access_mode, add_fields", [("append", True), (None, False)])
+def test_vector_translate_columns_nonexisting(tmp_path, access_mode, add_fields):
+    """Specify non-existing column in the columns parameter."""
+    input_path = test_helper.get_testfile("polygon-parcel")
+    columns = ["OIDN", "NOT_EXISTING_COLUMN"]
+    output_path = tmp_path / "output.gpkg"
+    with pytest.raises(
+        Exception, match="Field 'NOT_EXISTING_COLUMN' not found in source layer"
+    ):
+        _ogr_util.vector_translate(
+            input_path,
+            output_path,
+            columns=columns,
+            access_mode=access_mode,
+            add_fields=add_fields,
+        )
+
+
 @pytest.mark.parametrize(
     "output_geometrytype, exp_geometrytype",
     [

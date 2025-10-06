@@ -250,6 +250,7 @@ class VectorTranslateInfo:
         warp: dict | None = None,
         preserve_fid: bool | None = None,
         dst_dimensions: str | None = None,
+        add_fields: bool = False,
     ):
         self.input_path = input_path
         self.output_path = output_path
@@ -272,6 +273,7 @@ class VectorTranslateInfo:
         self.warp = warp
         self.preserve_fid = preserve_fid
         self.dst_dimensions = dst_dimensions
+        self.add_fields = add_fields
 
 
 def vector_translate_by_info(info: VectorTranslateInfo):
@@ -297,6 +299,7 @@ def vector_translate_by_info(info: VectorTranslateInfo):
         warp=info.warp,
         preserve_fid=info.preserve_fid,
         dst_dimensions=info.dst_dimensions,
+        add_fields=info.add_fields,
     )
 
 
@@ -322,6 +325,7 @@ def vector_translate(
     warp: dict | None = None,
     preserve_fid: bool | None = None,
     dst_dimensions: str | None = None,
+    add_fields: bool = False,
 ) -> bool:
     # API Doc of VectorTranslateOptions:
     #   https://gdal.org/en/stable/api/python/utilities.html#osgeo.gdal.VectorTranslateOptions
@@ -359,15 +363,6 @@ def vector_translate(
         # VectorTranslate outputs no or an invalid file if the statement doesn't return
         # any rows...
         sql_stmt = sql_stmt.lstrip("\n\t ")
-    if clip_geometry is not None:
-        args.extend(["-clipsrc"])
-        if isinstance(clip_geometry, str):
-            args.extend([clip_geometry])
-        else:
-            bounds = [str(coord) for coord in clip_geometry]
-            args.extend(bounds)
-    if columns is not None:
-        args.extend(["-select", ",".join(columns)])
     if sql_stmt is not None and where is not None:
         raise ValueError("it is not supported to specify both sql_stmt and where")
 
@@ -416,8 +411,6 @@ def vector_translate(
             datasetCreationOptions.extend([f"{option_name}={value}"])
 
     # Output layer options
-    if explodecollections:
-        args.append("-explodecollections")
     output_geometrytypes = []
     if force_output_geometrytype is not None:
         if isinstance(force_output_geometrytype, GeometryType):
@@ -443,15 +436,12 @@ def vector_translate(
         # multiparts geometries, so promote to multi
         output_geometrytypes.append("PROMOTE_TO_MULTI")
 
-    if transaction_size is not None:
-        args.extend(["-gt", str(transaction_size)])
     if preserve_fid is None:
+        preserve_fid = False
         if explodecollections:
             # If explodecollections is specified, explicitly disable fid to avoid errors
             args.append("-unsetFid")
-    elif preserve_fid:
-        args.append("-preserve_fid")
-    else:
+    elif not preserve_fid:
         args.append("-unsetFid")
 
     # Prepare output layer creation options
@@ -522,6 +512,7 @@ def vector_translate(
 
             # if sql_stmt is None, input_layers must be specified if the input file has
             # multiple layers.
+            # If there is only one layer, use that one.
             if sql_stmt is None and input_layers is None:
                 nb_layers = input_ds.GetLayerCount()
                 if nb_layers == 1:
@@ -530,6 +521,28 @@ def vector_translate(
                     raise ValueError(
                         f"input has > 1 layers: a layer must be specified: {input_path}"
                     )
+
+            # If appending with add_fields, VectorTranslate does not give an error when
+            # the columns don't match, but the output is not correct, so check here.
+            # Apparently with older versions of GDAL (3.8) the check isn't done either
+            # when creating a new file, so do the check always.
+            if (
+                columns is not None
+                and len(list(columns)) > 0
+                and input_layers is not None
+            ):
+                datasource_layer = input_ds.GetLayerByName(input_layers[0])
+                layer_defn = datasource_layer.GetLayerDefn()
+                columns_input = [
+                    layer_defn.GetFieldDefn(i).GetName().lower()
+                    for i in range(layer_defn.GetFieldCount())
+                ]
+                for column in columns:
+                    if column.lower() not in columns_input:
+                        raise ValueError(
+                            f"Field '{column}' not found in source layer "
+                            f"{input_path}#{input_layers[0]}"
+                        )
 
             # If output_srs is not specified and the result has 0 rows, gdal creates the
             # output file without srs.
@@ -579,6 +592,8 @@ def vector_translate(
                     elif field_name_lower == "geometry":
                         input_has_geometry_attribute = True
 
+            datasource_layer = None
+
             # Consolidate all parameters
             # First take copy of args, because gdal.VectorTranslateOptions adds all
             # other parameters to the list passed (by ref)!!!
@@ -593,8 +608,8 @@ def vector_translate(
                 SQLStatement=sql_stmt,
                 SQLDialect=sql_dialect,
                 where=where,
-                selectFields=None,
-                addFields=False,
+                selectFields=columns,
+                addFields=add_fields,
                 forceNullable=False,
                 spatFilter=spatial_filter,
                 spatSRS=None,
@@ -604,7 +619,11 @@ def vector_translate(
                 layerName=output_layer,
                 geometryType=output_geometrytypes,
                 dim=dst_dimensions,
+                transactionSize=transaction_size,
+                clipSrc=clip_geometry,
+                preserveFID=preserve_fid,
                 segmentizeMaxDist=None,
+                explodeCollections=explodecollections,
                 zField=None,
                 skipFailures=False,
                 limit=None,
