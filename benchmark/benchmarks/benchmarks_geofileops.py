@@ -658,7 +658,7 @@ def union(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input1_path, _input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
     input2_path, input2_descr = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
     # Go!

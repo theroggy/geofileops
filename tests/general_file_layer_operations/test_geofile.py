@@ -1437,7 +1437,7 @@ def test_update_column_error(tmp_path):
 
     # Trying to update column that doesn't exist should raise ValueError
     assert "not_existing column" not in layerinfo.columns
-    with pytest.raises(ValueError, match="Column .* doesn't exist in"):
+    with pytest.raises(ValueError, match=r"Column .* doesn't exist in"):
         gfo.update_column(
             test_path, name="not_existing column", expression="ST_area(geom)"
         )

@@ -101,5 +101,5 @@ def with_stem(path: Union[str, "os.PathLike[Any]"], new_stem: str) -> str | Path
         return new_path_str
     else:
         # Retain forward/backward slashes in the path by using os.path.
-        parent, tail = os.path.split(path)
+        parent, _tail = os.path.split(path)
         return f"{parent}/{new_stem}{path_p.suffix}"
