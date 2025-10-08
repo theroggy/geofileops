@@ -931,7 +931,7 @@ def _apply_geooperation_to_layer(
                 and not tmp_output_path.suffix.lower() == ".zip"
             ):
                 zipped_path = Path(f"{tmp_output_path.as_posix()}.zip")
-                fileops.geo_sozip(tmp_output_path, zipped_path)
+                fileops.zip_geofile(tmp_output_path, zipped_path)
                 tmp_output_path = zipped_path
 
             # Move to final location
@@ -1645,7 +1645,7 @@ def dissolve(
                     and not output_tmp_final_path.suffix.lower() == ".zip"
                 ):
                     zipped_path = Path(f"{output_tmp_final_path.as_posix()}.zip")
-                    fileops.geo_sozip(output_tmp_final_path, zipped_path)
+                    fileops.zip_geofile(output_tmp_final_path, zipped_path)
                     output_tmp_final_path = zipped_path
 
                 # Now we are ready to move the result to the final spot...
@@ -1694,7 +1694,7 @@ def _dissolve_polygons_pass(
         if GeoPath(input_path).is_multi_suffix:
             # Unzip, as we can't create a spatial index on a zipped file
             unzipped_dir = tempdir / "input_unzipped"
-            input_path = fileops.geo_unzip(input_path, unzipped_dir)
+            input_path = fileops.unzip_geofile(input_path, unzipped_dir)
         gfo.create_spatial_index(input_path, layer=input_layer, exist_ok=True)
 
     # Start calculation in parallel# Start processing

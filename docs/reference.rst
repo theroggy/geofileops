@@ -94,7 +94,9 @@ General file operations
    get_driver
    listlayers
    move
+   unzip_geofile
    remove
+   zip_geofile
 
 Classes
 -------

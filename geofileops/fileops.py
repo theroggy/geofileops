@@ -2606,18 +2606,18 @@ def copy_layer(
             stem is taken as layer name. Defaults to None.
         write_mode (str, optional): The write mode. Defaults to "create". Valid values:
 
-            - "create": create a new destination file. If the file already exists and
-                `force=True` the function just returns, if `force=False` the file is
+            - **"create"**: create a new destination file. If the file already exists
+                and `force=True` the function just returns, if `force=False` the file is
                 overwritten.
-            - "add_layer": add the source layer to the destination file as a new layer.
-                When using "add_layer", `dst_layer` should be specified. If the layer
-                already exists and `force=True` the function just returns, if
+            - **"add_layer"**: add the source layer to the destination file as a new
+                layer. When using "add_layer", `dst_layer` should be specified. If the
+                layer already exists and `force=True` the function just returns, if
                 `force=False` the layer is overwritten.
-            - "append": append the source layer to the destination layer, if the
+            - **"append"**: append the source layer to the destination layer, if the
                 layer already exists. If not, the file and/or layer will be created.
                 If the file already contains layers named differently than the default
                 layer name for the file, `dst_layer` becomes mandatory.
-            - "append_add_fields": append the source layer to the destination layer,
+            - **"append_add_fields"**: append the source layer to the destination layer,
                 adding fields from the source layer that are not present in the
                 destination layer. If the layer doesn't exist, it will be created.
                 If the file already contains layers named differently than the default
@@ -2852,7 +2852,7 @@ def copy_layer(
     _ogr_util.vector_translate_by_info(info=translate_info)
 
 
-def geo_sozip(
+def zip_geofile(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
 ):
@@ -2909,7 +2909,7 @@ def _zip(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"
                     zipf.write(file_path, file_path.relative_to(src))
 
 
-def geo_unzip(
+def unzip_geofile(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
 ) -> Path:

@@ -158,7 +158,7 @@ def test_isvalid(tmp_path, suffix, epsg):
     gfo.execute_sql(input_tmp_path, sql_stmt=sql_stmt, sql_dialect="SQLITE")
     if suffix.endswith(".zip"):
         input_path = input_tmp_path.with_suffix(suffix)
-        gfo.geo_sozip(input_tmp_path, input_path)
+        gfo.zip_geofile(input_tmp_path, input_path)
     else:
         input_path = input_tmp_path
 

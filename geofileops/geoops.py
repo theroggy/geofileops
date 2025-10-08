@@ -1863,6 +1863,10 @@ def clip(
         - geometries in the input layer that overlap with multiple adjacent
           geometries in the clip layer won't result in the input geometries
           getting split.
+        - To speed up processing, complex clip geometries are subdivided by default.
+          In this case, the output geometries can contain extra collinear points where
+          the subdividing occured. This behaviour can be controlled via the
+          ``subdivide_coords`` parameter.
 
     This is the result you can expect when clipping a polygon layer (yellow)
     with another polygon layer (purple):

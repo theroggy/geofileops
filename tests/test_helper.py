@@ -242,7 +242,7 @@ def _get_testfile(
         # If the output should be zipped, zip it
         if prepared_path.suffix == ".zip":
             tmp_path_zipped_path = dst_dir / f"{tmp_path.name}.zip"
-            gfo.geo_sozip(tmp_path, tmp_path_zipped_path)
+            gfo.zip_geofile(tmp_path, tmp_path_zipped_path)
             gfo.remove(tmp_path, missing_ok=True)
             tmp_path = tmp_path_zipped_path
 

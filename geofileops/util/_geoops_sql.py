@@ -3786,10 +3786,10 @@ def _convert_to_spatialite_based(
     if unzip_gpkg:
         if input1_path.name.lower().endswith(".gpkg.zip"):
             input1_unzipped_path = tempdir / f"input1_{input1_path.stem}"
-            input1_path = gfo.geo_unzip(input1_path, input1_unzipped_path)
+            input1_path = gfo.unzip_geofile(input1_path, input1_unzipped_path)
         if input2_path and input2_path.name.lower().endswith(".gpkg.zip"):
             input2_unzipped_path = tempdir / f"input2_{input2_path.stem}"
-            input2_path = gfo.geo_unzip(input2_path, input2_unzipped_path)
+            input2_path = gfo.unzip_geofile(input2_path, input2_unzipped_path)
 
     input1_info = _geofileinfo.get_geofileinfo(input1_path)
     input2_info = (
@@ -3885,7 +3885,7 @@ def _finalize_output(
             and not tmp_output_path.suffix.lower() == ".zip"
         ):
             zipped_path = Path(f"{tmp_output_path.as_posix()}.zip")
-            fileops.geo_sozip(tmp_output_path, zipped_path)
+            fileops.zip_geofile(tmp_output_path, zipped_path)
             tmp_output_path = zipped_path
 
         # Move to final location
@@ -3907,7 +3907,7 @@ def _finalize_output(
             tmp_output_cpg_path.touch(exist_ok=True)
 
             zipped_path = Path(f"{tmp_output_path.as_posix()}.zip")
-            fileops.geo_sozip(tmp_output_path, zipped_path)
+            fileops.zip_geofile(tmp_output_path, zipped_path)
             tmp_output_path = zipped_path
             gfo.move(tmp_output_path, output_path)
 

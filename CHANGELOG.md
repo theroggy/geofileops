@@ -10,7 +10,7 @@
 
 - Add `concat` function (#746, #747)
 - Add `write_mode="append_add_fields"` option to `copy_layer` (#750)
-- Add `geo_sozip` and `geo_unzip` functions (#754)
+- Add `zip_geofile` and `unzip_geofile` functions (#754, #743)
 - Add support for ".gpkg.zip" and ".shp.zip" input and output files for geo operations
   (#754)
 - Improve performance of clip with a complex clip layer (#740)
