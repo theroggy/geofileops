@@ -30,9 +30,14 @@ Combining both, a basic script using geofileops can look like this:
         gfo.buffer(input_path="input.gpkg", output_path="output.gpkg", distance=2)
 
 
-Finally, for the spatial tools, only geopackage and shapefile files are supported.
-However, geopackage is **very** recommended for
-:ref:`many reasons <FAQ-supported-file-formats>`. Most general file/layer operations
+Finally, for the spatial tools, only geopackage (".gpkg", ".gpkg.zip") and shapefile
+(".shp", ".shp.zip") files are supported as input and output formats.
+However, (unzipped) geopackage files (".gpkg") are **very** recommended because they
+will lead to significantly better performance because no conversions will be needed
+under the hood. There are also :ref:`many other reasons <FAQ-supported-file-formats>`
+to use Geopackage files.
+
+Most general file/layer operations like :meth:`~get_layerinfo`, :meth:`~read_file`,...
 can be used on any file format supported by GDAL as well as on paths using
 `GDAL VSI handlers <https://gdal.org/en/stable/user/virtual_file_systems.html>`_.
 

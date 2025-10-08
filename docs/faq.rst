@@ -30,9 +30,13 @@ You can find more details on why this is needed in the
 Supported file formats
 ----------------------
 
-The spatial functionalities of geofileops are supported on standard geopackage and
-shapefile input/output files. However, geopackage is highly recommended because it will
-offer better performance in geofileops as well as for the reasons listed here: 
+The spatial tools of geofileops (buffer, overlays,...) are only supported on geopackage
+(".gpkg", ".gpkg.zip") and shapefile (".shp", ".shp.zip") input/output files.
+However, uncompressed geopackages (".gpkg") will offer the best performance because
+most spatial operations (overlays,...) in geofileops need the data to be in geopackage.
+Hence, if the input and/or output is not ".gpkg", often extra conversions will be
+happening under the hood.
+Some other reasons to consider using Geopackage are listed here: 
 `www.switchfromshapefile.org <http://www.switchfromshapefile.org>`_.
 
 Most general file/layer operations can be used on all vector formats supported by

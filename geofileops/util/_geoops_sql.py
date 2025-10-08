@@ -36,6 +36,7 @@ from geofileops.util import (
     _sqlite_util,
 )
 from geofileops.util._geofileinfo import GeofileInfo
+from geofileops.util._geopath_util import GeoPath
 
 logger = logging.getLogger(__name__)
 
@@ -569,7 +570,10 @@ def _single_layer_vector_operation(
         # able to determine the columns later on.
         if gridsize != 0.0 or geom_selected is None:
             input_path, input_layer, _, _ = _convert_to_spatialite_based(
-                input1_path=input_path, input1_layer=input_layer, tempdir=tempdir
+                input1_path=input_path,
+                input1_layer=input_layer,
+                tempdir=tempdir,
+                unzip_gpkg=True,
             )
 
         processing_params = _prepare_processing_params(
@@ -706,7 +710,12 @@ def _single_layer_vector_operation(
         )
 
         # Prepare temp output filename
-        tmp_output_path = tempdir / output_path.name
+        # If output is a zip file, drop the .zip for .gpkg.zip and .shp.zip files
+        if output_path.name.lower().endswith((".gpkg.zip", ".shp.zip")):
+            # stem will result here ending in .gpkg/.shp, which is what we want
+            tmp_output_path = tempdir / output_path.stem
+        else:
+            tmp_output_path = tempdir / output_path.name
 
         # Processing in threads is 2x faster for small datasets (on Windows)
         worker_type = _general_helper.worker_type_to_use(input_layer.featurecount)
@@ -726,7 +735,7 @@ def _single_layer_vector_operation(
                 batches[batch_id]["layer"] = output_layer
 
                 tmp_partial_output_path = (
-                    tempdir / f"{output_path.stem}_{batch_id}.gpkg"
+                    tempdir / f"{GeoPath(output_path).stem}_{batch_id}.gpkg"
                 )
                 batches[batch_id]["tmp_partial_output_path"] = tmp_partial_output_path
 
@@ -780,7 +789,7 @@ def _single_layer_vector_operation(
                     error = str(ex).partition("\n")[0]
                     message = f"Error <{error}> executing {batches[batch_id]}"
                     logger.exception(message)
-                    raise Exception(message) from ex
+                    raise RuntimeError(message) from ex
 
                 # Start copy of the result to a common file
                 # Remark: give higher priority, because this is the slowest factor
@@ -833,29 +842,8 @@ def _single_layer_vector_operation(
                 )
 
         # Round up and clean up
-        # Now create spatial index and move to output location
-        if tmp_output_path.exists():
-            if GeofileInfo(tmp_output_path).default_spatial_index:
-                gfo.create_spatial_index(
-                    path=tmp_output_path,
-                    layer=output_layer,
-                    exist_ok=True,
-                    no_geom_ok=True,
-                )
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            gfo.move(tmp_output_path, output_path)
-        elif (
-            gfo.get_driver(tmp_output_path) == "ESRI Shapefile"
-            and tmp_output_path.with_suffix(".dbf").exists()
-        ):
-            # If the output shapefile doesn't have a geometry column, the .shp file
-            # doesn't exist but the .dbf does
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            gfo.move(
-                tmp_output_path.with_suffix(".dbf"), output_path.with_suffix(".dbf")
-            )
-        else:
-            logger.debug("Result was empty!")
+        spatial_index = GeofileInfo(tmp_output_path).default_spatial_index
+        _finalize_output(tmp_output_path, output_path, output_layer, spatial_index)
 
     finally:
         # Clean tmp dir
@@ -3197,7 +3185,7 @@ def _two_layer_vector_operation(
     output_crs = _check_crs(input1_layer, input2_layer)
 
     # Prepare tmp output filename
-    tmp_output_path = tmp_dir / output_path.name
+    tmp_output_path = tmp_dir / GeoPath(output_path).name_nozip
     tmp_output_path.parent.mkdir(exist_ok=True, parents=True)
     gfo.remove(tmp_output_path, missing_ok=True)
 
@@ -3210,6 +3198,7 @@ def _two_layer_vector_operation(
                 input1_path=input1_path,
                 input1_layer=input1_layer,
                 tempdir=tmp_dir,
+                unzip_gpkg=True,
                 input2_path=input2_path,
                 input2_layer=input2_layer,
             )
@@ -3430,7 +3419,8 @@ def _two_layer_vector_operation(
             column_datatypes["geom"] = output_geometrytype_calc.name
         output_geometrytype_append = (
             force_output_geometrytype
-            if explode_append or output_path.suffix == ".shp"
+            if explode_append
+            or GeoPath(output_path).suffix_full in (".shp", ".shp.zip")
             else None
         )
 
@@ -3452,7 +3442,7 @@ def _two_layer_vector_operation(
                 batches[batch_id]["layer"] = output_layer
 
                 tmp_partial_output_path = (
-                    tmp_dir / f"{output_path.stem}_{batch_id}.gpkg"
+                    tmp_dir / f"{GeoPath(output_path).stem}_{batch_id}.gpkg"
                 )
                 batches[batch_id]["tmp_partial_output_path"] = tmp_partial_output_path
 
@@ -3566,20 +3556,9 @@ def _two_layer_vector_operation(
                 )
 
         # Round up and clean up
-        # Now create spatial index and move to output location
-        if tmp_output_path.exists():
-            if output_with_spatial_index:
-                gfo.create_spatial_index(
-                    path=tmp_output_path,
-                    layer=output_layer,
-                    exist_ok=True,
-                    no_geom_ok=True,
-                )
-            if tmp_output_path != output_path:
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                gfo.move(tmp_output_path, output_path)
-        else:
-            logger.debug("Result was empty!")
+        _finalize_output(
+            tmp_output_path, output_path, output_layer, output_with_spatial_index
+        )
 
         logger.info(f"Ready, took {datetime.now() - start_time}")
 
@@ -3783,6 +3762,7 @@ def _convert_to_spatialite_based(
     input1_path: Path,
     input1_layer: LayerInfo,
     tempdir: Path,
+    unzip_gpkg: bool,
     input2_path: Path | None = None,
     input2_layer: LayerInfo | None = None,
 ) -> tuple[Path, LayerInfo, Path | None, LayerInfo | None]:
@@ -3791,9 +3771,26 @@ def _convert_to_spatialite_based(
     The input files should be spatialite based, and should be of the same type: either
     both GPKG, or both SQLite.
 
+    Args:
+        input1_path (Path): path to the 1st input
+        input1_layer (LayerInfo): the layer info of the 1st input file
+        tempdir (Path): the temp dir to use
+        unzip_gpkg (bool): if True, zipped gpkg files will be unzipped
+        input2_path (Optional[Path]): path to the 2nd input file
+        input2_layer (Optional[LayerInfo]): the layer info of the 2nd input file
+
     Returns:
         the input1_path, input1_layer, input2_path, input2_layer
     """
+    # If input1 and/or input2 are a zipped gpkg, unzip.
+    if unzip_gpkg:
+        if input1_path.name.lower().endswith(".gpkg.zip"):
+            input1_unzipped_path = tempdir / f"input1_{input1_path.stem}"
+            input1_path = gfo.geo_unzip(input1_path, input1_unzipped_path)
+        if input2_path and input2_path.name.lower().endswith(".gpkg.zip"):
+            input2_unzipped_path = tempdir / f"input2_{input2_path.stem}"
+            input2_path = gfo.geo_unzip(input2_path, input2_unzipped_path)
+
     input1_info = _geofileinfo.get_geofileinfo(input1_path)
     input2_info = (
         None if input2_path is None else _geofileinfo.get_geofileinfo(input2_path)
@@ -3818,7 +3815,7 @@ def _convert_to_spatialite_based(
         suffix = ".gpkg"
         if input2_info is not None and input2_info.driver == "SQLite":
             suffix = ".sqlite"
-        input1_tmp_path = tempdir / f"{input1_path.stem}{suffix}"
+        input1_tmp_path = tempdir / f"{GeoPath(input1_path).stem}{suffix}"
         gfo.copy_layer(
             src=input1_path,
             src_layer=input1_layer.name,
@@ -3845,11 +3842,11 @@ def _convert_to_spatialite_based(
             suffix = ".gpkg"
             if input1_info is not None and input1_info.driver == "SQLite":
                 suffix = ".sqlite"
-            input2_tmp_path = tempdir / f"{input2_path.stem}{suffix}"
+            input2_tmp_path = tempdir / f"{GeoPath(input2_path).stem}{suffix}"
 
             # Make sure the copy is taken to a separate file.
             if input2_tmp_path.exists():
-                input2_tmp_path = tempdir / f"{input2_path.stem}2{suffix}"
+                input2_tmp_path = tempdir / f"{GeoPath(input2_path).stem}2{suffix}"
             assert input2_layer is not None
             gfo.copy_layer(
                 src=input2_path,
@@ -3864,6 +3861,62 @@ def _convert_to_spatialite_based(
             input2_layer = gfo.get_layerinfo(input2_path, raise_on_nogeom=False)
 
     return input1_path, input1_layer, input2_path, input2_layer
+
+
+def _finalize_output(
+    tmp_output_path: Path,
+    output_path: Path,
+    output_layer: str | None,
+    output_with_spatial_index: bool,
+):
+    if tmp_output_path.exists():
+        # Create spatial index if needed
+        if output_with_spatial_index:
+            gfo.create_spatial_index(
+                path=tmp_output_path,
+                layer=output_layer,
+                exist_ok=True,
+                no_geom_ok=True,
+            )
+
+        # Zip if needed
+        if (
+            output_path.suffix.lower() == ".zip"
+            and not tmp_output_path.suffix.lower() == ".zip"
+        ):
+            zipped_path = Path(f"{tmp_output_path.as_posix()}.zip")
+            fileops.geo_sozip(tmp_output_path, zipped_path)
+            tmp_output_path = zipped_path
+
+        # Move to final location
+        gfo.move(tmp_output_path, output_path)
+
+    elif (
+        gfo.get_driver(tmp_output_path) == "ESRI Shapefile"
+        and tmp_output_path.with_suffix(".dbf").exists()
+    ):
+        # If the output shapefile doesn't have a geometry column, the .shp file
+        # doesn't exist but the .dbf does
+        # Zip if needed
+        if (
+            output_path.suffix.lower() == ".zip"
+            and not tmp_output_path.suffix.lower() == ".zip"
+        ):
+            # Add a .cpg file, otherwise the zipped shapefile will not be recognized
+            tmp_output_cpg_path = tmp_output_path.with_suffix(".cpg")
+            tmp_output_cpg_path.touch(exist_ok=True)
+
+            zipped_path = Path(f"{tmp_output_path.as_posix()}.zip")
+            fileops.geo_sozip(tmp_output_path, zipped_path)
+            tmp_output_path = zipped_path
+            gfo.move(tmp_output_path, output_path)
+
+        else:
+            gfo.move(
+                tmp_output_path.with_suffix(".dbf"), output_path.with_suffix(".dbf")
+            )
+    else:
+        logger.debug("Result was empty!")
 
 
 def _prepare_processing_params(
@@ -4312,13 +4365,13 @@ def dissolve_singlethread(
     # Now we can really start
     tempdir = _io_util.create_tempdir("geofileops/dissolve_singlethread")
     try:
-        suffix = output_path.suffix
         options = {}
         if where_post is not None:
             # where_post needs to be applied still, so no spatial index needed
             options["LAYER_CREATION.SPATIAL_INDEX"] = False
-            suffix = ".gpkg"
-        tmp_output_path = tempdir / f"output_tmp{suffix}"
+            tmp_output_path = tempdir / f"{output_path.stem}.gpkg"
+        else:
+            tmp_output_path = tempdir / output_path.name
 
         _ogr_util.vector_translate(
             input_path=input_path,
@@ -4333,7 +4386,10 @@ def dissolve_singlethread(
 
         # We still need to apply the where_post filter
         if where_post is not None:
-            tmp_output_where_path = tempdir / f"output_tmp2_where{output_path.suffix}"
+            tmp_output_where_path = (
+                tempdir / f"output_tmp2_where{GeoPath(output_path).suffix_full}"
+            )
+
             tmp_output_info = gfo.get_layerinfo(tmp_output_path)
             where_post = where_post.format(
                 geometrycolumn=tmp_output_info.geometrycolumn

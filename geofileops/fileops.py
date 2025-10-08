@@ -26,16 +26,17 @@ from osgeo import gdal, ogr
 from pandas.api.types import is_integer_dtype
 from pygeoops import GeometryType, PrimitiveType  # noqa: F401
 
+from geofileops._compat import GDAL_GTE_311
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
     _geofileinfo,
-    _geopath_util,
     _geoseries_util,
     _io_util,
     _ogr_sql_util,
     _ogr_util,
     _sqlite_util,
 )
+from geofileops.util._geopath_util import GeoPath
 
 try:
     import fiona
@@ -115,7 +116,7 @@ def listlayers(
     if str(path).lower().endswith((".shp", ".shp.zip")):
         if not _vsi_exists(path):
             raise FileNotFoundError(f"File not found: {path}")
-        return [_geopath_util.stem(path)]
+        return [GeoPath(path).stem]
 
     datasource = None
     try:
@@ -401,6 +402,9 @@ def get_layerinfo(
             errors.append("Layer doesn't have a geometry column!")
 
         # If there were no errors, everything was OK so we can return.
+        # Remark: for e.g. for a ".shp.zip" file the layer name will include .shp at the
+        # end, but this is not an error! If it isn't there, using the layer name in SQL
+        # statements on the ".shp.zip" file will lead to "table not found" errors.
         if len(errors) == 0:
             return LayerInfo(
                 name=datasource_layer.GetName(),
@@ -543,7 +547,7 @@ def get_default_layer(path: Union[str, "os.PathLike[Any]"]) -> str:
     Returns:
         str: The default layer name.
     """
-    return _geopath_util.stem(path)
+    return GeoPath(path).stem
 
 
 def execute_sql(
@@ -2848,6 +2852,42 @@ def copy_layer(
     _ogr_util.vector_translate_by_info(info=translate_info)
 
 
+def geo_sozip(
+    input_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
+):
+    """Zip a geofile to a seek-optimized zip file.
+
+    For geofile types that consist of multiple files (eg. shapefiles), all relevant
+    (existing) files are included in the zip.
+
+    Args:
+        input_path (PathLike): the geofile to zip.
+        output_path (PathLike): the output zip file.
+    """
+    if not GDAL_GTE_311:
+        raise RuntimeError("sozip requires gdal>=3.11")
+
+    # For some file types, extra files need to be included
+    input_info = _geofileinfo.get_geofileinfo(input_path)
+    input_path_suffix = Path(input_path).suffix
+    input_path_no_suffix = Path(input_path).with_suffix("").as_posix()
+
+    input_paths = []
+    if _vsi_exists(input_path):
+        input_paths.append(input_path)
+    for suffix in input_info.suffixes_extrafiles:
+        if suffix == input_path_suffix:
+            continue
+        extra_path = f"{input_path_no_suffix}{suffix}"
+        if _vsi_exists(extra_path):
+            input_paths.append(extra_path)
+
+    gdal.Run(
+        "vsi", "sozip", "create", input=input_paths, output=output_path, no_paths=True
+    )
+
+
 def _zip(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
     """Zip a file or directory.
 
@@ -2869,16 +2909,48 @@ def _zip(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"
                     zipf.write(file_path, file_path.relative_to(src))
 
 
-def _unzip(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
-    """Unzip a zip file.
+def geo_unzip(
+    input_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
+) -> Path:
+    """Unzip a zipped geofile and return the path to the unzipped geofile.
+
+    The zip file should contain a single geofile. If the file contains a single file,
+    that file is returned. If it contains multiple files, the geofile is determined
+    based on the file extension. If multiple geofiles are found, an error is raised.
 
     Args:
-        src (PathLike): the zip file to unzip.
-        dst (PathLike): the destination directory.
+        input_path (PathLike): the zip file to unzip.
+        output_path (PathLike): the output directory.
+
+    Returns:
+        Path: The path to the unzipped geofile in the destination directory.
     """
-    # Unzip the file
-    with zipfile.ZipFile(src, "r") as zipf:
-        zipf.extractall(dst)
+    geo_suffixes = (".gpkg", ".shp", ".geojson", ".json", ".gpkg.zip", ".shp.zip")
+    with zipfile.ZipFile(input_path, "r") as zipf:
+        # Determine the geofile in the zip to be able to return it
+        files = zipf.filelist
+        geofilename = None
+        if len(files) == 0:
+            raise ValueError(f"No files found in zip: {input_path}")
+        elif len(files) == 1:
+            geofilename = files[0].filename
+        else:
+            for file in files:
+                if file.filename.endswith(geo_suffixes):
+                    if geofilename is not None:
+                        raise ValueError(
+                            f"Multiple geofiles found in zip: {input_path}, so cannot "
+                            "determine which one to return."
+                        )
+                    geofilename = file.filename
+
+        if geofilename is None:
+            raise ValueError(f"No geofile found in zip: {input_path}")
+
+        zipf.extractall(output_path)
+
+    return Path(output_path) / geofilename
 
 
 def _determine_access_mode(

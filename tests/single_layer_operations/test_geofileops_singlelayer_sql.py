@@ -10,9 +10,16 @@ from shapely.geometry import Polygon
 
 import geofileops as gfo
 from geofileops import GeometryType
+from geofileops._compat import GDAL_GTE_311
 from geofileops.util import _geoops_sql as geoops_sql
+from geofileops.util._geopath_util import GeoPath
 from tests import test_helper
-from tests.test_helper import EPSGS, SUFFIXES_GEOOPS, assert_geodataframe_equal
+from tests.test_helper import (
+    EPSGS,
+    SUFFIXES_GEOOPS,
+    SUFFIXES_GEOOPS_EXT,
+    assert_geodataframe_equal,
+)
 
 
 @pytest.mark.parametrize(
@@ -123,27 +130,40 @@ def test_dissolve_singlethread_output_exists(tmp_path):
     assert output_path.stat().st_size != 0
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS_EXT)
 @pytest.mark.parametrize("epsg", EPSGS)
 @pytest.mark.filterwarnings(
     "ignore: The default date converter is deprecated as of Python 3.12"
 )
 def test_isvalid(tmp_path, suffix, epsg):
+    """Test isvalid operation."""
+    if not GDAL_GTE_311 and suffix in {".gpkg.zip", ".shp.zip"}:
+        # Skip test for unsupported GDAL versions
+        pytest.skip(".zip support requires gdal>=3.11")
+
     # Prepare test data
-    input_path = test_helper.get_testfile(
-        "polygon-invalid", dst_dir=tmp_path, suffix=suffix, epsg=epsg
+    input_tmp_path = test_helper.get_testfile(
+        "polygon-invalid",
+        dst_dir=tmp_path,
+        suffix=suffix.replace(".zip", ""),
+        epsg=epsg,
     )
 
     # For Geopackage, also test if fid is properly preserved
     preserve_fid = True if suffix == ".gpkg" else False
     # Delete 2nd row, so we can check properly if fid is retained for Geopackage
     # WHERE rowid = 2, because fid is not known for .shp file with sql_dialect="SQLITE"
-    input_layer = gfo.get_only_layer(input_path)
+    input_layer = gfo.get_only_layer(input_tmp_path)
     sql_stmt = f'DELETE FROM "{input_layer}" WHERE rowid = 2'
-    gfo.execute_sql(input_path, sql_stmt=sql_stmt, sql_dialect="SQLITE")
+    gfo.execute_sql(input_tmp_path, sql_stmt=sql_stmt, sql_dialect="SQLITE")
+    if suffix.endswith(".zip"):
+        input_path = input_tmp_path.with_suffix(suffix)
+        gfo.geo_sozip(input_tmp_path, input_path)
+    else:
+        input_path = input_tmp_path
 
     # Now run test
-    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
+    output_path = tmp_path / f"output{suffix}"
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     gfo.isvalid(input_path=input_path, output_path=output_path, batchsize=batchsize)
@@ -166,9 +186,7 @@ def test_isvalid(tmp_path, suffix, epsg):
     )
 
     # Now check if the tmp file is correctly created
-    output_auto_path = (
-        output_path.parent / f"{input_path.stem}_isvalid{output_path.suffix}"
-    )
+    output_auto_path = tmp_path / f"{GeoPath(input_path).stem}_isvalid{suffix}"
     assert output_auto_path.exists()
     result_auto_layerinfo = gfo.get_layerinfo(output_auto_path)
     assert input_layerinfo.featurecount == result_auto_layerinfo.featurecount
@@ -334,7 +352,7 @@ def test_select_equal_columns(tmp_path, suffix):
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
     # Now run test
-    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
+    output_path = tmp_path / f"{GeoPath(input_path).stem}-output{suffix}"
     sql_stmt = 'SELECT {geometrycolumn}, oidn, uidn AS oidn FROM "{input_layer}"'
 
     gfo.select(input_path=input_path, output_path=output_path, sql_stmt=sql_stmt)
@@ -348,9 +366,9 @@ def test_select_equal_columns(tmp_path, suffix):
     assert len(layerinfo_output.columns) == 2
     columns_output_upper = [col.upper() for col in layerinfo_output.columns]
     assert "OIDN" in columns_output_upper
-    if suffix == ".gpkg":
+    if suffix in (".gpkg", ".gpkg.zip"):
         assert "OIDN:1" in columns_output_upper
-    elif suffix == ".shp":
+    elif suffix in (".shp", ".shp.zip"):
         assert "OIDN_1" in columns_output_upper
     else:
         raise ValueError(f"Test doesn't support {suffix=}")
@@ -405,7 +423,7 @@ def test_select_invalid_sql(tmp_path, suffix):
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
     # Now run test
-    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
+    output_path = tmp_path / f"{GeoPath(input_path).stem}-output{suffix}"
     sql_stmt = 'SELECT {geometrycolumn}, not_existing_column FROM "{input_layer}"'
 
     with pytest.raises(Exception, match="Error no such column"):
@@ -420,11 +438,11 @@ def test_select_nogeom_in_input(tmp_path, suffix, gridsize):
     # Prepare test data
     input_geom_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
     data_df = gfo.read_file(input_geom_path, ignore_geometry=True)
-    input_path = tmp_path / f"{input_geom_path.stem}_nogeom{suffix}"
+    input_path = tmp_path / f"{GeoPath(input_geom_path).stem}_nogeom{suffix}"
     gfo.to_file(data_df, input_path)
 
     # Now run test
-    output_path = tmp_path / f"{input_path.stem}-output{suffix}"
+    output_path = tmp_path / f"{GeoPath(input_path).stem}-output{suffix}"
     sql_stmt = 'SELECT * FROM "{input_layer}"'
 
     # Column casing seems to behave odd: without gridsize (=subselect) results in upper
@@ -542,7 +560,7 @@ def test_select_star(tmp_path, suffix, explodecollections):
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
     # Now run test
-    name = f"{input_path.stem}-output{suffix}"
+    name = f"{GeoPath(input_path).stem}-output{suffix}"
     output_path = tmp_path / name
     input_layerinfo = gfo.get_layerinfo(input_path)
     sql_stmt = 'SELECT * FROM "{input_layer}"'

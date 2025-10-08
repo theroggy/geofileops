@@ -176,7 +176,7 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
         # The first partial file during calculation to be completed has None geometry,
         # so file is created with GEOMETRY type.
         pass
-    elif force_output_geometrytype is None or suffix == ".shp":
+    elif force_output_geometrytype is None or suffix in (".shp", ".shp.zip"):
         assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
     else:
         assert output_layerinfo.geometrytype == GeometryType.POLYGON

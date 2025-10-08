@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any, Union
 from osgeo import gdal
 from osgeo_utils.auxiliary.util import GetOutputDriversFor
 
+from geofileops.util._geopath_util import GeoPath
+
 if TYPE_CHECKING:  # pragma: no cover
     import os
 
@@ -240,10 +242,10 @@ def get_driver(path: Union[str, "os.PathLike[Any]"]) -> str:
 
     """  # noqa: E501
     # gdal.OpenEx is relatively slow on windows, so for straightforward cases, avoid it.
-    suffix = Path(path).suffix.lower()
-    if suffix == ".gpkg":
+    suffix = GeoPath(path).suffix_full.lower()
+    if suffix in (".gpkg", ".gpkg.zip"):
         return "GPKG"
-    elif suffix == ".shp":
+    elif suffix in (".shp", ".shp.zip"):
         return "ESRI Shapefile"
 
     def get_driver_for_path(input_path: Union[str, "os.PathLike[Any]"]) -> str:

@@ -1,105 +1,149 @@
 """Helper functions for working with paths to geo files."""
 
 import os
-from pathlib import Path, PurePath
+from pathlib import Path
 from typing import Any, Union
 
-GEO_MULTI_SUFFIXES = [".gpkg.zip", ".shp.zip"]
+GEO_MULTI_SUFFIXES = (".gpkg.zip", ".shp.zip")
 
 
-def stem(path: Union[str, "os.PathLike[Any]"]) -> str:
-    """Return the stem of a path, supporting multi-suffixes for geo formats.
+class GeoPath:
+    """Class to work with geo file paths."""
 
-    Args:
-        path (PathLike): The path to get the stem of.
+    def __init__(self, path: Union[str, "os.PathLike[Any]"]) -> None:
+        """Initialize the GeoPath object.
 
-    Returns:
-        str: the stem of the path.
-    """
-    # If there are multiple "."s in the name, check if it is a geo multi-suffix
-    path = PurePath(path)
-    if path.name.count(".") > 1:
-        name_lower = path.name.lower()
-        is_geo_multi_suffix = False
+        Args:
+            path (PathLike): The path to work with.
+        """
+        self._path = Path(path)
+
+    @property
+    def is_multi_suffix(self) -> bool:
+        """Return True if the path has a geo multi-suffix.
+
+        Returns:
+            bool: True if the path has a geo multi-suffix.
+        """
+        name_lower = self._path.name.lower()
+        for multi_suffix in GEO_MULTI_SUFFIXES:
+            if name_lower.endswith(multi_suffix):
+                return True
+
+        return False
+
+    @property
+    def path(self) -> Path:
+        """Return the original path as a Path object."""
+        return self._path
+
+    @property
+    def name_nozip(self) -> str:
+        """Return the name of a path, removing a .zip suffix if present.
+
+        Returns:
+            str: The name of the path without a .zip suffix.
+        """
+        if self._path.suffix.lower() == ".zip":
+            return self._path.name[: -len(".zip")]
+        return self._path.name
+
+    @property
+    def stem(self) -> str:
+        """Return the stem of a path, supporting multi-suffixes for geo formats.
+
+        Args:
+            path (PathLike): The path to get the stem of.
+
+        Returns:
+            str: the stem of the path.
+        """
+        name_lower = self._path.name.lower()
         for suffixes in GEO_MULTI_SUFFIXES:
             if name_lower.endswith(suffixes):
-                is_geo_multi_suffix = True
-                break
+                # Geo multi-suffix found, remove it from the name to get the stem
+                return self._path.name[: -len(suffixes)]
 
-        # A geo multi-suffix has been found
-        if is_geo_multi_suffix:
-            return path.name[: -len(suffixes)]
+        return self._path.stem
 
-    return path.stem
+    @property
+    def suffix_full(self) -> str:
+        """Return the suffixes of a path, supporting multi-suffixes for geo formats.
 
+        Returns:
+            str: The suffixes of the path.
+        """
+        # If there are multiple "."s in the name, check if it is a geo multi-suffix
+        name_lower = self._path.name.lower()
+        for multi_suffix in GEO_MULTI_SUFFIXES:
+            if name_lower.endswith(multi_suffix):
+                return self._path.name[-len(multi_suffix) :]
 
-def suffixes(path: Union[str, "os.PathLike[Any]"]) -> str:
-    """Return the suffixes of a path, supporting multi-suffixes for geo formats.
+        return self._path.suffix
 
-    Args:
-        path (PathLike): The path to get the suffixes of.
+    @property
+    def suffix_nozip(self) -> str:
+        """Return the suffixes of a path, removing a .zip suffix if present.
 
-    Returns:
-        str: The suffixes of the path.
-    """
-    # If there are multiple "."s in the name, check if it is a geo multi-suffix
-    path = PurePath(path)
-    if path.name.count(".") > 1:
-        name_lower = path.name.lower()
-        for suffixes in GEO_MULTI_SUFFIXES:
-            if name_lower.endswith(suffixes):
-                return path.name[-len(suffixes) :]
+        Returns:
+            str: The suffixes of the path without a .zip suffix.
+        """
+        suffix_tmp = self.suffix_full
+        if suffix_tmp.lower().endswith(".zip"):
+            return suffix_tmp[: -len(".zip")]
 
-    return path.suffix
+        return suffix_tmp
 
+    def with_stem(self, stem: str) -> Path:
+        """Return a Path with a new stem, supporting multi-suffixes for geo formats.
 
-def with_stem(path: Union[str, "os.PathLike[Any]"], new_stem: str) -> str | Path:
-    """Return a Path with a new stem, supporting multi-suffixes for geo formats.
+        If the input is a string, the output will be a string. If the input is a Path,
+        the output will be a Path.
 
-    If the input is a string, the output will be a string. If the input is a Path, the
-    output will be a Path.
+        Args:
+            stem (str): The new stem to set.
 
-    Args:
-        path (PathLike): The path to change the stem of.
-        new_stem (str): The new stem to set.
+        Returns:
+            Path: The path with the new stem.
 
-    Returns:
-        str | Path: The path with the new stem.
-
-    """
-    # If there are multiple "."s in the name, check if it is a geo multi-suffix
-    path_p = PurePath(path)
-
-    new_path_str = None
-    if path_p.name.count(".") > 1:
+        """
         # Determine if the filename has a geo multi-suffix (case insensitive)
-        name_lower = path_p.name.lower()
+        new_path_str = None
+        name_lower = self._path.name.lower()
         is_geo_multi_suffix = False
-        for suffixes in GEO_MULTI_SUFFIXES:
-            if name_lower.endswith(suffixes):
+        for multi_suffix in GEO_MULTI_SUFFIXES:
+            if name_lower.endswith(multi_suffix):
                 is_geo_multi_suffix = True
                 break
 
         # The file name has a geo multi-suffix
         if is_geo_multi_suffix:
             # Recover the suffixes from the file name to keep the casing
-            suffixes = path_p.name[-len(suffixes) :]
-            new_name = f"{new_stem}{suffixes}"
+            multi_suffix = self._path.name[-len(multi_suffix) :]
+            new_name = f"{stem}{multi_suffix}"
             # Use os.path to retain forward/backward slashes in the path
-            parent, _ = os.path.split(path)
+            parent, _ = os.path.split(self._path)
             new_path_str = f"{parent}/{new_name}"
 
-    # If the input was a Path, return a Path
-    if isinstance(path, Path):
+        # If the input was a Path, return a Path
         if new_path_str is not None:
             return Path(new_path_str)
         else:
-            return Path(path_p).with_stem(new_stem)
+            return self._path.with_stem(stem)
 
-    # The input was not a Path, return a string
-    if new_path_str is not None:
-        return new_path_str
-    else:
-        # Retain forward/backward slashes in the path by using os.path.
-        parent, _tail = os.path.split(path)
-        return f"{parent}/{new_stem}{path_p.suffix}"
+    def with_stem_suffix(self, stem_suffix: str) -> Path:
+        """Return a Path with a new stem by adding a stem_suffix.
+
+        Multiple suffixes are supported for geo formats.
+
+        If the input is a string, the output will be a string. If the input is a Path,
+        the output will be a Path.
+
+        Args:
+            stem_suffix (str): The suffix to add to the stem.
+
+        Returns:
+            Path: The path with the new stem.
+
+        """
+        return self._path.parent / f"{self.stem}{stem_suffix}{self.suffix_full}"
