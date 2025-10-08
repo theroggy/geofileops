@@ -3,7 +3,7 @@ channels:
   # - gdal-master  # If uncommented, GDAL master will be used for the environment.
   - conda-forge
 dependencies:
-  - python =3.12
+  - python =3.13
   - pip
   # required
   - cloudpickle

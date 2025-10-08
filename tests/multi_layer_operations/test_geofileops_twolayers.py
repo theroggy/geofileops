@@ -17,10 +17,11 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops._compat import GEOPANDAS_110, GEOPANDAS_GTE_10
+from geofileops._compat import GDAL_GTE_311, GEOPANDAS_110, GEOPANDAS_GTE_10
 from geofileops.util import _general_util, _geofileinfo, _sqlite_util
 from geofileops.util import _geoops_sql as geoops_sql
 from geofileops.util._geofileinfo import GeofileInfo
+from geofileops.util._geopath_util import GeoPath
 from tests import test_helper
 from tests.test_helper import SUFFIXES_GEOOPS, TESTFILES, assert_geodataframe_equal
 
@@ -126,7 +127,7 @@ def test_clip_resultempty(tmp_path, suffix, clip_empty):
     not GEOPANDAS_GTE_10,
     reason="assert_geodataframe_equal with check_geom_gridsize requires gpd >= 1.0",
 )
-@pytest.mark.skipif(os.name == "nt", reason="crashes on windows")
+# @pytest.mark.skipif(os.name == "nt", reason="crashes on windows")
 def test_difference(
     tmp_path,
     suffix,
@@ -137,7 +138,7 @@ def test_difference(
     check_geom_tolerance,
 ):
     input1_path = test_helper.get_testfile(testfile, suffix=suffix)
-    if suffix == ".shp":
+    if suffix in (".shp", ".shp.zip"):
         input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
         input2_layer = None
     else:
@@ -145,7 +146,7 @@ def test_difference(
         input2_layer = "zones"
     input_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
-    output_path = tmp_path / f"{input1_path.stem}-output{suffix}"
+    output_path = tmp_path / f"{GeoPath(input1_path).stem}-output{suffix}"
 
     kwargs = {}
     if subdivide_coords is not None:
@@ -186,7 +187,7 @@ def test_difference(
     exp_gdf = exp_gdf[~exp_gdf.geometry.is_empty]
 
     if test_helper.RUNS_LOCAL:
-        output_exp_path = tmp_path / f"{input1_path.stem}-expected{suffix}"
+        output_exp_path = tmp_path / f"{GeoPath(input1_path).stem}-expected{suffix}"
         gfo.to_file(exp_gdf, output_exp_path)
 
     assert_geodataframe_equal(
@@ -637,12 +638,14 @@ def test_intersect_deprecated(tmp_path):
     "suffix_in, suffix_out, epsg, gridsize, explodecollections, worker_type, "
     "nb_parallel",
     [
-        (".gpkg.zip", ".gpkg", 31370, 0.0, True, "threads", 1),
+        (".gpkg.zip", ".gpkg.zip", 31370, 0.0, True, "threads", 1),
         (".gpkg", ".gpkg", 31370, 0.01, True, "threads", 1),
-        (".gpkg", ".gpkg", 31370, 0.0, False, "processes", 2),
+        (".gpkg.zip", ".gpkg.zip", 31370, 0.0, False, "processes", 2),
         (".gpkg", ".gpkg", 4326, 0.0, True, "threads", 2),
         (".shp", ".shp", 31370, 0.0, True, "threads", 1),
+        (".shp.zip", ".shp.zip", 31370, 0.0, True, "threads", 1),
         (".shp", ".shp", 31370, 0.0, False, "processes", 2),
+        (".shp.zip", ".shp.zip", 31370, 0.0, False, "processes", 2),
     ],
 )
 def test_intersection(
@@ -655,10 +658,8 @@ def test_intersection(
     worker_type,
     nb_parallel,
 ):
-    if suffix_in == ".gpkg.zip":
-        pytest.xfail(
-            "Two layer operations use sqlite directly, so .gpkg.zip does not work"
-        )
+    if not GDAL_GTE_311 and suffix_in in [".gpkg.zip", ".shp.zip"]:
+        pytest.skip("zip files require gdal >= 3.1.1")
 
     # Prepare test data/parameters
     input1_path = test_helper.get_testfile(
@@ -666,7 +667,10 @@ def test_intersection(
     )
     input2_path = test_helper.get_testfile("polygon-zone", suffix=suffix_in, epsg=epsg)
 
-    output_path = tmp_path / f"{input1_path.stem}_inters_{input2_path.stem}{suffix_out}"
+    output_path = (
+        tmp_path
+        / f"{GeoPath(input1_path).stem}_inters_{GeoPath(input2_path).stem}{suffix_out}"
+    )
     batchsize = -1
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     if nb_parallel > 1:
@@ -694,7 +698,7 @@ def test_intersection(
         len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
     )
 
-    if explodecollections and suffix_out != ".shp":
+    if explodecollections and suffix_out not in (".shp", ".shp.zip"):
         assert output_layerinfo.geometrytype == GeometryType.POLYGON
     else:
         assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
@@ -1493,7 +1497,7 @@ def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
         input2_path = input_geom_path
         geom_column = '"{input2_geometrycolumn}" AS geom'
         order_by_geom = "ORDER BY geom IS NULL"
-        layer1 = "input_nogeom layer1"
+        layer1 = '"{input1_layer}" layer1'
         layer2 = '"{input2_layer}" layer2'
         exp_output_geom = True
         exp_featurecount = 37
@@ -1503,7 +1507,7 @@ def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
         geom_column = '"{input1_geometrycolumn}" AS geom'
         order_by_geom = "ORDER BY geom IS NULL"
         layer1 = '"{input1_layer}" layer1'
-        layer2 = "input_nogeom layer2"
+        layer2 = '"{input2_layer}" layer2'
         exp_output_geom = True
         exp_featurecount = 37
     elif input_nogeom == "both":
@@ -1511,16 +1515,16 @@ def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
         input2_path = input_nogeom_path
         geom_column = "NULL AS TEST"
         order_by_geom = ""
-        layer1 = "input_nogeom layer1"
-        layer2 = "input_nogeom layer2"
+        layer1 = '"{input1_layer}" layer1'
+        layer2 = '"{input2_layer}" layer2'
         exp_output_geom = False
         exp_featurecount = 2
 
     if suffix == ".shp" and not exp_output_geom:
         # For shapefiles, if there is no geometry only the .dbf file is written
-        output_path = tmp_path / f"{input1_path.stem}-output.dbf"
+        output_path = tmp_path / f"{GeoPath(input1_path).stem}-output.dbf"
     else:
-        output_path = tmp_path / f"{input1_path.stem}-output{suffix}"
+        output_path = tmp_path / f"{GeoPath(input1_path).stem}-output{suffix}"
 
     # Prepare query to execute.
     # order_by_geom is needed to avoid creating GEOMETRY type output, as a NULL geometry

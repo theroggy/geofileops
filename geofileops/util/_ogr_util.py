@@ -14,8 +14,9 @@ from pygeoops import GeometryType
 
 import geofileops as gfo
 from geofileops import _compat, fileops
-from geofileops.util import _geopath_util, _io_util
+from geofileops.util import _io_util
 from geofileops.util._general_util import MissingRuntimeDependencyError
+from geofileops.util._geopath_util import GeoPath
 
 # Make sure only one instance per process is running
 lock = Lock()
@@ -393,7 +394,7 @@ def vector_translate(
 
     # Shapefiles only can have one layer, and the layer name == the stem of the file
     if output_info.driver == "ESRI Shapefile":
-        output_layer = _geopath_util.stem(output_path)
+        output_layer = GeoPath(output_path).stem
 
     # SRS
     if output_srs is not None and isinstance(output_srs, int):

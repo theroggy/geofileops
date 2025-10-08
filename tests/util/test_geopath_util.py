@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from geofileops.util import _geopath_util
+from geofileops.util._geopath_util import GeoPath
 
 
 @pytest.mark.parametrize(
@@ -22,25 +22,26 @@ from geofileops.util import _geopath_util
     ],
 )
 def test_stem(path, exp_stem):
-    assert _geopath_util.stem(path) == exp_stem
+    assert GeoPath(path).stem == exp_stem
 
 
 @pytest.mark.parametrize(
-    "path, exp_suffixes",
+    "path, exp_suffix_full, exp_suffix_nozip",
     [
-        (Path("/tmp/testje.gpkg"), ".gpkg"),
-        ("/tmp/testje.gpkg.zip", ".gpkg.zip"),
-        ("/tmp/testje.shp", ".shp"),
-        ("/tmp/testje.shp.zip", ".shp.zip"),
-        ("/tmp/testje.txt", ".txt"),
-        ("/tmp/testje", ""),
-        ("/tmp/testje.tar.gz", ".gz"),
-        ("/tmp/t.estj.e.gpkg", ".gpkg"),
-        ("/tmp/t.estj.e.gpkg.zip", ".gpkg.zip"),
+        (Path("/tmp/testje.gpkg"), ".gpkg", ".gpkg"),
+        ("/tmp/testje.gpkg.zip", ".gpkg.zip", ".gpkg"),
+        ("/tmp/testje.shp", ".shp", ".shp"),
+        ("/tmp/testje.shp.zip", ".shp.zip", ".shp"),
+        ("/tmp/testje.txt", ".txt", ".txt"),
+        ("/tmp/testje", "", ""),
+        ("/tmp/testje.tar.gz", ".gz", ".gz"),
+        ("/tmp/t.estj.e.gpkg", ".gpkg", ".gpkg"),
+        ("/tmp/t.estj.e.gpkg.zip", ".gpkg.zip", ".gpkg"),
     ],
 )
-def test_suffixes(path, exp_suffixes):
-    assert _geopath_util.suffixes(path) == exp_suffixes
+def test_suffix(path, exp_suffix_full, exp_suffix_nozip):
+    assert GeoPath(path).suffix_full == exp_suffix_full
+    assert GeoPath(path).suffix_nozip == exp_suffix_nozip
 
 
 @pytest.mark.parametrize(
@@ -58,8 +59,4 @@ def test_suffixes(path, exp_suffixes):
     ],
 )
 def test_with_stem(path, new_stem, exp_path):
-    # If input is a string, output should be a string
-    assert _geopath_util.with_stem(path, new_stem) == exp_path
-
-    # If input is a Path, output should be a Path
-    assert _geopath_util.with_stem(Path(path), new_stem) == Path(exp_path)
+    assert GeoPath(path).with_stem(new_stem) == Path(exp_path)

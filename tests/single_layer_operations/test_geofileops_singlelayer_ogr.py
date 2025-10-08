@@ -10,10 +10,10 @@ import geofileops as gfo
 from geofileops import GeometryType
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
-from tests.test_helper import SUFFIXES_GEOOPS
+from tests.test_helper import SUFFIXES_GEOOPS, SUFFIXES_GEOOPS_EXT
 
 
-@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
+@pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS_EXT)
 @pytest.mark.parametrize(
     "clip_geometry, exp_featurecount",
     [
@@ -46,7 +46,7 @@ def test_clip_by_geometry(tmp_path, suffix, clip_geometry, exp_featurecount):
     layerinfo_output = gfo.get_layerinfo(output_path)
     assert len(layerinfo_orig.columns) == len(layerinfo_output.columns)
     assert layerinfo_output.geometrytype == GeometryType.MULTIPOLYGON
-    if suffix == ".shp" and not isinstance(clip_geometry, str):
+    if suffix in {".shp", ".shp.zip"} and not isinstance(clip_geometry, str):
         # Shapefile includes an null geometry feature with GDAL <= 3.11.4
         pytest.xfail(reason="Shapefile output includes an extra null geometry feature")
     assert layerinfo_output.featurecount == exp_featurecount

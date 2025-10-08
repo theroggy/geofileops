@@ -240,7 +240,7 @@ def test_vector_translate_input_nolayer(tmp_path):
     gfo.execute_sql(input_path, sql_stmt=f'DROP TABLE "{layer}"')
 
     with pytest.raises(
-        Exception, match="Error .* not recognized as .*a supported file format"
+        Exception, match=r"Error .* not recognized as .*a supported file format"
     ):
         _ogr_util.vector_translate(str(input_path), output_path)
 

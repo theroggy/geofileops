@@ -43,6 +43,7 @@ Spatial overlays and joins
    export_by_distance
    export_by_location
    intersection
+   join
    join_by_location
    join_nearest
    select_two_layers
@@ -94,7 +95,9 @@ General file operations
    get_driver
    listlayers
    move
+   unzip_geofile
    remove
+   zip_geofile
 
 Classes
 -------
