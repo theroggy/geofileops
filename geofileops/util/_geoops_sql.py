@@ -956,7 +956,7 @@ def clip(
         input1_columns=input_columns,
         input1_columns_prefix=input_columns_prefix,
         input2_layer=clip_layer,
-        input2_columns=None,
+        input2_columns=[],
         input2_columns_prefix="",
         output_layer=output_layer,
         explodecollections=explodecollections,
@@ -967,6 +967,7 @@ def clip(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types={},
     )
 
 
@@ -1246,6 +1247,7 @@ def difference(  # noqa: D417
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types={},
         output_with_spatial_index=output_with_spatial_index,
         tmp_dir=tempdir,
     )
@@ -1582,6 +1584,11 @@ def export_by_location(
             WHERE sub_area.{area_inters_column_name} >= {min_area_intersect}
         """
 
+    # Pass the columns that won't be read from the input files.
+    column_types = {}
+    if area_inters_column_name is not None:
+        column_types[area_inters_column_name] = "REAL"
+
     _two_layer_vector_operation(
         input1_path=input_path,
         input2_path=input_to_compare_with_path,
@@ -1602,6 +1609,7 @@ def export_by_location(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types=column_types,
         tmp_dir=tmp_dir,
     )
 
@@ -1669,6 +1677,7 @@ def export_by_distance(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types={},
     )
 
 
@@ -1946,6 +1955,7 @@ def intersection(  # noqa: D417
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types={},
         input1_subdivided_path=input1_subdivided_path,
         input2_subdivided_path=input2_subdivided_path,
         output_with_spatial_index=output_with_spatial_index,
@@ -2028,6 +2038,7 @@ def join(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types={},
     )
 
 
@@ -2154,6 +2165,11 @@ def join_by_location(
                    SELECT l1_fid FROM layer1_relations_filtered)
         """
 
+    # Pass the columns that won't be read from the input files.
+    column_types = {}
+    if area_inters_column_name is not None:
+        column_types[area_inters_column_name] = "REAL"
+
     return _two_layer_vector_operation(
         input1_path=input1_path,
         input2_path=input2_path,
@@ -2174,6 +2190,7 @@ def join_by_location(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types=column_types,
     )
 
 
@@ -2525,6 +2542,7 @@ def join_nearest(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types={"pos": "INTEGER", "distance": "REAL", "distance_crs": "REAL"},
         use_ogr=True,
     )
 
@@ -2572,6 +2590,7 @@ def select_two_layers(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        column_types=None,  # pass None as we don't know the columns here
         output_with_spatial_index=output_with_spatial_index,
     )
 
@@ -3118,6 +3137,7 @@ def _two_layer_vector_operation(
     output_path: Path,
     sql_template: str,
     operation_name: str,
+    *,
     input1_layer: str | LayerInfo | None,
     input1_columns: list[str] | None,
     input1_columns_prefix: str,
@@ -3132,6 +3152,7 @@ def _two_layer_vector_operation(
     nb_parallel: int,
     batchsize: int,
     force: bool,
+    column_types: dict[str, str] | None,
     input1_subdivided_path: Path | None = None,
     input2_subdivided_path: Path | None = None,
     use_ogr: bool = False,
@@ -3177,6 +3198,11 @@ def _two_layer_vector_operation(
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): [description]. Defaults to False.
+        column_types (dict, optional): an optional dictionary with columns with their
+            types. If a dict is passed, the column types specified in it combined with
+            the lists of columns in input1_columns and input2_columns should contain all
+            columns to be created in the output layer. If None, the output columns are
+            determined using the sql_stmt, which can be slow for slow queries.
         input1_subdivided_path (Path, optional): subdivided version of input1.
         input2_subdivided_path (Path, optional): subdivided version of input2.
         use_ogr (bool, optional): If True, ogr is used to do the processing,
@@ -3413,17 +3439,20 @@ def _two_layer_vector_operation(
             batch_filter="{batch_filter}",
         )
 
-        # Determine column names and types based on sql statement
-        column_datatypes = None
-        # Use first batch_filter to improve performance
-        sql_stmt = sql_template.format(
-            batch_filter=processing_params.batches[0]["batch_filter"]
-        )
-
-        column_datatypes = _sqlite_util.get_columns(
-            sql_stmt=sql_stmt,
-            input_databases=input_db_names,
-            output_geometrytype=force_output_geometrytype,
+        # Determine the columns and column types to be used to created the output layer
+        # based on the sql_template and/or the input files.
+        column_types = _determine_column_types(
+            input_column_types=column_types,
+            input1_path=input1_path,
+            input2_path=input2_path,
+            input1_layer=input1_layer,
+            input2_layer=input2_layer,
+            sql_template=sql_template,
+            force_output_geometrytype=force_output_geometrytype,
+            input1_col_strs=input1_col_strs,
+            input2_col_strs=input2_col_strs,
+            processing_params=processing_params,
+            input_db_names=input_db_names,
         )
 
         # Apply gridsize if it is specified
@@ -3447,7 +3476,7 @@ def _two_layer_vector_operation(
             # Remark:
             # - use "LIMIT -1 OFFSET 0" to avoid the subquery flattening. Flattening
             #   "geom IS NOT NULL" leads to GFO_Difference_Collection calculated double!
-            cols = [col for col in column_datatypes if col.lower() != "geom"]
+            cols = [col for col in column_types if col.lower() != "geom"]
             columns_to_select = _ogr_sql_util.columns_quoted(cols)
             sql_template = f"""
                 SELECT * FROM
@@ -3491,8 +3520,8 @@ def _two_layer_vector_operation(
 
         # Apply the geometrytype already during calculation
         output_geometrytype_calc = force_output_geometrytype
-        if output_geometrytype_calc is not None and "geom" in column_datatypes:
-            column_datatypes["geom"] = output_geometrytype_calc.name
+        if output_geometrytype_calc is not None and "geom" in column_types:
+            column_types["geom"] = output_geometrytype_calc.name
         output_geometrytype_append = (
             force_output_geometrytype
             if explode_append
@@ -3544,7 +3573,7 @@ def _two_layer_vector_operation(
                     output_crs=output_crs,
                     use_ogr=use_ogr,
                     create_spatial_index=False,
-                    column_datatypes=column_datatypes,
+                    column_datatypes=column_types,
                 )
                 future_to_batch_id[future] = batch_id
 
@@ -3645,6 +3674,80 @@ def _two_layer_vector_operation(
     finally:
         if ConfigOptions.remove_temp_files:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def _determine_column_types(
+    input_column_types: dict[str, str] | None,
+    input1_path: Path,
+    input2_path: Path,
+    input1_layer: LayerInfo,
+    input2_layer: LayerInfo,
+    sql_template: str,
+    force_output_geometrytype: GeometryType | None,
+    input1_col_strs,
+    input2_col_strs,
+    processing_params,
+    input_db_names,
+) -> dict[str, str]:
+    """Determine the column types to use in the output layer."""
+    column_types_tmp = {}
+    column_types_from_sql = False
+    if input_column_types is None or force_output_geometrytype is None:
+        # Determine the columns and types based on the sql statement
+        # Use first batch_filter to improve performance
+        sql_stmt = sql_template.format(
+            batch_filter=processing_params.batches[0]["batch_filter"]
+        )
+        column_types_tmp = _sqlite_util.get_columns(
+            sql_stmt=sql_stmt,
+            input_databases=input_db_names,
+            output_geometrytype=force_output_geometrytype,
+        )
+        column_types_from_sql = True
+
+    # Fill out the column_types dict, or overrule existing types based on the
+    # columns asked and the types in the input layers.
+    # If an output_geometrytype is known, use it.
+    if force_output_geometrytype is not None:
+        column_types_tmp["geom"] = force_output_geometrytype.name
+
+    # Get the types of all columns in the input files.
+    input1_column_types = _sqlite_util.get_column_types(
+        database_path=input1_path, table=input1_layer.name
+    )
+    input1_column_types = {k.lower(): v for k, v in input1_column_types.items()}
+    input2_column_types = _sqlite_util.get_column_types(
+        database_path=input2_path, table=input2_layer.name
+    )
+    input2_column_types = {k.lower(): v for k, v in input2_column_types.items()}
+
+    # The types determined from the input layers for the columns asked are the most
+    # detailed/correct ones possible, so use them.
+    columns_aliases = zip(
+        input1_col_strs.columns_asked_list(), input1_col_strs.aliases_list()
+    )
+    for column, alias in columns_aliases:
+        if column_types_from_sql and alias not in column_types_tmp:
+            # If the types were determined from the sql, only overrule types for
+            # columns that were actually found in the sql.
+            continue
+        column_types_tmp[alias] = input1_column_types[column.lower()]
+
+    columns_aliases = zip(
+        input2_col_strs.columns_asked_list(), input2_col_strs.aliases_list()
+    )
+    for column, alias in columns_aliases:
+        if column_types_from_sql and alias not in column_types_tmp:
+            # If the types were determined from the sql, only overrule types for
+            # columns that were actually found in the sql.
+            continue
+        column_types_tmp[alias] = input2_column_types[column.lower()]
+
+    # Now add any extra columns at the end
+    if input_column_types is not None and len(input_column_types) > 0:
+        column_types_tmp.update(input_column_types)
+
+    return column_types_tmp
 
 
 def _validate_params(

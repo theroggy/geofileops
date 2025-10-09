@@ -708,6 +708,13 @@ def test_intersection(
     else:
         assert output_layerinfo.featurecount == 30
 
+    # Check if the columns read from the input files have the same detailed types as in
+    # the input files
+    assert output_layerinfo.columns["l1_HFDTLT"].gdal_type == "String"
+    assert output_layerinfo.columns["l1_HFDTLT"].width == 20
+    assert output_layerinfo.columns["l2_naam"].gdal_type == "String"
+    assert output_layerinfo.columns["l2_naam"].width == 30
+
     # Check the contents of the result file by comparing with geopandas
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
@@ -1420,6 +1427,9 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
         SELECT layer1."{{input1_geometrycolumn}}" AS geom
               {{layer1_columns_prefix_alias_str}}
               {{layer2_columns_prefix_alias_str}}
+              ,1.0 AS test_constant_float
+              ,100 AS test_constant_int
+              ,'constant_string' AS test_constant_string
           FROM {{input1_databasename}}."{{input1_layer}}" layer1
           JOIN {{input1_databasename}}."{rtree_layer1}" layer1tree
             ON layer1.fid = layer1tree.id
@@ -1456,9 +1466,15 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == 30
     assert len(output_layerinfo.columns) == (
-        len(input1_layerinfo.columns) + len(input2_layerinfo.columns)
+        len(input1_layerinfo.columns) + len(input2_layerinfo.columns) + 3
     )
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    # Check if the columns read from the input files have the same detailed types as in
+    # the input files
+    assert output_layerinfo.columns["l1_HFDTLT"].gdal_type == "String"
+    assert output_layerinfo.columns["l1_HFDTLT"].width == 20
+    assert output_layerinfo.columns["l2_naam"].gdal_type == "String"
+    assert output_layerinfo.columns["l2_naam"].width == 30
 
     # Check if the "gpkg_ogr_contents" table is present in the output gpkg
     if suffix == ".gpkg":
