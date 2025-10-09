@@ -43,6 +43,7 @@ Spatial overlays and joins
    export_by_distance
    export_by_location
    intersection
+   join
    join_by_location
    join_nearest
    select_two_layers

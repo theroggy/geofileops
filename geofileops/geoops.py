@@ -2775,6 +2775,113 @@ def intersection(
     )
 
 
+def join(
+    input1_path: Path,
+    input2_path: Path,
+    output_path: Path,
+    input1_on: list[str] | str,
+    input2_on: list[str] | str,
+    join_type: str = "INNER",
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
+    input1_columns_prefix: str = "l1_",
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
+    input2_columns_prefix: str = "l2_",
+    output_layer: str | None = None,
+    explodecollections: bool = False,
+    gridsize: float = 0.0,
+    where_post: str | None = None,
+    nb_parallel: int = 1,
+    batchsize: int = -1,
+    force: bool = False,
+):
+    r"""Joins two layers based on attribute values.
+
+    The output will contain the geometries of input1. The ``input1_on`` and
+    ``input2_on`` parameters will determine which geometries of input1 will be matched
+    with input2.
+
+    Alternative names:
+        - Pandas: merge, join
+
+    Args:
+        input1_path (PathLike): the 1st input file
+        input2_path (PathLike): the 2nd input file
+        output_path (PathLike): the file to write the result to
+        input1_on (List[str] or str): column(s) in the 1st input layer to join on.
+        input2_on (List[str] or str): column(s) in the 2nd input layer to join on.
+        join_type (str, optional): type of join: "INNER" or "LEFT". Defaults to "INNER".
+        input1_layer (str or LayerInfo, optional): 1st input layer name. If None,
+            ``input1_path`` should contain only one layer. Defaults to None.
+        input1_columns (List[str], optional): list of columns to retain. If None, all
+            standard columns are retained. In addition to standard columns, it is also
+            possible to specify "fid", a unique index available in all input files. Note
+            that the "fid" will be aliased even if ``input1_columns_prefix`` is "", eg.
+            to "fid_1". Defaults to None.
+        input1_columns_prefix (str, optional): prefix to use in the column aliases.
+            Defaults to "l1\_".
+        input2_layer (str or LayerInfo, optional): 2nd input layer name. If None,
+            ``input2_path`` should contain only one layer. Defaults to None.
+        input2_columns (List[str], optional): columns to select. If None is specified,
+            all columns are selected. As explained for ``input1_columns``, it is also
+            possible to specify "fid". Defaults to None.
+        input2_columns_prefix (str, optional): prefix to use in the column aliases.
+            Defaults to "l2\_".
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
+        explodecollections (bool, optional): True to convert all multi-geometries to
+            single geometries. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
+        where_post (str, optional): SQL filter to apply after all other processing,
+            including e.g. ``explodecollections``. It should be in sqlite syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
+        nb_parallel (int, optional): the number of parallel processes to use.
+            Defaults to 1.
+        batchsize (int, optional): indicative number of rows to process per
+            batch. A smaller batch size, possibly in combination with a
+            smaller ``nb_parallel``, will reduce the memory usage.
+            Defaults to -1: (try to) determine optimal size automatically.
+        force (bool, optional): overwrite existing output file(s).
+            Defaults to False.
+
+    See Also:
+        * :func:`join_by_location`: join two layers based on their spatial relationship
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
+    logger = logging.getLogger("geofileops.join")
+    logger.info(
+        f"join: select from {input1_path} joining with {input2_path} to {output_path}"
+    )
+    return _geoops_sql.join(
+        input1_path=Path(input1_path),
+        input2_path=Path(input2_path),
+        output_path=Path(output_path),
+        input1_on=input1_on,
+        input2_on=input2_on,
+        join_type=join_type,
+        input1_layer=input1_layer,
+        input1_columns=input1_columns,
+        input1_columns_prefix=input1_columns_prefix,
+        input2_layer=input2_layer,
+        input2_columns=input2_columns,
+        input2_columns_prefix=input2_columns_prefix,
+        output_layer=output_layer,
+        explodecollections=explodecollections,
+        gridsize=gridsize,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        force=force,
+    )
+
+
 def join_by_location(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]"],
@@ -2796,7 +2903,7 @@ def join_by_location(
     batchsize: int = -1,
     force: bool = False,
 ):
-    r"""Joins all features in input1 with all features in input2.
+    r"""Join two layers based on the spatial relationship between the geometries.
 
     The output will contain the geometries of input1. The ``spatial_relations_query``
     and ``min_area_intersect`` parameters will determine which geometries of input1 will
@@ -2822,6 +2929,7 @@ def join_by_location(
     Alternative names:
         - GeoPandas: sjoin
         - ArcGIS: spatial join
+        - QGIS: join attributes by location
 
     Args:
         input1_path (PathLike): the 1st input file

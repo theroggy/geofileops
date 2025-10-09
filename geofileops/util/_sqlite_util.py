@@ -313,6 +313,28 @@ def create_new_spatialdb(
     return conn
 
 
+def get_column_types(database_path: Path, table: str) -> dict[str, str]:
+    column_types = {}
+
+    # Connect to the input databases and fetch the column types
+    try:
+        conn = sqlite3.connect(database_path)
+        # Get column types
+        sql = f"PRAGMA table_info('{table}');"
+        cur = conn.execute(sql)
+        for row in cur.fetchall():
+            column_types[row[1]] = row[2]
+        cur.close()
+
+    except Exception as ex:  # pragma: no cover
+        raise RuntimeError(f"Error {ex} executing {sql}") from ex
+
+    finally:
+        conn.close()
+
+    return column_types
+
+
 def get_columns(
     sql_stmt: str,
     input_databases: dict[str, Path],
