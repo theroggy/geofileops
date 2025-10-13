@@ -753,6 +753,7 @@ def _single_layer_vector_operation(
                     if nb_batches == 1
                     else False
                 )
+                # input_layers is already in the sql_stmt, so doesn't need to be passed.
                 translate_info = _ogr_util.VectorTranslateInfo(
                     input_path=processing_params.batches[batch_id]["input1_path"],
                     output_path=tmp_partial_output_path,
@@ -825,6 +826,8 @@ def _single_layer_vector_operation(
                     fileops.copy_layer(
                         src=tmp_partial_output_path,
                         dst=tmp_output_path,
+                        src_layer=output_layer,
+                        dst_layer=output_layer,
                         write_mode="append",
                         where=where_post,
                         create_spatial_index=False,

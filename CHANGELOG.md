@@ -34,6 +34,7 @@
 
 - `copy_layer` should give an error if `src_layer` is not specified for multi-layer src
   files (#745)
+- Fix error when custom `output_layer` is specified in single layer operations (#760)
 
 ## 0.10.2 (2025-08-20)
 
