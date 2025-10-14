@@ -2316,6 +2316,53 @@ def test_union_invalid_params(kwargs, expected_error):
         )
 
 
+@pytest.mark.parametrize("remove_temp_files", [True, False, None])
+def test_union_remove_temp_files(tmp_path, remove_temp_files):
+    """Test if temporary files created during union are correctly removed afterwards."""
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"output{input1_path.suffix}"
+
+    # Now run test
+    tmp_dir = tmp_path / "gfo_tmpdir"
+    with gfo.TempEnv(
+        {"GFO_REMOVE_TEMP_FILES": remove_temp_files, "GFO_TMPDIR": tmp_dir}
+    ):
+        gfo.union(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=output_path,
+            nb_parallel=2,
+            batchsize=10,
+            subdivide_coords=10,
+        )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+
+    # Check if the temp files were created in the right location or were removed.
+    assert tmp_dir.exists()
+    tmp_dir = list(tmp_dir.iterdir())
+
+    if remove_temp_files is None or remove_temp_files:
+        # Temporary files/directories should be removed
+        assert len(tmp_dir) == 0
+    else:
+        # Temporary files/directories should be kept
+        assert len(tmp_dir) == 1
+        assert tmp_dir[0].name == "union_000001"
+        tmp_dirs = list(tmp_dir[0].iterdir())
+        tmp_dirnames = {d.name for d in tmp_dirs if d.is_dir()}
+        assert tmp_dirnames == {
+            "apply_vectorized_000001",
+            "apply_vectorized_000002",
+            "subdivided",
+            "union_difference_000001",
+            "union_difference_000002",
+            "union_intersection_000001",
+        }
+
+
 @pytest.mark.parametrize("subdivide_coords", [2000, 10])
 @pytest.mark.parametrize("include_duplicates", [False, True])
 def test_union_self(tmp_path, subdivide_coords, include_duplicates):

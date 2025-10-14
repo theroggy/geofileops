@@ -2,7 +2,6 @@
 
 import logging
 import logging.config
-import shutil
 import warnings
 from collections.abc import Callable
 from datetime import datetime
@@ -12,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal, Union
 from pygeoops import GeometryType
 
 from geofileops import fileops
-from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers import _general_helper
 from geofileops.util import (
     _geofileinfo,
     _geoops_gpd,
@@ -105,8 +104,7 @@ def dissolve_within_distance(
     logger = logging.getLogger(f"geofileops.{operation_name}")
     nb_steps = 9
 
-    tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-    try:
+    with _general_helper.create_gfo_tmp_dir(operation_name) as tmp_dir:
         # First dissolve the input.
         #
         # Note: this reduces the complexity of operations to be executed later on.
@@ -114,7 +112,7 @@ def dissolve_within_distance(
         logger.info(f"Start, with input file {input_path}")
         step = 1
         logger.info(f"Step {step} of {nb_steps}")
-        diss_path = tempdir / "100_diss.gpkg"
+        diss_path = tmp_dir / "100_diss.gpkg"
         _geoops_gpd.dissolve(
             input_path=input_path,
             output_path=diss_path,
@@ -124,6 +122,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Positive buffer of distance / 2 to close all gaps.
@@ -134,7 +133,7 @@ def dissolve_within_distance(
         # addedpieces_1neighbour later on.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        bufp_path = tempdir / "110_diss_bufp.gpkg"
+        bufp_path = tmp_dir / "110_diss_bufp.gpkg"
         _geoops_gpd.buffer(
             input_path=diss_path,
             output_path=bufp_path,
@@ -146,6 +145,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Dissolve the buffered input.
@@ -156,7 +156,7 @@ def dissolve_within_distance(
         # addedpieces_1neighbour later on.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        buff_diss_path = tempdir / "120_diss_bufp_diss.gpkg"
+        buff_diss_path = tmp_dir / "120_diss_bufp_diss.gpkg"
         _geoops_gpd.dissolve(
             input_path=bufp_path,
             output_path=buff_diss_path,
@@ -165,6 +165,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Negative buffer to get back to the borders of the input geometries
@@ -172,7 +173,7 @@ def dissolve_within_distance(
         # don't dissappear again.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        bufp_diss_bufm_path = tempdir / "130_diss_bufp_diss_bufm.gpkg"
+        bufp_diss_bufm_path = tmp_dir / "130_diss_bufp_diss_bufm.gpkg"
         _geoops_gpd.buffer(
             input_path=buff_diss_path,
             output_path=bufp_diss_bufm_path,
@@ -185,6 +186,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # We want to keep the original boundaries as identical as possible. However,
@@ -202,7 +204,7 @@ def dissolve_within_distance(
         # Note: no gridsize is applied to preserve all possible accuracy for these
         # temporary boundariesstep += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_path = tempdir / "200_parts_to_add.gpkg"
+        parts_to_add_path = tmp_dir / "200_parts_to_add.gpkg"
         _geoops_sql.difference(
             input1_path=bufp_diss_bufm_path,
             input2_path=diss_path,
@@ -213,6 +215,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # To avoid parts not being detected as touching to 2 neighbours because of
@@ -223,8 +226,8 @@ def dissolve_within_distance(
             distance_parts_to_add = 0.0000000001
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_bufp_path = tempdir / "200_parts_to_add_bufp.gpkg"
-        bufp_path = tempdir / "110_diss_bufp.gpkg"
+        parts_to_add_bufp_path = tmp_dir / "200_parts_to_add_bufp.gpkg"
+        bufp_path = tmp_dir / "110_diss_bufp.gpkg"
         _geoops_gpd.buffer(
             input_path=parts_to_add_path,
             output_path=parts_to_add_bufp_path,
@@ -236,6 +239,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Build a filter to only keep the pieces that actually need to be added to the
@@ -336,7 +340,7 @@ def dissolve_within_distance(
         # temporary boundariesstep += 1
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_filtered_path = tempdir / "210_parts_to_add_filtered.gpkg"
+        parts_to_add_filtered_path = tmp_dir / "210_parts_to_add_filtered.gpkg"
         _geoops_sql.select_two_layers(
             input1_path=parts_to_add_bufp_path,
             input2_path=input_path,
@@ -349,6 +353,7 @@ def dissolve_within_distance(
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
             output_with_spatial_index=False,
+            tmp_dir=tmp_dir / "parts_to_add_filtered",
         )
 
         # Note: no gridsize is applied to preserve all possible accuracy for these
@@ -375,11 +380,8 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
-
-    finally:
-        if ConfigOptions.remove_temp_files:
-            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now() - start_time}")
 
@@ -594,6 +596,7 @@ def apply_vectorized(
     return _geoops_gpd.apply_vectorized(
         input_path=Path(input_path),
         output_path=Path(output_path),
+        operation_name=None,
         func=func,
         input_layer=input_layer,
         output_layer=output_layer,
@@ -606,6 +609,8 @@ def apply_vectorized(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        parallelization_config=None,
+        tmp_basedir=None,
     )
 
 
@@ -2005,8 +2010,7 @@ def concat(
     logger.info(f"Start concat to {output_path}")
 
     start_time = datetime.now()
-    tmp_dir = _io_util.create_tempdir("geofileops/concat")
-    try:
+    with _general_helper.create_gfo_tmp_dir("concat") as tmp_dir:
         # Loop over all files and copy_layer them one by one together.
         tmp_dst = tmp_dir / output_path.name
         is_first = True
@@ -2050,10 +2054,6 @@ def concat(
             fileops.create_spatial_index(tmp_dst, output_layer)
 
         fileops.move(tmp_dst, output_path)
-
-    finally:
-        if ConfigOptions.remove_temp_files:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now() - start_time}")
 

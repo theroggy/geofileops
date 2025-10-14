@@ -3,6 +3,7 @@ Tests for functionalities in _configoptions_helper.
 """
 
 import os
+import tempfile
 
 import pytest
 
@@ -98,6 +99,11 @@ def test_configoptions(key, value, expected):
             "invalid value for bool configoption <GFO_REMOVE_TEMP_FILES>",
         ),
         (
+            "GFO_TMPDIR",
+            "   ",
+            "GFO_TMPDIR='' environment variable found which is not supported",
+        ),
+        (
             "GFO_WORKER_TYPE",
             "invalid",
             "invalid value for configoption <GFO_WORKER_TYPE>",
@@ -113,7 +119,24 @@ def test_configoptions_invalid(key, invalid_value, expected_error):
                 _ = ConfigOptions.on_data_error
             elif key == "GFO_REMOVE_TEMP_FILES":
                 _ = ConfigOptions.remove_temp_files
+            elif key == "GFO_TMPDIR":
+                _ = ConfigOptions.tmp_dir
             elif key == "GFO_WORKER_TYPE":
                 _ = ConfigOptions.worker_type
             else:
                 raise ValueError(f"Unexpected key: {key}")
+
+
+def test_configoptions_tmpdir(tmp_path):
+    """Test ConfigOptions.tmp_dir property."""
+    with gfo.TempEnv({"GFO_TMPDIR": str(tmp_path)}):
+        assert ConfigOptions.tmp_dir == tmp_path
+
+    # If GFO_TMPDIR is not set, a "geofileops" subdirectory in the system temp dir is
+    # used.
+    with gfo.TempEnv({"GFO_TMPDIR": None}):
+        tmp_dir = ConfigOptions.tmp_dir
+        assert tmp_dir.exists()
+        assert tmp_dir.name == "geofileops"
+        tempdir = tempfile.gettempdir()
+        assert str(tmp_dir).startswith(tempdir)
