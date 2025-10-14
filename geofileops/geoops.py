@@ -2,7 +2,6 @@
 
 import logging
 import logging.config
-import shutil
 import warnings
 from collections.abc import Callable
 from datetime import datetime
@@ -12,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal, Union
 from pygeoops import GeometryType
 
 from geofileops import fileops
-from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers import _general_helper
 from geofileops.util import (
     _geofileinfo,
     _geoops_gpd,
@@ -105,8 +104,7 @@ def dissolve_within_distance(
     logger = logging.getLogger(f"geofileops.{operation_name}")
     nb_steps = 9
 
-    tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-    try:
+    with _general_helper.create_gfo_tmp_dir(operation_name) as tmp_dir:
         # First dissolve the input.
         #
         # Note: this reduces the complexity of operations to be executed later on.
@@ -114,7 +112,7 @@ def dissolve_within_distance(
         logger.info(f"Start, with input file {input_path}")
         step = 1
         logger.info(f"Step {step} of {nb_steps}")
-        diss_path = tempdir / "100_diss.gpkg"
+        diss_path = tmp_dir / "100_diss.gpkg"
         _geoops_gpd.dissolve(
             input_path=input_path,
             output_path=diss_path,
@@ -124,6 +122,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Positive buffer of distance / 2 to close all gaps.
@@ -134,7 +133,7 @@ def dissolve_within_distance(
         # addedpieces_1neighbour later on.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        bufp_path = tempdir / "110_diss_bufp.gpkg"
+        bufp_path = tmp_dir / "110_diss_bufp.gpkg"
         _geoops_gpd.buffer(
             input_path=diss_path,
             output_path=bufp_path,
@@ -146,6 +145,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Dissolve the buffered input.
@@ -156,7 +156,7 @@ def dissolve_within_distance(
         # addedpieces_1neighbour later on.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        buff_diss_path = tempdir / "120_diss_bufp_diss.gpkg"
+        buff_diss_path = tmp_dir / "120_diss_bufp_diss.gpkg"
         _geoops_gpd.dissolve(
             input_path=bufp_path,
             output_path=buff_diss_path,
@@ -165,6 +165,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Negative buffer to get back to the borders of the input geometries
@@ -172,7 +173,7 @@ def dissolve_within_distance(
         # don't dissappear again.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        bufp_diss_bufm_path = tempdir / "130_diss_bufp_diss_bufm.gpkg"
+        bufp_diss_bufm_path = tmp_dir / "130_diss_bufp_diss_bufm.gpkg"
         _geoops_gpd.buffer(
             input_path=buff_diss_path,
             output_path=bufp_diss_bufm_path,
@@ -185,6 +186,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # We want to keep the original boundaries as identical as possible. However,
@@ -202,7 +204,7 @@ def dissolve_within_distance(
         # Note: no gridsize is applied to preserve all possible accuracy for these
         # temporary boundariesstep += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_path = tempdir / "200_parts_to_add.gpkg"
+        parts_to_add_path = tmp_dir / "200_parts_to_add.gpkg"
         _geoops_sql.difference(
             input1_path=bufp_diss_bufm_path,
             input2_path=diss_path,
@@ -213,6 +215,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # To avoid parts not being detected as touching to 2 neighbours because of
@@ -223,8 +226,8 @@ def dissolve_within_distance(
             distance_parts_to_add = 0.0000000001
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_bufp_path = tempdir / "200_parts_to_add_bufp.gpkg"
-        bufp_path = tempdir / "110_diss_bufp.gpkg"
+        parts_to_add_bufp_path = tmp_dir / "200_parts_to_add_bufp.gpkg"
+        bufp_path = tmp_dir / "110_diss_bufp.gpkg"
         _geoops_gpd.buffer(
             input_path=parts_to_add_path,
             output_path=parts_to_add_bufp_path,
@@ -236,6 +239,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Build a filter to only keep the pieces that actually need to be added to the
@@ -336,7 +340,7 @@ def dissolve_within_distance(
         # temporary boundariesstep += 1
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_filtered_path = tempdir / "210_parts_to_add_filtered.gpkg"
+        parts_to_add_filtered_path = tmp_dir / "210_parts_to_add_filtered.gpkg"
         _geoops_sql.select_two_layers(
             input1_path=parts_to_add_bufp_path,
             input2_path=input_path,
@@ -349,6 +353,7 @@ def dissolve_within_distance(
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
             output_with_spatial_index=False,
+            tmp_dir=tmp_dir / "parts_to_add_filtered",
         )
 
         # Note: no gridsize is applied to preserve all possible accuracy for these
@@ -375,11 +380,8 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
-
-    finally:
-        if ConfigOptions.remove_temp_files:
-            shutil.rmtree(tempdir, ignore_errors=True)
 
     logger.info(f"Ready, took {datetime.now() - start_time}")
 
@@ -594,6 +596,7 @@ def apply_vectorized(
     return _geoops_gpd.apply_vectorized(
         input_path=Path(input_path),
         output_path=Path(output_path),
+        operation_name=None,
         func=func,
         input_layer=input_layer,
         output_layer=output_layer,
@@ -606,6 +609,8 @@ def apply_vectorized(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        parallelization_config=None,
+        tmp_basedir=None,
     )
 
 
@@ -2005,8 +2010,7 @@ def concat(
     logger.info(f"Start concat to {output_path}")
 
     start_time = datetime.now()
-    tmp_dir = _io_util.create_tempdir("geofileops/concat")
-    try:
+    with _general_helper.create_gfo_tmp_dir("concat") as tmp_dir:
         # Loop over all files and copy_layer them one by one together.
         tmp_dst = tmp_dir / output_path.name
         is_first = True
@@ -2051,10 +2055,6 @@ def concat(
 
         fileops.move(tmp_dst, output_path)
 
-    finally:
-        if ConfigOptions.remove_temp_files:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-
     logger.info(f"Ready, took {datetime.now() - start_time}")
 
 
@@ -2076,16 +2076,17 @@ def difference(
 ):
     """Calculate the difference of the input1 layer and input2 layer.
 
+    If ``input2_path`` is None, the 1st input layer is used for both inputs but
+    interactions between the same rows in this layer will be ignored. The output will be
+    the (pieces of) features in this layer that don't have any intersections with other
+    features in this layer.
+
     Notes:
         - Every row in the input layer will result in maximum one row in the
           output layer.
         - The output will contain the columns from the 1st no columns from the 2nd
           layer. The attribute values wont't be changed, so columns like area,...
           will have to be recalculated manually.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          interactions between the same rows in this layer will be ignored. The output
-          will be the (pieces of) features in this layer that don't have any
-          intersections with other features in this layer.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -2440,6 +2441,7 @@ def identity(
     input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
     output_layer: str | None = None,
+    include_duplicates: bool = True,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
@@ -2453,12 +2455,25 @@ def identity(
     The result is the equivalent of the intersection between the two layers + layer 1
     differenced with layer 2.
 
+    If ``input2_path`` is None, a self-identity is performed. This means the 1st input
+    layer is used for both inputs but interactions between the same rows in this layer
+    are ignored. The output can be influenced via the ``include_duplicates`` parameter:
+        - If True (the default), the logic explained above is applied as-such. The
+          result is that each (part of a) geometry that has an intersection is
+          duplicated in the output with the attribute column values "switched". Hence,
+          each intersecting pair of geometries A and B will lead to two rows in the
+          output: one row with the attributes of A in the columns with
+          ``input1_columns_prefix`` and the attributes of B in the columns with
+          ``input2_columns_prefix``, and a second row with the column values saved the
+          other way around. Non-intersecting areas will not lead to duplicates in
+          identity.
+        - If False, only one of the duplicates is kept in the
+          output with the column values only available "in one direction".
+
     Notes:
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          interactions between the same rows in this layer will be ignored.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -2488,6 +2503,11 @@ def identity(
             Defaults to "l2\_".
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
+        include_duplicates (bool, optional): only applicable for a union on a single
+            layer (input2_path=None). True to include duplicate geometries resulting
+            from the pairwise identity in the output, which leads to each intersection
+            being duplicated with the attribute column values "switched".
+            Defaults to True.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
@@ -2538,6 +2558,7 @@ def identity(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=overlay_self,
+        include_duplicates=include_duplicates,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2588,6 +2609,7 @@ def split(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=False,
+        include_duplicates=True,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2659,6 +2681,7 @@ def intersection(
     input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
     output_layer: str | None = None,
+    include_duplicates: bool = True,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
@@ -2669,13 +2692,28 @@ def intersection(
 ):
     r"""Calculates the pairwise intersection of the two input layers.
 
+    Pairwise intersection means that the intersection of each geometry in the 1st input
+    layer with each geometry in the 2nd input layer is calculated and retained in the
+    output.
+
+    If ``input2_path`` is None, a self-intersection is performed. This means the 1st
+    input layer is used for both inputs but interactions between the same rows in this
+    layer are ignored. The output can be influenced with the ``include_duplicates``
+    parameter:
+        - If True (the default), the logic described above is applied as-such. The
+          result is that each geometry is duplicated in the output with the attribute
+          column values "switched". Hence, each intersecting pair of geometries A and B
+          will lead to two rows in the output: one row with the attributes of A in the
+          columns with ``input1_columns_prefix`` and the attributes of B in the columns
+          with ``input2_columns_prefix``, and another row with the columns filled up the
+          other way around.
+        - If ``include_duplicates`` is False, only one of the duplicates is kept in the
+          output with the column values only saved "in one direction".
+
     Notes:
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          intersections between the same rows in this layer will be omitted from the
-          result.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -2708,6 +2746,12 @@ def intersection(
             Defaults to "l2\_".
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
+        include_duplicates (bool, optional): only applicable for an intersection on a
+            single layer (input2_path=None). True to include duplicate geometries
+            resulting from the pairwise intersection in the output, which leads to each
+            geometry being duplicated with the attribute column values "switched". False
+            to keep only one of the resulting geometries in the output with the column
+            values only available "in one direction". Defaults to True.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
@@ -2758,6 +2802,7 @@ def intersection(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=overlay_self,
+        include_duplicates=include_duplicates,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -3382,12 +3427,20 @@ def symmetric_difference(
     The result will be a layer containing features from both the input and overlay
     layers but with the overlapping areas between the two layers removed.
 
+    If ``input2_path`` is None, the 1st input layer is used for both inputs but
+    interactions between the same rows in this layer will be ignored. This leads to each
+    non-intersecting area getting a duplicated geometry with the attribute column values
+    "switched" in the output. Hence, each non-intersecting geometry will lead to one row
+    in the output with the attribute values in the columns with
+    ``input1_columns_prefix`` and NULL values in the columns with
+    ``input2_columns_prefix``, as well as a second row with the attribute values the
+    other way around. If you don't want this duplication, use the :func:`difference`
+    function instead.
+
     Notes:
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          interactions between the same rows in this layer will be ignored.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -3503,6 +3556,7 @@ def union(
     input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
     output_layer: str | None = None,
+    include_duplicates: bool = True,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
@@ -3521,12 +3575,28 @@ def union(
         - The (parts of) features of layer 2 that don't have any intersection with layer
           1.
 
+    If ``input2_path`` is None, a self-union is performed. This means the 1st input
+    layer is used for both inputs but interactions between the same rows in this layer
+    are ignored. The output can be influenced with the ``include_duplicates``
+    parameter:
+        - If True (the default), the logic explained above is applied as-such. The
+          result is that each geometry is duplicated in the output with the attribute
+          column values "switched". Hence, each intersecting pair of geometries A and B
+          will lead to two rows in the output: one row with the attributes of A in the
+          columns with ``input1_columns_prefix`` and the attributes of B in the columns
+          with ``input2_columns_prefix``, and a second row with the columns filled up
+          the other way around.
+          A non-intersecting geometry will lead to one row in the output with the
+          attribute values in the columns with ``input1_columns_prefix`` and NULL values
+          in the columns with ``input2_columns_prefix``, and a second row with the
+          columns filled up the other way around.
+        - If False, only one of the duplicates is kept in the output with the column
+          values only available "in one direction".
+
     Notes:
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          interactions between the same rows in this layer will be ignored.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -3560,6 +3630,12 @@ def union(
             Defaults to "l2\_".
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
+        include_duplicates (bool, optional): only applicable for a union on a single
+            layer (input2_path=None). True to include duplicate geometries resulting
+            from the pairwise union in the output, which leads to each geometry being
+            duplicated with the attribute column values "switched". False to keep only
+            one of the resulting geometries in the output with the column values only
+            available "in one direction". Defaults to True.
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
@@ -3613,6 +3689,7 @@ def union(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=overlay_self,
+        include_duplicates=include_duplicates,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,

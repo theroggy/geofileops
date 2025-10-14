@@ -12,6 +12,7 @@
 - Add `join` function (#751)
 - Add `write_mode="append_add_fields"` option to `copy_layer` (#750)
 - Add `zip_geofile` and `unzip_geofile` functions (#754, #743)
+- Add an `include_duplicates` parameter to `union`, `intersection` and `identity` (#757)
 - Add support for ".gpkg.zip" and ".shp.zip" input and output files for geo operations
   (#754)
 - Improve performance of clip with a complex clip layer (#740)
@@ -33,6 +34,7 @@
 
 - `copy_layer` should give an error if `src_layer` is not specified for multi-layer src
   files (#745)
+- Fix error when custom `output_layer` is specified in single layer operations (#760)
 
 ## 0.10.2 (2025-08-20)
 

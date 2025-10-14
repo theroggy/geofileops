@@ -24,10 +24,9 @@ def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
         base_dirname (str): The name the tempdir will start with. The name will be
             suffixed with a number to make the directory name unique. If a "/" is part
             of the base_dirname a subdirectory will be created: e.g. "foo/bar".
-        parent_dir (Path, optional): The dir to create the tempdir in. If None, the
-            directory specified in the environment variable `GFO_TMPDIR` is used. If
-            that does not exist, the directory returned by :func:`tempfile.gettempdir`
-            is used. Defaults to None.
+        parent_dir (Path, optional): The directory to create the tempdir in. If None,
+            the directory returned by :func:`tempfile.gettempdir` is used.
+            Defaults to None.
 
     Raises:
         RuntimeError: if it wasn't possible to create the temp dir because there
@@ -37,7 +36,7 @@ def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
         Path: the path to the temp dir created.
     """
     if parent_dir is None:
-        parent_dir = get_tempdir()
+        parent_dir = Path(tempfile.gettempdir())
 
     for i in range(1, 999999):
         try:
@@ -51,23 +50,6 @@ def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
         f"Wasn't able to create a temporary dir with basedir: "
         f"{parent_dir / base_dirname}"
     )
-
-
-def get_tempdir() -> Path:
-    """Returns the path to the geofileops temporary directory.
-
-    Returns:
-        Path: The path to the temporary directory.
-    """
-    tmp_dir = os.environ.get("GFO_TMPDIR")
-    if tmp_dir is None:
-        tmp_dir = tempfile.gettempdir()
-    elif tmp_dir == "":
-        raise RuntimeError(
-            "GFO_TMPDIR='' environment variable found which is not supported."
-        )
-
-    return Path(tmp_dir)
 
 
 def get_tempfile_locked(
@@ -101,7 +83,7 @@ def get_tempfile_locked(
     """
     # If no dir specified, use default temp dir
     if tempdir is None:
-        tempdir = get_tempdir()
+        tempdir = Path(tempfile.gettempdir())
     if dirname is not None:
         tempdir = tempdir / dirname
         tempdir.mkdir(parents=True, exist_ok=True)
@@ -120,7 +102,7 @@ def get_tempfile_locked(
                 # So delete lock file and try again.
                 tempfilelock_path.unlink()
 
-    raise Exception(
+    raise RuntimeError(
         f"Wasn't able to create a temporary file with base_filename: {base_filename}, "
         f"dir: {dir}"
     )

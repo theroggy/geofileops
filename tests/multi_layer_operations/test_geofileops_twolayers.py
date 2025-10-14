@@ -586,17 +586,21 @@ def test_identity_invalid_params(kwargs, expected_error):
 
 
 @pytest.mark.parametrize("subdivide_coords", [2000, 10])
-def test_identity_self(tmp_path, subdivide_coords):
+@pytest.mark.parametrize("include_duplicates", [False, True])
+def test_identity_self(tmp_path, subdivide_coords, include_duplicates):
     input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
 
     # Now run test
-    output_path = tmp_path / f"{input1_path.stem}_identity_self.gpkg"
+    output_path = (
+        tmp_path / f"{input1_path.stem}_identity_self_dupl-{include_duplicates}.gpkg"
+    )
     gfo.identity(
         input1_path=input1_path,
         input2_path=None,
         output_path=output_path,
+        include_duplicates=include_duplicates,
         nb_parallel=2,
         batchsize=batchsize,
         subdivide_coords=subdivide_coords,
@@ -608,7 +612,10 @@ def test_identity_self(tmp_path, subdivide_coords):
     assert gfo.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == 2 * len(input1_layerinfo.columns)
-    assert output_layerinfo.featurecount == 9
+    if include_duplicates:
+        assert output_layerinfo.featurecount == 9
+    else:
+        assert output_layerinfo.featurecount == 6
 
 
 def test_intersect_deprecated(tmp_path):
@@ -896,7 +903,8 @@ def test_intersection_resultempty(tmp_path, suffix, input2_empty):
 
 
 @pytest.mark.parametrize("subdivide", [False, True])
-def test_intersection_self(tmp_path, subdivide):
+@pytest.mark.parametrize("include_duplicates", [False, True])
+def test_intersection_self(tmp_path, subdivide, include_duplicates):
     input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
@@ -909,11 +917,14 @@ def test_intersection_self(tmp_path, subdivide):
         subdivide_coords = 7500
 
     # Now run test
-    output_path = tmp_path / f"{input1_path.stem}_inters_self.gpkg"
+    output_path = (
+        tmp_path / f"{input1_path.stem}_inters_self_dupl-{include_duplicates}.gpkg"
+    )
     gfo.intersection(
         input1_path=input1_path,
         input2_path=None,
         output_path=output_path,
+        include_duplicates=include_duplicates,
         nb_parallel=2,
         batchsize=batchsize,
         subdivide_coords=subdivide_coords,
@@ -925,7 +936,10 @@ def test_intersection_self(tmp_path, subdivide):
     assert gfo.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == 2 * len(input1_layerinfo.columns)
-    assert output_layerinfo.featurecount == 6
+    if include_duplicates:
+        assert output_layerinfo.featurecount == 6
+    else:
+        assert output_layerinfo.featurecount == 3
 
 
 @pytest.mark.parametrize("testfile", ["polygon-parcel"])
@@ -2302,18 +2316,69 @@ def test_union_invalid_params(kwargs, expected_error):
         )
 
 
+@pytest.mark.parametrize("remove_temp_files", [True, False, None])
+def test_union_remove_temp_files(tmp_path, remove_temp_files):
+    """Test if temporary files created during union are correctly removed afterwards."""
+    input1_path = test_helper.get_testfile("polygon-parcel")
+    input2_path = test_helper.get_testfile("polygon-zone")
+    output_path = tmp_path / f"output{input1_path.suffix}"
+
+    # Now run test
+    tmp_dir = tmp_path / "gfo_tmpdir"
+    with gfo.TempEnv(
+        {"GFO_REMOVE_TEMP_FILES": remove_temp_files, "GFO_TMPDIR": tmp_dir}
+    ):
+        gfo.union(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=output_path,
+            nb_parallel=2,
+            batchsize=10,
+            subdivide_coords=10,
+        )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+
+    # Check if the temp files were created in the right location or were removed.
+    assert tmp_dir.exists()
+    tmp_dir = list(tmp_dir.iterdir())
+
+    if remove_temp_files is None or remove_temp_files:
+        # Temporary files/directories should be removed
+        assert len(tmp_dir) == 0
+    else:
+        # Temporary files/directories should be kept
+        assert len(tmp_dir) == 1
+        assert tmp_dir[0].name == "union_000001"
+        tmp_dirs = list(tmp_dir[0].iterdir())
+        tmp_dirnames = {d.name for d in tmp_dirs if d.is_dir()}
+        assert tmp_dirnames == {
+            "apply_vectorized_000001",
+            "apply_vectorized_000002",
+            "subdivided",
+            "union_difference_000001",
+            "union_difference_000002",
+            "union_intersection_000001",
+        }
+
+
 @pytest.mark.parametrize("subdivide_coords", [2000, 10])
-def test_union_self(tmp_path, subdivide_coords):
+@pytest.mark.parametrize("include_duplicates", [False, True])
+def test_union_self(tmp_path, subdivide_coords, include_duplicates):
     input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
 
     # Now run test
-    output_path = tmp_path / f"{input1_path.stem}_union_self.gpkg"
+    output_path = (
+        tmp_path / f"{input1_path.stem}_union_self_dupl-{include_duplicates}.gpkg"
+    )
     gfo.union(
         input1_path=input1_path,
         input2_path=None,
         output_path=output_path,
+        include_duplicates=include_duplicates,
         nb_parallel=2,
         batchsize=batchsize,
         subdivide_coords=subdivide_coords,
@@ -2325,4 +2390,18 @@ def test_union_self(tmp_path, subdivide_coords):
     assert gfo.has_spatial_index(output_path) is exp_spatial_index
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert len(output_layerinfo.columns) == 2 * len(input1_layerinfo.columns)
-    assert output_layerinfo.featurecount == 12
+    if include_duplicates:
+        assert output_layerinfo.featurecount == 12
+    else:
+        assert output_layerinfo.featurecount == 6
+
+    # Check the contents of the result file
+    output_gdf = gfo.read_file(output_path)
+    if not include_duplicates:
+        # For the non-intersecting polygons, the l2_... columns should be NULL.
+        null_counts = (output_gdf.filter(like="l2_").isnull()).sum().item()
+        assert null_counts == 3
+
+        # The l1_... columns should NOT be NULL.
+        null_counts = (output_gdf.filter(like="l1_").isnull()).sum().item()
+        assert null_counts == 0

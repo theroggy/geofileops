@@ -8,7 +8,6 @@ import logging.config
 import math
 import multiprocessing
 import pickle
-import shutil
 import time
 import warnings
 from collections.abc import Callable, Iterable
@@ -406,28 +405,45 @@ def apply(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        tmp_basedir=None,
         parallelization_config=parallelization_config,
     )
 
 
-def apply_vectorized(
+def apply_vectorized(  # noqa: D417
     input_path: Path,
     output_path: Path,
+    operation_name: str | None,
     func: Callable[[Any], Any],
-    operation_name: str | None = None,
-    input_layer: str | LayerInfo | None = None,
-    output_layer: str | None = None,
-    columns: list[str] | None = None,
-    explodecollections: bool = False,
-    force_output_geometrytype: GeometryType | str | None = None,
-    gridsize: float = 0.0,
-    keep_empty_geoms: bool = False,
-    where_post: str | None = None,
-    nb_parallel: int = -1,
-    batchsize: int = -1,
-    force: bool = False,
-    parallelization_config: ParallelizationConfig | None = None,
+    *,
+    input_layer: str | LayerInfo | None,
+    output_layer: str | None,
+    columns: list[str] | None,
+    explodecollections: bool,
+    force_output_geometrytype: GeometryType | str | None,
+    gridsize: float,
+    keep_empty_geoms: bool,
+    where_post: str | None,
+    nb_parallel: int,
+    batchsize: int,
+    force: bool,
+    parallelization_config: ParallelizationConfig | None,
+    tmp_basedir: Path | None,
 ):
+    """Applies a vectorized function to all geometries in a layer.
+
+    Only arguments specific to the internal difference operation are documented here.
+    For the other arguments, check out the corresponding function in geoops.py.
+
+    Args:
+        operation_name (str, optional): The name of the operation. Will be used in
+            logging,... if specified.
+        tmp_basedir (Optional[Path], optional): The directory to create the temporary
+            directory in for this operation call. If None, it is created in the default
+            geofileops temporary directory. Useful to keep all temporary files for an
+            operation that uses multiple steps in one temporary directory.
+
+    """
     # Init
     operation_params = {"pickled_func": cloudpickle.dumps(func)}
     if operation_name is not None:
@@ -451,6 +467,7 @@ def apply_vectorized(
         batchsize=batchsize,
         force=force,
         parallelization_config=parallelization_config,
+        tmp_basedir=tmp_basedir,
     )
 
 
@@ -474,6 +491,7 @@ def buffer(
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
+    tmp_basedir: Path | None = None,
 ):
     # Init
     operation_params = {
@@ -509,6 +527,7 @@ def buffer(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        tmp_basedir=tmp_basedir,
     )
 
 
@@ -546,6 +565,7 @@ def convexhull(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        tmp_basedir=None,
     )
 
 
@@ -585,10 +605,10 @@ def makevalid(
     apply_vectorized(
         input_path=Path(input_path),
         output_path=Path(output_path),
+        operation_name="makevalid",
         func=lambda geom: pygeoops.make_valid(
             geom, keep_collapsed=keep_collapsed, only_if_invalid=True
         ),
-        operation_name="makevalid",
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
@@ -600,6 +620,8 @@ def makevalid(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        parallelization_config=None,
+        tmp_basedir=None,
     )
 
 
@@ -644,6 +666,7 @@ def simplify(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        tmp_basedir=None,
     )
 
 
@@ -663,6 +686,7 @@ def _apply_geooperation_to_layer(
     nb_parallel: int,  # = -1
     batchsize: int,  # = -1
     force: bool,  # = False
+    tmp_basedir: Path | None,
     parallelization_config: ParallelizationConfig | None = None,
 ):
     """Applies a geo operation on a layer.
@@ -727,6 +751,10 @@ def _apply_geooperation_to_layer(
             smaller nb_parallel, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): [description]. Defaults to False.
+        tmp_basedir (Optional[Path], optional): The directory to create the temporary
+            directory in for this operation call. If None, it is created in the default
+            geofileops temporary directory. Useful to keep all temporary files for an
+            operation that uses multiple steps in one temporary directory.
         parallelization_config (ParallelizationConfig, optional): Defaults to None.
 
     Technical remarks:
@@ -781,11 +809,7 @@ def _apply_geooperation_to_layer(
             # doesn't seem to work... so create temp partial files always as gpkg.
             where_post = where_post.format(geometrycolumn="geom")
 
-    # Prepare tmp files
-    tmp_dir = _io_util.create_tempdir(f"geofileops/{operation.value}")
-    logger.debug(f"Start calculation to temp files in {tmp_dir}")
-
-    try:
+    with _general_helper.create_gfo_tmp_dir(operation.value, tmp_basedir) as tmp_dir:
         # Calculate the best number of parallel processes and batches for
         # the available resources
         process_params = _prepare_processing_params(
@@ -939,10 +963,6 @@ def _apply_geooperation_to_layer(
         else:
             logger.debug("Result was empty")
 
-    finally:
-        if ConfigOptions.remove_temp_files:
-            shutil.rmtree(tmp_dir, ignore_errors=True)
-
     logger.info(f"Ready, took {datetime.now() - start_time_global}")
 
 
@@ -1068,7 +1088,7 @@ def _apply_geooperation(
     return message
 
 
-def dissolve(
+def dissolve(  # noqa: D417
     input_path: Path,
     output_path: Path,
     groupby_columns: list[str] | str | None = None,
@@ -1084,6 +1104,7 @@ def dissolve(
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
+    tmp_basedir: Path | None = None,
 ):
     """Function that applies a dissolve.
 
@@ -1133,6 +1154,16 @@ def dissolve(
         in the correct list of JSON strings that should be used to base the agregations
         on. The only caveat is that the order of the columns in the JSON strings always
         needs to be the same.
+
+    Only arguments specific to the internal dissolve operation are documented here.
+    For the other arguments, check out the corresponding function in geoops.py.
+
+    Args:
+        tmp_basedir (Optional[Path], optional): The directory to create the temporary
+            directory in for this operation call. If None, it is created in the default
+            geofileops temporary directory. Useful to keep all temporary files for an
+            operation that uses multiple steps in one temporary directory.
+            Defaults to None.
     """
     # Init and validate input parameters
     # ----------------------------------
@@ -1238,6 +1269,7 @@ def dissolve(
             keep_empty_geoms=False,
             where_post=where_post,
             force=force,
+            tmp_basedir=tmp_basedir,
         )
 
     elif input_layer.geometrytype.to_primitivetype is PrimitiveType.POLYGON:
@@ -1297,11 +1329,10 @@ def dissolve(
         # The dissolve for polygons is done in several passes, and after the first
         # pass, only the 'onborder' features are further dissolved, as the
         # 'notonborder' features are already OK.
-        tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-        try:
+        with _general_helper.create_gfo_tmp_dir(operation_name, tmp_basedir) as tmp_dir:
             if output_layer is None:
                 output_layer = gfo.get_default_layer(output_path)
-            output_tmp_path = tempdir / "output_tmp.gpkg"
+            output_tmp_path = tmp_dir / "output_tmp.gpkg"
             prev_nb_batches = None
             last_pass = False
             pass_id = 0
@@ -1365,7 +1396,7 @@ def dissolve(
                     tiles_gdf.geometry = shapely.set_precision(
                         tiles_gdf.geometry, grid_size=gridsize
                     )
-                gfo.to_file(tiles_gdf, tempdir / f"output_{pass_id}_tiles.gpkg")
+                gfo.to_file(tiles_gdf, tmp_dir / f"output_{pass_id}_tiles.gpkg")
 
                 # If the number of tiles ends up as 1, it is the last pass anyway...
                 if len(tiles_gdf) == 1:
@@ -1376,7 +1407,7 @@ def dissolve(
                 # gfo. The notonborder rows are final immediately
                 if last_pass is not True:
                     output_tmp_onborder_path = (
-                        tempdir / f"output_{pass_id}_onborder.gpkg"
+                        tmp_dir / f"output_{pass_id}_onborder.gpkg"
                     )
                 else:
                     output_tmp_onborder_path = output_tmp_path
@@ -1603,7 +1634,7 @@ def dissolve(
                     # where_post still needs to be ran, so no index + to gpkg
                     name = "output_tmp2_final.gpkg"
                     options["LAYER_CREATION.SPATIAL_INDEX"] = False
-                output_tmp_final_path = tempdir / name
+                output_tmp_final_path = tmp_dir / name
 
                 _ogr_util.vector_translate(
                     input_path=output_tmp_path,
@@ -1619,7 +1650,7 @@ def dissolve(
                 # We still need to apply the where_post filter
                 if where_post is not None:
                     name = f"output_tmp3_where_{GeoPath(output_path).suffix_full}"
-                    output_tmp_local_path = tempdir / name
+                    output_tmp_local_path = tmp_dir / name
                     tmp_info = gfo.get_layerinfo(output_tmp_final_path, output_layer)
                     where_post = where_post.format(
                         geometrycolumn=tmp_info.geometrycolumn
@@ -1651,10 +1682,6 @@ def dissolve(
                 # Now we are ready to move the result to the final spot...
                 gfo.move(output_tmp_final_path, output_path)
 
-        finally:
-            if ConfigOptions.remove_temp_files:
-                shutil.rmtree(tempdir, ignore_errors=True)
-
         logger.info(f"Ready, full dissolve took {datetime.now() - start_time}")
 
     else:
@@ -1684,7 +1711,7 @@ def _dissolve_polygons_pass(
         input_layer = gfo.get_layerinfo(input_path, input_layer)
 
     # Make sure the input file has a spatial index
-    tempdir = output_onborder_path.parent
+    tmp_dir = output_onborder_path.parent
     # If it is not a .gpkg.zip that already has a spatial index, unzip the file if it is
     # zipped and create a spatial index on it if it doesn't have one.
     if not (
@@ -1693,7 +1720,7 @@ def _dissolve_polygons_pass(
     ):
         if GeoPath(input_path).is_multi_suffix:
             # Unzip, as we can't create a spatial index on a zipped file
-            unzipped_dir = tempdir / "input_unzipped"
+            unzipped_dir = tmp_dir / "input_unzipped"
             input_path = fileops.unzip_geofile(input_path, unzipped_dir)
         gfo.create_spatial_index(input_path, layer=input_layer, exist_ok=True)
 
@@ -1718,12 +1745,12 @@ def _dissolve_polygons_pass(
             # are timeout issues when processing large files
             suffix = output_notonborder_path.suffix
             name = f"{output_notonborder_path.stem}_{batch_id}{suffix}"
-            output_notonborder_tmp_partial_path = tempdir / name
+            output_notonborder_tmp_partial_path = tmp_dir / name
             batches[batch_id]["output_notonborder_tmp_partial_path"] = (
                 output_notonborder_tmp_partial_path
             )
             name = f"{output_onborder_path.stem}_{batch_id}{suffix}"
-            output_onborder_tmp_partial_path = tempdir / name
+            output_onborder_tmp_partial_path = tmp_dir / name
             batches[batch_id]["output_onborder_tmp_partial_path"] = (
                 output_onborder_tmp_partial_path
             )

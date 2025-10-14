@@ -15,6 +15,7 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops._compat import GDAL_GTE_311, PYTHON_313
+from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
     _geofileinfo,
     _geoseries_util,
@@ -156,7 +157,7 @@ def _get_testfile(
 
     # Prepare destination location
     if dst_dir is None:
-        dst_dir = _io_util.get_tempdir() / "geofileops_test_data"
+        dst_dir = ConfigOptions.tmp_dir / "_test_data"
     assert isinstance(dst_dir, Path)
     dst_dir.mkdir(parents=True, exist_ok=True)
 

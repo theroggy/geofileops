@@ -421,6 +421,46 @@ def test_buffer_invalid_params(
         geoops.buffer(input_path=input_path, output_path=output_path, distance=1)
 
 
+@pytest.mark.parametrize("suffix", [".gpkg", ".gpkg.zip"])
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
+def test_buffer_layer_special_cases(tmp_path, suffix, geoops_module):
+    """Test buffer on input file with multiple layers + a custom output layer.
+
+    Only tested on .gpkg and .gpkg.zip as these support multiple layers/custom layer
+    names.
+    """
+    if not GDAL_GTE_311 and suffix in {".gpkg.zip"}:
+        # Skip test for unsupported GDAL versions
+        pytest.skip(".zip support requires gdal>=3.11")
+
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-twolayers", suffix=suffix)
+    input_layerinfo = fileops.get_layerinfo(input_path, layer="parcels")
+    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+    output_layer = "buffered_parcels"
+
+    # Now run test
+    output_path = tmp_path / f"output{suffix}"
+    set_geoops_module(geoops_module)
+    geoops.buffer(
+        input_path=input_path,
+        output_path=output_path,
+        input_layer="parcels",
+        output_layer=output_layer,
+        distance=1,
+        nb_parallel=2,
+        keep_empty_geoms=True,
+        batchsize=batchsize,
+    )
+
+    # Now check if the output file is correctly created
+    assert output_path.exists()
+    output_layerinfo = fileops.get_layerinfo(output_path)
+    assert output_layerinfo.name == output_layer
+    assert len(output_layerinfo.columns) == len(input_layerinfo.columns)
+    assert output_layerinfo.featurecount == input_layerinfo.featurecount
+
+
 @pytest.mark.parametrize(
     "suffix, epsg, geoops_module, testfile, empty_input, gridsize, keep_empty_geoms, "
     "where_post, dimensions",
