@@ -465,6 +465,8 @@ def apply(
                 func=lambda geom: pygeoops.remove_inner_rings(geom, min_area_to_keep=1),
             )
 
+        .. plot:: code/apply_remove_inner_rings.py
+
         If you need to use the contents of other columns in your lambda function, you can
         call ``gfo.apply`` like this:
 
@@ -581,8 +583,10 @@ def apply_vectorized(
             gfo.apply_vectorized(
                 input_path="input.gpkg",
                 output_path="output.gpkg",
-                func=lambda geom: pygeoops.centerline(geom, densify_distance=0),
+                func=lambda geom: pygeoops.centerline(geom),
             )
+
+        .. plot:: code/apply_vectorized_centerline.py
 
 
     .. |spatialite_reference_link| raw:: html

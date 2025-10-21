@@ -3,6 +3,7 @@ Tests for functionalities in ogr_util.
 """
 
 import logging
+import warnings
 from pathlib import Path
 
 import pytest
@@ -136,7 +137,7 @@ def test_copy_table_columns(tmp_path):
     output_path = tmp_path / "output.gpkg"
     gfo.copy(input_path, output_path)
 
-    # Append the layer to itself, but only copy the 'geom' column
+    # Append the layer to itself, but only copy the 'geom' and 'OIDN' columns.
     sqlite_util.copy_table(
         input_path=input_path,
         output_path=output_path,
@@ -151,6 +152,7 @@ def test_copy_table_columns(tmp_path):
     # For all appended rows, the columns that were not copied should be NULL
     for column in result.columns:
         if column in ("geometry", "OIDN"):
+            warnings.filterwarnings("ignore", "GeoSeries.notna", UserWarning)
             assert result[column].iloc[info.featurecount :].notnull().all()
         else:
             assert result[column].iloc[info.featurecount :].isnull().all()
