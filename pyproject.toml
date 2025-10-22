@@ -19,6 +19,7 @@ log_level = "DEBUG"
 filterwarnings = [
     "ignore: The output driver does not natively support DateTime type",
     "ignore: Field .* create as date field, though DateTime requested",
+    "ignore: Field .* created as String field, though DateTime requested",
     "ignore: Geometry is in a geographic CRS",
     "ignore: Normalized/laundered field name",
     "ignore: Non-conformant content for record 0 in column",
