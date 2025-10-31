@@ -4,6 +4,7 @@ Tests for functionalities in geofileops.general.
 
 import os
 import shutil
+from contextlib import nullcontext
 from itertools import product
 from pathlib import Path
 
@@ -63,19 +64,25 @@ def points_gdf():
     return gdf
 
 
-def test_add_column_gpkg(tmp_path):
-    test_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+@pytest.mark.parametrize("suffix", [".gpkg", ".shp"])
+def test_add_column(tmp_path, suffix):
+    test_path = test_helper.get_testfile(
+        "polygon-parcel", dst_dir=tmp_path, suffix=suffix
+    )
+    layer = "parcels" if suffix == ".gpkg" else None
+    geom_column = "geom" if suffix == ".gpkg" else "geometry"
 
     # The area column shouldn't be in the test file yet
-    layerinfo = gfo.get_layerinfo(path=test_path, layer="parcels")
+    layerinfo = gfo.get_layerinfo(path=test_path, layer=layer)
     assert "AREA" not in layerinfo.columns
 
     # Add area column
+    expression = f"ST_area({geom_column})"
     gfo.add_column(
-        test_path, layer="parcels", name="AREA", type="real", expression="ST_area(geom)"
+        test_path, layer=layer, name="AREA", type="real", expression=expression
     )
 
-    layerinfo = gfo.get_layerinfo(path=test_path, layer="parcels")
+    layerinfo = gfo.get_layerinfo(path=test_path, layer=layer)
     assert "AREA" in layerinfo.columns
 
     gdf = gfo.read_file(test_path)
@@ -84,14 +91,12 @@ def test_add_column_gpkg(tmp_path):
     )
 
     # Add perimeter column
+    expression = f"ST_perimeter({geom_column})"
     gfo.add_column(
-        test_path,
-        name="PERIMETER",
-        type=gfo.DataType.REAL,
-        expression="ST_perimeter(geom)",
+        test_path, name="PERIMETER", type=gfo.DataType.REAL, expression=expression
     )
 
-    layerinfo = gfo.get_layerinfo(path=test_path, layer="parcels")
+    layerinfo = gfo.get_layerinfo(path=test_path, layer=layer)
     assert "AREA" in layerinfo.columns
 
     gdf = gfo.read_file(test_path)
@@ -99,22 +104,7 @@ def test_add_column_gpkg(tmp_path):
         gdf["OPPERVL"].astype("float")[0], 1
     )
 
-    # Add a column of different gdal types
-    gdal_types = [
-        "Binary",
-        "Date",
-        "DateTime",
-        "Integer",
-        "Integer64",
-        "String",
-        "Time",
-        "Real",
-    ]
-    for type in gdal_types:
-        gfo.add_column(test_path, name=f"column_{type}", type=type)
     info = gfo.get_layerinfo(test_path)
-    for type in gdal_types:
-        assert f"column_{type}" in info.columns
 
     # Adding an already existing column doesn't give an error
     existing_column = next(iter(info.columns))
@@ -128,6 +118,54 @@ def test_add_column_gpkg(tmp_path):
     )
     gdf = gfo.read_file(test_path)
     assert gdf["HFDTLT"][0] == "5"
+
+
+@pytest.mark.parametrize(
+    "suffix, type, type_supported, exp_gdal_type",
+    [
+        (".gpkg", "Binary", True, "Binary"),
+        (".gpkg", "Blob", True, "Binary"),
+        (".gpkg", "Date", True, "Date"),
+        (".gpkg", "DateTime", True, "DateTime"),
+        (".gpkg", "Integer", True, "Integer64"),
+        (".gpkg", "Text", True, "String"),
+        (".gpkg", "Time", True, "DateTime"),
+        (".gpkg", "Real", True, "Real"),
+        (".gpkg", "Invalid", False, "Invalid"),
+        (".shp", "Binary", True, "String"),
+        (".shp", "Blob", True, "String"),
+        (".shp", "Date", True, "Date"),
+        (".shp", "DateTime", True, "String"),
+        (".shp", "Integer", True, "Integer"),
+        (".shp", "String", True, "String"),
+        (".shp", "Text", True, "String"),
+        (".shp", "Time", True, "String"),
+        (".shp", "Real", True, "Real"),
+    ],
+)
+def test_add_column_types(tmp_path, suffix, type, type_supported, exp_gdal_type):
+    """Test adding columns of different types."""
+    # Before GDAL 3.11, Datetimes were saved in a Date column instead of a String column
+    # for shapefiles
+    if not GDAL_GTE_311 and suffix == ".shp" and type in ("DateTime", "Time"):
+        exp_gdal_type = "Date"
+
+    test_path = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dst_dir=tmp_path
+    )
+
+    column_name = f"column_{type}"
+    if suffix == ".shp" and len(column_name) > 10:
+        # Shapefile column name length limit = 10
+        column_name = column_name[:10]
+
+    handler = nullcontext() if type_supported else pytest.raises(RuntimeError)
+    with handler:
+        gfo.add_column(test_path, name=column_name, type=type)
+
+        info = gfo.get_layerinfo(test_path)
+        assert column_name in info.columns.keys()
+        assert info.columns[column_name].gdal_type == exp_gdal_type
 
 
 @pytest.mark.parametrize(

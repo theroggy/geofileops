@@ -976,6 +976,7 @@ def add_column(
             column value. It should be in SQLite syntax and |spatialite_reference_link|
             functions can be used. Defaults to None.
         expression_dialect (str, optional): SQL dialect used for the expression.
+            Deprecated: is ignored. Defaults to None.
         layer (str, optional): The layer name. If None and the geofile
             has only one layer, that layer is used. Defaults to None.
         force_update (bool, optional): If the column already exists, execute
@@ -1034,21 +1035,12 @@ def add_column(
 
     """  # noqa: E501
     # Init
-    if isinstance(type, DataType):
-        type_str = type.value
-    else:
-        type_lower = type.lower()
-        if type_lower == "string":
-            # TODO: think whether being flexible here is a good idea...
-            type_str = "TEXT"
-        elif type_lower == "binary":
-            type_str = "BLOB"
-        elif type_lower == "time":
-            type_str = "DATETIME"
-        elif type_lower == "integer64":
-            type_str = "INTEGER"
-        else:
-            type_str = type
+    if expression_dialect is not None:  # pragma: no cover
+        warnings.warn(
+            "expression_dialect is deprecated and will be ignored", stacklevel=2
+        )
+
+    type_str = _datatype_to_sqlite(type)
 
     start = time.perf_counter()
     layerinfo = get_layerinfo(path, layer, raise_on_nogeom=False)
@@ -1068,6 +1060,15 @@ def add_column(
             datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
             _ogr_util.StartTransaction(datasource)
             datasource.ExecuteSQL(sql_stmt)
+
+            # check if column was really added
+            datasource_layer = datasource.GetLayer(layer)
+            layer_defn = datasource_layer.GetLayerDefn()
+            field_index = layer_defn.GetFieldIndex(name)
+            if field_index == -1:
+                raise RuntimeError(
+                    f"add_column of {name=}, {type=} failed for {path}#{layer}"
+                )
         else:
             logger.warning(f"Column {name} existed already in {path}#{layer}")
 
@@ -1079,7 +1080,7 @@ def add_column(
                 datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
                 _ogr_util.StartTransaction(datasource)
             sql_stmt = f'UPDATE "{layer}" SET "{name}" = {expression}'
-            datasource.ExecuteSQL(sql_stmt, dialect=expression_dialect)
+            datasource.ExecuteSQL(sql_stmt, dialect="SQLITE")
 
         _ogr_util.CommitTransaction(datasource)
 
@@ -1094,6 +1095,34 @@ def add_column(
         took = time.perf_counter() - start
         if took > 2:  # pragma: no cover
             logger.info(f"Ready, add_column of {name} took {took:.2f}")
+
+
+def _datatype_to_sqlite(type: str | DataType) -> str:
+    """Validate the datatype specified for a column.
+
+    Args:
+        type (str or DataType): the datatype.
+
+    Returns:
+        str: the validated datatype.
+    """
+    if isinstance(type, DataType):
+        type_str = type.value
+    else:
+        type_upper = type.upper()
+        if type_upper == "STRING":
+            # TODO: think whether being flexible here is a good idea...
+            type_str = "TEXT"
+        elif type_upper == "BINARY":
+            type_str = "BLOB"
+        elif type_upper == "TIME":
+            type_str = "DATETIME"
+        elif type_upper == "INTEGER64":
+            type_str = "INTEGER"
+        else:
+            type_str = type_upper
+
+    return type_str
 
 
 def drop_column(
