@@ -1,5 +1,6 @@
 """Module with helper functions for geo files."""
 
+import contextlib
 import enum
 import filecmp
 import logging
@@ -27,6 +28,7 @@ from pandas.api.types import is_integer_dtype
 from pygeoops import GeometryType, PrimitiveType  # noqa: F401
 
 from geofileops._compat import GDAL_GTE_311
+from geofileops.helpers import _general_helper
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
     _geofileinfo,
@@ -814,6 +816,9 @@ def rename_layer(
 ):
     """Rename the layer specified.
 
+    `rename_layer` can only be used on file types that support multiple layers, so
+    for drivers that have the `GDAL_DCAP_MULTIPLE_VECTOR_LAYERS` capability.
+
     Args:
         path (PathLike): The file path.
         layer (Optional[str]): The layer name. If not specified, and there is only
@@ -821,19 +826,24 @@ def rename_layer(
         new_layer (str): The new layer name. If not specified, and there is only
             one layer in the file, this layer is used. Otherwise exception.
     """
-    # Renaming the layer name is not possible for single layer file formats.
-    path_info = _geofileinfo.get_geofileinfo(path)
-    if path_info.is_singlelayer:
-        raise ValueError(f"rename_layer not possible for {path_info.driver} file")
-
-    # Now really rename
+    # Rename
     try:
         datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
+        driver = datasource.GetDriver()
+        is_multi_layer = (
+            driver.GetMetadataItem(gdal.DCAP_MULTIPLE_VECTOR_LAYERS) == "YES"
+        )
+        if not is_multi_layer:
+            raise ValueError(
+                "rename_layer not supported for single layer file types. You can use "
+                f"move to rename the file: {path}"
+            )
+
         datasource_layer = _get_layer(datasource, layer)
         layername = datasource_layer.GetName()
 
         if not datasource_layer.TestCapability(gdal.ogr.OLCRename):
-            raise ValueError(f"rename_layer not supported for {path}")
+            raise ValueError(f"rename_layer not supported for {path}#{layer}")
 
         # If the layer name only differs in case, we need to rename it first to a
         # temporary layer name to avoid an error.
@@ -842,7 +852,9 @@ def rename_layer(
 
         # Rename layer
         datasource_layer.Rename(new_layer)
-    except Exception as ex:
+    except ValueError:
+        raise
+    except Exception as ex:  # pragma: no cover
         ex.args = (f"rename_layer error: {ex}, for {path}#{layer}",)
         raise
     finally:
@@ -1040,7 +1052,7 @@ def add_column(
             "expression_dialect is deprecated and will be ignored", stacklevel=2
         )
 
-    type_str = _datatype_to_sqlite(type)
+    type_str = _validate_datatype(type)
 
     start = time.perf_counter()
     layerinfo = get_layerinfo(path, layer, raise_on_nogeom=False)
@@ -1097,7 +1109,215 @@ def add_column(
             logger.info(f"Ready, add_column of {name} took {took:.2f}")
 
 
-def _datatype_to_sqlite(type: str | DataType) -> str:
+def add_columns(
+    path: Union[str, "os.PathLike[Any]"],
+    new_columns: list[tuple[str, str | DataType, str | None, str | None]],
+    *,
+    layer: str | None = None,
+    output_path: Union[str, "os.PathLike[Any]"] | None = None,
+    output_layer: str | None = None,
+    force_update: bool = False,
+):
+    """Add columns to a layer of a geofile and optionally fill them out.
+
+    If columns are being filled out or updated, the file is copied to a temporary
+    location, the columns are added there, and then the file is moved back to the
+    original location (or to `output_path` if specified). If just adding columns without
+    filling them out, the columns are added in place.
+
+    If `output_path` is specified, but `output_layer` is None, the output layer name is
+    determined like this for file types that support multiple layers:
+       - if the input layer contains a single spatial layer, :func:`get_default_layer`
+         on `output_path` will be used to determine `output_layer`.
+       - otherwise, the input layername is used/retained.
+
+    Args:
+        path (PathLike): Path to the geofile.
+        new_columns (list of tuples): list of new columns to add. Each tuple should
+            contain 2 or 3 elements: (name, type, optional expression). The `type` can
+            be a string or a DataType enum value. The optional `expression` is a SQL
+            expression to use to fill out the column value. It should be in SQLite
+            syntax and |spatialite_reference_link| functions can be used.
+        layer (str, optional): The layer name. If None and the geofile
+            has only one layer, that layer is used. Defaults to None.
+        output_path (PathLike, optional): If specified, the modified file is written
+            to this location. If not specified, the original file is overwritten or the
+            columns are added in place.
+        output_layer (str, optional): the layer name to use if `output_path` is
+            specified. For single-layer file types `output_layer` is ignored. If None,
+            :func:`get_default_layer` of `output_path` is used if the input contains a
+            single spatial layer. If the input contains multiple spatial layers, the
+            input layer name is used/retained. Defaults to None.
+        force_update (bool, optional): If a column already exists, execute
+            the update expression even if it means overwriting existing data.
+            Defaults to False.
+    """
+    # Validate input parameters
+    if output_layer is not None and output_path is None:
+        raise ValueError("output_layer can only be used together with output_path")
+    if output_path is not None and (
+        GeoPath(path).suffix_full.lower() != GeoPath(output_path).suffix_full.lower()
+    ):
+        raise ValueError("output_path should have the same suffix as the input path")
+
+    # Validate new_columns
+    if not isinstance(new_columns, list) or len(new_columns) == 0:
+        raise TypeError(
+            "new_columns should be a non-empty list of tuples, each with 2 or 3 "
+            "elements: [(name, type, optional expression),...]"
+        )
+    updates_needed = False
+    for new_column in new_columns:
+        if not isinstance(new_column, tuple) or len(new_column) not in (2, 3):
+            raise TypeError(
+                "each element in new_columns should be a tuple with 2 or 3 elements:"
+                f" (name, type, optional expression), not: {new_column}"
+            )
+        if len(new_column) >= 3 and new_column[2] is not None:
+            updates_needed = True
+
+    # Set some config options to improve performance for GPKG if updates are done
+    if updates_needed and Path(path).suffix.lower() == ".gpkg":
+        gdal_handler = _ogr_util.set_config_options(
+            {"OGR_SQLITE_SYNCHRONOUS": "OFF", "OGR_SQLITE_JOURNAL": "OFF"}
+        )
+    else:
+        gdal_handler = contextlib.nullcontext()  # type: ignore[assignment]
+
+    # If columns are being updated or if there is an output_path, create a tmp_dir to
+    # first make a local copy. If just adding columns, do it in place.
+    if updates_needed or output_path is not None:
+        tmp_dir_handler = _general_helper.create_gfo_tmp_dir("add_columns")
+    else:
+        tmp_dir_handler = contextlib.nullcontext()  # type: ignore[assignment]
+
+    # Add all columns one by one + update them all together in a transaction
+    with tmp_dir_handler as tmp_dir, gdal_handler:
+        if tmp_dir is not None:
+            # Add columns to tmp copy
+            output_tmp_path = tmp_dir / Path(path).name
+            copy(path, output_tmp_path)
+        else:
+            # Add columns in place
+            output_tmp_path = path  # type: ignore[assignment]
+
+        start = time.perf_counter()
+
+        # Get layerinfo and determine `layer` and `output_layer` if not specified
+        # Remark: don't reuse the opened datasource here, because then the layer info
+        # is cached and the check if the columns are added correctly later on does not
+        # work correctly anymore.
+        layerinfo = get_layerinfo(output_tmp_path, layer, raise_on_nogeom=False)
+        if layer is None:
+            layer = layerinfo.name
+
+        # Go!
+        datasource = None
+        try:
+            datasource = gdal.OpenEx(str(output_tmp_path), nOpenFlags=gdal.OF_UPDATE)
+
+            # If column doesn't exist yet, create it
+            _ogr_util.StartTransaction(datasource)
+            update_set_expressions = []
+            columns_upper = [column.upper() for column in layerinfo.columns]
+            column_added = False
+            for new_column in new_columns:
+                name = new_column[0]
+                type_str = _validate_datatype(new_column[1])
+                expression = new_column[2] if len(new_column) >= 3 else None
+
+                if expression is not None:
+                    update_set_expressions.append(f'"{name}" = {expression}')
+
+                if name.upper() in columns_upper:
+                    logger.warning(f"Column {name} existed already in {path}#{layer}")
+                    continue
+
+                column_added = True
+
+                # Open datasource if not opened yet
+                sql_stmt = f'ALTER TABLE "{layer}" ADD COLUMN "{name}" {type_str}'
+                datasource.ExecuteSQL(sql_stmt)
+
+            # check if the columns were really added
+            if column_added:
+                datasource_layer = datasource.GetLayer(layer)
+                layer_defn = datasource_layer.GetLayerDefn()
+                for new_column in new_columns:
+                    name = new_column[0]
+                    field_index = layer_defn.GetFieldIndex(name)
+                    if field_index == -1:
+                        raise RuntimeError(
+                            f"add_columns of {name=}, {type_str=} failed for "
+                            f"{path}#{layer}"
+                        )
+
+            # If an expression was provided and update can be done, go for it...
+            if len(update_set_expressions) > 0 and (column_added or force_update):
+                set_expr = "\n,".join(update_set_expressions)
+                sql_stmt = f"""
+                    UPDATE "{layer}"
+                       SET {set_expr}
+                """
+                datasource.ExecuteSQL(sql_stmt, dialect="SQLITE")
+
+            _ogr_util.CommitTransaction(datasource)
+            driver = datasource.GetDriver()
+            is_multi_layer = (
+                driver.GetMetadataItem(gdal.DCAP_MULTIPLE_VECTOR_LAYERS) == "YES"
+            )
+            datasource = None
+
+            # For multilayer file types, if an output_path is specified, but no
+            # output_layer, determine if the output output layer needs to be changed
+            # and change output_layer accordingly.
+            if is_multi_layer and output_path is not None and output_layer is None:
+                # If the input file contains a single spatial layer, the default
+                # layername should be used for output_layer.
+                if len(listlayers(path, only_spatial_layers=True)) == 1:
+                    # Rename output_tmp_path to the output_path name so get_only_layer
+                    # returns the correct layer name for e.g. shapefiles.
+                    output_tmp2_path = tmp_dir / Path(output_path).name
+                    move(output_tmp_path, output_tmp2_path)
+                    output_tmp_path = output_tmp2_path
+
+                    # Now check the layer names
+                    current_output_layer = get_only_layer(output_tmp_path)
+                    default_output_layer = get_default_layer(output_path)
+                    if current_output_layer != default_output_layer:
+                        # The output layer needs to be changed
+                        output_layer = default_output_layer
+
+            # Rename layer if needed
+            if is_multi_layer and output_layer is not None:
+                rename_layer(output_tmp_path, new_layer=output_layer, layer=layer)
+
+            # Move file to final location if we were working on a temp copy
+            if tmp_dir is not None:
+                if output_path is None:
+                    move(output_tmp_path, path)
+                else:
+                    move(output_tmp_path, output_path)
+
+        except Exception as ex:
+            _ogr_util.RollbackTransaction(datasource)
+
+            if str(ex).startswith("add_columns"):
+                raise
+
+            ex.args = (f"add_columns error for {path}#{layer}:\n  {ex}",)
+            raise
+
+        finally:
+            datasource = None
+
+            # Log time taken if it was slow.
+            took = time.perf_counter() - start
+            if took > 2:  # pragma: no cover
+                logger.info(f"Ready, add_columns of {name} took {took:.2f}")
+
+
+def _validate_datatype(type: str | DataType) -> str:
     """Validate the datatype specified for a column.
 
     Args:

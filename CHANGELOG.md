@@ -10,8 +10,9 @@
 
 - Add `concat` function (#746, #747)
 - Add `join` function (#751)
-- Add `write_mode="append_add_fields"` option to `copy_layer` (#750)
+- Add `add_columns` function (#768)
 - Add `zip_geofile` and `unzip_geofile` functions (#754, #743)
+- Add `write_mode="append_add_fields"` option to `copy_layer` (#750)
 - Add an `include_duplicates` parameter to `union`, `intersection` and `identity` (#757)
 - Add support for ".gpkg.zip" and ".shp.zip" input and output files for geo operations
   (#754)
