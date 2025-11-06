@@ -23,7 +23,7 @@ def clip_by_geometry(
     columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
-):
+) -> None:
     spatial_filter = None
     if isinstance(clip_geometry, str):
         geom = wkt.loads(clip_geometry)
@@ -63,7 +63,7 @@ def export_by_bounds(
     columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
-):
+) -> None:
     _run_ogr(
         operation="export_by_bounds",
         input_path=input_path,
@@ -88,7 +88,7 @@ def warp(
     columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
-):
+) -> None:
     warp = {
         "gcps": gcps,
         "algorithm": algorithm,
@@ -122,16 +122,15 @@ def _run_ogr(
     sql_stmt: str | None = None,
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     transaction_size: int = 65536,
-    append: bool = False,
-    update: bool = False,
     explodecollections: bool = False,
     force_output_geometrytype: GeometryType | str | Iterable[str] | None = None,
-    options: dict = {},
+    options: dict | None = None,
     columns: list[str] | None = None,
     warp: dict | None = None,
     force: bool = False,
 ) -> bool:
     # Init
+    options = options or {}
     logger = logging.getLogger(f"geofileops.{operation}")
     if _io_util.output_exists(path=output_path, remove_if_exists=force):
         return True

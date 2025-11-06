@@ -445,7 +445,7 @@ def test_export_by_distance(tmp_path, testfile, suffix):
 
     # Check if columns exist and have the same data type
     for col_name, col_infos in input_layerinfo.columns.items():
-        assert col_name in output_layerinfo.columns.keys()
+        assert col_name in output_layerinfo.columns
         assert col_infos.gdal_type == output_layerinfo.columns.get(col_name).gdal_type
 
     # Compare attribute values of a selected column
@@ -504,7 +504,7 @@ def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords):
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
     exp_gdf = input1_gdf.overlay(input2_gdf, how="identity", keep_geom_type=True)
-    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
     for column in exp_gdf.select_dtypes(include="O").columns:
@@ -732,7 +732,7 @@ def test_intersection(
     expected_gdf = input1_gdf.overlay(
         input2_gdf, how=overlay_operation, keep_geom_type=True
     )
-    renames = dict(zip(expected_gdf.columns, output_gdf.columns))
+    renames = dict(zip(expected_gdf.columns, output_gdf.columns, strict=True))
     expected_gdf = expected_gdf.rename(columns=renames)
     if gridsize != 0.0:
         expected_gdf.geometry = shapely.set_precision(
@@ -834,7 +834,7 @@ def test_intersection_invalid_params2(kwargs, expected_error):
         gfo.intersection(input1_path="input1.gpkg", output_path="output.gpkg", **kwargs)
 
 
-def test_intersection_output_path_exists(tmp_path):
+def test_intersection_output_path_exists():
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-parcel")
     input2_path = test_helper.get_testfile("polygon-parcel")
@@ -1082,7 +1082,7 @@ def test_intersection_subdivide(
     expected_gdf = input1_gdf.overlay(
         input2_gdf, how=overlay_operation, keep_geom_type=True
     )
-    renames = dict(zip(expected_gdf.columns, output_gdf.columns))
+    renames = dict(zip(expected_gdf.columns, output_gdf.columns, strict=True))
     expected_gdf = expected_gdf.rename(columns=renames)
     if gridsize != 0.0:
         expected_gdf.geometry = shapely.set_precision(
@@ -1182,8 +1182,8 @@ def test_prepare_spatial_relations_filter():
     ]
     for relation in named_relations:
         query = f"{relation} is True"
-        filter = geoops_sql._prepare_spatial_relation_filter(query)
-        assert filter is not None and filter != ""
+        relation_filter = geoops_sql._prepare_spatial_relation_filter(query)
+        assert relation_filter is not None and relation_filter != ""
 
     # Test extra queries that should work
     ok_queries = [
@@ -1192,8 +1192,8 @@ def test_prepare_spatial_relations_filter():
         "(((T******** is False)))",
     ]
     for query in ok_queries:
-        filter = geoops_sql._prepare_spatial_relation_filter(query)
-        assert filter is not None and filter != ""
+        relation_filter = geoops_sql._prepare_spatial_relation_filter(query)
+        assert relation_filter is not None and relation_filter != ""
 
     # Test queries that should fail
     error_queries = [
@@ -1244,7 +1244,6 @@ def test_prepare_spatial_relations_filter():
 )
 def test_join_by_location(
     tmp_path,
-    recwarn,
     suffix: str,
     spatial_relations_query: str,
     epsg: int,
@@ -1641,7 +1640,7 @@ def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
     ],
 )
 def test_select_two_layers_invalid_paths(
-    tmp_path, input1_path, input2_path, output_path, exp_ex, exp_error
+    input1_path, input2_path, output_path, exp_ex, exp_error
 ):
     """
     select_two_layers doesn't get info on input layers up-front, so this is the best
@@ -1952,7 +1951,7 @@ def test_symmetric_difference(tmp_path, suffix, epsg, gridsize, subdivide_coords
     exp_gdf = input1_gdf.overlay(
         input2_gdf, how="symmetric_difference", keep_geom_type=True
     )
-    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
     for column in exp_gdf.select_dtypes(include="O").columns:
@@ -2077,8 +2076,8 @@ def test_union(
     input2_columns = None
     input2_layerinfo = gfo.get_layerinfo(input2_path)
     if keep_fid:
-        input1_columns = list(input1_layerinfo.columns) + ["fid"]
-        input2_columns = list(input2_layerinfo.columns) + ["fid"]
+        input1_columns = [*list(input1_layerinfo.columns), "fid"]
+        input2_columns = [*list(input2_layerinfo.columns), "fid"]
 
     # Test
     gfo.union(
@@ -2122,7 +2121,7 @@ def test_union(
         input1_gdf["l1_fid"] = input1_gdf.index
         input2_gdf["l2_fid"] = input2_gdf.index
     exp_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
     for column in exp_gdf.select_dtypes(include="O").columns:
@@ -2195,7 +2194,7 @@ def test_union_circles(tmp_path, suffix, epsg):
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
     exp_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
     for column in exp_gdf.select_dtypes(include="O").columns:
@@ -2253,7 +2252,7 @@ def test_union_circles(tmp_path, suffix, epsg):
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
     exp_gdf = input1_gdf.overlay(input2_gdf, how="union", keep_geom_type=True)
-    renames = dict(zip(exp_gdf.columns, output_gdf.columns))
+    renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
     for column in exp_gdf.select_dtypes(include="O").columns:

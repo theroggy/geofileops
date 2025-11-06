@@ -36,7 +36,7 @@ from tests import test_helper
         ),
     ],
 )
-def test_geos_functions(descr, sql):
+def test_geos_functions(descr, sql):  # noqa: ARG001
     """Test some geos functions available via spatialite."""
     test_path = test_helper.get_testfile(testfile="polygon-parcel")
     gfo.read_file(test_path, sql_stmt=sql)

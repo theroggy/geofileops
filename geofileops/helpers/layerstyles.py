@@ -50,7 +50,7 @@ def add_layerstyle(
     description: str = "",
     owner: str = "",
     ui: str = "",
-):
+) -> None:
     """Add the layer style to the geofile.
 
     Remark: at the time of writing, QGIS only uses the qml field to interprete the
@@ -74,10 +74,7 @@ def add_layerstyle(
     """
     # Make sure the layer_styles table exists
     _init_layerstyles(path, exist_ok=True)
-    if use_as_default:
-        use_as_default_str = 1
-    else:
-        use_as_default_str = 0
+    use_as_default_str = 1 if use_as_default else 0
 
     # Get existing layer styles
     layer_styles_df = get_layerstyles(path, layer=layer, name=name)
@@ -114,7 +111,7 @@ def add_layerstyle(
         conn.close()
 
 
-def remove_layerstyle(path: Path, id: int):
+def remove_layerstyle(path: Path, id: int) -> None:  # noqa: A002
     """Remove a layer style.
 
     Only styles saved according to the QGIS Geopackage styling extension are removed:
@@ -163,7 +160,7 @@ def _has_layerstyles_table(path: Path) -> bool:
     return table_exists
 
 
-def _init_layerstyles(path: Path, exist_ok: bool = False):
+def _init_layerstyles(path: Path, exist_ok: bool = False) -> None:
     """Create a layer_styles attribute table to store style information in the QGIS way.
 
     The table is created according to the QGIS Geopackage styling extension:

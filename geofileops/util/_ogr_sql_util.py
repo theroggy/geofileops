@@ -20,7 +20,7 @@ class ColumnFormatter:
         fid_column: str,
         table_alias: str = "",
         column_alias_prefix: str = "",
-    ):
+    ) -> None:
         """Format strings with column names for use in sql statements.
 
         Args:
@@ -51,7 +51,7 @@ class ColumnFormatter:
         # Now prepare the actual column list to use
         if columns_asked is not None:
             # Add special column "fid" to available columns so it can be specified
-            columns_in_layer = list(columns_in_layer) + ["fid"]
+            columns_in_layer = [*list(columns_in_layer), "fid"]
             # Case-insensitive check if input1_columns contains columns not in layer...
             columns_in_layer_upper = {
                 column.upper(): column for column in columns_in_layer
@@ -175,26 +175,26 @@ class ColumnFormatter:
             return ""
         return f",{', '.join(self._columns_prefixed())}"
 
-    def prefixed_aliased(self):
+    def prefixed_aliased(self) -> str:
         if len(self._columns) == 0:
             return ""
 
         columns_prefixed_aliased = [
             f'{column_prefixed} "{column_alias}"'
             for column_prefixed, column_alias in zip(
-                self._columns_prefixed(), self.aliases_list()
+                self._columns_prefixed(), self.aliases_list(), strict=True
             )
         ]
         return f",{', '.join(columns_prefixed_aliased)}"
 
-    def null_aliased(self):
+    def null_aliased(self) -> str:
         if len(self._columns) == 0:
             return ""
 
         columns_null_aliased = [f'NULL "{alias}"' for alias in self.aliases_list()]
         return f",{', '.join(columns_null_aliased)}"
 
-    def from_subselect(self, subselect_alias: str = "sub"):
+    def from_subselect(self, subselect_alias: str = "sub") -> str:
         if len(self._columns) == 0:
             return ""
 
@@ -203,7 +203,7 @@ class ColumnFormatter:
         return f",{', '.join(columns_from_subselect)}"
 
 
-def columns_quoted(columns: list[str]):
+def columns_quoted(columns: list[str]) -> str:
     if len(columns) == 0:
         return ""
     columns_quoted = [f'"{column}"' for column in columns]

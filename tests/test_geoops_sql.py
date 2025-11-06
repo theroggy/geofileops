@@ -33,7 +33,7 @@ from tests import test_helper
     ],
 )
 def test_determine_nb_batches(
-    descr: str,
+    descr: str,  # noqa: ARG001
     nb_rows_input_layer: int,
     nb_parallel: int,
     batchsize: int,
@@ -117,7 +117,7 @@ def test_convert_to_spatialite_based(
 
 
 @pytest.mark.parametrize(
-    "desc, testfile, subdivide_coords, expected_subdivided",
+    "descr, testfile, subdivide_coords, expected_subdivided",
     [
         ("input poly not complex", "polygon-zone", 1000, False),
         ("input poly complex", "polygon-zone", 1, True),
@@ -127,7 +127,11 @@ def test_convert_to_spatialite_based(
     ],
 )
 def test_subdivide_layer(
-    desc, tmp_path, testfile, subdivide_coords, expected_subdivided: bool
+    tmp_path,
+    descr,  # noqa: ARG001
+    testfile,
+    subdivide_coords,
+    expected_subdivided: bool,
 ):
     path = test_helper.get_testfile(testfile)
     output_path = tmp_path / "output.gpkg"
@@ -336,7 +340,6 @@ def test_subdivide_layer_check_parallel(tmp_path, nb_rows, fraction):
     ],
 )
 def test_prepare_filter_by_location_fields(
-    tmp_path,
     query,
     geom1,
     geom2,

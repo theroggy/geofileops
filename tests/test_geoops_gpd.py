@@ -27,7 +27,7 @@ from geofileops.util import _geoops_gpd
     ],
 )
 def test_determine_nb_batches(
-    descr: str,
+    descr: str,  # noqa: ARG001
     nb_rows_input_layer: int,
     nb_parallel: int,
     batchsize: int,

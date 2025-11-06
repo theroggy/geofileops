@@ -53,20 +53,24 @@ def test_apply(
 
     # Run test
     if only_geom_input:
-        func = lambda geom: pygeoops.remove_inner_rings(
-            geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
-        )
+
+        def remove_inner_rings(geom):
+            return pygeoops.remove_inner_rings(
+                geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
+            )
     else:
-        func = lambda row: pygeoops.remove_inner_rings(
-            row.geometry,
-            min_area_to_keep=row.min_area,
-            crs=input_layerinfo.crs,
-        )
+
+        def remove_inner_rings(row):
+            return pygeoops.remove_inner_rings(
+                row.geometry,
+                min_area_to_keep=row.min_area,
+                crs=input_layerinfo.crs,
+            )
 
     gfo.apply(
         input_path=str(input_path),
         output_path=str(output_path),
-        func=func,
+        func=remove_inner_rings,
         only_geom_input=only_geom_input,
         gridsize=gridsize,
         keep_empty_geoms=keep_empty_geoms,
@@ -145,18 +149,22 @@ def test_apply_None(tmp_path, suffix, only_geom_input, force_output_geometrytype
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
 
     if only_geom_input:
-        func = lambda geom: pygeoops.remove_inner_rings(
-            geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
-        )
+
+        def remove_inner_rings(geom):
+            return pygeoops.remove_inner_rings(
+                geometry=geom, min_area_to_keep=2, crs=input_layerinfo.crs
+            )
     else:
-        func = lambda row: pygeoops.remove_inner_rings(
-            row.geometry, min_area_to_keep=row.min_area, crs=input_layerinfo.crs
-        )
+
+        def remove_inner_rings(row):
+            return pygeoops.remove_inner_rings(
+                row.geometry, min_area_to_keep=row.min_area, crs=input_layerinfo.crs
+            )
 
     gfo.apply(
         input_path=input_path,
         output_path=output_path,
-        func=func,
+        func=remove_inner_rings,
         only_geom_input=only_geom_input,
         force_output_geometrytype=force_output_geometrytype,
         batchsize=batchsize,
@@ -352,11 +360,9 @@ def test_simplify_lang(tmp_path, suffix, epsg, testfile, gridsize):
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     assert input_layerinfo.crs is not None
-    if input_layerinfo.crs.is_projected:
-        tolerance = 5
-    else:
-        # 1 degree = 111 km or 111000 m
-        tolerance = 5 / 111000
+    # 1 degree = 111 km or 111000 m
+    tolerance = 5 if input_layerinfo.crs.is_projected else 5 / 111000
+
     # Test lang algorithm
     output_path = tmp_path / f"{input_path.stem}-output_lang{suffix}"
     gfo.simplify(
@@ -413,11 +419,8 @@ def test_simplify_vw(tmp_path, suffix, epsg, testfile, gridsize):
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     assert input_layerinfo.crs is not None
-    if input_layerinfo.crs.is_projected:
-        tolerance = 5
-    else:
-        # 1 degree = 111 km or 111000 m
-        tolerance = 5 / 111000
+    # 1 degree = 111 km or 111000 m
+    tolerance = 5 if input_layerinfo.crs.is_projected else 5 / 111000
 
     # Test vw (visvalingam-whyatt) algorithm
     output_path = tmp_path / f"{input_path.stem}-output_vw{suffix}"

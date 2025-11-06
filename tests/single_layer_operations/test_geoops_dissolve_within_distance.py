@@ -68,8 +68,8 @@ def test_gapfill_touches_segment(tmp_path):
     rounding issues because the gap points only touches a segment at one polygon.
     """
     # Prepare test data
-    dir = test_helper.data_dir / "dissolve_within_distance"
-    input_zip = dir / "gapfill_touches_segment.gpkg.zip"
+    input_dir = test_helper.data_dir / "dissolve_within_distance"
+    input_zip = input_dir / "gapfill_touches_segment.gpkg.zip"
     input_path = tmp_path / input_zip.stem
     shutil.unpack_archive(input_zip, input_path.parent)
     output_path = tmp_path / "output.gpkg"
@@ -93,8 +93,8 @@ def test_neg_buffer_makes_smaller(tmp_path):
     Polygon becomes slightly smaller due to positive and negative buffer.
     """
     # Prepare test data
-    dir = test_helper.data_dir / "dissolve_within_distance"
-    input_zip = dir / "neg_buffer_makes_smaller.gpkg.zip"
+    input_dir = test_helper.data_dir / "dissolve_within_distance"
+    input_zip = input_dir / "neg_buffer_makes_smaller.gpkg.zip"
     input_path = tmp_path / input_zip.stem
     shutil.unpack_archive(input_zip, input_path.parent)
     output_path = tmp_path / "output.gpkg"

@@ -175,7 +175,7 @@ class ColumnInfo:
         gdal_type: str,
         width: int | None,
         precision: int | None,
-    ):
+    ) -> None:
         """Constructor of ColumnInfo.
 
         Args:
@@ -189,7 +189,7 @@ class ColumnInfo:
         self.width = width
         self.precision = precision
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Overrides the representation property of ColumnInfo."""
         return f"{self.__class__}({self.__dict__})"
 
@@ -228,7 +228,7 @@ class LayerInfo:
         fid_column: str,
         crs: pyproj.CRS | None,
         errors: list[str],
-    ):
+    ) -> None:
         """Constructor of Layerinfo.
 
         Args:
@@ -253,14 +253,14 @@ class LayerInfo:
         self.errors = errors
 
     @property
-    def geometrytype(self):
+    def geometrytype(self):  # noqa: ANN201
         """The geometry type of the geometrycolumn."""
         if self.geometrytypename == "NONE":
             return None
 
         return GeometryType(self.geometrytypename)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Overrides the representation property of LayerInfo."""
         return f"{self.__class__}({self.__dict__})"
 
@@ -296,7 +296,7 @@ def get_layer_geometrytypes(
                END AS geom_type
           FROM "{input_layer}" layer
     """
-    result_df = read_file(path, sql_stmt=sql_stmt, sql_dialect="SQLITE")
+    result_df = read_file(path, layer=layer, sql_stmt=sql_stmt, sql_dialect="SQLITE")
     return result_df["geom_type"].to_list()
 
 
@@ -363,20 +363,22 @@ def get_layerinfo(
                 name=name, gdal_type=gdal_type, width=width, precision=precision
             )
             columns[name] = column_info
-            if driver == "ESRI Shapefile":
-                if name.casefold() == "geometry":
-                    errors.append(
-                        "An attribute column 'geometry' is not supported in a shapefile"
-                    )
+            if driver == "ESRI Shapefile" and name.casefold() == "geometry":
+                errors.append(
+                    "An attribute column 'geometry' is not supported in a shapefile"
+                )
 
         # Get geometry column name.
         geometrytypename = _ogr_util.ogrtype_to_name(datasource_layer.GetGeomType())
 
         # For shape files, the difference between the 'MULTI' variant and the
         # single one doesn't exists... so always report MULTI variant by convention.
-        if geometrytypename != "NONE" and driver == "ESRI Shapefile":
-            if not geometrytypename.startswith("MULTI"):
-                geometrytypename = f"MULTI{geometrytypename}"
+        if (
+            geometrytypename != "NONE"
+            and driver == "ESRI Shapefile"
+            and not geometrytypename.startswith("MULTI")
+        ):
+            geometrytypename = f"MULTI{geometrytypename}"
 
         # If the geometry type is not None, fill out the extra properties
         geometrycolumn = None
@@ -556,7 +558,7 @@ def execute_sql(
     path: Union[str, "os.PathLike[Any]"],
     sql_stmt: str,
     sql_dialect: str | None = None,
-):
+) -> None:
     """Execute a SQL statement (DML or DDL) on the file.
 
     To run SELECT SQL statements on a file, use :meth:`~read_file`.
@@ -598,7 +600,7 @@ def create_spatial_index(
     exist_ok: bool = False,
     force_rebuild: bool = False,
     no_geom_ok: bool = False,
-):
+) -> None:
     """Create a spatial index on the layer specified.
 
     Args:
@@ -754,7 +756,7 @@ def remove_spatial_index(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | LayerInfo | None = None,
     datasource: gdal.Dataset | None = None,
-):
+) -> None:
     """Remove the spatial index from the layer specified.
 
     Args:
@@ -813,7 +815,7 @@ def remove_spatial_index(
 
 def rename_layer(
     path: Union[str, "os.PathLike[Any]"], new_layer: str, layer: str | None = None
-):
+) -> None:
     """Rename the layer specified.
 
     `rename_layer` can only be used on file types that support multiple layers, so
@@ -866,7 +868,7 @@ def rename_column(
     column_name: str,
     new_column_name: str,
     layer: str | None = None,
-):
+) -> None:
     """Rename the column specified.
 
     Args:
@@ -966,13 +968,13 @@ class DataType(enum.Enum):
 def add_column(
     path: Union[str, "os.PathLike[Any]"],
     name: str,
-    type: DataType | str,
+    type: DataType | str,  # noqa: A002
     expression: str | float | None = None,
     expression_dialect: str | None = None,
     layer: str | None = None,
     force_update: bool = False,
     width: int | None = None,
-):
+) -> None:
     """Add a column to a layer of the geofile.
 
     You can specify an `expression` to use to fill out the value of the column. For file
@@ -1117,7 +1119,7 @@ def add_columns(
     output_path: Union[str, "os.PathLike[Any]"] | None = None,
     output_layer: str | None = None,
     force_update: bool = False,
-):
+) -> None:
     """Add columns to a layer of a geofile and optionally fill them out.
 
     If columns are being filled out or updated, the file is copied to a temporary
@@ -1317,19 +1319,19 @@ def add_columns(
                 logger.info(f"Ready, add_columns of {name} took {took:.2f}")
 
 
-def _validate_datatype(type: str | DataType) -> str:
+def _validate_datatype(datatype: str | DataType) -> str:
     """Validate the datatype specified for a column.
 
     Args:
-        type (str or DataType): the datatype.
+        datatype (str or DataType): the datatype.
 
     Returns:
         str: the validated datatype.
     """
-    if isinstance(type, DataType):
-        type_str = type.value
+    if isinstance(datatype, DataType):
+        type_str = datatype.value
     else:
-        type_upper = type.upper()
+        type_upper = datatype.upper()
         if type_upper == "STRING":
             # TODO: think whether being flexible here is a good idea...
             type_str = "TEXT"
@@ -1347,7 +1349,7 @@ def _validate_datatype(type: str | DataType) -> str:
 
 def drop_column(
     path: Union[str, "os.PathLike[Any]"], column_name: str, layer: str | None = None
-):
+) -> None:
     """Drop the column specified.
 
     Args:
@@ -1391,7 +1393,7 @@ def update_column(
     expression: str,
     layer: str | None = None,
     where: str | None = None,
-):
+) -> None:
     """Update a column from a layer of the geofile.
 
     Args:
@@ -1485,14 +1487,14 @@ def read_file(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     columns: Iterable[str] | None = None,
-    bbox=None,
-    rows=None,
+    bbox: tuple[float, float, float, float] | None = None,
+    rows: slice | None = None,
     where: str | None = None,
     sql_stmt: str | None = None,
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
-    **kwargs,
+    **kwargs: object,
 ) -> gpd.GeoDataFrame:
     """Reads a file to a geopandas GeoDataframe.
 
@@ -1600,8 +1602,8 @@ def read_file_nogeom(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     columns: Iterable[str] | None = None,
-    bbox=None,
-    rows=None,
+    bbox: tuple[float, float, float, float] | None = None,
+    rows: slice | None = None,
     sql_stmt: str | None = None,
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     fid_as_index: bool = False,
@@ -1631,14 +1633,14 @@ def _read_file_base(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     columns: Iterable[str] | None = None,
-    bbox=None,
-    rows=None,
+    bbox: tuple[float, float, float, float] | None = None,
+    rows: slice | None = None,
     where: str | None = None,
     sql_stmt: str | None = None,
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
-    **kwargs,
+    **kwargs: object,
 ) -> pd.DataFrame | gpd.GeoDataFrame:
     """Reads a file to a pandas Dataframe."""
     # Check if the fid column needs to be read as column via the columns parameter
@@ -1646,9 +1648,8 @@ def _read_file_base(
     if isinstance(columns, str):
         # If a string is passed, convert to list
         columns = [columns]
-    if columns is not None:
-        if "fid" in [column.lower() for column in columns]:
-            fid_as_column = True
+    if columns is not None and "fid" in [column.lower() for column in columns]:
+        fid_as_column = True
 
     # Read with the engine specified
     engine = ConfigOptions.io_engine
@@ -1696,14 +1697,14 @@ def _read_file_base_fiona(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     columns: Iterable[str] | None = None,
-    bbox=None,
-    rows=None,
+    bbox: tuple[float, float, float, float] | None = None,
+    rows: slice | None = None,
     where: str | None = None,
     sql_stmt: str | None = None,
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
-    **kwargs,
+    **kwargs: object,
 ) -> pd.DataFrame | gpd.GeoDataFrame:
     """Reads a file to a pandas Dataframe using fiona.
 
@@ -1835,14 +1836,14 @@ def _read_file_base_pyogrio(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | LayerInfo | None = None,
     columns: Iterable[str] | None = None,
-    bbox=None,
-    rows=None,
+    bbox: tuple[float, float, float, float] | None = None,
+    rows: slice | None = None,
     where: str | None = None,
     sql_stmt: str | None = None,
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
-    **kwargs,
+    **kwargs: object,
 ) -> pd.DataFrame | gpd.GeoDataFrame:
     """Reads a file to a pandas Dataframe using pyogrio."""
     # Convert rows slice object to pyogrio parameters
@@ -2007,8 +2008,8 @@ def to_file(
     append_timeout_s: int = 600,
     index: bool | None = None,
     create_spatial_index: bool | None = None,
-    **kwargs,
-):
+    **kwargs: object,
+) -> None:
     """Writes a pandas dataframe to file.
 
     The fileformat is detected based on the filepath extension.
@@ -2037,9 +2038,7 @@ def to_file(
             Defaults to False.
         append (bool, optional): True to append to the file/layer if it already exists.
             If it doesn't exist yet, it is created. Defaults to False.
-        append_timeout_s (int, optional): The maximum timeout to wait when the
-            output file is already being written to by another process.
-            Defaults to 600.
+        append_timeout_s (int, optional): This parameter is deprecated and is ignored.
         index (bool, optional): If True, write index into one or more columns (for
             MultiIndex). None writes the index into one or more columns only if the
             index is named, is a MultiIndex, or has a non-integer data type.
@@ -2094,7 +2093,6 @@ def to_file(
             force_output_geometrytype=force_output_geometrytype,
             force_multitype=force_multitype,
             append=append,
-            append_timeout_s=append_timeout_s,
             index=index,
             create_spatial_index=create_spatial_index,
             **kwargs,
@@ -2126,8 +2124,8 @@ def _to_file_fiona(
     append_timeout_s: int = 600,
     index: bool | None = None,
     create_spatial_index: bool | None = None,
-    **kwargs,
-):
+    **kwargs: object,
+) -> None:
     """Writes a pandas dataframe to file using fiona.
 
     The "fiona" IO engine is deprecated and will be removed in the future.
@@ -2199,13 +2197,10 @@ def _to_file_fiona(
         append: bool = False,
         schema: dict | None = None,
         create_spatial_index: bool | None = None,
-        **kwargs,
-    ):
+        **kwargs: object,
+    ) -> None:
         # Prepare args for to_file
-        if append:
-            mode = "a"
-        else:
-            mode = "w"
+        mode = "a" if append else "w"
 
         kwargs["engine"] = "fiona"
         kwargs["mode"] = mode
@@ -2298,11 +2293,10 @@ def _to_file_pyogrio(
     force_output_geometrytype: GeometryType | str | None = None,
     force_multitype: bool = False,
     append: bool = False,
-    append_timeout_s: int = 600,
     index: bool | None = None,
     create_spatial_index: bool | None = None,
-    **kwargs,
-):
+    **kwargs: object,
+) -> None:
     """Writes a pandas dataframe to file using pyogrio."""
     # Check upfront if append is going to work to give nice error
     if append and _vsi_exists(path):
@@ -2535,7 +2529,7 @@ def copy(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
     keep_permissions: bool = True,
-):
+) -> None:
     """Copies the geofile from src to dst.
 
     If the source file is a geofile containing of multiple files (eg. .shp) all files
@@ -2584,7 +2578,9 @@ def copy(
                 shutil.copyfile(srcfile, dstfile)
 
 
-def move(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
+def move(
+    src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]
+) -> None:
     """Moves the geofile from src to dst.
 
     If the source file is a geofile containing of multiple files (eg. .shp) all files
@@ -2622,7 +2618,7 @@ def move(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"
     shutil.move(str(src), dst)
 
 
-def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False):
+def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False) -> None:
     """Removes the geofile.
 
     Is it is a geofile composed of multiple files (eg. .shp) all files are removed.
@@ -2669,14 +2665,15 @@ def append_to(
     transaction_size: int = 50000,
     preserve_fid: bool | None = None,
     dst_dimensions: str | None = None,
-    options: dict = {},
-):
+    options: dict | None = None,
+) -> None:
     """DEPRECATED: use copy_layer with write_mode='add_layer' or write_mode='append'.
 
     If you explicitly would like to keep the option to use the current undocumented file
     locking mechanism present in append_to, please open an issue asking for this in
     https://github.com/geofileops/geofileops/issues
     """
+    options = options or {}
     warnings.warn(
         "append_to is deprecated: use copy_layer with write_mode='append' or "
         "write_mode='add_layer'. It will be removed in a future version.",
@@ -2752,11 +2749,12 @@ def convert(
     force_output_geometrytype: GeometryType | str | None = None,
     create_spatial_index: bool | None = None,
     preserve_fid: bool | None = None,
-    options: dict = {},
+    options: dict | None = None,
     append: bool = False,
     force: bool = False,
-):
+) -> None:
     """DEPRECATED: please use copy_layer."""
+    options = options or {}
     warnings.warn(
         "convert is deprecated: use copy_layer. It will be removed in a future "
         "version.",
@@ -2801,10 +2799,10 @@ def copy_layer(
     transaction_size: int = 50000,
     preserve_fid: bool | None = None,
     dst_dimensions: str | None = None,
-    options: dict = {},
+    options: dict | None = None,
     append: bool = False,
     force: bool = False,
-):
+) -> None:
     """Copy a layer from a source to a destination dataset.
 
     Typical use cases:
@@ -2920,7 +2918,7 @@ def copy_layer(
         dst_dimensions (str, optional): Force the dimensions of the destination layer to
             the value specified. Valid values: "XY", "XYZ", "XYM" or "XYZM".
             Defaults to None.
-        options (dict, optional): options to pass to gdal.
+        options (dict, optional): options to pass to gdal. Defaults to None.
         append (bool, optional): True to append to the destination layer if it already
             exists. Deprecated: use write_mode='append'. Defaults to False.
         force (bool, optional): True to overwrite the output file/layer (depending on
@@ -2941,6 +2939,7 @@ def copy_layer(
 
     """  # noqa: E501
     # The append parameter is deprecated, but keep backwards compatibility
+    options = options or {}
     if append:
         if write_mode != "create":
             raise ValueError("append parameter is deprecated, use write_mode='append'")
@@ -3104,7 +3103,7 @@ def copy_layer(
 def zip_geofile(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-):
+) -> None:
     """Zip a geofile to a seek-optimized zip file.
 
     For geofile types that consist of multiple files (eg. shapefiles), all relevant
@@ -3137,7 +3136,9 @@ def zip_geofile(
     )
 
 
-def _zip(src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]):
+def _zip(
+    src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]
+) -> None:
     """Zip a file or directory.
 
     Args:
@@ -3229,7 +3230,9 @@ def _determine_access_mode(
               - "append": the destination layer exists, append to it.
     """
 
-    def try_listlayers(dst, only_spatial_layers: bool) -> list[str] | None:
+    def try_listlayers(
+        dst: Union[str, "os.PathLike[Any]"], only_spatial_layers: bool
+    ) -> list[str] | None:
         try:
             return listlayers(dst, only_spatial_layers)
         except FileNotFoundError:
@@ -3361,11 +3364,10 @@ def _launder_column_names(columns: Iterable) -> list[tuple[str, str]]:
     laundered_upper = []
     for column in columns:
         # Doubles in casing aree not allowed either
-        if len(column) <= 10:
-            if column.upper() not in laundered_upper:
-                laundered_upper.append(column.upper())
-                laundered.append((column, column))
-                continue
+        if len(column) <= 10 and column.upper() not in laundered_upper:
+            laundered_upper.append(column.upper())
+            laundered.append((column, column))
+            continue
 
         # Laundering is needed
         column_laundered = column[:10]

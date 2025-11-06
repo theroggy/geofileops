@@ -194,7 +194,7 @@ def test_harmonize_geometrytypes():
             assert geom is not None
 
 
-def test_is_valid_reason(tmp_path):
+def test_is_valid_reason():
     # Test with valid data + Empty geometry
     # -------------------------------------
     test_gdf = gpd.GeoDataFrame(

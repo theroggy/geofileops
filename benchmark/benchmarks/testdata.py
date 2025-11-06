@@ -54,7 +54,13 @@ class TestFile(enum.Enum):
         "agri parcels (~500k poly)",
     )
 
-    def __init__(self, value, url: str, filename: str, descr: str | None):
+    def __init__(
+        self,
+        value: tuple[int, str, str, str],
+        url: str,
+        filename: str,
+        descr: str | None,
+    ) -> None:
         """Create a test file.
 
         Args:
@@ -208,7 +214,7 @@ def create_testfile(
     return (testfile_path, descr)
 
 
-def _move_xy(x, y, max_x, max_y):
+def _move_xy(x: int, y: int, max_x: int, max_y: int) -> tuple[int, int]:
     # Move to next location in the grid
     if x >= max_x:
         x = 0
@@ -442,7 +448,7 @@ def _download_samplefile(url: str, dst_name: str, dst_dir: Path | None = None) -
     return dst_path
 
 
-def _prepare_dst_path(dst_name: str, dst_dir: Path | None = None):
+def _prepare_dst_path(dst_name: str, dst_dir: Path | None = None) -> Path:
     if dst_dir is None:
         return Path(tempfile.gettempdir()) / "geofileops_sampledata" / dst_name
     else:

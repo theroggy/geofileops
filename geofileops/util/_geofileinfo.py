@@ -37,7 +37,7 @@ class GeofileTypeInfo:
 geofiletypes: dict[str, GeofileTypeInfo] = {}
 
 
-def _init_geofiletypes():
+def _init_geofiletypes() -> None:
     geofiletypes_path = Path(__file__).resolve().parent / "geofiletypes.csv"
     with geofiletypes_path.open() as file:
         # Set skipinitialspace to True so the csv can be formatted for readability
@@ -82,7 +82,7 @@ class GeofileType(enum.Enum):
     FlatGeobuf = enum.auto()
 
     @classmethod
-    def _missing_(cls, value):
+    def _missing_(cls, value: object) -> Union["GeofileType", None]:
         """Expand options in the GeofileType() constructor.
 
         Args:
@@ -96,14 +96,14 @@ class GeofileType(enum.Enum):
             [GeofileType]: The corresponding GeometryType.
         """
 
-        def get_geofiletype_for_suffix(suffix: str):
+        def get_geofiletype_for_suffix(suffix: str) -> GeofileType:
             suffix_lower = suffix.lower()
             for geofiletype, geofiletype_info in geofiletypes.items():
                 if suffix_lower in geofiletype_info.suffixes:
                     return GeofileType[geofiletype]
             raise ValueError(f"Unknown extension {suffix}")
 
-        def get_geofiletype_for_ogrdriver(ogrdriver: str):
+        def get_geofiletype_for_ogrdriver(ogrdriver: str) -> GeofileType:
             for geofiletype, geofiletype_info in geofiletypes.items():
                 driver = geofiletype_info.ogrdriver
                 if driver is not None and driver == ogrdriver:
@@ -152,10 +152,7 @@ class GeofileType(enum.Enum):
     @property
     def is_singlelayer(self) -> bool:
         """Returns True if a file of this GeofileType can only have one layer."""
-        if self.is_spatialite_based:
-            return False
-        else:
-            return True
+        return not self.is_spatialite_based
 
 
 # Init!
@@ -169,7 +166,7 @@ class GeofileInfo:
         driver (str): the relevant gdal driver for the file.
     """
 
-    def __init__(self, path: Union[str, "os.PathLike[Any]"]):
+    def __init__(self, path: Union[str, "os.PathLike[Any]"]) -> None:
         """Constructor of Layerinfo.
 
         Args:
@@ -179,7 +176,7 @@ class GeofileInfo:
         self.driver = get_driver(path=path)
         self.geofiletype_info = geofiletypes.get(self.driver.replace(" ", ""))
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Overrides the representation property of GeofileInfo."""
         return f"{self.__class__}({self.__dict__})"
 

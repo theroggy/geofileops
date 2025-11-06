@@ -3,7 +3,9 @@
 import multiprocessing
 import multiprocessing.context
 import os
+from collections.abc import Callable
 from concurrent import futures
+from types import TracebackType
 
 import psutil
 
@@ -28,10 +30,11 @@ class PooledExecutorFactory:
     def __init__(
         self,
         worker_type: str = "processes",
-        max_workers=None,
-        initializer=None,
+        max_workers: int | None = None,
+        initializer: Callable | None = None,
+        initargs: tuple = (),
         mp_context: multiprocessing.context.BaseContext | None = None,
-    ):
+    ) -> None:
         self.worker_type = worker_type.lower()
         if self.worker_type not in WORKER_TYPES:
             raise ValueError(
@@ -39,12 +42,13 @@ class PooledExecutorFactory:
                 f"Must be one of {WORKER_TYPES}."
             )
 
+        self.max_workers = max_workers
         if max_workers is not None and os.name == "nt":
+            # On windows, max workers should be limited to 61 to avoid errors
             self.max_workers = min(max_workers, 61)
-        else:
-            self.max_workers = max_workers
 
         self.initializer = initializer
+        self.initargs = initargs
         self.mp_context = mp_context
         if mp_context is None and os.name not in {"nt", "darwin"}:
             # On linux, overrule default to "forkserver" to avoid risks to deadlocks
@@ -54,12 +58,15 @@ class PooledExecutorFactory:
     def __enter__(self) -> futures.Executor:
         if self.worker_type == "threads":
             self.pool = futures.ThreadPoolExecutor(
-                max_workers=self.max_workers, initializer=self.initializer
+                max_workers=self.max_workers,
+                initializer=self.initializer,
+                initargs=self.initargs,
             )
         elif self.worker_type == "processes":
             self.pool = futures.ProcessPoolExecutor(
                 max_workers=self.max_workers,
                 initializer=self.initializer,
+                initargs=self.initargs,
                 mp_context=self.mp_context,
             )
         else:
@@ -70,12 +77,17 @@ class PooledExecutorFactory:
 
         return self.pool
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(
+        self,
+        type: type,  # noqa: A002
+        value: Exception | None,
+        traceback: TracebackType | None,
+    ) -> None:
         if self.pool is not None:
             self.pool.shutdown(wait=True)
 
 
-def initialize_worker(worker_type: str, nice_value: int = 15):
+def initialize_worker(worker_type: str, nice_value: int = 15) -> None:
     """Some default inits.
 
     Following things are done:
@@ -138,7 +150,7 @@ def getprocessnice() -> int:
         return int(nice_value)
 
 
-def setprocessnice(nice_value: int):
+def setprocessnice(nice_value: int) -> None:
     """Set the niceness of the current process.
 
     The nice value can (typically) range from 19, which gives all other

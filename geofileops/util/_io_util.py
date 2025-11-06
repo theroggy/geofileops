@@ -112,7 +112,7 @@ def create_file_atomic_wait(
     path: Union[str, "os.PathLike[Any]"],
     time_between_attempts: float = 1,
     timeout: float = 0,
-):
+) -> None:
     """Create a file in an atomic way.
 
     If it already exists, wait till it can be created.

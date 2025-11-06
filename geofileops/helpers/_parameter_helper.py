@@ -5,7 +5,7 @@ different functions in geofileops.
 """
 
 
-def validate_agg_columns(agg_columns: dict):
+def validate_agg_columns(agg_columns: dict) -> None:
     """Validates if the agg_columns parameter is properly formed.
 
     If an problem is found, an error is raised.

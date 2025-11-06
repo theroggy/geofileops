@@ -44,9 +44,11 @@ def test_get_bool(value, default, expected):
 
 def test_get_bool_invalidvalue():
     test_key = "GFO_TEST_BOOL"
-    with gfo.TempEnv({test_key: "INVALID"}):
-        with pytest.raises(ValueError, match="invalid value for bool configoption"):
-            _ = _configoptions_helper.get_bool(test_key, default="")
+    with (
+        gfo.TempEnv({test_key: "INVALID"}),
+        pytest.raises(ValueError, match="invalid value for bool configoption"),
+    ):
+        _ = _configoptions_helper.get_bool(test_key, default="")
 
 
 @pytest.mark.parametrize(
@@ -111,20 +113,22 @@ def test_configoptions(key, value, expected):
     ],
 )
 def test_configoptions_invalid(key, invalid_value, expected_error):
-    with gfo.TempEnv({key: invalid_value}):
-        with pytest.raises(ValueError, match=expected_error):
-            if key == "GFO_IO_ENGINE":
-                _ = ConfigOptions.io_engine
-            elif key == "GFO_ON_DATA_ERROR":
-                _ = ConfigOptions.on_data_error
-            elif key == "GFO_REMOVE_TEMP_FILES":
-                _ = ConfigOptions.remove_temp_files
-            elif key == "GFO_TMPDIR":
-                _ = ConfigOptions.tmp_dir
-            elif key == "GFO_WORKER_TYPE":
-                _ = ConfigOptions.worker_type
-            else:
-                raise ValueError(f"Unexpected key: {key}")
+    with (
+        gfo.TempEnv({key: invalid_value}),
+        pytest.raises(ValueError, match=expected_error),
+    ):
+        if key == "GFO_IO_ENGINE":
+            _ = ConfigOptions.io_engine
+        elif key == "GFO_ON_DATA_ERROR":
+            _ = ConfigOptions.on_data_error
+        elif key == "GFO_REMOVE_TEMP_FILES":
+            _ = ConfigOptions.remove_temp_files
+        elif key == "GFO_TMPDIR":
+            _ = ConfigOptions.tmp_dir
+        elif key == "GFO_WORKER_TYPE":
+            _ = ConfigOptions.worker_type
+        else:
+            raise ValueError(f"Unexpected key: {key}")
 
 
 def test_configoptions_tmpdir(tmp_path):

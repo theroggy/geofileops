@@ -34,66 +34,47 @@ extend-exclude = ["docs/conf.py", "local_ignore/*"]
 
 [tool.ruff.lint]
 select = [
-    "F",  # pyflakes
-    "E",  # pycodestyle
-    "W",
-    "UP",  # pyupgrade
+    "YTT",  # flake8-2020
+    "ANN",  # flake8-annotations
     "B",  # flake8-bugbear
-    "PTH",  # flake8-pathlib
+    "A",  # flake8-builtins
+    "C4",  # flake8-comprehensions
     "T10",  # flake8-debugger
+    "ISC",  # flake8-implicit string concatenation
+    # "G",  # flake8-logging-format
+    "PIE",  # flake8-pie misc lints
     # "SIM",  # flake8-simplify
-    "PLC",  # pylint
-    "PLE",
-    "PLR",
-    "PLW",
-    "PIE",  # misc lints
-    "ISC",  # implicit string concatenation
-    "TCH",  # type-checking imports
-    "C4",  # comprehensions
-    "RUF",  # Ruff-specific rules
+    "TC",  # flake8-type-checking imports
+    "ARG",  # flake8-unused-arguments
+    "PTH",  # flake8-use-pathlib
+    "FLY",  # flynt
     "I",  # isort
+    "NPY",  # NumPy-specific rules
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
     "D",  # pydocstyle
+    "F",  # pyflakes
+    "PLC",  # pylint convention
+    "PLE",  # pylint error
+    "PLR",  # pylint refactor
+    "PLW",  # pylint warning
+    "UP",  # pyupgrade
+    "RUF",  # Ruff-specific rules
 ]
 
 ignore = [
     ### Intentionally disabled
-    # module level import not at top of file
-    "E402",
-    # do not assign a lambda expression, use a def
-    "E731",
-    # mutable-argument-default
-    "B006",
-    # unused-loop-control-variable
-    "B007",
-    # get-attr-with-constant
-    "B009",
-    # Only works with python >=3.10
-    "B905",
-    # dict literals
-    "C408",
-    # Too many arguments to function call
-    "PLR0913",
-    # Too many returns
-    "PLR0911",
-    # Too many branches
-    "PLR0912",
-    # Too many statements
-    "PLR0915",
-    # Magic number
-    "PLR2004",
-    # Redefined loop name
-    "PLW2901",
-    # Global statements are discouraged
-    "PLW0603",
-    # compare-to-empty-string
-    "PLC1901",
-    # collection-literal-concatenation
-    "RUF005",
+    "PLR0913",  # Too many arguments to function call
+    "PLR0911",  # Too many returns
+    "PLR0912",  # Too many branches
+    "PLR0915",  # Too many statements
+    "PLR2004",  # Magic number
+    "PLW2901",  # loop variable overwritten by assignment target
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D"]
-"perftests/*" = ["D"]
+"tests/*" = ["ANN", "D"]
+"perftests/*" = ["ANN", "D"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

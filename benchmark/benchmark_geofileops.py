@@ -3,7 +3,7 @@
 from benchmark import benchmarker
 
 
-def main():
+def main() -> None:
     """Run the benchmark function(s)."""
     functions_to_run = [
         # "buffer_spatialite",
