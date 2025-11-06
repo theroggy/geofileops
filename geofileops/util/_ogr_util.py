@@ -7,6 +7,7 @@ import warnings
 from collections.abc import Iterable
 from pathlib import Path
 from threading import Lock
+from types import TracebackType
 from typing import Any, Literal, Union
 
 from osgeo import gdal, ogr
@@ -31,15 +32,17 @@ class GDALError(Exception):
     def __init__(
         self,
         message: str,
-        log_details: list[str] = [],
-        error_details: list[str] = [],
-    ):
+        log_details: list[str] | None = None,
+        error_details: list[str] | None = None,
+    ) -> None:
+        log_details = log_details or []
+        error_details = error_details or []
         self.message = message
         self.log_details = log_details
         self.error_details = error_details
         super().__init__(self.message)
 
-    def __str__(self):
+    def __str__(self) -> str:
         retstring = ""
         if len(self.error_details) > 0:
             retstring += "\n    GDAL CPL_LOG ERRORS"
@@ -246,13 +249,14 @@ class VectorTranslateInfo:
         transaction_size: int = 65536,
         explodecollections: bool = False,
         force_output_geometrytype: GeometryType | str | Iterable[str] | None = None,
-        options: dict = {},
+        options: dict | None = None,
         columns: Iterable[str] | None = None,
         warp: dict | None = None,
         preserve_fid: bool | None = None,
         dst_dimensions: str | None = None,
         add_fields: bool = False,
-    ):
+    ) -> None:
+        options = options or {}
         self.input_path = input_path
         self.output_path = output_path
         self.input_layers = input_layers
@@ -277,7 +281,7 @@ class VectorTranslateInfo:
         self.add_fields = add_fields
 
 
-def vector_translate_by_info(info: VectorTranslateInfo):
+def vector_translate_by_info(info: VectorTranslateInfo) -> bool:
     return vector_translate(
         input_path=info.input_path,
         output_path=info.output_path,
@@ -321,7 +325,7 @@ def vector_translate(
     transaction_size: int = 65536,
     explodecollections: bool = False,
     force_output_geometrytype: GeometryType | str | Iterable[str] | None = None,
-    options: dict = {},
+    options: dict | None = None,
     columns: Iterable[str] | None = None,
     warp: dict | None = None,
     preserve_fid: bool | None = None,
@@ -330,6 +334,7 @@ def vector_translate(
 ) -> bool:
     # API Doc of VectorTranslateOptions:
     #   https://gdal.org/en/stable/api/python/utilities.html#osgeo.gdal.VectorTranslateOptions
+    options = options or {}
     args = []
     if isinstance(input_path, Path):
         input_path = input_path.as_posix()
@@ -404,10 +409,12 @@ def vector_translate(
     datasetCreationOptions = []
     if access_mode is None:
         dataset_creation_options = gdal_options["DATASET_CREATION"]
-        if output_info.driver == "SQLite":
-            # If SQLite file, use the spatialite type of sqlite by default
-            if "SPATIALITE" not in dataset_creation_options:
-                dataset_creation_options["SPATIALITE"] = "YES"
+        # If SQLite file, use the spatialite type of sqlite by default
+        if (
+            output_info.driver == "SQLite"
+            and "SPATIALITE" not in dataset_creation_options
+        ):
+            dataset_creation_options["SPATIALITE"] = "YES"
         for option_name, value in dataset_creation_options.items():
             datasetCreationOptions.extend([f"{option_name}={value}"])
 
@@ -454,10 +461,12 @@ def vector_translate(
     # Remark: passing them as parameter using --config doesn't work, but they are set as
     # runtime config options later on (using a context manager).
     config_options = dict(gdal_options["CONFIG"])
-    if input_info.is_spatialite_based or output_info.is_spatialite_based:
-        # If spatialite based file, increase SQLITE cache size by default
-        if "OGR_SQLITE_CACHE" not in config_options:
-            config_options["OGR_SQLITE_CACHE"] = "128"
+
+    # If spatialite based file, increase SQLITE cache size by default
+    if (
+        input_info.is_spatialite_based or output_info.is_spatialite_based
+    ) and "OGR_SQLITE_CACHE" not in config_options:
+        config_options["OGR_SQLITE_CACHE"] = "128"
 
     # Have gdal throw exception on error
     gdal.UseExceptions()
@@ -690,7 +699,7 @@ def _validate_file(
     layer: str | None,
     input_has_geometry_attribute: bool,
     input_has_geom_attribute: bool,
-):
+) -> bool | None:
     """Validate and fix a GPKG file.
 
     Two things are checked and fixed if needed:
@@ -705,9 +714,13 @@ def _validate_file(
             attribute column.
         input_has_geom_attribute (bool): True if the input file has a geom attribute
             column.
+
+    Returns:
+        Returns True if the file is valid (now), False if it is not valid and could not
+        be fixed or None if the file does not exist (anymore).
     """
     if not fileops._vsi_exists(path):
-        return
+        return None
 
     try:
         try:
@@ -743,7 +756,7 @@ def _validate_file(
 
             output_ds = None
             gfo.remove(path)
-            return False
+            return None
 
         else:
             result_layer = None
@@ -796,10 +809,15 @@ def _validate_file(
             "Opening output file gave error, so remove it. Probably the input file was "
             f"empty, no rows were selected, geom was NULL or the SQL was invalid: {ex}"
         )
+        output_ds = None
         gfo.remove(path)
+
+        return None
 
     finally:
         output_ds = None
+
+    return True
 
 
 def _prepare_gdal_options(options: dict, split_by_option_type: bool = False) -> dict:
@@ -880,10 +898,10 @@ class set_config_options:
             `Eg. { "OGR_SQLITE_CACHE", 128 }`
     """
 
-    def __init__(self, config_options: dict):
+    def __init__(self, config_options: dict) -> None:
         self.config_options = config_options
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         # TODO: uncomment if GetConfigOptions() is supported
         # self.config_options_backup = gdal.GetConfigOptions()
         for name, value in self.config_options.items():
@@ -896,7 +914,12 @@ class set_config_options:
                 value = str(value)
             gdal.SetConfigOption(str(name), value)
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(
+        self,
+        type: type,  # noqa: A002
+        value: Exception | None,
+        traceback: TracebackType | None,
+    ) -> None:
         # Remove config options that were set
         # TODO: delete loop + uncomment if SetConfigOptions() is supported
         for name, _ in self.config_options.items():

@@ -4,6 +4,7 @@ import datetime
 import logging
 import os
 from collections.abc import Iterable
+from types import TracebackType
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ class MissingRuntimeDependencyError(RuntimeError):
         message (str): Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         self.message = message
         super().__init__(self.message)
 
@@ -82,7 +83,7 @@ def report_progress(
     nb_todo: int,
     operation: str | None = None,
     nb_parallel: int = 1,
-):
+) -> None:
     # If logging level not enabled for INFO, no progress reporting...
     if logger.isEnabledFor(logging.INFO) is False:
         return
@@ -145,9 +146,9 @@ def format_progress(
         return message
 
 
-def formatbytes(bytes: float):
+def formatbytes(nb_bytes: float) -> str:
     """Return the given bytes as a human friendly KB, MB, GB, or TB string."""
-    bytes_float = float(bytes)
+    bytes_float = float(nb_bytes)
     KB = float(1024)
     MB = float(KB**2)  # 1,048,576
     GB = float(KB**3)  # 1,073,741,824
@@ -161,7 +162,7 @@ def formatbytes(bytes: float):
         return f"{bytes_float / MB:.2f} MB"
     elif GB <= bytes_float < TB:
         return f"{bytes_float / GB:.2f} GB"
-    elif TB <= bytes_float:
+    else:
         return f"{bytes_float / TB:.2f} TB"
 
 
@@ -190,11 +191,11 @@ class TempEnv:
         envs (Dict[str, Any]): dict with environment variables to set.
     """
 
-    def __init__(self, envs: dict[str, Any]):
+    def __init__(self, envs: dict[str, Any]) -> None:
         self._envs_backup: dict[str, str] = {}
         self._envs = envs
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         # Only if a name and value is specified...
         for name, value in self._envs.items():
             # If the environment variable is already defined, make backup
@@ -208,13 +209,12 @@ class TempEnv:
             else:
                 os.environ[name] = str(value)
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type: type, value: Exception, traceback: TracebackType) -> None:  # noqa: A002
         # Set variables that were backed up back to original value
         for name, env_value in self._envs_backup.items():
             # Recover backed up value
             os.environ[name] = env_value
         # For variables without backup, remove them
         for name, _ in self._envs.items():
-            if name not in self._envs_backup:
-                if name in os.environ:
-                    del os.environ[name]
+            if name not in self._envs_backup and name in os.environ:
+                del os.environ[name]

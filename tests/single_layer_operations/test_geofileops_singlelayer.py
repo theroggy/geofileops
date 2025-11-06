@@ -38,13 +38,13 @@ GEOOPS_MODULES = [
 
 
 def set_geoops_module(geoops_module: str):
-    global current_geoops_module
+    global current_geoops_module  # noqa: PLW0603
     if current_geoops_module == geoops_module:
         # The right module is already loaded, so don't do anything
         return
     else:
         # Load the desired module as fileops
-        global geoops
+        global geoops  # noqa: PLW0603
         geoops = import_module(geoops_module, __package__)
         current_geoops_module = geoops_module
         print(f"gfo module switched to: {current_geoops_module}")
@@ -268,7 +268,8 @@ def test_buffer_basic(
     # More detailed check
     output_gdf = fileops.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
-    check_less_precise = True if input_layerinfo.crs.is_projected is False else False
+    # Check less precise for geographic CRS (WGS84)
+    check_less_precise = not input_layerinfo.crs.is_projected
     assert_geodataframe_equal(
         output_gdf,
         expected_gdf,
@@ -469,14 +470,14 @@ def test_buffer_layer_special_cases(tmp_path, suffix, geoops_module):
 def test_buffer_negative(
     tmp_path,
     suffix,
-    epsg,
+    epsg,  # noqa: ARG001
     geoops_module,
     testfile,
-    empty_input,
+    empty_input,  # noqa: ARG001
     gridsize,
     keep_empty_geoms,
     where_post,
-    dimensions,
+    dimensions,  # noqa: ARG001
 ):
     """Buffer basics are available both in the gpd and sql implementations."""
     input_path = test_helper.get_testfile(testfile, suffix=suffix)
@@ -1153,7 +1154,7 @@ def test_simplify(
     gridsize,
     keep_empty_geoms,
     where_post,
-    dimensions,
+    dimensions,  # noqa: ARG001
 ):
     # Prepare test data
     tmp_dir = tmp_path / f"{geoops_module}_{epsg}"
@@ -1166,11 +1167,8 @@ def test_simplify(
     input_layerinfo = fileops.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
     assert input_layerinfo.crs is not None
-    if input_layerinfo.crs.is_projected:
-        tolerance = 5
-    else:
-        # 1 degree = 111 km or 111000 m
-        tolerance = 5 / 111000
+    # 1 degree = 111 km or 111000 m
+    tolerance = 5 if input_layerinfo.crs.is_projected else 5 / 111000
     keep_empty_geoms_prepped = False if keep_empty_geoms is None else keep_empty_geoms
 
     # Prepare expected result

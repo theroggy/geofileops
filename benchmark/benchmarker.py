@@ -33,7 +33,7 @@ class RunResult:
         operation_descr: str,
         secs_taken: float,
         run_details: dict | None = None,
-    ):
+    ) -> None:
         """Constructor for a RunResult.
 
         Args:
@@ -53,7 +53,7 @@ class RunResult:
         self.secs_taken = secs_taken
         self.run_details = run_details
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Format the result."""
         return f"{self.__class__}({self.__dict__})"
 
@@ -61,7 +61,7 @@ class RunResult:
 def run_benchmarks(
     modules_to_run: list[str] | None = None,
     functions_to_run: list[str] | None = None,
-):
+) -> None:
     """Run all benchmarks specified.
 
     Args:

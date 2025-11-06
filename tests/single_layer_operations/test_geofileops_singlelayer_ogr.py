@@ -30,7 +30,7 @@ def test_clip_by_geometry(tmp_path, suffix, clip_geometry, exp_featurecount):
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
     # For Geopackage, also test if fid is properly preserved
-    preserve_fid = True if suffix == ".gpkg" else False
+    preserve_fid = suffix == ".gpkg"
 
     # Do operation
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
@@ -69,13 +69,13 @@ def test_export_by_bounds(tmp_path, suffix):
     input_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
     # For Geopackage, also test if fid is properly preserved
-    preserve_fid = True if suffix == ".gpkg" else False
+    preserve_fid = suffix == ".gpkg"
 
     # Do operation
     output_path = tmp_path / f"{input_path.stem}-output{suffix}"
-    filter = (156036, 196691, 156368, 196927)
+    bounds_filter = (156036, 196691, 156368, 196927)
     gfo.export_by_bounds(
-        input_path=str(input_path), output_path=str(output_path), bounds=filter
+        input_path=str(input_path), output_path=str(output_path), bounds=bounds_filter
     )
 
     # Now check if the output file is correctly created

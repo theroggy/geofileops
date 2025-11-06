@@ -10,11 +10,13 @@
 
 - Add `concat` function (#746, #747)
 - Add `join` function (#751)
-- Add `write_mode="append_add_fields"` option to `copy_layer` (#750)
+- Add `add_columns` function (#768)
 - Add `zip_geofile` and `unzip_geofile` functions (#754, #743)
+- Add `write_mode="append_add_fields"` option to `copy_layer` (#750)
 - Add an `include_duplicates` parameter to `union`, `intersection` and `identity` (#757)
 - Add support for ".gpkg.zip" and ".shp.zip" input and output files for geo operations
   (#754)
+- Add support to use `add_column` on e.g. shapefiles (#767)
 - Improve performance of clip with a complex clip layer (#740)
 - Improve performance of most operations by using a direct gpkg to gpkg append via
   sqlite where possible (#728)
@@ -35,6 +37,7 @@
 - `copy_layer` should give an error if `src_layer` is not specified for multi-layer src
   files (#745)
 - Fix error when custom `output_layer` is specified in single layer operations (#760)
+- Fix error in `copy_file` if `dst` has a suffix with multiple available drivers (#765)
 
 ## 0.10.2 (2025-08-20)
 

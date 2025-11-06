@@ -103,15 +103,15 @@ def test_concat_columns_empty(tmp_path):
     files.
     """
     # Prepare test data
-    input = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
 
     # Test
-    output = tmp_path / "output.gpkg"
-    gfo.concat([input, input], output, columns=[])
+    output_path = tmp_path / "output.gpkg"
+    gfo.concat([input_path, input_path], output_path, columns=[])
 
     # Now check result file
-    input_info = gfo.get_layerinfo(input)
-    output_info = gfo.get_layerinfo(output)
+    input_info = gfo.get_layerinfo(input_path)
+    output_info = gfo.get_layerinfo(output_path)
 
     exp_featurecount = input_info.featurecount * 2
     assert output_info.featurecount == exp_featurecount
@@ -122,18 +122,18 @@ def test_concat_columns_empty(tmp_path):
 def test_concat_explodecollections(tmp_path):
     """Test the concat function with explodecollections."""
     # Prepare test data
-    input = test_helper.get_testfile("polygon-parcel")
+    input_path = test_helper.get_testfile("polygon-parcel")
     input_expl = tmp_path / "input_exploded.gpkg"
-    gfo.copy_layer(input, input_expl, explodecollections=True)
+    gfo.copy_layer(input_path, input_expl, explodecollections=True)
 
     # Test
-    output = tmp_path / "output.gpkg"
-    gfo.concat([input_expl, input_expl], output, explodecollections=True)
+    output_path = tmp_path / "output.gpkg"
+    gfo.concat([input_expl, input_expl], output_path, explodecollections=True)
 
     # Now check the result file
-    input_info = gfo.get_layerinfo(input)
+    input_info = gfo.get_layerinfo(input_path)
     input_expl_info = gfo.get_layerinfo(input_expl)
-    output_info = gfo.get_layerinfo(output)
+    output_info = gfo.get_layerinfo(output_path)
 
     # Make sure the input file contains multipolygons
     assert input_info.geometrytypename == "MULTIPOLYGON"
@@ -209,26 +209,26 @@ def test_concat_input1_more_columns(tmp_path):
 def test_concat_invalid_input(tmp_path):
     """Test the concat function with invalid input."""
     # Prepare test data
-    input = test_helper.get_testfile("polygon-parcel")
+    input_path = test_helper.get_testfile("polygon-parcel")
 
     # Test
-    output = tmp_path / "output.gpkg"
+    output_path = tmp_path / "output.gpkg"
     with pytest.raises(
         ValueError,
         match="input_layers must have the same length as input_paths if it is a list",
     ):
-        gfo.concat([input, input], output, input_layers=["lines"])
+        gfo.concat([input_path, input_path], output_path, input_layers=["lines"])
 
 
 def test_concat_output_exists(tmp_path):
     """Test the concat function with an existing output file."""
     # Prepare test data
-    input = test_helper.get_testfile("polygon-parcel")
-    output = tmp_path / "output.gpkg"
-    output.touch()
+    input_path = test_helper.get_testfile("polygon-parcel")
+    output_path = tmp_path / "output.gpkg"
+    output_path.touch()
 
     # Test
-    gfo.concat([input, input], output)
+    gfo.concat([input_path, input_path], output_path)
 
     # The test file should not be overwritten/changed.
-    assert output.stat().st_size == 0
+    assert output_path.stat().st_size == 0

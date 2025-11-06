@@ -84,7 +84,7 @@ from geofileops.util import _ogr_sql_util
     ],
 )
 def test_ColumnFormatter(
-    descr: str,
+    descr: str,  # noqa: ARG001
     columns_specified: list[str] | None,
     columns_available: Iterable[str],
     table_alias: str,

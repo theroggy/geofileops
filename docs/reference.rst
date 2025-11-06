@@ -61,6 +61,7 @@ General layer operations
 
    append_to
    add_column
+   add_columns
    add_layerstyle
    concat
    copy_layer

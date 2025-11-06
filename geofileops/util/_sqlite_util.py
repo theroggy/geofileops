@@ -34,7 +34,7 @@ class EmptyResultError(Exception):
         message (str): Exception message
     """
 
-    def __init__(self, message):
+    def __init__(self, message: str) -> None:
         self.message = message
         super().__init__(self.message)
 
@@ -96,7 +96,11 @@ class SqliteProfile(enum.Enum):
     SPEED = 1
 
 
-def add_gpkg_ogr_contents(database: Any, layer: str | None, force_update: bool = False):
+def add_gpkg_ogr_contents(
+    database: Union[str, "os.PathLike[Any]", sqlite3.Connection],
+    layer: str | None,
+    force_update: bool = False,
+) -> None:
     """Add a layer to the gpkg_ogr_contents table in a geopackage.
 
     If the table doesn't exist yet, it will be created.
@@ -112,9 +116,6 @@ def add_gpkg_ogr_contents(database: Any, layer: str | None, force_update: bool =
 
     Raises:
         RuntimeError: an error occured while creating the table.
-
-    Returns:
-        None
     """
     if isinstance(database, sqlite3.Connection):
         # If a connection is passed, use it
@@ -374,8 +375,8 @@ def get_columns(
 
     sql = None
     try:
-        if not new_db:
-            # If an existing database is opened, we still need to load spatialite
+        # If an existing database is opened, we still need to load spatialite
+        if not new_db and use_spatialite:
             load_spatialite(conn)
 
         if filetype == "gpkg":
@@ -393,7 +394,7 @@ def get_columns(
             conn.execute(sql, dbSpec)
 
         # Set some default performance options
-        database_names = ["main"] + list(input_databases.keys())
+        database_names = ["main", *list(input_databases.keys())]
         set_performance_options(conn, SqliteProfile.SPEED, database_names)
 
         # Start transaction manually needed for performance
@@ -500,9 +501,8 @@ def get_columns(
     finally:
         conn.close()
         conn = None
-        if ConfigOptions.remove_temp_files:
-            if tmp_dir is not None:
-                shutil.rmtree(tmp_dir, ignore_errors=True)
+        if ConfigOptions.remove_temp_files and tmp_dir is not None:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     time_taken = time.perf_counter() - start
     if time_taken > 5:  # pragma: no cover
@@ -628,7 +628,7 @@ def create_table_as_sql(
     empty_output_ok: bool = True,
     column_datatypes: dict | None = None,
     profile: SqliteProfile = SqliteProfile.DEFAULT,
-):
+) -> None:
     """Execute sql statement and save the result in the output file.
 
     Args:
@@ -701,11 +701,11 @@ def create_table_as_sql(
     sql = None
     try:
 
-        def to_string_for_sql(input) -> str:
-            if input is None:
+        def to_string_for_sql(value: object) -> str:
+            if value is None:
                 return "NULL"
             else:
-                return str(input)
+                return str(value)
 
         # Connect to output database file so it is main, otherwise the
         # gpkg... functions don't work
@@ -727,7 +727,7 @@ def create_table_as_sql(
             conn.execute(sql, dbSpec)
 
         # Set some default performance options
-        database_names = [output_databasename] + list(input_databases.keys())
+        database_names = [output_databasename, *list(input_databases.keys())]
         set_performance_options(conn, profile, database_names)
 
         # Start transaction manually needed for performance
@@ -902,7 +902,9 @@ def create_table_as_sql(
             conn = None
 
 
-def execute_sql(path: Path, sql_stmt: str | list[str], use_spatialite: bool = True):
+def execute_sql(
+    path: Path, sql_stmt: str | list[str], use_spatialite: bool = True
+) -> None:
     # Connect to database file
     conn = sqlite3.connect(path)
     sql = None
@@ -1011,7 +1013,7 @@ def get_tables(path: Path) -> list[str]:
     return tables
 
 
-def test_data_integrity(path: Path, use_spatialite: bool = True):
+def test_data_integrity(path: Path, use_spatialite: bool = True) -> None:
     # Get list of layers in database
     layers = gfo.listlayers(path=path)
 
@@ -1051,8 +1053,10 @@ def test_data_integrity(path: Path, use_spatialite: bool = True):
 def set_performance_options(
     conn: sqlite3.Connection,
     profile: SqliteProfile | None = None,
-    database_names: list[str] = [],
-):
+    database_names: list[str] | None = None,
+) -> None:
+    """Set some performance related PRAGMA's on the sqlite connection."""
+    database_names = database_names or []
     try:
         # Set cache size to 128 MB (in kibibytes)
         sql = "PRAGMA cache_size=-128000;"
@@ -1087,11 +1091,11 @@ def set_performance_options(
         raise RuntimeError(f"Error executing {sql}: {ex}") from ex
 
 
-def load_spatialite(conn):
+def load_spatialite(conn: sqlite3.Connection) -> None:
     """Load mod_spatialite for an existing sqlite connection.
 
     Args:
-        conn ([type]): Sqlite connection
+        conn (sqlite3.Connection): Sqlite connection
     """
     conn.enable_load_extension(True)
     try:

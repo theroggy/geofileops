@@ -163,7 +163,7 @@ def _harmonize_to_multitype(
 
 
 def set_precision(
-    geometry,
+    geometry,  # noqa: ANN001
     grid_size: float,
     mode: str = "valid_output",
     raise_on_topoerror: bool = True,
