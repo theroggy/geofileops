@@ -26,10 +26,10 @@ input_wkts_2 = [
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize(
-    "columns, gridsize, where_post, subdivide_coords, exp_featurecount",
+    "columns, gridsize, where_post, subdivide_coords, fid_column, exp_featurecount",
     [
-        (["OIDN", "UIDN"], 0.0, "ST_Area(geom) > 2000", 0, 25),
-        (None, 0.01, None, 10, 27),
+        (["OIDN", "UIDN"], 0.0, "ST_Area(geom) > 2000", 0, "fid", 25),
+        (None, 0.01, None, 10, "fid_custom", 27),
     ],
 )
 def test_export_by_location(
@@ -39,10 +39,11 @@ def test_export_by_location(
     gridsize,
     where_post,
     subdivide_coords,
+    fid_column,
     exp_featurecount,
 ):
     input_to_select_from_path = test_helper.get_testfile(
-        "polygon-parcel", suffix=suffix
+        "polygon-parcel", suffix=suffix, fid_column=fid_column
     )
     input_to_compare_with_path = test_helper.get_testfile("polygon-zone", suffix=suffix)
     output_path = tmp_path / f"{input_to_select_from_path.stem}-output{suffix}"

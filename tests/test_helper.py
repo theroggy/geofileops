@@ -116,8 +116,28 @@ def get_testfile(
     empty: bool = False,
     dimensions: str | None = None,
     explodecollections: bool = False,
-    read_only: bool | None = None,
+    read_only: bool = False,
+    fid_column: str | None = None,
 ) -> Path:
+    """Get a testfile, possibly converting it to another CRS, filetype, etc.
+
+    Args:
+        testfile: Name of the testfile (without extension)
+        dst_dir: Destination directory where the prepared testfile should be stored.
+            If None, the path to the readonly cached version of the file is returned.
+        suffix: Suffix of the prepared testfile (e.g. .gpkg, .shp, .csv, etc)
+        epsg: EPSG code of the prepared testfile
+        empty: If True, prepare an empty testfile (no features)
+        dimensions: If not None, prepare the testfile with the given dimensions
+            (e.g. 'XYZ')
+        explodecollections: If True, explode geometry collections in the prepared
+            testfile.
+        read_only: If True, set the prepared testfile to read-only. If False,
+            set it to read-write. If `dst_dir` is None, this parameter is ignored
+            and the file is always set to read-only.
+        fid_column: If not None, set the FID column to the given name. If None, the
+            default FID column is used. Defaults to None.
+    """
     if dst_dir is None:
         read_only = True
 
@@ -129,6 +149,7 @@ def get_testfile(
         empty=empty,
         dimensions=dimensions,
         explodecollections=explodecollections,
+        fid_column=fid_column,
     )
 
     # Make input read-only
@@ -146,6 +167,7 @@ def _get_testfile(
     empty: bool = False,
     dimensions: str | None = None,
     explodecollections: bool = False,
+    fid_column: str | None = None,
 ) -> Path:
     if suffix.lower() in (".gpkg.zip", ".shp.zip") and not GDAL_GTE_311:
         pytest.skip("geo_sozip support requires gdal>=3.11")
@@ -163,8 +185,10 @@ def _get_testfile(
 
     # Prepare file + return
     empty_str = "_empty" if empty else ""
+    fid_column_str = f"_{fid_column}" if fid_column is not None else ""
     prepared_path = (
-        dst_dir / f"{testfile_path.stem}_{epsg}_{dimensions}{empty_str}{suffix}"
+        dst_dir
+        / f"{testfile_path.stem}_{epsg}_{dimensions}{empty_str}{fid_column_str}{suffix}"
     )
     if prepared_path.exists():
         return prepared_path
@@ -204,6 +228,9 @@ def _get_testfile(
                 dst_layer = src_layer
                 preserve_fid = not explodecollections
 
+            options = {}
+            if fid_column is not None:
+                options["LAYER_CREATION.FID"] = fid_column
             gfo.copy_layer(
                 testfile_path,
                 tmp_path,
@@ -215,6 +242,7 @@ def _get_testfile(
                 preserve_fid=preserve_fid,
                 dst_dimensions=dimensions,
                 explodecollections=explodecollections,
+                options=options,
             )
 
             if empty:
