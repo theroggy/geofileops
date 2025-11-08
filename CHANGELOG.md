@@ -27,6 +27,7 @@
 - Improve and speed up attribute column type detection in two-layer operations (#758)
 - Ensure that the featurecount is properly cached in GPKG files, also for older GDAL
   versions + small refactor (#693)
+- Improve support for custom fid columns in gpkg (#771)
 - Add checks on invalid values in `ConfigOptions` (#711)
 - Add worker_type used to progress logging (#715)
 - Write gdal log files to `GFO_TMPDIR` if specified (#727)

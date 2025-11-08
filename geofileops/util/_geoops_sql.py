@@ -1201,50 +1201,50 @@ def difference(  # noqa: D417
                     {{layer1_columns_prefix_alias_str}}
                     {{layer2_columns_prefix_alias_null_str}}
                 FROM (
-                    SELECT layer1_fid_orig, ST_Union(geom) AS geom FROM (
-                    SELECT fid_1 AS layer1_fid_orig
-                            ,IFNULL(
-                            ( SELECT IFNULL(
-                                        IIF(COUNT(layer2_sub.rowid) = 0,
-                                            layer1_subdiv.{{input1_subdiv_geometrycolumn}},
-                                            ST_CollectionExtract(
-                                                ST_difference(
-                                                    layer1_subdiv.{{input1_subdiv_geometrycolumn}},
-                                                    ST_Union(layer2_sub.{{input2_geometrycolumn}})
-                                                ),
-                                                {primitivetypeid}
-                                            )
-                                        ),
-                                        'DIFF_EMPTY'
-                                        ) AS diff_geom
-                                FROM {{input1_subdiv_databasename}}."{input1_subdiv_layer_rtree}" layer1tree
-                                JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
-                                JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                                    ON layer2_sub.rowid = layer2tree.id
-                                WHERE {where_clause_self}
-                                    AND layer1tree.id = layer1_subdiv.rowid
-                                    AND layer1tree.minx <= layer2tree.maxx
-                                    AND layer1tree.maxx >= layer2tree.minx
-                                    AND layer1tree.miny <= layer2tree.maxy
-                                    AND layer1tree.maxy >= layer2tree.miny
-                                    AND ST_intersects(layer1_subdiv.{{input1_subdiv_geometrycolumn}},
-                                                    layer2_sub.{{input2_geometrycolumn}}) = 1
-                                LIMIT -1 OFFSET 0
-                            ),
-                            layer1_subdiv.{{input1_subdiv_geometrycolumn}}
-                            ) AS geom
-                        FROM {{input1_subdiv_databasename}}."{{input1_layer}}" layer1_subdiv
-                    WHERE 1=1
-                        {{batch_filter}}
-                    LIMIT -1 OFFSET 0
+                    SELECT layer1_rowid_orig, ST_Union(geom) AS geom FROM (
+                        SELECT fid_1 AS layer1_rowid_orig
+                                ,IFNULL(
+                                ( SELECT IFNULL(
+                                            IIF(COUNT(layer2_sub.rowid) = 0,
+                                                layer1_subdiv.{{input1_subdiv_geometrycolumn}},
+                                                ST_CollectionExtract(
+                                                    ST_difference(
+                                                        layer1_subdiv.{{input1_subdiv_geometrycolumn}},
+                                                        ST_Union(layer2_sub.{{input2_geometrycolumn}})
+                                                    ),
+                                                    {primitivetypeid}
+                                                )
+                                            ),
+                                            'DIFF_EMPTY'
+                                            ) AS diff_geom
+                                    FROM {{input1_subdiv_databasename}}."{input1_subdiv_layer_rtree}" layer1tree
+                                    JOIN {{input2_databasename}}."{{input2_layer}}" layer2_sub
+                                    JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
+                                        ON layer2_sub.rowid = layer2tree.id
+                                    WHERE {where_clause_self}
+                                        AND layer1tree.id = layer1_subdiv.rowid
+                                        AND layer1tree.minx <= layer2tree.maxx
+                                        AND layer1tree.maxx >= layer2tree.minx
+                                        AND layer1tree.miny <= layer2tree.maxy
+                                        AND layer1tree.maxy >= layer2tree.miny
+                                        AND ST_intersects(layer1_subdiv.{{input1_subdiv_geometrycolumn}},
+                                                        layer2_sub.{{input2_geometrycolumn}}) = 1
+                                    LIMIT -1 OFFSET 0
+                                ),
+                                layer1_subdiv.{{input1_subdiv_geometrycolumn}}
+                                ) AS geom
+                            FROM {{input1_subdiv_databasename}}."{{input1_layer}}" layer1_subdiv
+                        WHERE 1=1
+                            {{batch_filter}}
+                        LIMIT -1 OFFSET 0
                     )
                     WHERE geom IS NOT NULL
                     AND geom <> 'DIFF_EMPTY'
                     AND ST_IsEmpty(geom) = 0
-                    GROUP BY layer1_fid_orig
+                    GROUP BY layer1_rowid_orig
                     ) differenced
                     JOIN {{input1_databasename}}."{{input1_layer}}" layer1
-                        ON layer1.fid = differenced.layer1_fid_orig
+                        ON layer1.rowid = differenced.layer1_rowid_orig
             """  # noqa: E501
 
         # Go!
@@ -1888,10 +1888,10 @@ def intersection(  # noqa: D417
                             {{layer2_columns_prefix_alias_str}}
                         FROM {{input1_databasename}}."{{input1_layer}}" layer1
                         JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-                        ON layer1.fid = layer1tree.id
+                        ON layer1.rowid = layer1tree.id
                         JOIN {{input2_databasename}}."{{input2_layer}}" layer2
                         JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                        ON layer2.fid = layer2tree.id
+                        ON layer2.rowid = layer2tree.id
                     WHERE {where_clause_self}
                         {{batch_filter}}
                         AND layer1tree.minx <= layer2tree.maxx
@@ -1917,12 +1917,12 @@ def intersection(  # noqa: D417
             if input1_subdivided_path is None:
                 # input1 layer was not subdivided, so use the original input1 layer
                 input1_subdiv_databasename = "{input1_databasename}"
-                input1_subdiv_fid_orig = "fid"
+                input1_subdiv_rowid_orig = "rowid"
                 input1_subdiv_geometrycolumn = "{input1_geometrycolumn}"
                 input1_subdiv_layer_rtree = input1_layer_rtree
             else:
                 input1_subdiv_databasename = "{input1_subdiv_databasename}"
-                input1_subdiv_fid_orig = "fid_1"
+                input1_subdiv_rowid_orig = "fid_1"
                 input1_subdiv_geometrycolumn = "{input1_subdiv_geometrycolumn}"
                 input1_subdiv_layer_rtree = (
                     "rtree_{input1_layer}_{input1_subdiv_geometrycolumn}"
@@ -1931,12 +1931,12 @@ def intersection(  # noqa: D417
             if input2_subdivided_path is None:
                 # input2 layer was not subdivided, so use the original input2 layer
                 input2_subdiv_databasename = "{input2_databasename}"
-                input2_subdiv_fid_orig = "fid"
+                input2_subdiv_rowid_orig = "rowid"
                 input2_subdiv_geometrycolumn = "{input2_geometrycolumn}"
                 input2_subdiv_layer_rtree = input2_layer_rtree
             else:
                 input2_subdiv_databasename = "{input2_subdiv_databasename}"
-                input2_subdiv_fid_orig = "fid_1"
+                input2_subdiv_rowid_orig = "fid_1"
                 input2_subdiv_geometrycolumn = "{input2_subdiv_geometrycolumn}"
                 input2_subdiv_layer_rtree = (
                     "rtree_{input2_layer}_{input2_subdiv_geometrycolumn}"
@@ -1947,12 +1947,12 @@ def intersection(  # noqa: D417
                     {{layer1_columns_prefix_alias_str}}
                     {{layer2_columns_prefix_alias_str}}
                 FROM (
-                    SELECT sub.layer1_fid_orig
-                        ,sub.layer2_fid_orig
+                    SELECT sub.layer1_rowid_orig
+                        ,sub.layer2_rowid_orig
                         ,ST_Union(geom) AS geom
                     FROM (
-                        SELECT layer1_subdiv.{input1_subdiv_fid_orig} AS layer1_fid_orig
-                            ,layer2_subdiv.{input2_subdiv_fid_orig} AS layer2_fid_orig
+                        SELECT layer1_subdiv.{input1_subdiv_rowid_orig} AS layer1_rowid_orig
+                            ,layer2_subdiv.{input2_subdiv_rowid_orig} AS layer2_rowid_orig
                             ,ST_CollectionExtract(
                                 ST_Intersection(
                                     layer1_subdiv.{input1_subdiv_geometrycolumn},
@@ -1960,10 +1960,10 @@ def intersection(  # noqa: D417
                                     {primitivetype_to_extract.value}) AS geom
                         FROM {input1_subdiv_databasename}."{{input1_layer}}" layer1_subdiv
                         JOIN {input1_subdiv_databasename}."{input1_subdiv_layer_rtree}" layer1tree
-                            ON layer1_subdiv.fid = layer1tree.id
+                            ON layer1_subdiv.rowid = layer1tree.id
                         JOIN {input2_subdiv_databasename}."{{input2_layer}}" layer2_subdiv
                         JOIN {input2_subdiv_databasename}."{input2_subdiv_layer_rtree}" layer2tree
-                            ON layer2_subdiv.fid = layer2tree.id
+                            ON layer2_subdiv.rowid = layer2tree.id
                         WHERE {where_clause_self}
                         {{batch_filter}}
                         AND layer1tree.minx <= layer2tree.maxx
@@ -1979,12 +1979,12 @@ def intersection(  # noqa: D417
                         LIMIT -1 OFFSET 0
                     ) sub
                 WHERE sub.geom IS NOT NULL
-                GROUP BY sub.layer1_fid_orig, sub.layer2_fid_orig
+                GROUP BY sub.layer1_rowid_orig, sub.layer2_rowid_orig
                 ) intersections
                 JOIN {{input1_databasename}}."{{input1_layer}}" layer1
-                    ON layer1.fid = intersections.layer1_fid_orig
+                    ON layer1.rowid = intersections.layer1_rowid_orig
                 JOIN {{input2_databasename}}."{{input2_layer}}" layer2
-                    ON layer2.fid = intersections.layer2_fid_orig
+                    ON layer2.rowid = intersections.layer2_rowid_orig
             """  # noqa: E501
 
         # Go!
@@ -2171,17 +2171,17 @@ def join_by_location(
                     {area_inters_column_expression}
                 FROM (
                   SELECT layer1.{{input1_geometrycolumn}} AS geom
-                        ,layer1.fid l1_fid
+                        ,layer1.rowid AS l1_rowid
                         ,layer2.{{input2_geometrycolumn}} AS l2_geom
                         {{layer1_columns_prefix_alias_str}}
                         {{layer2_columns_prefix_alias_str}}
                         {spatial_relations_column}
                     FROM {{input1_databasename}}."{{input1_layer}}" layer1
                     JOIN {{input1_databasename}}."{input1_layer_rtree}" layer1tree
-                      ON layer1.fid = layer1tree.id
+                      ON layer1.rowid = layer1tree.id
                     JOIN {{input2_databasename}}."{{input2_layer}}" layer2
                     JOIN {{input2_databasename}}."{input2_layer_rtree}" layer2tree
-                      ON layer2.fid = layer2tree.id
+                      ON layer2.rowid = layer2tree.id
                    WHERE 1=1
                      {{batch_filter}}
                      AND layer1tree.minx <= layer2tree.maxx
@@ -2217,8 +2217,8 @@ def join_by_location(
               FROM {{input1_databasename}}."{{input1_layer}}" layer1
              WHERE 1=1
                {{batch_filter}}
-               AND layer1.fid NOT IN (
-                   SELECT l1_fid FROM layer1_relations_filtered)
+               AND layer1.rowid NOT IN (
+                   SELECT l1_rowid FROM layer1_relations_filtered)
         """
 
     # Pass the columns that won't be read from the input files.
@@ -3392,7 +3392,7 @@ def _two_layer_vector_operation(
 
         elif input2_subdivided_path is not None:
             input1_layer_alias = "layer1_subdiv"
-            filter_column = "fid"
+            filter_column = "rowid"
 
         else:
             input1_layer_alias = "layer1"
