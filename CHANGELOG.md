@@ -19,7 +19,7 @@
 - Add support to use `add_column` on e.g. shapefiles (#767)
 - Improve performance of clip with a complex clip layer (#740)
 - Improve performance of most operations by using a direct gpkg to gpkg append via
-  sqlite where possible (#728)
+  sqlite where possible (#728, #772)
 - Improve performance of the subdividividing used in most two-layer operations (#730)
 - Improve performance of `dissolve` (#748)
 - Improve performance of two-layer operations using `nb_parallel=1` (#692)

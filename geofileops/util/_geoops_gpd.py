@@ -2080,7 +2080,7 @@ def _dissolve_polygons(
         notonborder_gdf = diss_gdf
     else:
         # If not, save the polygons on the border seperately
-        bbox_lines = pygeoops.explode(
+        bbox_lines = shapely.get_parts(
             shapely.boundary(sh_geom.box(bbox[0], bbox[1], bbox[2], bbox[3]))
         )
         bbox_lines_gdf = gpd.GeoDataFrame(geometry=bbox_lines, crs=input_gdf.crs)

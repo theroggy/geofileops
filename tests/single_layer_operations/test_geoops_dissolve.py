@@ -332,8 +332,9 @@ def test_dissolve_polygons(
     else:
         input_path = test_path
 
+    # Use a small enough batchsize so the dissolves uses multiple passes.
     input_layerinfo = gfo.get_layerinfo(input_path)
-    batchsize = math.ceil(input_layerinfo.featurecount / 2)
+    batchsize = math.ceil(input_layerinfo.featurecount / 4)
 
     # Test dissolve polygons with different options for groupby and explodecollections
     # --------------------------------------------------------------------------------

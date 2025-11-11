@@ -15,6 +15,7 @@ import shapely.geometry as sh_geom
 from osgeo import gdal
 from pandas.testing import assert_frame_equal
 from pygeoops import GeometryType
+from shapely import box
 
 import geofileops as gfo
 from geofileops import fileops
@@ -648,6 +649,62 @@ def test_copy_layer_add_layer_shp(tmp_path):
     # Check result
     layer1_info = gfo.get_layerinfo(dst, layer1)
     assert layer1_info.featurecount == 48
+
+
+@pytest.mark.parametrize(
+    "suffix, copy_layer_sqlite_direct",
+    [(".gpkg", True), (".gpkg", False), (".shp", False)],
+)
+def test_copy_layer_append_bounds(tmp_path, suffix, copy_layer_sqlite_direct):
+    """Test appending rows and checking the total bounds of the result file."""
+    if copy_layer_sqlite_direct and suffix != ".gpkg":
+        raise ValueError("copy_layer_sqlite_direct can only be True for .gpkg files.")
+
+    # Prepare test data: use two files with different total_bounds.
+    layer1_path = test_helper.get_testfile(
+        "polygon-parcel", dst_dir=tmp_path, suffix=suffix
+    )
+    layer1 = "parcels" if suffix == ".gpkg" else None
+
+    # For copy_layer_sqlite_direct to be applied, one of (many) prerequisites is that
+    # all columns must have the same column name. To achieve this, set name to "geom".
+    geom_name = "geom" if copy_layer_sqlite_direct else None
+    layer2_path = test_helper.get_testfile(
+        "polygon-zone", suffix=suffix, geom_name=geom_name, dst_dir=tmp_path
+    )
+    # Remove "naam" column as it is not in polygon-parcel
+    gfo.drop_column(layer2_path, column_name="naam")
+    layer2 = "zones" if suffix == ".gpkg" else None
+
+    layer1_info = gfo.get_layerinfo(layer1_path, layer=layer1)
+    layer2_info = gfo.get_layerinfo(layer2_path, layer=layer2)
+
+    # Append layer2 to layer1 file
+    gfo.copy_layer(
+        src=str(layer2_path),
+        dst=str(layer1_path),
+        src_layer=layer2,
+        dst_layer=layer1,
+        write_mode="append",
+    )
+
+    # Check result
+    result_layers = gfo.listlayers(layer1_path)
+    assert len(result_layers) == 1
+    if layer1 is not None:
+        assert result_layers == [layer1]
+    result_info = gfo.get_layerinfo(layer1_path)
+    assert (
+        result_info.featurecount == layer1_info.featurecount + layer2_info.featurecount
+    )
+
+    # Check total bounds
+    exp_total_bounds = sh_geom.MultiPolygon(
+        [box(*layer1_info.total_bounds), box(*layer2_info.total_bounds)]
+    ).bounds
+    exp_total_bounds_rounded = [round(coord) for coord in exp_total_bounds]
+    result_total_bounds_rounded = [round(coord) for coord in result_info.total_bounds]
+    assert result_total_bounds_rounded == exp_total_bounds_rounded
 
 
 @pytest.mark.parametrize("write_mode", ["append", "append_add_fields"])
