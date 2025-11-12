@@ -2185,17 +2185,14 @@ def _dissolve(
     level : int or str or sequence of int or sequence of str, default None
         If the axis is a MultiIndex (hierarchical), group by a
         particular level or levels.
-        .. versionadded:: 0.9.0
     sort : bool, default True
         Sort group keys. Get better performance by turning this off.
         Note this does not influence the order of observations within
         each group. Groupby preserves the order of rows within each group.
-        .. versionadded:: 0.9.0
     observed : bool, default False
         This only applies if any of the groupers are Categoricals.
         If True: only show observed values for categorical groupers.
         If False: show all values for categorical groupers.
-        .. versionadded:: 0.9.0
     dropna : bool, default True
         If True, and if group keys contain NA values, NA values
         together with row/column will be dropped. If False, NA
@@ -2203,7 +2200,6 @@ def _dissolve(
         This parameter is not supported for pandas < 1.1.0.
         A warning will be emitted for earlier pandas versions
         if a non-default value is given for this parameter.
-        .. versionadded:: 0.9.0
 
     Returns:
     -------

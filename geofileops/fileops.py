@@ -578,6 +578,8 @@ def execute_sql(
         * :func:`update_column`: update the values of a column in the layer
         * :func:`add_column`: add a column to the layer, optionally using a SQL
           expression to fill out the values
+        * :func:`add_columns`: add columns to the layer, optionally using a SQL
+          expression to fill out the values
 
     """
     datasource = None
@@ -1133,13 +1135,17 @@ def add_columns(
          on `output_path` will be used to determine `output_layer`.
        - otherwise, the input layername is used/retained.
 
+    .. versionadded:: 0.11.0
+
     Args:
         path (PathLike): Path to the geofile.
         new_columns (list of tuples): list of new columns to add. Each tuple should
             contain 2 or 3 elements: (name, type, optional expression). The `type` can
             be a string or a DataType enum value. The optional `expression` is a SQL
             expression to use to fill out the column value. It should be in SQLite
-            syntax and |spatialite_reference_link| functions can be used.
+            syntax and |spatialite_reference_link| functions can be used. If no
+            expression is provided or if it is None, the column will be created with
+            NULL values.
         layer (str, optional): The layer name. If None and the geofile
             has only one layer, that layer is used. Defaults to None.
         output_path (PathLike, optional): If specified, the modified file is written
@@ -1153,7 +1159,37 @@ def add_columns(
         force_update (bool, optional): If a column already exists, execute
             the update expression even if it means overwriting existing data.
             Defaults to False.
-    """
+
+    See Also:
+        * :func:`add_column`: add a single column to the layer
+        * :func:`update_column`: update a column of the layer
+
+    Examples:
+        To add multiple columns at once, some with an expression to fill out the values:
+
+        .. code-block:: python
+
+            new_columns = [
+                ("area", "REAL", "ST_Area(geom)"),
+                ("type_id", "INTEGER",
+                    '''
+                    CASE
+                        WHEN "type" = 'A' THEN 1
+                        WHEN "type" = 'B' THEN 2
+                        ELSE 3
+                    END
+                    '''),
+                ("new_text", "TEXT", "'text_to_fill_out'"),
+                ("new_real_null", "REAL"),
+            ]
+            gfo.add_columns("file.gpkg", new_columns, layer="my_layer")
+
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     # Validate input parameters
     if output_layer is not None and output_path is None:
         raise ValueError("output_layer can only be used together with output_path")
@@ -2785,7 +2821,9 @@ def copy_layer(
     dst: Union[str, "os.PathLike[Any]"],
     src_layer: str | LayerInfo | None = None,
     dst_layer: str | None = None,
-    write_mode: str = "create",
+    write_mode: Literal[
+        "create", "add_layer", "append", "append_add_fields"
+    ] = "create",
     src_crs: str | int | None = None,
     dst_crs: str | int | None = None,
     columns: Iterable[str] | None = None,
@@ -2870,6 +2908,9 @@ def copy_layer(
                 If the file already contains layers named differently than the default
                 layer name for the file, `dst_layer` becomes mandatory.
 
+            .. versionadded:: 0.10.0
+            .. versionchanged:: 0.11.0
+               Added "append_add_fields" write mode.
         src_crs (Union[str, int], optional): an epsg int or anything supported
             by the OGRSpatialReference.SetFromUserInput() call, which includes
             an EPSG string (eg. "EPSG:4326"), a well known text (WKT) CRS
@@ -2920,7 +2961,10 @@ def copy_layer(
             Defaults to None.
         options (dict, optional): options to pass to gdal. Defaults to None.
         append (bool, optional): True to append to the destination layer if it already
-            exists. Deprecated: use write_mode='append'. Defaults to False.
+            exists. Defaults to False.
+
+            .. deprecated:: 0.10.0
+               Please use `write_mode="append"` instead.
         force (bool, optional): True to overwrite the output file/layer (depending on
             `write_mode`) if it already exists. False to just return if the output
             file/layer exists. Defaults to False.
@@ -3109,6 +3153,8 @@ def zip_geofile(
     For geofile types that consist of multiple files (eg. shapefiles), all relevant
     (existing) files are included in the zip.
 
+    .. versionadded:: 0.11.0
+
     Args:
         input_path (PathLike): the geofile to zip.
         output_path (PathLike): the output zip file.
@@ -3169,6 +3215,8 @@ def unzip_geofile(
     that file is returned. If it contains multiple files, the geofile is determined
     based on the file extension. If multiple geofiles are found, an error is raised.
 
+    .. versionadded:: 0.11.0
+
     Args:
         input_path (PathLike): the zip file to unzip.
         output_path (PathLike): the output directory.
@@ -3206,7 +3254,7 @@ def unzip_geofile(
 def _determine_access_mode(
     dst: Union[str, "os.PathLike[Any]"],
     dst_layer: str | None,
-    write_mode: str,
+    write_mode: Literal["create", "add_layer", "append", "append_add_fields"],
     force: bool,
 ) -> str | None:
     """Determines an access mode based on the write mode,...
