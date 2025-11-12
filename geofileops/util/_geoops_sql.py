@@ -3789,11 +3789,11 @@ def _determine_column_types(
 
     # Get the types of all columns in the input files.
     input1_column_types = _sqlite_util.get_column_types(
-        database_path=input1_path, table=input1_layer.name
+        database=input1_path, table=input1_layer.name
     )
     input1_column_types = {k.lower(): v for k, v in input1_column_types.items()}
     input2_column_types = _sqlite_util.get_column_types(
-        database_path=input2_path, table=input2_layer.name
+        database=input2_path, table=input2_layer.name
     )
     input2_column_types = {k.lower(): v for k, v in input2_column_types.items()}
 

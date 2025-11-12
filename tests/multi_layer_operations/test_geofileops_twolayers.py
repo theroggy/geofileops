@@ -1396,6 +1396,10 @@ def test_join_nearest(tmp_path, suffix, epsg):
     exp_columns = len(input1_columns) + len(input2_layerinfo.columns) + 2 + 1
     assert len(output_layerinfo.columns) == exp_columns
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
+    if suffix == ".gpkg":
+        assert output_layerinfo.geometrycolumn == "geom"
+    else:
+        assert output_layerinfo.geometrycolumn == "geometry"
 
     # Check the contents of the result file
     # TODO: this test should be more elaborate...
@@ -1470,6 +1474,7 @@ def test_join_nearest_distance(tmp_path):
     assert output_path.exists()
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.featurecount == 1
+    assert output_layerinfo.geometrycolumn == "geom"
     # Check the contents of the result file
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["distance"][0] == 7

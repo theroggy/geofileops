@@ -3,13 +3,17 @@ Tests for functionalities in ogr_util.
 """
 
 import logging
+import sqlite3
 import warnings
 from pathlib import Path
 
 import pytest
+import shapely
+from shapely import box
 
 import geofileops as gfo
 from geofileops import fileops
+from geofileops._compat import GDAL_GTE_311
 from geofileops.util import _sqlite_util as sqlite_util
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
@@ -105,25 +109,97 @@ def test_add_gpkg_ogr_contents_layer_force_update(tmp_path):
     assert ogr_contents[layer]["feature_count"] == featurecount_orig
 
 
-def test_copy_table(tmp_path):
-    """Test the copy_table function."""
-    input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
-    layer = gfo.get_only_layer(input_path)
-    info = gfo.get_layerinfo(input_path, layer)
-    output_path = tmp_path / "output.gpkg"
-    gfo.copy(input_path, output_path)
+@pytest.mark.parametrize("use_spatialite", [True, False])
+def test_connect(use_spatialite):
+    """Test the connect function."""
+    test_path = test_helper.get_testfile("polygon-parcel")
 
-    # Append the layer to itself
+    conn = sqlite_util.connect(test_path, use_spatialite=use_spatialite)
+
+    # Check connection
+    try:
+        assert isinstance(conn, sqlite3.Connection)
+        if use_spatialite:
+            # Verify if spatialite extension is loaded by checking versions
+            sql = "SELECT spatialite_version(), geos_version()"
+            spatialite_version, geos_version = conn.execute(sql).fetchone()
+
+            assert spatialite_version is not None
+            assert geos_version is not None
+        else:
+            # Verify that spatialite is not loaded by checking that the
+            # spatialite_version function does not exist.
+            sql = "SELECT spatialite_version();"
+            with pytest.raises(sqlite3.OperationalError, match="no such function"):
+                conn.execute(sql).fetchone()
+
+    finally:
+        conn.close()
+
+
+def test_connect_invalid(tmp_path):
+    """Test error handling in the connect function."""
+    not_existing_path = tmp_path / "not_existing_file.gpkg"
+    with pytest.raises(FileNotFoundError, match="Database file not found"):
+        sqlite_util.connect(not_existing_path)
+
+
+@pytest.mark.parametrize(
+    "layer1_empty, layer2_empty",
+    [(True, True), (True, False), (False, True), (False, False)],
+)
+def test_copy_table(tmp_path, layer1_empty, layer2_empty):
+    """Test the copy_table function.
+
+    Test with combinations of empty and non-empty input layers to make sure the
+    total_bounds are handled correctly.
+    """
+    if not GDAL_GTE_311 and (
+        (layer1_empty and not layer2_empty) or (not layer1_empty and layer2_empty)
+    ):
+        pytest.skip(
+            "GDAL versions < 3.11 have issues with calculating total_bounds when "
+            "one of the layers is empty."
+        )
+
+    layer1_path = test_helper.get_testfile(
+        "polygon-parcel", geom_name="geometry", dst_dir=tmp_path, empty=layer1_empty
+    )
+    layer2_path = test_helper.get_testfile(
+        "polygon-zone", geom_name="geometry", dst_dir=tmp_path, empty=layer2_empty
+    )
+    gfo.drop_column(layer2_path, column_name="naam")
+    layer1_info = gfo.get_layerinfo(layer1_path)
+    layer2_info = gfo.get_layerinfo(layer2_path)
+
+    # Append layer2 to layer1
     sqlite_util.copy_table(
-        input_path=input_path,
-        output_path=output_path,
-        input_table=layer,
-        output_table=layer,
+        input_path=layer2_path,
+        output_path=layer1_path,
+        input_table=layer2_info.name,
+        output_table=layer1_info.name,
     )
 
     # Check if the rows were appended
-    result = gfo.read_file(output_path)
-    assert info.featurecount * 2 == len(result)
+    result_info = gfo.get_layerinfo(layer1_path)
+    assert (
+        result_info.featurecount == layer1_info.featurecount + layer2_info.featurecount
+    )
+
+    # Check total bounds
+    # total_bounds with all zero values are ignored
+    exp_bounds_list = [
+        bounds
+        for bounds in [layer1_info.total_bounds, layer2_info.total_bounds]
+        if not all(value == 0 for value in bounds)
+    ]
+    exp_total_bounds = (
+        shapely.MultiPolygon([box(*bounds) for bounds in exp_bounds_list]).bounds
+        if len(exp_bounds_list) > 0
+        else (0, 0, 0, 0)
+    )
+    for idx, value in enumerate(result_info.total_bounds):
+        assert round(value) == round(exp_total_bounds[idx])
 
 
 def test_copy_table_columns(tmp_path):
@@ -394,7 +470,10 @@ def test_execute_sql_invalid(tmp_path):
         sqlite_util.execute_sql(test_path, sql_stmt="INVALID SQL STATEMENT")
 
 
-def test_get_columns():
+@pytest.mark.parametrize(
+    "db1_name, db2_name", [("input1_db", "input2_db"), ("main", "input2_db")]
+)
+def test_get_columns(db1_name, db2_name):
     # Prepare test data
     input1_path = test_helper.get_testfile("polygon-parcel")
     input2_path = test_helper.get_testfile("polygon-zone")
@@ -405,8 +484,8 @@ def test_get_columns():
     # was a bug (https://github.com/geofileops/geofileops/pull/477).
     sql_stmt = f"""
         SELECT layer1.OIDN, layer1.UIDN, layer1.datum, layer2.naam, 'test' AS naam
-          FROM input1_db."{input1_info.name}" layer1
-          CROSS JOIN input2_db."{input2_info.name}" layer2
+          FROM {db1_name}."{input1_info.name}" layer1
+          CROSS JOIN {db2_name}."{input2_info.name}" layer2
          WHERE 1=1
     """
 
@@ -417,10 +496,29 @@ def test_get_columns():
     # Run test
     columns = sqlite_util.get_columns(
         sql_stmt=sql_stmt,
-        input_databases={"input1_db": input1_path, "input2_db": input2_path},
+        input_databases={db1_name: input1_path, db2_name: input2_path},
     )
 
     assert len(columns) == 5
+
+
+def test_get_column_types():
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel")
+    input_info = gfo.get_layerinfo(input_path)
+
+    # Run test
+    column_types = sqlite_util.get_column_types(
+        database=input_path, table=input_info.name
+    )
+
+    # Check results
+    assert len(column_types) == len(input_info.columns) + 2
+    assert column_types["fid"] == "INTEGER"
+    assert column_types["geom"] == "MULTIPOLYGON"
+    assert column_types["OIDN"] == "INTEGER"
+    assert column_types["HFDTLT"] == "TEXT(20)"
+    assert column_types["DATUM"] == "DATETIME"
 
 
 def test_create_table_as_sql_single_input(tmp_path):
@@ -455,3 +553,117 @@ def test_create_table_as_sql_single_input(tmp_path):
     # EMPTY geometry becomes NULL/None...
     expected_gdf.loc[expected_gdf.geometry.is_empty, "geometry"] = None
     assert_geodataframe_equal(output_gdf, expected_gdf)
+
+
+def test_get_gpkg_content():
+    input_path = test_helper.get_testfile(testfile="polygon-parcel")
+
+    layer = gfo.get_only_layer(input_path)
+    layer_info = gfo.get_layerinfo(input_path, layer)
+
+    content_info = sqlite_util.get_gpkg_content(input_path, layer)
+    assert content_info["table_name"] == layer
+    assert content_info["data_type"] == "features"
+    assert content_info["srs_id"] == layer_info.crs.to_epsg()
+    assert round(content_info["min_x"]) == round(layer_info.total_bounds[0])
+    assert round(content_info["min_y"]) == round(layer_info.total_bounds[1])
+    assert round(content_info["max_x"]) == round(layer_info.total_bounds[2])
+    assert round(content_info["max_y"]) == round(layer_info.total_bounds[3])
+    for idx, value in enumerate(content_info["total_bounds"]):
+        assert round(value) == round(layer_info.total_bounds[idx])
+
+
+@pytest.mark.parametrize("database_connection", [True, False])
+def test_get_gpkg_contents(database_connection):
+    """Test getting gpkg_contents with both a path and a connection."""
+    input_path = test_helper.get_testfile(testfile="polygon-parcel")
+    database = sqlite_util.connect(input_path) if database_connection else input_path
+
+    gpkg_contents = sqlite_util.get_gpkg_contents(database=database)
+
+    if database_connection:
+        database.close()
+        database = None
+
+    # Check results
+    layer = gfo.get_only_layer(input_path)
+    layer_info = gfo.get_layerinfo(input_path, layer)
+
+    assert layer in gpkg_contents
+    content_info = gpkg_contents[layer]
+    assert content_info["table_name"] == layer
+    assert content_info["data_type"] == "features"
+    assert content_info["srs_id"] == layer_info.crs.to_epsg()
+    assert round(content_info["min_x"]) == round(layer_info.total_bounds[0])
+    assert round(content_info["min_y"]) == round(layer_info.total_bounds[1])
+    assert round(content_info["max_x"]) == round(layer_info.total_bounds[2])
+    assert round(content_info["max_y"]) == round(layer_info.total_bounds[3])
+
+
+@pytest.mark.parametrize("database_connection", [True, False])
+def test_get_gpkg_geometry_column_info(database_connection):
+    """Test getting gpkg_geometry_columns with both a path and a connection."""
+    input_path = test_helper.get_testfile(testfile="polygon-parcel")
+    layer = gfo.get_only_layer(input_path)
+    database = sqlite_util.connect(input_path) if database_connection else input_path
+
+    geometry_column_info = sqlite_util.get_gpkg_geometry_column_info(
+        database=database, table_name=layer
+    )
+
+    if database_connection:
+        database.close()
+        database = None
+
+    # Check result
+    layer_info = gfo.get_layerinfo(input_path)
+    assert layer_info.geometrycolumn == geometry_column_info["column_name"]
+
+
+@pytest.mark.parametrize("empty", [True, False])
+def test_get_gpkg_total_bounds(empty):
+    input_path = test_helper.get_testfile(testfile="polygon-parcel", empty=empty)
+
+    layer = gfo.get_only_layer(input_path)
+    layer_info = gfo.get_layerinfo(input_path, layer)
+
+    total_bounds = sqlite_util.get_gpkg_total_bounds(input_path, layer)
+    if empty:
+        assert total_bounds is None
+    else:
+        for idx, value in enumerate(total_bounds):
+            assert round(value) == round(layer_info.total_bounds[idx])
+
+
+def test_load_spatialite():
+    test_path = test_helper.get_testfile("polygon-parcel")
+    conn = sqlite3.connect(test_path)
+
+    sqlite_util.load_spatialite(conn, enable_gpkg_mode=True)
+
+    # Verify if spatialite extension is loaded by checking versions
+    sql = "SELECT spatialite_version(), geos_version()"
+    spatialite_version, geos_version = conn.execute(sql).fetchone()
+
+    assert spatialite_version is not None
+    assert geos_version is not None
+
+    # Verify if GPKG mode is enabled
+    sql = "SELECT GetGpkgMode();"
+    gpkg_mode = conn.execute(sql).fetchone()[0]
+
+    assert gpkg_mode == 1
+
+
+def test_load_spatialite_gpkgmode_failed():
+    """Test error if enabling GPKG mode fails.
+
+    Enabling GPKG mode will fail here because the test file is not a valid GPKG file.
+    """
+    test_path = test_helper.get_testfile("polygon-parcel", suffix=".sqlite")
+    conn = sqlite3.connect(test_path)
+
+    with pytest.raises(
+        RuntimeError, match="Failed to enable GPKG mode in mod_spatialite"
+    ):
+        sqlite_util.load_spatialite(conn, enable_gpkg_mode=True)
