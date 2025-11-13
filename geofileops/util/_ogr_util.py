@@ -14,7 +14,8 @@ from osgeo import gdal, ogr
 from pygeoops import GeometryType
 
 import geofileops as gfo
-from geofileops import _compat, fileops
+from geofileops import fileops
+from geofileops._compat import GDAL_GTE_3101, GDAL_GTE_3114
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util._general_util import MissingRuntimeDependencyError
 from geofileops.util._geopath_util import GeoPath
@@ -498,12 +499,15 @@ def vector_translate(
     input_has_geom_attribute = False
     input_has_geometry_attribute = False
     try:
-        # Till gdal 3.10 datetime columns can be interpreted wrongly with arrow.
-        # Additionally, enabling arrow seems to lead to (rare) random crashes, so
-        # for now, disable it by default.
-        use_arrow_key = "OGR2OGR_USE_ARROW_API"
-        if use_arrow_key not in config_options and use_arrow_key not in os.environ:
-            config_options[use_arrow_key] = False
+        # Disable arrow API in following situations:
+        #   - for gdal < 3.11 datetime columns can be interpreted wrong with arrow.
+        #   - for gdal < 3.11.4 using arrow leads to (rare) random crashes.
+        #   - if columns=[], this is ignored by gdal when using arrow.
+        #       -> reference: https://github.com/OSGeo/gdal/issues/13401
+        if not GDAL_GTE_3114 or (columns is not None and len(list(columns)) == 0):
+            use_arrow_key = "OGR2OGR_USE_ARROW_API"
+            if use_arrow_key not in config_options and use_arrow_key not in os.environ:
+                config_options[use_arrow_key] = False
 
         # Go!
         with set_config_options(config_options):
@@ -764,7 +768,7 @@ def _validate_file(
         # In some cases output files ended up with NULL featurecount in GDAL < 3.10.1.
         # This was fixed in https://github.com/OSGeo/gdal/pull/11275, but getting the
         # featurecount of the layer will fix this.
-        if result_layer is not None and not _compat.GDAL_GTE_3101:
+        if result_layer is not None and not GDAL_GTE_3101:
             result_layer.GetFeatureCount()
 
         # If the (first) output row contains NULL as geom/geometry, gdal will
