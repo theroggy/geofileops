@@ -9,8 +9,8 @@ def main() -> None:
         # "buffer_spatialite",
         # "clip",
         # "clip_agri_complexpoly",
-        "dissolve_nogroupby",
-        "dissolve_groupby",
+        # "dissolve_nogroupby",
+        # "dissolve_groupby",
         # "export_by_location_intersects_complexpoly",
         # "export_by_location_intersects",
         # "intersection",
@@ -20,6 +20,7 @@ def main() -> None:
         # "join_by_location_intersects",
         # "symmetric_difference_complexpolys_agri",
         # "union",
+        "union_full_self",
     ]
     # Run all benchmark functions
     # functions_to_run = None

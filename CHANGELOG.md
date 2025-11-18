@@ -8,6 +8,7 @@
 
 ### Improvements
 
+- Add `union_full_self` operation (#764)
 - Add `concat` function (#746, #747)
 - Add `join` function (#751)
 - Add `add_columns` function (#768)

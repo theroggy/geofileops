@@ -73,3 +73,63 @@ def test_validate_agg_columns(agg_columns_value):
 def test_validate_agg_columns_invalid(expected_error, agg_columns_value):
     with pytest.raises(ValueError, match=re.escape(expected_error)):
         _parameter_helper.validate_agg_columns(agg_columns_value)
+
+
+@pytest.mark.parametrize(
+    "input_stem, output_stem, exp_error",
+    [
+        ("input", "input", "test: output_path must not equal input_path"),
+        ("input", "output", "test: input_path not found"),
+    ],
+)
+def test_validate_params_single_layer_errors(
+    tmp_path, input_stem, output_stem, exp_error
+):
+    input_path = tmp_path / f"{input_stem}.gpkg"
+    output_path = tmp_path / f"{output_stem}.gpkg"
+
+    if "output_path must not equal" in exp_error:
+        input_path.touch()
+
+    with pytest.raises(Exception, match=exp_error):
+        _parameter_helper.validate_params_single_layer(
+            input_path=input_path,
+            output_path=output_path,
+            input_layer=None,
+            output_layer=None,
+            operation_name="test",
+        )
+
+
+@pytest.mark.parametrize(
+    "input1_stem, input2_stem, output_stem, exp_error",
+    [
+        ("in1", "in2", "in1", "test: output_path must not equal one of input paths"),
+        ("in1", "in2", "in2", "test: output_path must not equal one of input paths"),
+        ("in1", "in2", "output", "test: input1_path not found"),
+        ("in1", "in2", "output", "test: input2_path not found"),
+    ],
+)
+def test_validate_params_two_layers_errors(
+    tmp_path, input1_stem, input2_stem, output_stem, exp_error
+):
+    input1_path = tmp_path / f"{input1_stem}.gpkg"
+    input2_path = tmp_path / f"{input2_stem}.gpkg"
+    output_path = tmp_path / f"{output_stem}.gpkg"
+
+    if "output_path must not equal" in exp_error:
+        input1_path.touch()
+        input2_path.touch()
+    elif "input2_path not found" in exp_error:
+        input1_path.touch()
+
+    with pytest.raises(Exception, match=re.escape(exp_error)):
+        _parameter_helper.validate_params_two_layers(
+            input1_path=input1_path,
+            input2_path=input2_path,
+            output_path=output_path,
+            input1_layer=None,
+            input2_layer=None,
+            output_layer=None,
+            operation_name="test",
+        )

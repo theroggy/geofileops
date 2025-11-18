@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Literal, Union
 from pygeoops import GeometryType
 
 from geofileops import fileops
+from geofileops.geoops_sql import _union_full
 from geofileops.helpers import _general_helper
 from geofileops.util import (
     _geofileinfo,
@@ -1045,6 +1046,7 @@ def delete_duplicate_geometries(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        tmp_basedir=None,
     )
 
 
@@ -3674,6 +3676,7 @@ def union(
             Defaults to False.
 
     See Also:
+        * :func:`union_full_self`: calculate the "Full" union of a layer
         * :func:`difference`: calculate the difference between two layers
         * :func:`identity`: calculate the identity of two layers
         * :func:`intersection`: calculate the intersection of two layers
@@ -3712,6 +3715,127 @@ def union(
         input2_columns=input2_columns,
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
+        explodecollections=explodecollections,
+        gridsize=gridsize,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
+        force=force,
+    )
+
+
+def union_full_self(
+    input_path: Path,
+    output_path: Path,
+    *,
+    intersections_as: Literal["COLUMNS", "LISTS", "ROWS"],
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
+    explodecollections: bool = False,
+    gridsize: float = 0.0,
+    where_post: str | None = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
+    subdivide_coords: int = 2000,
+    force: bool = False,
+) -> None:
+    """Calculates the "full" union of the features in a layer.
+
+    .. warning::
+       This function is experimental and may be changed and/or renamed in a future
+       release without backwards compatibility!
+
+    All geometries in the input layer are cut up till the smallest possible parts based
+    on the intersections between them.
+
+    The way intersecting (parts of) features are treated in the output depends on the
+    ``intersections_as`` parameter.
+
+    The following plot shows the result of a full union on a layer with intersecting
+    features. The labels on b) indicate the number of features that intersect in the
+    input layer on that location:
+
+    .. plot:: code/union_full_self.py
+
+    .. versionadded:: 0.11.0
+
+    Args:
+        input_path (PathLike): the input file.
+        output_path (PathLike): the file to write the result to
+        intersections_as (Literal["COLUMNS", "LISTS", "ROWS"]): determines the way
+            intersecting features in the input layer are treated in the output. Possible
+            options are:
+
+            - "COLUMNS": the output won't contain any intersections between geometries.
+              The `columns` in the output are prefixed with "i1_", "i2_", etc., where
+              for each extra intersection on a location a new set of prefixed columns is
+              created. E.g. for an input layer with 1 column "test" where a location is
+              covered by 3 input features, the output will contain 3 columns: "i1_test",
+              "i2_test", and "i3_test" with each column having the attribute value of
+              one of the intersecting features on that location. For features with less
+              than the maximum number of intersections, the extra columns are NULL.
+            - "LISTS": the output won't contain any intersections between geometries.
+              The `columns` to retain will be available in the output as well, but
+              their values are stored in a list the length of the number of
+              intersections. A column "nb_intersecting" is added to indicate the number
+              of intersections per feature. Hence, if a location of an input layer with
+              1 column "test" is covered by 3 input features, the output will contain 2
+              columns: "test" and "nb_intersecting". For a location with 3 intersecting
+              features in the input layer, "nb_intersecting" will be 3 and the value in
+              the "test" column will be a json list with 3 values, each being the
+              attribute value of one of the intersecting features on that location.
+            - "ROWS": each location where the input features intersect is repeated the
+              number of times that area is covered by an input feature.
+              Hence, the output may contain intersections between features. Attribute
+              columns are retained, whith each intersection having the attribute values
+              of one of the intersecting input features on that location.
+
+        input_layer (str, optional): input layer name. If None, ``input_path``
+            should contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
+        columns (List[str], optional): list of columns to retain. If None, all
+            standard columns are retained. In addition to standard columns, it is also
+            possible to retain custom columns by specifying their names in this list.
+            Note that the "fid" column is always retained even if not specified here.
+            Defaults to None.
+        explodecollections (bool, optional): True to convert all multi-geometries to
+            singular ones after the dissolve. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
+        where_post (str, optional): SQL filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
+        nb_parallel (int, optional): the number of parallel processes to use.
+            Defaults to -1: use all available CPUs.
+        batchsize (int, optional): indicative number of rows to process per batch.
+            A smaller batch size, possibly in combination with a
+            smaller ``nb_parallel``, will reduce the memory usage.
+            Defaults to -1: (try to) determine optimal size automatically.
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about ``subdivide_coords`` coordinates during processing which
+            can offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 2000.
+        force (bool, optional): overwrite existing output file(s).
+            Defaults to False.
+
+    See Also:
+        * :func:`union`: calculate the pairwise union of two layers
+    """
+    logger = logging.getLogger("geofileops.union_full_self")
+    logger.info(f"Start, with input: {input_path}, output: {output_path}")
+
+    _union_full.union_full_self(
+        input_path=Path(input_path),
+        output_path=Path(output_path),
+        intersections_as=intersections_as,
+        input_layer=input_layer,
+        output_layer=output_layer,
+        columns=columns,
         explodecollections=explodecollections,
         gridsize=gridsize,
         where_post=where_post,

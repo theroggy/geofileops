@@ -50,6 +50,7 @@ Spatial overlays and joins
    identity
    symmetric_difference
    union
+   union_full_self
 
 .. _reference-general-layer-ops:
 

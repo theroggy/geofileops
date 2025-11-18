@@ -10,6 +10,15 @@ from geofileops.util import _ogr_sql_util
 
 
 @pytest.mark.parametrize(
+    "columns, exp_quoted",
+    [(["col1", "Col2", "COL3"], ',"col1", "Col2", "COL3"'), ([], "")],
+)
+def test_columns_quoted(columns, exp_quoted):
+    quoted = _ogr_sql_util.columns_quoted(columns)
+    assert quoted == exp_quoted
+
+
+@pytest.mark.parametrize(
     "descr, columns_specified, columns_available, table_alias, columnname_prefix, "
     "fid_column, "
     "exp_quoted, exp_prefixed, exp_prefixed_aliased, "
@@ -117,3 +126,14 @@ def test_ColumnFormatter_invalidcolumn():
             columns_in_layer=["test1"],
             fid_column="fid",
         )
+
+
+def test_get_unique_fid_aliases():
+    # Use some different casings to check case-insensitivity
+    existing_aliases = {"Fid", "fiD_1", "fid_2"}
+    fid_alias = _ogr_sql_util.get_unique_fid_alias("Fid", existing_aliases)
+    assert fid_alias == "Fid_3"
+
+    # The function only tries up to 100 suffixes
+    with pytest.raises(ValueError, match="Could not find unique fid alias"):
+        _ogr_sql_util.get_unique_fid_alias("fid", [f"fid_{i}" for i in range(1, 100)])

@@ -1339,7 +1339,7 @@ def dissolve(  # noqa: D417
             output_tmp_path = tmp_dir / "output_tmp.gpkg"
             prev_nb_batches = None
             last_pass = False
-            pass_id = 0
+            pass_id = 1
             geoindex_column = "__tmp_geoindex_column__"
 
             logger.info(f"Start, with input {input_path}")

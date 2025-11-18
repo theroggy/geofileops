@@ -132,11 +132,7 @@ class ColumnFormatter:
             for alias_idx, alias in enumerate(aliases):
                 if alias.lower() == "fid":
                     # If alias "fid", change it + make sure the alias isn't in use yet
-                    for idx in range(1, 100):
-                        alias_with_id = f"{alias}_{idx}"
-                        if alias_with_id not in aliases:
-                            aliases[alias_idx] = alias_with_id
-                            break
+                    aliases[alias_idx] = get_unique_fid_alias(alias, aliases)
 
         self._aliases_cache = aliases
         return self._aliases_cache
@@ -208,3 +204,26 @@ def columns_quoted(columns: list[str]) -> str:
         return ""
     columns_quoted = [f'"{column}"' for column in columns]
     return f",{', '.join(columns_quoted)}"
+
+
+def get_unique_fid_alias(alias: str, aliases: list[str]) -> str:
+    """Get a case-insensitively unique alias for the fid column.
+
+    Case is retained in the result, but the check whether the alias is unique is done
+    case-insensitively. Hence, for an alias "Fid", if "FID", "fid_1" and "FiD_2" are
+    already in use, the returned alias will be "Fid_3".
+
+    Args:
+        alias (str): base alias to use.
+        aliases (List[str]): list of already used aliases.
+
+    Returns:
+        str: unique alias for the fid column.
+    """
+    aliases_lower = {a.lower() for a in aliases}
+    for idx in range(1, 100):
+        alias_with_id = f"{alias}_{idx}"
+        if alias_with_id.lower() not in aliases_lower:
+            return alias_with_id
+
+    raise ValueError("Could not find unique fid alias.")

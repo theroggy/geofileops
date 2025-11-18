@@ -658,7 +658,7 @@ def union(tmp_dir: Path) -> RunResult:
     # Init
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
-    input1_path, _input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+    input1_path, input1_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
     input2_path, input2_descr = testdata.TestFile.AGRIPRC_2019.get_file(tmp_dir)
 
     # Go!
@@ -676,7 +676,37 @@ def union(tmp_dir: Path) -> RunResult:
         package_version=_get_version(),
         operation=function_name,
         secs_taken=(datetime.now() - start_time).total_seconds(),
-        operation_descr=f"{function_name} between {input2_descr} and {input2_descr}",
+        operation_descr=f"{function_name} between {input1_descr} and {input2_descr}",
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    output_path.unlink()
+    return result
+
+
+def union_full_self_attr_cols(tmp_dir: Path) -> RunResult:
+    # Init
+    function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
+
+    input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
+
+    # Go!
+    start_time = datetime.now()
+    output_path = tmp_dir / f"{input_path.stem}_{function_name}.gpkg"
+    gfo.union_full_self(
+        input_path=input_path,
+        output_path=output_path,
+        intersections_as="COLUMNS",
+        nb_parallel=nb_parallel,
+        force=True,
+    )
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation=function_name,
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=f"{function_name} on {input_descr}",
         run_details={"nb_cpu": nb_parallel},
     )
 
