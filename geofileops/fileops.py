@@ -1115,7 +1115,9 @@ def add_column(
 
 def add_columns(
     path: Union[str, "os.PathLike[Any]"],
-    new_columns: list[tuple[str, str | DataType, str | None, str | None]],
+    new_columns: list[
+        tuple[str, str | DataType, str | None] | tuple[str, str | DataType]
+    ],
     *,
     layer: str | None = None,
     output_path: Union[str, "os.PathLike[Any]"] | None = None,
