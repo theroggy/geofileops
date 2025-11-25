@@ -1,36 +1,145 @@
 # CHANGELOG
 
-## 0.10 (????-??-??)
+## 0.11.0 (yyyy-mm-dd)
 
 ### Deprecations and compatibility notes
 
+- Minimum version of dependencies updated to spatialite 5.1.
+
+### Improvements
+
+- Add `union_full_self` operation (#764)
+- Add `concat` function (#746, #747)
+- Add `join` function (#751)
+- Add `add_columns` function (#768)
+- Add `zip_geofile` and `unzip_geofile` functions (#754, #743)
+- Add `write_mode="append_add_fields"` option to `copy_layer` (#750)
+- Add an `include_duplicates` parameter to `union`, `intersection` and `identity` (#757)
+- Add support for ".gpkg.zip" and ".shp.zip" input and output files for geo operations
+  (#754)
+- Add support to use `add_column` on e.g. shapefiles (#767)
+- Improve performance of `clip` with a complex clip layer (#740)
+- Improve performance of most operations by using a direct gpkg to gpkg append via
+  sqlite where possible (#728, #772)
+- Improve performance of the subdividividing used in many operations (#730)
+- Improve performance of `dissolve` (#748)
+- Improve performance of two-layer operations using `nb_parallel=1` (#692)
+- Alternative query for `clip` + default `subdivide_coords` to 15000 (#450)
+- Improve and speed up attribute column type detection in two-layer operations (#758)
+- Ensure that the featurecount is properly cached in GPKG files, also for older GDAL
+  versions + small refactor (#693)
+- Improve support for custom fid columns in gpkg (#771)
+- Add checks on invalid values in `ConfigOptions` (#711)
+- Add `worker_type` used to progress logging (#715)
+- Write gdal log files to `GFO_TMPDIR` if specified (#727)
+- Reduce memory being committed on hardware with many cores (#739, #717)
+
+### Bugs fixed
+
+- `copy_layer` should give an error if `src_layer` is not specified for multi-layer src
+  files (#745)
+- Fix error when custom `output_layer` is specified in single layer operations (#760)
+- Fix error in `copy_file` if `dst` has a suffix with multiple available drivers (#765)
+
+## 0.10.2 (2025-08-20)
+
+### Improvements
+
+- Improve performance of `makevalid` by using `apply_vectorized` under the hood (#713)
+- Support to specify the directory used by geofileops to put temporary files via an
+  environment variable (GFO_TMPDIR) (#707)
+
+### Bugs fixed
+
+- Disable arrow in `gdal.VectorTranslate` to avoid random crashes (#714)
+- Fix `copy_file` for some special vsi cases (#703)
+- Fix handling `None` values for environment variables in the `gfo.TempEnv` context
+  manager (#710)
+
+## 0.10.1 (2025-05-16)
+
+### Deprecations and compatibility notes
+
+- Add warning when the GFO_IO_ENGINE configuration option is used with engine "fiona"
+  that this is deprecated and will be removed/ignored in a future version (#688, #701)
+
+### Improvements
+
+- Don't pin maximum versions of dependencies for e.g. geopandas, shapely, pyogrio (#685)
+
+### Bugs fixed
+
+- Don't throw error when running `create_spatial_index` on a read-only file if the index
+  exists already (#686)
+- Fix `join_by_location` when using "contains" (#694)
+- Fix that on some input files spatial operations take significant time, even though
+  the output exists already and `force=False` (#696)
+
+## 0.10.0 (2025-03-26)
+
+### Deprecations and compatibility notes
+
+- Worker processes are now being created using "forkserver" on linux. This solves risks
+  of deadlocks and the corresponding warning for that. Consequence is that also on linux
+  the `if __name__ == "__main__":` construct needs to be used in scripts. Some more info
+  can be found in the geofileops FAQ (#675).
 - `erase` was renamed to `difference`, as most other open source applications/libraries
   use this terminology. `erase` just keeps existing for backwards compatibility for now,
   but a warning is shown that it might be removed in the (distant) future. (#595)
+- In `copy_layer` and `append_to` the default `dst_layer` was, contrary to the
+  documentation, not the stem of the destination filename. This is corrected now. (#648)
+- In `copy_layer`, the `append` parameter is deprecated and replaced by the `write_mode`
+  parameter that accepts e.g. "append" as value (#663).
+- The `append_to` function is deprecated, as it is almost identical to `copy_layer` with
+  `write_mode="append"` (#669).
 
 ### Improvements
 
 - Add function `apply_vectorized` to apply a vectorized function on a geometry column
   and use it internally where possible (#588, #594)
-- Add support for renaming column with only difference in casing (#549)
+- Improve performance of `erase` and `intersection` for very complex input geometries.
+  This gives similar improvements for such datasets to `identity`,
+  `symmetric_difference` and `union`. (#585, #601, #591, #614)
+- Improve performance of `export_by_location` and `join_by_location` for simple queries
+  (#548)
+- Add support for `query=""` in `export_by_location` (#597)
+- Add support for GDAL vsi handlers in paths in most general file/layer operations (#669)
+- Add basic support for ".gpkg.zip" and ".shp.zip" files in most general file/layer
+  operations (#673)
+- Add support to rename columns and layers with only a difference in casing (#549, #593)
+- Use `ST_Equals` and add priority feature to `delete_duplicate_geometries` (#638)
+- Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
+- Speed up processing many small files, mainly on windows:
+    - reduce calls to `gdal.OpenEx` (#622, #625, #677)
+    - improvements in sqlite3 code for 2 layer operations: start transactions
+      explicitly, remove obsolete GPKG triggers, use a :memory: temp file where possible
+      (#626, #628, #630)
 - Add support to pass a single string for all `column` type parameters if a single
   column should be retained (#523)
 - Enable "CURVE" geometrytype files to be processed in the general file and
   layer operations (#558)
+- Replace `append` parameter by `write_mode` in `copy_file` (#663)
 - Don't convert to multi-part geometries by default in `copy_layer`,... (#570)
-- Improve performance of `erase` and `intersection` for very complex input geometries.
-  This gives similar improvements for such datasets to `identity`,
-  `symmetric_difference` and `union`. (#585, #601, #591)
-- Enable subdividing of linestring layers as well (#614)
+- In `add_column`, don't add column if update expression is invalid (#650)
 - Add configuration option to only warn on dissolve errors (#561)
-- Add some pre-flight checks when geofileops is imported (#573)
-- Add support for renaming layer with only difference in casing (#593)
-- Avoid integer overflow when gpkg written by geofileops is read from .NET (#612)
+- For `dissolve`, apply `grid_size` within `union_all` (#566)
+- Add some pre-flight checks when geofileops is imported (#573, #627)
+- For `select_two_layers`, add the `gpkg_ogr_contents` table + fill out extents in the
+  `gpkg_contents` table in the output file (#647)
+- When using `join_nearest` with spatialite version >= 5.1,
+  show ST_distance between the two geometries instead of 
+  the distance between the centroid of the two geometries (#634)
 
 ### Bugs fixed
 
 - Fix `copy_layer` to a gpkg.zip file (#604)
+- Fix GDAL input open options being ignored in `copy_layer` (#632)
 - Fix `missing_ok` parameter in `remove` being ~ignored (#605)
+- Fix `dissolve` with `agg_columns` on sqlite 3.49.1 (#636)
+- Fix an invalid output .gpkg file being created when e.g. `copy_layer` is ran with an
+  invalid sql statement (#641)
+- Fix wrong results for `export_by_location` with queries != "intersects is True" (#617)
+- Fix listlayers returns layer name for a non-existing .shp (#672)
 
 ## 0.9.1 (2024-07-18)
 

@@ -2,17 +2,17 @@
 
 import logging
 import logging.config
-import shutil
 import warnings
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal, Union
 
 from pygeoops import GeometryType
 
 from geofileops import fileops
-from geofileops._compat import SPATIALITE_GTE_51
-from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.geoops_sql import _union_full
+from geofileops.helpers import _general_helper
 from geofileops.util import (
     _geofileinfo,
     _geoops_gpd,
@@ -26,8 +26,9 @@ from geofileops.util._geometry_util import (
     BufferJoinStyle,
     SimplifyAlgorithm,
 )
+from geofileops.util._geopath_util import GeoPath
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     import os
 
 logger = logging.getLogger(__name__)
@@ -39,12 +40,12 @@ def dissolve_within_distance(
     distance: float,
     gridsize: float,
     close_internal_gaps: bool = False,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Dissolve geometries that are within the distance specified.
 
     The output layer will contain the dissolved geometries where all gaps between the
@@ -89,21 +90,22 @@ def dissolve_within_distance(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
+
+    See Also:
+        * :func:`dissolve`: dissolve the input layer
+
     """
     input_path = Path(input_path)
     output_path = Path(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
 
     start_time = datetime.now()
     operation_name = "dissolve_within_distance"
     logger = logging.getLogger(f"geofileops.{operation_name}")
     nb_steps = 9
 
-    # Already check here if it is useful to continue
-    if _io_util.output_exists(path=output_path, remove_if_exists=force):
-        return
-
-    tempdir = _io_util.create_tempdir(f"geofileops/{operation_name}")
-    try:
+    with _general_helper.create_gfo_tmp_dir(operation_name) as tmp_dir:
         # First dissolve the input.
         #
         # Note: this reduces the complexity of operations to be executed later on.
@@ -111,7 +113,7 @@ def dissolve_within_distance(
         logger.info(f"Start, with input file {input_path}")
         step = 1
         logger.info(f"Step {step} of {nb_steps}")
-        diss_path = tempdir / "100_diss.gpkg"
+        diss_path = tmp_dir / "100_diss.gpkg"
         _geoops_gpd.dissolve(
             input_path=input_path,
             output_path=diss_path,
@@ -121,6 +123,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Positive buffer of distance / 2 to close all gaps.
@@ -131,7 +134,7 @@ def dissolve_within_distance(
         # addedpieces_1neighbour later on.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        bufp_path = tempdir / "110_diss_bufp.gpkg"
+        bufp_path = tmp_dir / "110_diss_bufp.gpkg"
         _geoops_gpd.buffer(
             input_path=diss_path,
             output_path=bufp_path,
@@ -143,6 +146,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Dissolve the buffered input.
@@ -153,7 +157,7 @@ def dissolve_within_distance(
         # addedpieces_1neighbour later on.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        buff_diss_path = tempdir / "120_diss_bufp_diss.gpkg"
+        buff_diss_path = tmp_dir / "120_diss_bufp_diss.gpkg"
         _geoops_gpd.dissolve(
             input_path=bufp_path,
             output_path=buff_diss_path,
@@ -162,6 +166,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Negative buffer to get back to the borders of the input geometries
@@ -169,7 +174,7 @@ def dissolve_within_distance(
         # don't dissappear again.
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        bufp_diss_bufm_path = tempdir / "130_diss_bufp_diss_bufm.gpkg"
+        bufp_diss_bufm_path = tmp_dir / "130_diss_bufp_diss_bufm.gpkg"
         _geoops_gpd.buffer(
             input_path=buff_diss_path,
             output_path=bufp_diss_bufm_path,
@@ -182,6 +187,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # We want to keep the original boundaries as identical as possible. However,
@@ -199,7 +205,7 @@ def dissolve_within_distance(
         # Note: no gridsize is applied to preserve all possible accuracy for these
         # temporary boundariesstep += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_path = tempdir / "200_parts_to_add.gpkg"
+        parts_to_add_path = tmp_dir / "200_parts_to_add.gpkg"
         _geoops_sql.difference(
             input1_path=bufp_diss_bufm_path,
             input2_path=diss_path,
@@ -210,18 +216,17 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # To avoid parts not being detected as touching to 2 neighbours because of
         # rounding issues, apply a small buffer to them.
-        if gridsize > 0.0:
-            distance_parts_to_add = gridsize / 10
-        else:
-            distance_parts_to_add = 0.0000000001
+        distance_parts_to_add = gridsize / 10 if gridsize > 0.0 else 0.0000000001
+
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_bufp_path = tempdir / "200_parts_to_add_bufp.gpkg"
-        bufp_path = tempdir / "110_diss_bufp.gpkg"
+        parts_to_add_bufp_path = tmp_dir / "200_parts_to_add_bufp.gpkg"
+        bufp_path = tmp_dir / "110_diss_bufp.gpkg"
         _geoops_gpd.buffer(
             input_path=parts_to_add_path,
             output_path=parts_to_add_bufp_path,
@@ -233,6 +238,7 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
         # Build a filter to only keep the pieces that actually need to be added to the
@@ -333,7 +339,7 @@ def dissolve_within_distance(
         # temporary boundariesstep += 1
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
-        parts_to_add_filtered_path = tempdir / "210_parts_to_add_filtered.gpkg"
+        parts_to_add_filtered_path = tmp_dir / "210_parts_to_add_filtered.gpkg"
         _geoops_sql.select_two_layers(
             input1_path=parts_to_add_bufp_path,
             input2_path=input_path,
@@ -346,6 +352,7 @@ def dissolve_within_distance(
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
             output_with_spatial_index=False,
+            tmp_dir=tmp_dir / "parts_to_add_filtered",
         )
 
         # Note: no gridsize is applied to preserve all possible accuracy for these
@@ -353,8 +360,11 @@ def dissolve_within_distance(
         step += 1
         logger.info(f"Step {step} of {nb_steps}")
         dst_layer = fileops.get_only_layer(diss_path)
-        fileops.append_to(
-            src=parts_to_add_filtered_path, dst=diss_path, dst_layer=dst_layer
+        fileops.copy_layer(
+            src=parts_to_add_filtered_path,
+            dst=diss_path,
+            dst_layer=dst_layer,
+            write_mode="append",
         )
 
         step += 1
@@ -369,13 +379,10 @@ def dissolve_within_distance(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             operation_prefix=f"{operation_name}-",
+            tmp_basedir=tmp_dir,
         )
 
-    finally:
-        if ConfigOptions.remove_temp_files:
-            shutil.rmtree(tempdir, ignore_errors=True)
-
-    logger.info(f"Ready, took {datetime.now()-start_time}")
+    logger.info(f"Ready, took {datetime.now() - start_time}")
 
 
 def apply(
@@ -383,21 +390,24 @@ def apply(
     output_path: Union[str, "os.PathLike[Any]"],
     func: Callable[[Any], Any],
     only_geom_input: bool = True,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Apply a python function on the geometry column of the input file.
 
     The result is written to the output file specified.
+
+    If the function you want to apply accepts an array of geometries as input, you can
+    typically use :func:`apply_vectorized` instead, which is faster.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -439,29 +449,31 @@ def apply(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`apply_vectorized`: apply a vectorized python function on the geometry
+          column
+
     Examples:
         This example shows the basic usage of ``gfo.apply``:
 
         .. code-block:: python
 
-            import geofileops as gfo
-
             gfo.apply(
-                input_path=...,
-                output_path=...,
+                input_path="input.gpkg",
+                output_path="output.gpkg",
                 func=lambda geom: pygeoops.remove_inner_rings(geom, min_area_to_keep=1),
             )
+
+        .. plot:: code/apply_remove_inner_rings.py
 
         If you need to use the contents of other columns in your lambda function, you can
         call ``gfo.apply`` like this:
 
         .. code-block:: python
 
-            import geofileops as gfo
-
             gfo.apply(
-                input_path=...,
-                output_path=...,
+                input_path="input.gpkg",
+                output_path="output.gpkg",
                 func=lambda row: pygeoops.remove_inner_rings(
                     row.geometry, min_area_to_keep=row.min_area_to_keep
                 ),
@@ -500,27 +512,29 @@ def apply_vectorized(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     func: Callable[[Any], Any],
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Apply a vectorized python function on the geometry column of the input file.
 
     The result is written to the output file specified.
 
     It is not possible to use the contents of other columns in the input file in the
-    python function. If you need this, use ``gfo.apply`` instead.
+    python function. If you need this, use :func:`apply` instead.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
+
+    .. versionadded:: 0.10.0
 
     Args:
         input_path (PathLike): the input file
@@ -559,18 +573,22 @@ def apply_vectorized(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`apply`: apply a python function on the geometry column
+
     Examples:
         This example shows the usage of ``gfo.apply_vectorized``:
 
         .. code-block:: python
 
-            import geofileops as gfo
-
             gfo.apply_vectorized(
-                input_path=...,
-                output_path=...,
-                func=lambda geom: pygeoops.centerline(geom, densify_distance=0),
+                input_path="input.gpkg",
+                output_path="output.gpkg",
+                func=lambda geom: pygeoops.centerline(geom),
             )
+
+        .. plot:: code/apply_vectorized_centerline.py
+
 
     .. |spatialite_reference_link| raw:: html
 
@@ -583,6 +601,7 @@ def apply_vectorized(
     return _geoops_gpd.apply_vectorized(
         input_path=Path(input_path),
         output_path=Path(output_path),
+        operation_name=None,
         func=func,
         input_layer=input_layer,
         output_layer=output_layer,
@@ -595,6 +614,8 @@ def apply_vectorized(
         nb_parallel=nb_parallel,
         batchsize=batchsize,
         force=force,
+        parallelization_config=None,
+        tmp_basedir=None,
     )
 
 
@@ -607,17 +628,17 @@ def buffer(
     join_style: BufferJoinStyle = BufferJoinStyle.ROUND,
     mitre_limit: float = 5.0,
     single_sided: bool = False,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Applies a buffer operation on geometry column of the input file.
 
     The result is written to the output file specified.
@@ -819,14 +840,14 @@ def buffer(
 def clip_by_geometry(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-    clip_geometry: Union[tuple[float, float, float, float], str],
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    clip_geometry: tuple[float, float, float, float] | str,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
-):
-    """Clip all geometries in the imput file by the geometry provided.
+) -> None:
+    """Clip all geometries in the input file by the geometry provided.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -848,6 +869,10 @@ def clip_by_geometry(
             Defaults to False.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
+
+    See Also:
+        * :func:`clip`: clip geometries by the features in another layer
+
     """
     logger = logging.getLogger("geofileops.clip_by_geometry")
     logger.info(f"Start, on {input_path}")
@@ -866,17 +891,17 @@ def clip_by_geometry(
 def convexhull(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Applies a convexhull operation on the input file.
 
     The result is written to the output file specified.
@@ -941,15 +966,29 @@ def convexhull(
 def delete_duplicate_geometries(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
+    priority_column: str | None = None,
+    priority_ascending: bool = True,
     explodecollections: bool = False,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Copy all rows to the output file, except for duplicate geometries.
+
+    The check for duplicates is done using ``ST_Equals``. ``ST_Equals`` is ``True`` if`
+    the given geometries are "topologically equal". This means that the geometries have
+    the same dimension and their point-sets occupy the same space. This means e.g. that
+    the order of vertices may be different, starting points of rings can be different
+    and polygons can contain extra points if they don't change the surface occupied.
+
+    If a ``priority_column`` is specified, the row with the lowest value in this column
+    is retained. If ``priority_ascending`` is False, the row with the highest value is
+    retained.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -965,6 +1004,10 @@ def delete_duplicate_geometries(
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
             "fid" will be aliased eg. to "fid_1". Defaults to None.
+        priority_column (str, optional): column to use as priority for keeping rows.
+            Defaults to None.
+        priority_ascending (bool, optional): True to keep the row with the lowest
+            priority value. Defaults to True.
         explodecollections (bool, optional): True to output only simple geometries.
             Defaults to False.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
@@ -972,6 +1015,12 @@ def delete_duplicate_geometries(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
+        nb_parallel (int, optional): the number of parallel processes to use.
+            Defaults to -1: use all available CPUs.
+        batchsize (int, optional): indicative number of rows to process per
+            batch. A smaller batch size, possibly in combination with a
+            smaller ``nb_parallel``, will reduce the memory usage.
+            Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
@@ -989,10 +1038,15 @@ def delete_duplicate_geometries(
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
+        priority_column=priority_column,
+        priority_ascending=priority_ascending,
         explodecollections=explodecollections,
         keep_empty_geoms=keep_empty_geoms,
         where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
         force=force,
+        tmp_basedir=None,
     )
 
 
@@ -1064,18 +1118,18 @@ def dissolve(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     explodecollections: bool,
-    groupby_columns: Union[list[str], str, None] = None,
-    agg_columns: Optional[dict] = None,
+    groupby_columns: list[str] | str | None = None,
+    agg_columns: dict | None = None,
     tiles_path: Union[str, "os.PathLike[Any]", None] = None,
     nb_squarish_tiles: int = 1,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Applies a dissolve operation on the input file.
 
     If columns are specified with ``groupby_columns``, the data is first grouped
@@ -1093,11 +1147,9 @@ def dissolve(
 
     .. code-block:: python
 
-        import geofileops as gfo
-
         gfo.dissolve(
-            input_path=...,
-            output_path=...,
+            input_path="input.gpkg",
+            output_path="output.gpkg",
             groupby_columns=["cropgroup"],
             agg_columns={
                 "columns": [
@@ -1124,11 +1176,9 @@ def dissolve(
 
     .. code-block:: python
 
-        import geofileops as gfo
-
         gfo.dissolve(
-            input_path=...,
-            output_path=...,
+            input_path="input.gpkg",
+            output_path="output.gpkg",
             groupby_columns=["cropgroup"],
             agg_columns={"json": ["crop", "area"]},
             explodecollections=False,
@@ -1151,7 +1201,7 @@ def dissolve(
         explodecollections (bool): True to output only simple geometries. If
             False, this can result in huge geometries for large files,
             especially if no ``groupby_columns`` are specified.
-        groupby_columns (Union[List[str], str], optional): columns (case insensitive) to
+        groupby_columns (list[str] or str, optional): columns (case insensitive) to
             group on while aggregating. Defaults to None, resulting in a spatial union
             of all geometries that touch.
         agg_columns (dict, optional): columns to aggregate based on
@@ -1216,6 +1266,11 @@ def dissolve(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`dissolve_within_distance`: dissolve all feature within the distance
+          specified of each other
+
+
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
@@ -1224,15 +1279,6 @@ def dissolve(
     # Init
     if tiles_path is not None:
         tiles_path = Path(tiles_path)
-
-    # Standardize parameter to simplify the rest of the code
-    if groupby_columns is not None:
-        if isinstance(groupby_columns, str):
-            # If a string is passed, convert to list
-            groupby_columns = [groupby_columns]
-        elif len(groupby_columns) == 0:
-            # If an empty list of geometry columns is passed, convert it to None
-            groupby_columns = None
 
     logger = logging.getLogger("geofileops.dissolve")
     logger.info(f"Start, on {input_path} to {output_path}")
@@ -1258,12 +1304,12 @@ def export_by_bounds(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     bounds: tuple[float, float, float, float],
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
-):
+) -> None:
     """Export the rows that intersect with the bounds specified.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
@@ -1285,6 +1331,13 @@ def export_by_bounds(
             Defaults to False.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
+
+    See Also:
+        * :func:`export_by_distance`: export features that are within a certain distance
+          of features of another layer
+        * :func:`export_by_location`: export features that e.g. intersect with features
+          of another layer
+
     """
     logger = logging.getLogger("geofileops.export_by_bounds")
     logger.info(f"Start, on {input_path}")
@@ -1303,10 +1356,10 @@ def export_by_bounds(
 def isvalid(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]", None] = None,
-    only_invalid: bool = True,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    only_invalid: bool = True,  # noqa: ARG001
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     validate_attribute_data: bool = False,
     nb_parallel: int = -1,
@@ -1350,21 +1403,24 @@ def isvalid(
 
     Returns:
         bool: True if all geometries were valid.
+
+    See Also:
+        * :func:`make_valid`: make the geometries in the input layer valid
+
     """
     # Check parameters
+    input_path = Path(input_path)
     if output_path is not None:
         output_path = Path(output_path)
     else:
-        input_path = Path(input_path)
-        output_path = (
-            input_path.parent / f"{input_path.stem}_isvalid{input_path.suffix}"
-        )
+        input_geopath = GeoPath(input_path)
+        output_path = input_geopath.with_stem(f"{input_geopath.stem}_isvalid")
 
     # Go!
     logger = logging.getLogger("geofileops.isvalid")
     logger.info(f"Start, on {input_path}")
     return _geoops_sql.isvalid(
-        input_path=Path(input_path),
+        input_path=input_path,
         output_path=output_path,
         input_layer=input_layer,
         output_layer=output_layer,
@@ -1380,20 +1436,20 @@ def isvalid(
 def makevalid(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[str, None, GeometryType] = None,
+    force_output_geometrytype: str | None | GeometryType = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
-    precision: Optional[float] = None,
+    where_post: str | None = None,
+    precision: float | None = None,
     validate_attribute_data: bool = False,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Makes all geometries in the input file valid.
 
     Writes the result to the output path.
@@ -1442,6 +1498,9 @@ def makevalid(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`isvalid`: check if the geometries in the input layer are valid
+
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
@@ -1467,7 +1526,7 @@ def makevalid(
             stacklevel=2,
         )
 
-    if SPATIALITE_GTE_51 and gridsize == 0.0:
+    if gridsize == 0.0:
         # If spatialite >= 5.1 available use faster/less memory using SQL implementation
         # Only use this version if gridsize is 0.0, because when gridsize applied it is
         # less robust than the gpd implementation.
@@ -1506,22 +1565,22 @@ def makevalid(
     # If asked and output is spatialite based, check if all data can be read
     if validate_attribute_data:
         output_geofileinfo = _geofileinfo.get_geofileinfo(input_path)
-        if output_geofileinfo.is_spatialite_based:
+        if input_path.suffix != ".zip" and output_geofileinfo.is_spatialite_based:
             _sqlite_util.test_data_integrity(path=input_path)
 
 
 def warp(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-    gcps: list[tuple[float, float, float, float, Optional[float]]],
+    gcps: list[tuple[float, float, float, float, float | None]],
     algorithm: str = "polynomial",
-    order: Optional[int] = None,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    order: int | None = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     force: bool = False,
-):
+) -> None:
     """Warp all input features to the output file according to the gcps specified.
 
     Alternative names:
@@ -1572,18 +1631,18 @@ def select(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     sql_stmt: str,
-    sql_dialect: Optional[Literal["SQLITE", "OGRSQL"]] = "SQLITE",
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    sql_dialect: Literal["SQLITE", "OGRSQL"] | None = "SQLITE",
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Union[GeometryType, str, None] = None,
+    force_output_geometrytype: GeometryType | str | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = True,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     '''Execute a SELECT SQL statement on the input file.
 
     The ``sql_stmt`` must be in SQLite dialect and can contain placeholders that will be
@@ -1628,6 +1687,10 @@ def select(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s). Defaults to False.
 
+    See Also:
+        * :func:`select_two_layers`: select features using two input layers based on a
+          SQL query
+
     Notes:
         By convention, the sqlite query can contain following placeholders that
         will be automatically replaced for you:
@@ -1647,8 +1710,6 @@ def select(
 
         .. code-block:: python
 
-            import geofileops as gfo
-
             minimum_area = 100
             sql_stmt = f"""
                 SELECT ST_Buffer({{geometrycolumn}}, 1) AS {{geometrycolumn}}
@@ -1659,8 +1720,8 @@ def select(
                    AND ST_Area({{geometrycolumn}}) > {minimum_area}
             """
             gfo.select(
-                input_path=...,
-                output_path=...,
+                input_path="input.gpkg",
+                output_path="output.gpkg",
                 sql_stmt=sql_stmt,
             )
 
@@ -1735,19 +1796,19 @@ def simplify(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     tolerance: float,
-    algorithm: Union[str, SimplifyAlgorithm] = "rdp",
+    algorithm: str | SimplifyAlgorithm = "rdp",
     lookahead: int = 8,
-    input_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
-    columns: Optional[list[str]] = None,
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Applies a simplify operation on geometry column of the input file.
 
     The result is written to the output file specified.
@@ -1845,26 +1906,27 @@ def simplify(
         )
 
 
-# ------------------------
-# Operations on two layers
-# ------------------------
+# -----------------------------
+# Operations on multiple layers
+# -----------------------------
 
 
 def clip(
     input_path: Union[str, "os.PathLike[Any]"],
     clip_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-    input_layer: Optional[str] = None,
-    input_columns: Optional[list[str]] = None,
-    clip_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    input_layer: str | None = None,
+    input_columns: list[str] | None = None,
+    clip_layer: str | None = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
+    subdivide_coords: int = 15000,
     force: bool = False,
-):
+) -> None:
     """Clip the input layer with the clip layer.
 
     The resulting layer will contain the parts of the geometries in the
@@ -1876,6 +1938,10 @@ def clip(
         - geometries in the input layer that overlap with multiple adjacent
           geometries in the clip layer won't result in the input geometries
           getting split.
+        - To speed up processing, complex clip geometries are subdivided by default.
+          In this case, the output geometries can contain extra collinear points where
+          the subdividing occured. This behaviour can be controlled via the
+          ``subdivide_coords`` parameter.
 
     This is the result you can expect when clipping a polygon layer (yellow)
     with another polygon layer (purple):
@@ -1916,8 +1982,16 @@ def clip(
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
             Defaults to -1: (try to) determine optimal size automatically.
-        force (bool, optional): overwrite existing output file(s).
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about ``subdivide_coords`` coordinates during processing which
+            can offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 15000.
+        force (bool, optional): True to overwrite existing output file(s).
             Defaults to False.
+
+    See Also:
+        * :func:`clip_by_geometry`: clip the input layer by a geometry specified
 
     .. |spatialite_reference_link| raw:: html
 
@@ -1943,27 +2017,142 @@ def clip(
         where_post=where_post,
         nb_parallel=nb_parallel,
         batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
         force=force,
     )
+
+
+def concat(
+    input_paths: list[Union[str, "os.PathLike[Any]"]],
+    output_path: Union[str, "os.PathLike[Any]"],
+    input_layers: list[str | None] | str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
+    explodecollections: bool = False,
+    create_spatial_index: bool | None = None,
+    force: bool = False,
+) -> None:
+    """Concatenate multiple geofiles into one output geofile.
+
+    The input files will be appended one after the other in the output file, so only
+    output file types that support appending are supported.
+
+    By default, all columns in any of the input files are retained. If columns are not
+    present in some input files, the values of these columns will be NULL for those
+    rows. If you want to retain only a subset of the columns, specify these in the
+    ``columns`` parameter.
+
+    .. versionadded:: 0.11.0
+
+    Args:
+        input_paths (list[PathLike]): the paths to the files to concatenate.
+        output_path (PathLike): the path to the output file.
+        input_layers (list[str | None] | str, optional): the layer names to use in the
+            input files. The layer names can be None for input files that only contain a
+            single layer. If a single value is specified, this value is used for all
+            input files. Defaults to None.
+        output_layer (str, optional): the layer name to use in the output file. If not
+            specified, the default layer name is used. Defaults to None.
+        columns (list[str], optional): the columns to keep in the output file.
+            If None, all columns present in the first input file are retained.
+            Defaults to None.
+        explodecollections (bool, optional): True to explode geometry collections
+            into separate features. Defaults to False.
+        create_spatial_index (bool, optional): True to create a spatial index on the
+            output file/layer. If None, the default behaviour by gdal for that file
+            type is respected. Defaults to None.
+        force (bool, optional): True to overwrite the output file if it already exists.
+    """
+    # Validate + cleanup input parameters
+    logger = logging.getLogger("geofileops.concat")
+    if input_layers is None or isinstance(input_layers, str):
+        input_layers = [input_layers] * len(input_paths)
+    elif len(input_layers) != len(input_paths):
+        raise ValueError(
+            "input_layers must have the same length as input_paths if it is a list"
+        )
+    output_path = Path(output_path)
+    if _io_util.output_exists(path=output_path, remove_if_exists=force):
+        return
+
+    if create_spatial_index is None:
+        output_geofileinfo = _geofileinfo.get_geofileinfo(output_path)
+        create_spatial_index = output_geofileinfo.default_spatial_index
+
+    logger.info(f"Start concat to {output_path}")
+
+    start_time = datetime.now()
+    with _general_helper.create_gfo_tmp_dir("concat") as tmp_dir:
+        # Loop over all files and copy_layer them one by one together.
+        tmp_dst = tmp_dir / output_path.name
+        is_first = True
+        for src_path, src_layer in zip(input_paths, input_layers, strict=True):
+            # This first file will be created, the others appended
+            write_mode: Literal["create", "append_add_fields"]
+            if is_first:
+                force_local = force
+                write_mode = "create"
+            else:
+                force_local = False
+                write_mode = "append_add_fields"
+
+            # The columns specified should only be columns present in the file,
+            # otherwise the output is invalid.
+            if columns is None or len(columns) == 0:
+                columns_local = columns
+            else:
+                src_info = fileops.get_layerinfo(src_path, layer=src_layer)
+                src_columns_lower = {col.lower() for col in src_info.columns}
+                columns_local = [
+                    col for col in columns if col.lower() in src_columns_lower
+                ]
+
+            fileops.copy_layer(
+                src=src_path,
+                dst=tmp_dst,
+                write_mode=write_mode,
+                src_layer=src_layer,
+                dst_layer=output_layer,
+                columns=columns_local,
+                explodecollections=explodecollections,
+                create_spatial_index=False,
+                force=force_local,
+            )
+
+            if is_first:
+                is_first = False
+
+        # Add a spatial index if needed
+        if create_spatial_index:
+            fileops.create_spatial_index(tmp_dst, output_layer)
+
+        fileops.move(tmp_dst, output_path)
+
+    logger.info(f"Ready, took {datetime.now() - start_time}")
 
 
 def difference(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
-    input2_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
+    input2_layer: str | None = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
-):
+) -> None:
     """Calculate the difference of the input1 layer and input2 layer.
+
+    If ``input2_path`` is None, the 1st input layer is used for both inputs but
+    interactions between the same rows in this layer will be ignored. The output will be
+    the (pieces of) features in this layer that don't have any intersections with other
+    features in this layer.
 
     Notes:
         - Every row in the input layer will result in maximum one row in the
@@ -1971,10 +2160,6 @@ def difference(
         - The output will contain the columns from the 1st no columns from the 2nd
           layer. The attribute values wont't be changed, so columns like area,...
           will have to be recalculated manually.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          interactions between the same rows in this layer will be ignored. The output
-          will be the (pieces of) features in this layer that don't have any
-          intersections with other features in this layer.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -2023,6 +2208,12 @@ def difference(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`identity`: calculate the identity of two layers
+        * :func:`intersection`: calculate the intersection of two layers
+        * :func:`symmetric_difference`: calculate the symmetric difference of two layers
+        * :func:`union`: calculate the union of two layers
+
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
@@ -2063,18 +2254,18 @@ def erase(
     input_path: Union[str, "os.PathLike[Any]"],
     erase_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
-    input_layer: Optional[str] = None,
-    input_columns: Optional[list[str]] = None,
-    erase_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    input_layer: str | None = None,
+    input_columns: list[str] | None = None,
+    erase_layer: str | None = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
-):
+) -> None:
     """DEPRECATED: please use difference."""
     warnings.warn(  # pragma: no cover
         "erase is deprecated because it was renamed to difference. "
@@ -2105,19 +2296,19 @@ def export_by_location(
     input_to_compare_with_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     spatial_relations_query: str = "intersects is True",
-    min_area_intersect: Optional[float] = None,
-    area_inters_column_name: Optional[str] = None,
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
-    input2_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    min_area_intersect: float | None = None,
+    area_inters_column_name: str | None = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
+    input2_layer: str | None = None,
+    output_layer: str | None = None,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 7500,
     force: bool = False,
-):
+) -> None:
     """Exports all features filtered by the specified spatial query.
 
     All features in ``input_to_select_from_path`` that comply to the
@@ -2133,7 +2324,7 @@ def export_by_location(
     Some examples of valid ``spatial_relations_query`` values:
 
         - "touches is True or within is True"
-        - "intersect is True and touches is False"
+        - "intersects is True and touches is False"
         - "(T*T***T** is True or 1*T***T** is True) and T*****FF* is False"
 
 
@@ -2182,6 +2373,16 @@ def export_by_location(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`export_by_bounds`: export features that intersect with the bounds
+          specified
+        * :func:`export_by_distance`: export features that are within a certain distance
+          of features of another layer
+        * :func:`export_by_location`: export features that e.g. intersect with features
+          of another layer
+        * :func:`join_by_location`: join features that e.g. intersect with features of
+          another layer
+
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
@@ -2221,16 +2422,16 @@ def export_by_distance(
     input_to_compare_with_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     max_distance: float,
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
-    input2_layer: Optional[str] = None,
-    output_layer: Optional[str] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
+    input2_layer: str | None = None,
+    output_layer: str | None = None,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """Exports all features within the distance specified.
 
     Features in ``input_to_select_from_path`` that are within the distance specified of
@@ -2268,6 +2469,12 @@ def export_by_distance(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`export_by_bounds`: export features that intersect with the bounds
+          specified
+        * :func:`export_by_location`: export features that e.g. intersect with features
+          of another layer
+
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
@@ -2300,32 +2507,46 @@ def identity(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
+    include_duplicates: bool = True,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
-):
+) -> None:
     r"""Calculates the pairwise identity of the two input layers.
 
     The result is the equivalent of the intersection between the two layers + layer 1
     differenced with layer 2.
 
+    If ``input2_path`` is None, a self-identity is performed. This means the 1st input
+    layer is used for both inputs but interactions between the same rows in this layer
+    are ignored. The output can be influenced via the ``include_duplicates`` parameter:
+        - If True (the default), the logic explained above is applied as-such. The
+          result is that each (part of a) geometry that has an intersection is
+          duplicated in the output with the attribute column values "switched". Hence,
+          each intersecting pair of geometries A and B will lead to two rows in the
+          output: one row with the attributes of A in the columns with
+          ``input1_columns_prefix`` and the attributes of B in the columns with
+          ``input2_columns_prefix``, and a second row with the column values saved the
+          other way around. Non-intersecting areas will not lead to duplicates in
+          identity.
+        - If False, only one of the duplicates is kept in the
+          output with the column values only available "in one direction".
+
     Notes:
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          interactions between the same rows in this layer will be ignored.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -2355,6 +2576,13 @@ def identity(
             Defaults to "l2\_".
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
+        include_duplicates (bool, optional): only applicable for a union on a single
+            layer (input2_path=None). True to include duplicate geometries resulting
+            from the pairwise identity in the output, which leads to each intersection
+            being duplicated with the attribute column values "switched".
+            Defaults to True.
+
+            .. versionadded:: 0.11.0
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
@@ -2376,6 +2604,12 @@ def identity(
             subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
+
+    See Also:
+        * :func:`difference`: calculate the difference between two layers
+        * :func:`intersection`: calculate the intersection of two layers
+        * :func:`symmetric_difference`: calculate the symmetric difference of two layers
+        * :func:`union`: calculate the union of two layers
 
     .. |spatialite_reference_link| raw:: html
 
@@ -2399,6 +2633,7 @@ def identity(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=overlay_self,
+        include_duplicates=include_duplicates,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2420,21 +2655,21 @@ def split(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
-):
+) -> None:
     """DEPRECATED: please use identity."""
     warnings.warn(
         "split is deprecated because it was renamed to identity. "
@@ -2449,6 +2684,7 @@ def split(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=False,
+        include_duplicates=True,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2470,19 +2706,19 @@ def intersect(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     """DEPRECATED: please use intersection."""
     warnings.warn(  # pragma: no cover
         "intersect is deprecated because it was renamed intersection. "
@@ -2513,30 +2749,46 @@ def intersection(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
+    include_duplicates: bool = True,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
-    subdivide_coords: int = 7500,
+    subdivide_coords: int = 15000,
     force: bool = False,
-):
+) -> None:
     r"""Calculates the pairwise intersection of the two input layers.
+
+    Pairwise intersection means that the intersection of each geometry in the 1st input
+    layer with each geometry in the 2nd input layer is calculated and retained in the
+    output.
+
+    If ``input2_path`` is None, a self-intersection is performed. This means the 1st
+    input layer is used for both inputs but interactions between the same rows in this
+    layer are ignored. The output can be influenced with the ``include_duplicates``
+    parameter:
+        - If True (the default), the logic described above is applied as-such. The
+          result is that each geometry is duplicated in the output with the attribute
+          column values "switched". Hence, each intersecting pair of geometries A and B
+          will lead to two rows in the output: one row with the attributes of A in the
+          columns with ``input1_columns_prefix`` and the attributes of B in the columns
+          with ``input2_columns_prefix``, and another row with the columns filled up the
+          other way around.
+        - If ``include_duplicates`` is False, only one of the duplicates is kept in the
+          output with the column values only saved "in one direction".
 
     Notes:
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          intersections between the same rows in this layer will be omitted from the
-          result.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -2569,6 +2821,14 @@ def intersection(
             Defaults to "l2\_".
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
+        include_duplicates (bool, optional): only applicable for an intersection on a
+            single layer (input2_path=None). True to include duplicate geometries
+            resulting from the pairwise intersection in the output, which leads to each
+            geometry being duplicated with the attribute column values "switched". False
+            to keep only one of the resulting geometries in the output with the column
+            values only available "in one direction". Defaults to True.
+
+            .. versionadded:: 0.11.0
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
@@ -2587,9 +2847,15 @@ def intersection(
             parts with about ``subdivide_coords`` coordinates during processing which
             can offer a large speed up for complex geometries. Subdividing can result in
             extra collinear points being added to the boundaries of the output. If 0, no
-            subdividing is applied. Defaults to 20000.
+            subdividing is applied. Defaults to 15000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
+
+    See Also:
+        * :func:`difference`: calculate the difference between two layers
+        * :func:`identity`: calculate the identity of two layers
+        * :func:`symmetric_difference`: calculate the symmetric difference of two layers
+        * :func:`union`: calculate the union of two layers
 
     .. |spatialite_reference_link| raw:: html
 
@@ -2613,6 +2879,7 @@ def intersection(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=overlay_self,
+        include_duplicates=include_duplicates,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -2630,28 +2897,137 @@ def intersection(
     )
 
 
+def join(
+    input1_path: Path,
+    input2_path: Path,
+    output_path: Path,
+    input1_on: list[str] | str,
+    input2_on: list[str] | str,
+    join_type: str = "INNER",
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
+    input1_columns_prefix: str = "l1_",
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
+    input2_columns_prefix: str = "l2_",
+    output_layer: str | None = None,
+    explodecollections: bool = False,
+    gridsize: float = 0.0,
+    where_post: str | None = None,
+    nb_parallel: int = 1,
+    batchsize: int = -1,
+    force: bool = False,
+) -> None:
+    r"""Joins two layers based on attribute values.
+
+    The output will contain the geometries of input1. The ``input1_on`` and
+    ``input2_on`` parameters will determine which geometries of input1 will be matched
+    with input2.
+
+    Alternative names:
+        - Pandas: merge, join
+
+    .. versionadded:: 0.11.0
+
+    Args:
+        input1_path (PathLike): the 1st input file
+        input2_path (PathLike): the 2nd input file
+        output_path (PathLike): the file to write the result to
+        input1_on (List[str] or str): column(s) in the 1st input layer to join on.
+        input2_on (List[str] or str): column(s) in the 2nd input layer to join on.
+        join_type (str, optional): type of join: "INNER" or "LEFT". Defaults to "INNER".
+        input1_layer (str or LayerInfo, optional): 1st input layer name. If None,
+            ``input1_path`` should contain only one layer. Defaults to None.
+        input1_columns (List[str], optional): list of columns to retain. If None, all
+            standard columns are retained. In addition to standard columns, it is also
+            possible to specify "fid", a unique index available in all input files. Note
+            that the "fid" will be aliased even if ``input1_columns_prefix`` is "", eg.
+            to "fid_1". Defaults to None.
+        input1_columns_prefix (str, optional): prefix to use in the column aliases.
+            Defaults to "l1\_".
+        input2_layer (str or LayerInfo, optional): 2nd input layer name. If None,
+            ``input2_path`` should contain only one layer. Defaults to None.
+        input2_columns (List[str], optional): columns to select. If None is specified,
+            all columns are selected. As explained for ``input1_columns``, it is also
+            possible to specify "fid". Defaults to None.
+        input2_columns_prefix (str, optional): prefix to use in the column aliases.
+            Defaults to "l2\_".
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
+        explodecollections (bool, optional): True to convert all multi-geometries to
+            single geometries. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
+        where_post (str, optional): SQL filter to apply after all other processing,
+            including e.g. ``explodecollections``. It should be in sqlite syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
+        nb_parallel (int, optional): the number of parallel processes to use.
+            Defaults to 1.
+        batchsize (int, optional): indicative number of rows to process per
+            batch. A smaller batch size, possibly in combination with a
+            smaller ``nb_parallel``, will reduce the memory usage.
+            Defaults to -1: (try to) determine optimal size automatically.
+        force (bool, optional): overwrite existing output file(s).
+            Defaults to False.
+
+    See Also:
+        * :func:`join_by_location`: join two layers based on their spatial relationship
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
+    logger = logging.getLogger("geofileops.join")
+    logger.info(
+        f"join: select from {input1_path} joining with {input2_path} to {output_path}"
+    )
+    return _geoops_sql.join(
+        input1_path=Path(input1_path),
+        input2_path=Path(input2_path),
+        output_path=Path(output_path),
+        input1_on=input1_on,
+        input2_on=input2_on,
+        join_type=join_type,
+        input1_layer=input1_layer,
+        input1_columns=input1_columns,
+        input1_columns_prefix=input1_columns_prefix,
+        input2_layer=input2_layer,
+        input2_columns=input2_columns,
+        input2_columns_prefix=input2_columns_prefix,
+        output_layer=output_layer,
+        explodecollections=explodecollections,
+        gridsize=gridsize,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        force=force,
+    )
+
+
 def join_by_location(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     spatial_relations_query: str = "intersects is True",
     discard_nonmatching: bool = True,
-    min_area_intersect: Optional[float] = None,
-    area_inters_column_name: Optional[str] = None,
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    min_area_intersect: float | None = None,
+    area_inters_column_name: str | None = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
-    r"""Joins all features in input1 with all features in input2.
+) -> None:
+    r"""Join two layers based on the spatial relationship between the geometries.
 
     The output will contain the geometries of input1. The ``spatial_relations_query``
     and ``min_area_intersect`` parameters will determine which geometries of input1 will
@@ -2677,6 +3053,7 @@ def join_by_location(
     Alternative names:
         - GeoPandas: sjoin
         - ArcGIS: spatial join
+        - QGIS: join attributes by location
 
     Args:
         input1_path (PathLike): the 1st input file
@@ -2725,6 +3102,12 @@ def join_by_location(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`export_by_location`: export features that e.g. intersect with features
+          of another layer
+        * :func:`join_by_distance`: join features that are within a certain distance of
+          features of another layer
+
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
@@ -2765,19 +3148,19 @@ def join_nearest(
     input2_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     nb_nearest: int,
-    distance: Optional[float] = None,
-    expand: Optional[bool] = None,
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    distance: float | None = None,
+    expand: bool | None = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     r"""Joins features of ``input1`` with the ``nb_nearest`` ones in ``input2``.
 
     In addition to the columns requested via the ``input*_columns`` parameters, the
@@ -2838,6 +3221,13 @@ def join_nearest(
             Defaults to -1: (try to) determine optimal size automatically.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
+
+    See Also:
+        * :func:`export_by_distance`: export features that are within a certain distance
+          of features of another layer
+        * :func:`join_by_location`: join features that e.g. intersect with features of
+          another layer
+
     """
     logger = logging.getLogger("geofileops.join_nearest")
     logger.info(f"select from {input1_path} joined with {input2_path} to {output_path}")
@@ -2867,21 +3257,21 @@ def select_two_layers(
     input2_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
     sql_stmt: str,
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: Optional[GeometryType] = None,
+    force_output_geometrytype: GeometryType | None = None,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = 1,
     batchsize: int = -1,
     force: bool = False,
-):
+) -> None:
     r'''Execute a SELECT SQL statement on the input files.
 
     The ``sql_stmt`` must be in SQLite dialect and can contain placeholders that will be
@@ -2969,8 +3359,6 @@ def select_two_layers(
 
         .. code-block:: python
 
-            import geofileops as gfo
-
             minimum_area = 100
             sql_stmt = f"""
                 SELECT layer1.{{input1_geometrycolumn}}
@@ -2984,9 +3372,9 @@ def select_two_layers(
                    AND ST_Area(layer1.{{input1_geometrycolumn}}) > {minimum_area}
             """
             gfo.select_two_layers(
-                input1_path=...,
-                input2_path=...,
-                output_path=...,
+                input1_path="input1.gpkg",
+                input2_path="input2.gpkg",
+                output_path="output.gpkg",
                 sql_stmt=sql_stmt,
             )
 
@@ -3010,9 +3398,12 @@ def select_two_layers(
           {layer1_columns_prefix_str}), they will start with a "," and if no column
           precedes it the SQL statement will be invalid.
 
+    See Also:
+        * :func:`select`: select features from a layer based on a SQL query
+
     Examples:
         An ideal place to get inspiration to write you own advanced queries
-        is in the following source code file: |geofileops_sql_link|.
+        is in the following source code file: |geoops_sql_link|.
 
         Additionally, there are some examples listed here that highlight
         other features/possibilities.
@@ -3058,14 +3449,13 @@ def select_two_layers(
                  WHERE pos = 1
             """
 
-
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
 
-    .. |geofileops_sql_link| raw:: html
+    .. |geoops_sql_link| raw:: html
 
-        <a href="https://github.com/geofileops/geofileops/blob/main/geofileops/util/geofileops_sql.py" target="_blank">geofileops_sql.py</a>
+        <a href="https://github.com/geofileops/geofileops/blob/main/geofileops/util/_geoops_sql.py" target="_blank">_geoops_sql.py</a>
 
     '''  # noqa: E501
     logger = logging.getLogger("geofileops.select_two_layers")
@@ -3096,32 +3486,40 @@ def symmetric_difference(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
-):
+) -> None:
     r"""Calculates the pairwise symmetric difference of the two input layers.
 
     The result will be a layer containing features from both the input and overlay
     layers but with the overlapping areas between the two layers removed.
 
+    If ``input2_path`` is None, the 1st input layer is used for both inputs but
+    interactions between the same rows in this layer will be ignored. This leads to each
+    non-intersecting area getting a duplicated geometry with the attribute column values
+    "switched" in the output. Hence, each non-intersecting geometry will lead to one row
+    in the output with the attribute values in the columns with
+    ``input1_columns_prefix`` and NULL values in the columns with
+    ``input2_columns_prefix``, as well as a second row with the attribute values the
+    other way around. If you don't want this duplication, use the :func:`difference`
+    function instead.
+
     Notes:
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          interactions between the same rows in this layer will be ignored.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -3178,6 +3576,12 @@ def symmetric_difference(
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
 
+    See Also:
+        * :func:`difference`: calculate the difference between two layers
+        * :func:`identity`: calculate the identity of two layers
+        * :func:`intersection`: calculate the intersection of two layers
+        * :func:`union`: calculate the union of two layers
+
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
@@ -3224,21 +3628,22 @@ def union(
     input1_path: Union[str, "os.PathLike[Any]"],
     input2_path: Union[str, "os.PathLike[Any]", None],
     output_path: Union[str, "os.PathLike[Any]"],
-    input1_layer: Optional[str] = None,
-    input1_columns: Optional[list[str]] = None,
+    input1_layer: str | None = None,
+    input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
-    input2_layer: Optional[str] = None,
-    input2_columns: Optional[list[str]] = None,
+    input2_layer: str | None = None,
+    input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
-    output_layer: Optional[str] = None,
+    output_layer: str | None = None,
+    include_duplicates: bool = True,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     nb_parallel: int = -1,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
-):
+) -> None:
     r"""Calculates the pairwise union of the two input layers.
 
     Union needs to be interpreted here as such: the output layer will contain the
@@ -3249,12 +3654,28 @@ def union(
         - The (parts of) features of layer 2 that don't have any intersection with layer
           1.
 
+    If ``input2_path`` is None, a self-union is performed. This means the 1st input
+    layer is used for both inputs but interactions between the same rows in this layer
+    are ignored. The output can be influenced with the ``include_duplicates``
+    parameter:
+        - If True (the default), the logic explained above is applied as-such. The
+          result is that each geometry is duplicated in the output with the attribute
+          column values "switched". Hence, each intersecting pair of geometries A and B
+          will lead to two rows in the output: one row with the attributes of A in the
+          columns with ``input1_columns_prefix`` and the attributes of B in the columns
+          with ``input2_columns_prefix``, and a second row with the columns filled up
+          the other way around.
+          A non-intersecting geometry will lead to one row in the output with the
+          attribute values in the columns with ``input1_columns_prefix`` and NULL values
+          in the columns with ``input2_columns_prefix``, and a second row with the
+          columns filled up the other way around.
+        - If False, only one of the duplicates is kept in the output with the column
+          values only available "in one direction".
+
     Notes:
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
-        - If ``input2_path`` is None, the 1st input layer is used for both inputs but
-          interactions between the same rows in this layer will be ignored.
         - To speed up processing, complex input geometries are subdivided by default.
           For these geometries, the output geometries will contain extra collinear
           points where the subdividing occured. This behaviour can be controlled via the
@@ -3288,6 +3709,14 @@ def union(
             Defaults to "l2\_".
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
+        include_duplicates (bool, optional): only applicable for a union on a single
+            layer (input2_path=None). True to include duplicate geometries resulting
+            from the pairwise union in the output, which leads to each geometry being
+            duplicated with the attribute column values "switched". False to keep only
+            one of the resulting geometries in the output with the column values only
+            available "in one direction". Defaults to True.
+
+            .. versionadded:: 0.11.0
         explodecollections (bool, optional): True to convert all multi-geometries to
             singular ones after the dissolve. Defaults to False.
         gridsize (float, optional): the size of the grid the coordinates of the ouput
@@ -3309,6 +3738,13 @@ def union(
             subdividing is applied. Defaults to 2000.
         force (bool, optional): overwrite existing output file(s).
             Defaults to False.
+
+    See Also:
+        * :func:`union_full_self`: calculate the "Full" union of a layer
+        * :func:`difference`: calculate the difference between two layers
+        * :func:`identity`: calculate the identity of two layers
+        * :func:`intersection`: calculate the intersection of two layers
+        * :func:`symmetric_difference`: calculate the symmetric difference of two layers
 
     .. |spatialite_reference_link| raw:: html
 
@@ -3335,6 +3771,7 @@ def union(
         input2_path=Path(input2_path),
         output_path=Path(output_path),
         overlay_self=overlay_self,
+        include_duplicates=include_duplicates,
         input1_layer=input1_layer,
         input1_columns=input1_columns,
         input1_columns_prefix=input1_columns_prefix,
@@ -3342,6 +3779,127 @@ def union(
         input2_columns=input2_columns,
         input2_columns_prefix=input2_columns_prefix,
         output_layer=output_layer,
+        explodecollections=explodecollections,
+        gridsize=gridsize,
+        where_post=where_post,
+        nb_parallel=nb_parallel,
+        batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
+        force=force,
+    )
+
+
+def union_full_self(
+    input_path: Path,
+    output_path: Path,
+    *,
+    intersections_as: Literal["COLUMNS", "LISTS", "ROWS"],
+    input_layer: str | None = None,
+    output_layer: str | None = None,
+    columns: list[str] | None = None,
+    explodecollections: bool = False,
+    gridsize: float = 0.0,
+    where_post: str | None = None,
+    nb_parallel: int = -1,
+    batchsize: int = -1,
+    subdivide_coords: int = 2000,
+    force: bool = False,
+) -> None:
+    """Calculates the "full" union of the features in a layer.
+
+    .. warning::
+       This function is experimental and may be changed and/or renamed in a future
+       release without backwards compatibility!
+
+    All geometries in the input layer are cut up till the smallest possible parts based
+    on the intersections between them.
+
+    The way intersecting (parts of) features are treated in the output depends on the
+    ``intersections_as`` parameter.
+
+    The following plot shows the result of a full union on a layer with intersecting
+    features. The labels on b) indicate the number of features that intersect in the
+    input layer on that location:
+
+    .. plot:: code/union_full_self.py
+
+    .. versionadded:: 0.11.0
+
+    Args:
+        input_path (PathLike): the input file.
+        output_path (PathLike): the file to write the result to
+        intersections_as (Literal["COLUMNS", "LISTS", "ROWS"]): determines the way
+            intersecting features in the input layer are treated in the output. Possible
+            options are:
+
+            - "COLUMNS": the output won't contain any intersections between geometries.
+              The `columns` in the output are prefixed with "i1_", "i2_", etc., where
+              for each extra intersection on a location a new set of prefixed columns is
+              created. E.g. for an input layer with 1 column "test" where a location is
+              covered by 3 input features, the output will contain 3 columns: "i1_test",
+              "i2_test", and "i3_test" with each column having the attribute value of
+              one of the intersecting features on that location. For features with less
+              than the maximum number of intersections, the extra columns are NULL.
+            - "LISTS": the output won't contain any intersections between geometries.
+              The `columns` to retain will be available in the output as well, but
+              their values are stored in a list the length of the number of
+              intersections. A column "nb_intersecting" is added to indicate the number
+              of intersections per feature. Hence, if a location of an input layer with
+              1 column "test" is covered by 3 input features, the output will contain 2
+              columns: "test" and "nb_intersecting". For a location with 3 intersecting
+              features in the input layer, "nb_intersecting" will be 3 and the value in
+              the "test" column will be a json list with 3 values, each being the
+              attribute value of one of the intersecting features on that location.
+            - "ROWS": each location where the input features intersect is repeated the
+              number of times that area is covered by an input feature.
+              Hence, the output may contain intersections between features. Attribute
+              columns are retained, whith each intersection having the attribute values
+              of one of the intersecting input features on that location.
+
+        input_layer (str, optional): input layer name. If None, ``input_path``
+            should contain only one layer. Defaults to None.
+        output_layer (str, optional): output layer name. If None, the ``output_path``
+            stem is used. Defaults to None.
+        columns (List[str], optional): list of columns to retain. If None, all
+            standard columns are retained. In addition to standard columns, it is also
+            possible to retain custom columns by specifying their names in this list.
+            Note that the "fid" column is always retained even if not specified here.
+            Defaults to None.
+        explodecollections (bool, optional): True to convert all multi-geometries to
+            singular ones after the dissolve. Defaults to False.
+        gridsize (float, optional): the size of the grid the coordinates of the ouput
+            will be rounded to. Eg. 0.001 to keep 3 decimals. Value 0.0 doesn't change
+            the precision. Defaults to 0.0.
+        where_post (str, optional): SQL filter to apply after all other processing,
+            including e.g. explodecollections. It should be in sqlite syntax and
+            |spatialite_reference_link| functions can be used. Defaults to None.
+        nb_parallel (int, optional): the number of parallel processes to use.
+            Defaults to -1: use all available CPUs.
+        batchsize (int, optional): indicative number of rows to process per batch.
+            A smaller batch size, possibly in combination with a
+            smaller ``nb_parallel``, will reduce the memory usage.
+            Defaults to -1: (try to) determine optimal size automatically.
+        subdivide_coords (int, optional): the input geometries will be subdivided to
+            parts with about ``subdivide_coords`` coordinates during processing which
+            can offer a large speed up for complex geometries. Subdividing can result in
+            extra collinear points being added to the boundaries of the output. If 0, no
+            subdividing is applied. Defaults to 2000.
+        force (bool, optional): overwrite existing output file(s).
+            Defaults to False.
+
+    See Also:
+        * :func:`union`: calculate the pairwise union of two layers
+    """
+    logger = logging.getLogger("geofileops.union_full_self")
+    logger.info(f"Start, with input: {input_path}, output: {output_path}")
+
+    _union_full.union_full_self(
+        input_path=Path(input_path),
+        output_path=Path(output_path),
+        intersections_as=intersections_as,
+        input_layer=input_layer,
+        output_layer=output_layer,
+        columns=columns,
         explodecollections=explodecollections,
         gridsize=gridsize,
         where_post=where_post,

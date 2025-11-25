@@ -2,7 +2,6 @@
 
 import sqlite3
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 from osgeo import gdal, ogr
@@ -14,7 +13,7 @@ ogr.UseExceptions()
 
 
 def get_layerstyles(
-    path: Path, layer: Optional[str] = None, name: Optional[str] = None
+    path: Path, layer: str | None = None, name: str | None = None
 ) -> pd.DataFrame:
     """Get the layer styles saved in the geofile.
 
@@ -51,7 +50,7 @@ def add_layerstyle(
     description: str = "",
     owner: str = "",
     ui: str = "",
-):
+) -> None:
     """Add the layer style to the geofile.
 
     Remark: at the time of writing, QGIS only uses the qml field to interprete the
@@ -75,10 +74,7 @@ def add_layerstyle(
     """
     # Make sure the layer_styles table exists
     _init_layerstyles(path, exist_ok=True)
-    if use_as_default:
-        use_as_default_str = 1
-    else:
-        use_as_default_str = 0
+    use_as_default_str = 1 if use_as_default else 0
 
     # Get existing layer styles
     layer_styles_df = get_layerstyles(path, layer=layer, name=name)
@@ -90,7 +86,7 @@ def add_layerstyle(
             .reset_index()
             .to_dict(orient="records")
         )
-        raise ValueError(f"layer style exists already: {styles_found}")
+        raise ValueError(f"layer style already exists: {styles_found}")
 
     # Insert style
     conn = sqlite3.connect(path)
@@ -115,7 +111,7 @@ def add_layerstyle(
         conn.close()
 
 
-def remove_layerstyle(path: Path, id: int):
+def remove_layerstyle(path: Path, id: int) -> None:  # noqa: A002
     """Remove a layer style.
 
     Only styles saved according to the QGIS Geopackage styling extension are removed:
@@ -164,7 +160,7 @@ def _has_layerstyles_table(path: Path) -> bool:
     return table_exists
 
 
-def _init_layerstyles(path: Path, exist_ok: bool = False):
+def _init_layerstyles(path: Path, exist_ok: bool = False) -> None:
     """Create a layer_styles attribute table to store style information in the QGIS way.
 
     The table is created according to the QGIS Geopackage styling extension:
@@ -172,16 +168,16 @@ def _init_layerstyles(path: Path, exist_ok: bool = False):
 
     Args:
         path (Path): the file to create the table in.
-        exist_ok (bool, options): If True and the index exists already, don't
+        exist_ok (bool, options): If True and the index already exists, don't
             throw an error.
     """
     try:
-        # First check if it exists already
+        # First check if it already exists
         if _has_layerstyles_table(path):
             if exist_ok:
                 return
             else:
-                raise ValueError(f"layer_styles table exists already in {path}")
+                raise ValueError(f"layer_styles table already exists in {path}")
 
         # Doesn't exist yet, so create the table
         datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)

@@ -3,14 +3,16 @@
 import logging
 import os
 import tempfile
+import time
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Union
 
 import geofileops as gfo
 
 
-def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path:
-    """Creates a new tempdir in the default temp location.
+def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:
+    """Creates a new temporary directory.
 
     Remark: the temp dir won't be cleaned up automatically!
 
@@ -22,11 +24,12 @@ def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path
         base_dirname (str): The name the tempdir will start with. The name will be
             suffixed with a number to make the directory name unique. If a "/" is part
             of the base_dirname a subdirectory will be created: e.g. "foo/bar".
-        parent_dir (Path, optional): The dir to create the tempdir in. If None, the
-            system temp dir is used. Defaults to None.
+        parent_dir (Path, optional): The directory to create the tempdir in. If None,
+            the directory returned by :func:`tempfile.gettempdir` is used.
+            Defaults to None.
 
     Raises:
-        Exception: if it wasn't possible to create the temp dir because there
+        RuntimeError: if it wasn't possible to create the temp dir because there
             wasn't found a unique directory name.
 
     Returns:
@@ -43,7 +46,7 @@ def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path
         except FileExistsError:
             continue
 
-    raise Exception(
+    raise RuntimeError(
         f"Wasn't able to create a temporary dir with basedir: "
         f"{parent_dir / base_dirname}"
     )
@@ -52,8 +55,8 @@ def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path
 def get_tempfile_locked(
     base_filename: str,
     suffix: str = ".tmp",
-    dirname: Optional[str] = None,
-    tempdir: Optional[Path] = None,
+    dirname: str | None = None,
+    tempdir: Path | None = None,
 ) -> tuple[Path, Path]:
     """Formats a temp file path, and creates a corresponding lock file.
 
@@ -99,20 +102,55 @@ def get_tempfile_locked(
                 # So delete lock file and try again.
                 tempfilelock_path.unlink()
 
-    raise Exception(
+    raise RuntimeError(
         f"Wasn't able to create a temporary file with base_filename: {base_filename}, "
         f"dir: {dir}"
     )
 
 
-def create_file_atomic(filename) -> bool:
-    """Create a lock file in an atomic way, so it is threadsafe.
+def create_file_atomic_wait(
+    path: Union[str, "os.PathLike[Any]"],
+    time_between_attempts: float = 1,
+    timeout: float = 0,
+) -> None:
+    """Create a file in an atomic way.
+
+    If it already exists, wait till it can be created.
+
+    Returns once the file is created.
+
+    Args:
+        path (PathLike): path of the file to create.
+        time_between_attempts (float, optional): time to wait between attempts.
+            Defaults to 1.
+        timeout (float, optional): maximum time in seconds to wait to create the file.
+            Once the timeout has been reached, a RunTimeError is raised. If 0, there is
+            no timeout. Defaults to 0.
+    """
+    start_time = datetime.now()
+    while True:
+        if create_file_atomic(path):
+            return
+
+        if timeout > 0:
+            time_waiting = (datetime.now() - start_time).total_seconds()
+            if time_waiting > timeout:
+                raise RuntimeError(
+                    f"timeout of {timeout} secs reached, couldn't create {path}"
+                )
+
+        # Wait 100ms
+        time.sleep(time_between_attempts)
+
+
+def create_file_atomic(path: Union[str, "os.PathLike[Any]"]) -> bool:
+    """Create a file in an atomic way.
 
     Returns True if the file was created by this thread, False if the file existed
     already.
     """
     try:
-        fd = os.open(filename, os.O_CREAT | os.O_EXCL)
+        fd = os.open(path, os.O_CREAT | os.O_EXCL)
         os.close(fd)
         return True
     except FileExistsError:
@@ -121,13 +159,7 @@ def create_file_atomic(filename) -> bool:
         if ex.errno == 13:
             return False
         else:
-            raise Exception("Error creating lock file {filename}") from ex
-
-
-def with_stem(path: Path, new_stem) -> Path:
-    # Remark: from python 3.9 this is available on any Path, but to avoid
-    # having to require 3.9 for this, this hack...
-    return path.parent / f"{new_stem}{path.suffix}"
+            raise RuntimeError(f"Error creating file {path}") from ex
 
 
 def output_exists(path: Path, remove_if_exists: bool) -> bool:
@@ -154,7 +186,7 @@ def output_exists(path: Path, remove_if_exists: bool) -> bool:
             gfo.remove(path)
             return False
         else:
-            logging.info(msg=f"Stop, output exists already {path}", stacklevel=2)
+            logging.info(msg=f"Stop, output already exists {path}", stacklevel=2)
             return True
 
     return False

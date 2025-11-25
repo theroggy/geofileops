@@ -2,28 +2,26 @@ name: geofileops-doc
 channels:
   - conda-forge
 dependencies:
-  - python =3.9
-  - pip
+  - python =3.12
   # required
   - cloudpickle
-  - fiona
   - gdal >=3.6.3
   - geopandas-base >=0.12
-  - libspatialite >=5.0
+  - libspatialite
+  - matplotlib
   - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
   - numpy
   - packaging
   - pandas
   - psutil
-  - pygeoops >=0.4,<0.5
-  - pyogrio >=0.5
+  - pygeoops >=0.4
+  - pyogrio >=0.7
   - pyproj
-  - shapely >=2,<2.1
+  - shapely >=2
   # optional
   - simplification
   # docs
-  # Restrict sphinx version to < 6 to avoid logo error
-  - sphinx<6
   - pydata-sphinx-theme
-  - pip:
-    - sphinx-automodapi ==0.13
+  - sphinx
+  - sphinx-automodapi
+  - sphinx-copybutton

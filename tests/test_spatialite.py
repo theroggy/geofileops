@@ -4,30 +4,25 @@ Tests for functionalities in ogr_util.
 
 import pytest
 import shapely.geometry as sh_geom
-from packaging import version
 
 import geofileops as gfo
-from geofileops._compat import SPATIALITE_GTE_51
 from tests import test_helper
 
 
 @pytest.mark.parametrize(
-    "descr, sql, version_needed",
+    "descr, sql",
     [
         (
             "1_geos_basic",
             "SELECT ST_Buffer(ST_GeomFromText('POINT (5 5)'), 5) AS geom",
-            "5.0",
         ),
         (
             "2_geos_advanced",
             "SELECT ST_ConcaveHull(ST_GeomFromText('POINT (5 5)')) geom",
-            "5.0",
         ),
         (
             "3_geos_3100",
             "SELECT GeosMakeValid(ST_GeomFromText('POINT (5 5)')) AS geom",
-            "5.1",
         ),
         (
             "4_geos_3110",
@@ -38,21 +33,13 @@ from tests import test_helper
                        5
                    ) AS geom
             """,
-            "5.1",
         ),
     ],
 )
-def test_geos_functions(descr, sql, version_needed):
-    """Test some geos functions from different spatialite versions."""
+def test_geos_functions(descr, sql):  # noqa: ARG001
+    """Test some geos functions available via spatialite."""
     test_path = test_helper.get_testfile(testfile="polygon-parcel")
-
-    if version.parse(version_needed) < version.parse("5.1") or (
-        version.parse(version_needed) >= version.parse("5.1") and SPATIALITE_GTE_51
-    ):
-        gfo.read_file(test_path, sql_stmt=sql)
-    else:
-        with pytest.raises(Exception, match="no such function"):
-            gfo.read_file(test_path, sql_stmt=sql)
+    gfo.read_file(test_path, sql_stmt=sql)
 
 
 @pytest.mark.skipif(
@@ -108,8 +95,11 @@ def test_nested_collections(ogr_type):
 
     test_gdf = gfo.read_file(input_path, sql_stmt=sql_stmt)
     if ogr_type == "WKT":
-        # Due to a bug in spatialite this isn't equal even though it should be equal...
-        assert test_gdf.geometry[0].wkt != collection.wkt
+        # Due to a bug in spatialite this isn't equal even though it should be equal.
+        pytest.xfail("Spatialite: Multi-geom in WKT GeometryCollection is flattened")
+        assert test_gdf.geometry[0].wkt == collection.wkt
     elif ogr_type == "WKB":
         # Due to a worse bug in spatialite the wkb version is parsed to a POINT.
+        pytest.xfail("Spatialite: Multi-geom in WKB GeometryCollection becomes Point")
         assert test_gdf.geometry[0].wkt == "GEOMETRYCOLLECTION (POINT (0 0))"
+        assert test_gdf.geometry[0].wkt == collection.wkt

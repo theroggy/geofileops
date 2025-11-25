@@ -1,54 +1,130 @@
 """Module containing utilities regarding processes."""
 
+import multiprocessing
+import multiprocessing.context
 import os
+from collections.abc import Callable
 from concurrent import futures
-from typing import Optional
+from types import TracebackType
 
 import psutil
 
+WORKER_TYPES = {"threads", "processes"}
+
 
 class PooledExecutorFactory:
-    """Context manager to create an Executor.
+    """Context manager to create a pooled executor.
 
     Args:
-        threadpool (bool, optional): True to get a ThreadPoolExecutor,
-            False to get a ProcessPoolExecutor. Defaults to True.
-        max_workers (int, optional): Max number of workers.
+        worker_type (str, optional): type of executor pool to create.
+            "threads" for a ThreadPoolExecutor, "processes" for a ProcessPoolExecutor.
+        max_workers (int, optional): Maximum number of workers.
             Defaults to None to get automatic determination.
-        initialisze (function, optional): Function that does initialisations.
+        initializer (function, optional): Function that does initialisations.
+        mp_context (BaseContext, optional): multiprocessing context if processes are
+            used. If None, "forkserver" will be used on linux to avoid risks on getting
+            deadlocks. Defaults to None.
+
     """
 
-    def __init__(self, threadpool: bool = True, max_workers=None, initializer=None):
-        self.threadpool = threadpool
+    def __init__(
+        self,
+        worker_type: str = "processes",
+        max_workers: int | None = None,
+        initializer: Callable | None = None,
+        initargs: tuple = (),
+        mp_context: multiprocessing.context.BaseContext | None = None,
+    ) -> None:
+        self.worker_type = worker_type.lower()
+        if self.worker_type not in WORKER_TYPES:
+            raise ValueError(
+                f"Invalid worker_type: {self.worker_type}. "
+                f"Must be one of {WORKER_TYPES}."
+            )
+
+        self.max_workers = max_workers
         if max_workers is not None and os.name == "nt":
+            # On windows, max workers should be limited to 61 to avoid errors
             self.max_workers = min(max_workers, 61)
-        else:
-            self.max_workers = max_workers
+
         self.initializer = initializer
-        self.pool: Optional[futures.Executor] = None
+        self.initargs = initargs
+        self.mp_context = mp_context
+        if mp_context is None and os.name not in {"nt", "darwin"}:
+            # On linux, overrule default to "forkserver" to avoid risks to deadlocks
+            self.mp_context = multiprocessing.get_context("forkserver")
+        self.pool: futures.Executor | None = None
 
     def __enter__(self) -> futures.Executor:
-        if self.threadpool:
+        if self.worker_type == "threads":
             self.pool = futures.ThreadPoolExecutor(
-                max_workers=self.max_workers, initializer=self.initializer
+                max_workers=self.max_workers,
+                initializer=self.initializer,
+                initargs=self.initargs,
+            )
+        elif self.worker_type == "processes":
+            self.pool = futures.ProcessPoolExecutor(
+                max_workers=self.max_workers,
+                initializer=self.initializer,
+                initargs=self.initargs,
+                mp_context=self.mp_context,
             )
         else:
-            self.pool = futures.ProcessPoolExecutor(
-                max_workers=self.max_workers, initializer=self.initializer
+            raise ValueError(
+                f"Invalid worker_type: {self.worker_type}. "
+                f"Must be one of {WORKER_TYPES}."
             )
+
         return self.pool
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(
+        self,
+        type: type,  # noqa: A002
+        value: Exception | None,
+        traceback: TracebackType | None,
+    ) -> None:
         if self.pool is not None:
             self.pool.shutdown(wait=True)
 
 
-def initialize_worker():
-    # We don't want the workers to block the entire system, so make them nice
+def initialize_worker(worker_type: str, nice_value: int = 15) -> None:
+    """Some default inits.
+
+    Following things are done:
+    - Set the worker process priority low (to `nice_value`) so the workers don't block
+      the system.
+    - Reduce OpenMP threads to avoid committed memory getting very high. You can specify
+      the number of threads using the environment variable `GFO_WORKER_OMP_NUM_THREADS`.
+
+    Args:
+        worker_type (str): The type of worker to initialize.
+            "threads" for thread pool, "processes" for process pool.
+        nice_value (int, optional): The niceness value to set for the worker. 19 is the
+            maximum niceness (lowest priority), and -20 is the minimum
+            (highest priority). Defaults to 15.
+    """
+    worker_type = worker_type.lower()
+    if worker_type not in WORKER_TYPES:
+        raise ValueError(
+            f"Invalid worker_type: {worker_type}. Must be one of {WORKER_TYPES}."
+        )
+
+    if worker_type == "processes":
+        # Reduce OpenMP threads to avoid unnecessary inflated committed memory when
+        # using multiprocessing.
+        # Should work for any numeric library used (openblas, mkl,...).
+        # Ref: https://stackoverflow.com/questions/77764228/pandas-scipy-high-commit-memory-usage-windows
+        worker_omp_threads = os.environ.get("GFO_WORKER_OMP_NUM_THREADS", "1")
+        os.environ["OMP_NUM_THREADS"] = worker_omp_threads
+
+    # We don't want the workers to block the entire system, so make the workers nice
     # if they aren't quite nice already.
-    # Remark: on linux, depending on system settings it is not possible to
-    # decrease niceness, even if it was you who niced before.
-    nice_value = 15
+    #
+    # Remarks:
+    #   - on linux, depending on system settings it is not possible to decrease
+    #     niceness, even if it was you who niced before.
+    #   - we are setting the niceness of the process here, so in case of
+    #     `worker_type=threads` the main thread/process will also be impacted.
     if getprocessnice() < nice_value:
         setprocessnice(nice_value)
 
@@ -74,7 +150,7 @@ def getprocessnice() -> int:
         return int(nice_value)
 
 
-def setprocessnice(nice_value: int):
+def setprocessnice(nice_value: int) -> None:
     """Set the niceness of the current process.
 
     The nice value can (typically) range from 19, which gives all other

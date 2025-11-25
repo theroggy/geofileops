@@ -3,23 +3,45 @@ Helper functions for all tests.
 """
 
 import os
-import tempfile
+import re
 from pathlib import Path
-from typing import Optional, Union
+from stat import S_IRGRP, S_IROTH, S_IRUSR, S_IRWXG, S_IRWXO, S_IRWXU
 
 import geopandas as gpd
 import geopandas.testing as gpd_testing
+import pytest
 import shapely
 import shapely.geometry as sh_geom
 
 import geofileops as gfo
-from geofileops.util import _geofileinfo, _geoseries_util, geodataframe_util
+from geofileops._compat import GDAL_GTE_311, PYTHON_313
+from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.util import (
+    _geofileinfo,
+    _geoseries_util,
+    _io_util,
+    geodataframe_util,
+)
+from geofileops.util._geopath_util import GeoPath
 
-_data_dir = Path(__file__).parent.resolve() / "data"
+try:
+    import matplotlib.colors as mcolors
+    from matplotlib import figure as mpl_figure
+except ImportError:
+    mcolors = None  # type: ignore[assignment]
+    mpl_figure = None  # type: ignore[assignment]
+
+data_dir = Path(__file__).parent.resolve() / "data"
+data_url = "https://raw.githubusercontent.com/geofileops/geofileops/main/tests/data"
+
 EPSGS = [31370, 4326]
 GRIDSIZE_DEFAULT = 0.0
 SUFFIXES_FILEOPS = [".gpkg", ".shp", ".csv"]
+SUFFIXES_FILEOPS_EXT = [".gpkg", ".gpkg.zip", ".shp.zip", ".shp", ".csv"]
 SUFFIXES_GEOOPS = [".gpkg", ".shp"]
+SUFFIXES_GEOOPS_EXT = [".gpkg", ".gpkg.zip", ".shp.zip", ".shp"]
+if GDAL_GTE_311 and PYTHON_313:
+    SUFFIXES_GEOOPS = SUFFIXES_GEOOPS_EXT
 TESTFILES = ["polygon-parcel", "linestring-row-trees", "point"]
 WHERE_AREA_GT_400 = "ST_Area({geometrycolumn}) > 400"
 WHERE_AREA_GT_5000 = "ST_Area({geometrycolumn}) > 5000"
@@ -35,9 +57,9 @@ def prepare_expected_result(
     gdf: gpd.GeoDataFrame,
     keep_empty_geoms: bool,
     gridsize: float = 0.0,
-    where_post: Optional[str] = None,
+    where_post: str | None = None,
     explodecollections=False,
-    columns: Optional[list[str]] = None,
+    columns: list[str] | None = None,
 ) -> gpd.GeoDataFrame:
     """Prepare expected data"""
     if keep_empty_geoms is None:
@@ -86,127 +108,213 @@ def prepare_expected_result(
     return exp_gdf
 
 
-def prepare_test_file(
-    input_path: Path,
-    output_dir: Path,
-    suffix: str,
-    crs_epsg: Optional[int] = None,
-    use_cachedir: bool = False,
-) -> Path:
-    # Tmp dir
-    if use_cachedir is True:
-        tmp_cache_dir = Path(tempfile.gettempdir()) / "geofileops_test_data"
-        tmp_cache_dir.mkdir(parents=True, exist_ok=True)
-    else:
-        tmp_cache_dir = output_dir
-
-    # If crs_epsg specified and test input file in wrong crs_epsg, reproject
-    input_prepared_path = input_path
-    if crs_epsg is not None:
-        input_prepared_path = tmp_cache_dir / f"{input_path.stem}_{crs_epsg}{suffix}"
-        if input_prepared_path.exists() is False:
-            input_layerinfo = gfo.get_layerinfo(input_path)
-            assert input_layerinfo.crs is not None
-            if input_layerinfo.crs.to_epsg() == crs_epsg:
-                if input_path.suffix == suffix:
-                    gfo.copy(input_path, input_prepared_path)
-                else:
-                    gfo.copy_layer(input_path, input_prepared_path)
-            else:
-                test_gdf = gfo.read_file(input_path)
-                test_gdf = test_gdf.to_crs(crs_epsg)
-                assert isinstance(test_gdf, gpd.GeoDataFrame)
-                gfo.to_file(test_gdf, input_prepared_path)
-    elif input_path.suffix != suffix:
-        # No crs specified, but different suffix asked, so convert file
-        input_prepared_path = tmp_cache_dir / f"{input_path.stem}{suffix}"
-        if input_prepared_path.exists() is False:
-            gfo.copy_layer(input_path, input_prepared_path)
-
-    # Now copy the prepared file to the output dir
-    output_path = output_dir / input_prepared_path.name
-    if str(input_prepared_path) != str(output_path):
-        gfo.copy(input_prepared_path, output_path)
-    return output_path
-
-
 def get_testfile(
     testfile: str,
-    dst_dir: Optional[Path] = None,
+    dst_dir: Path | None = None,
     suffix: str = ".gpkg",
     epsg: int = 31370,
     empty: bool = False,
-    dimensions: Optional[str] = None,
+    dimensions: str | None = None,
     explodecollections: bool = False,
+    read_only: bool = False,
+    fid_column: str | None = None,
+    geom_name: str | None = None,
 ) -> Path:
-    # Prepare original filepath; but try first with .zip.gpkg file.
-    testfile_path = _data_dir / f"{testfile}.gpkg"
+    """Get a testfile, possibly converting it to another CRS, filetype, etc.
+
+    Args:
+        testfile: Name of the testfile (without extension)
+        dst_dir: Destination directory where the prepared testfile should be stored.
+            If None, the path to the readonly cached version of the file is returned.
+        suffix: Suffix of the prepared testfile (e.g. .gpkg, .shp, .csv, etc)
+        epsg: EPSG code of the prepared testfile
+        empty: If True, prepare an empty testfile (no features)
+        dimensions: If not None, prepare the testfile with the given dimensions
+            (e.g. 'XYZ')
+        explodecollections: If True, explode geometry collections in the prepared
+            testfile.
+        read_only: If True, set the prepared testfile to read-only. If False,
+            set it to read-write. If `dst_dir` is None, this parameter is ignored
+            and the file is always set to read-only.
+        fid_column: If not None, set the FID column to the given name. If None, the
+            default FID column is used. Defaults to None.
+        geom_name: If not None, set the geometry column name to the given name. If None,
+            the default geometry column name is used. Defaults to None.
+    """
+    if dst_dir is None:
+        read_only = True
+
+    prepared_path = _get_testfile(
+        testfile=testfile,
+        dst_dir=dst_dir,
+        suffix=suffix,
+        epsg=epsg,
+        empty=empty,
+        dimensions=dimensions,
+        explodecollections=explodecollections,
+        fid_column=fid_column,
+        geom_name=geom_name,
+    )
+
+    # Make input read-only
+    if read_only:
+        set_read_only(prepared_path, read_only=True)
+
+    return prepared_path
+
+
+def _get_testfile(
+    testfile: str,
+    dst_dir: Path | None = None,
+    suffix: str = ".gpkg",
+    epsg: int = 31370,
+    empty: bool = False,
+    dimensions: str | None = None,
+    explodecollections: bool = False,
+    fid_column: str | None = None,
+    geom_name: str | None = None,
+) -> Path:
+    if suffix.lower() in (".gpkg.zip", ".shp.zip") and not GDAL_GTE_311:
+        pytest.skip("geo_sozip support requires gdal>=3.11")
+
+    # Prepare original filepath.
+    testfile_path = data_dir / f"{testfile}.gpkg"
     if not testfile_path.exists():
         raise ValueError(f"Invalid testfile type: {testfile}")
 
     # Prepare destination location
     if dst_dir is None:
-        dst_dir = Path(tempfile.gettempdir()) / "geofileops_test_data"
+        dst_dir = ConfigOptions.tmp_dir / "_test_data"
     assert isinstance(dst_dir, Path)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
     # Prepare file + return
     empty_str = "_empty" if empty else ""
+    fid_column_str = f"_{fid_column}" if fid_column is not None else ""
+    geom_name_str = f"_{geom_name}" if geom_name is not None else ""
     prepared_path = (
-        dst_dir / f"{testfile_path.stem}_{epsg}_{dimensions}{empty_str}{suffix}"
+        dst_dir / f"{testfile_path.stem}_{epsg}_{dimensions}"
+        f"{empty_str}{fid_column_str}{geom_name_str}{suffix}"
     )
     if prepared_path.exists():
         return prepared_path
-    layers = gfo.listlayers(testfile_path)
-    dst_info = _geofileinfo.get_geofileinfo(prepared_path)
-    if len(layers) > 1 and dst_info.is_singlelayer:
-        raise ValueError(
-            f"multilayer testfile ({testfile}) cannot be converted to single layer "
-            f"geofiletype: {dst_info.driver}"
+
+    # Test file doesn't exist yet, so create it
+    # To be safe for parallelized tests, lock the creation.
+    prepared_lock_path = Path(f"{prepared_path.as_posix()}.lock")
+    try:
+        _io_util.create_file_atomic_wait(
+            prepared_lock_path, time_between_attempts=0.1, timeout=60
         )
 
-    # Copy all layers found
-    for src_layer in layers:
-        # Single layer files have stem as layername
-        dst_layer = prepared_path.stem if dst_info.is_singlelayer else src_layer
+        # Make sure it wasn't created by another process while waiting for the lock file
+        if prepared_path.exists():
+            return prepared_path
 
-        gfo.copy_layer(
-            testfile_path,
-            prepared_path,
-            src_layer=src_layer,
-            dst_layer=dst_layer,
-            dst_crs=epsg,
-            reproject=True,
-            append=True,
-            preserve_fid=not explodecollections,
-            dst_dimensions=dimensions,
-            explodecollections=explodecollections,
-        )
-
-        if empty:
-            # Remove all rows from destination layer.
-            # GDAL only supports DELETE using SQLITE dialect, not with OGRSQL.
-            gfo.execute_sql(
-                prepared_path,
-                sql_stmt=f'DELETE FROM "{dst_layer}"',
-                sql_dialect="SQLITE",
+        # Prepare the file in a tmp file so the file is not visible to other
+        # processes until it is completely ready.
+        tmp_stem = f"{GeoPath(prepared_path).stem}_tmp"
+        tmp_path = dst_dir / f"{tmp_stem}{GeoPath(prepared_path).suffix_nozip}"
+        layers = gfo.listlayers(testfile_path)
+        dst_info = _geofileinfo.get_geofileinfo(tmp_path)
+        if len(layers) > 1 and dst_info.is_singlelayer:
+            raise ValueError(
+                f"multilayer testfile ({testfile}) cannot be converted to single layer "
+                f"geofiletype: {dst_info.driver}"
             )
-        elif dimensions is not None:
-            if dimensions != "XYZ":
-                raise ValueError(f"unimplemented dimensions: {dimensions}")
 
-            prepared_info = gfo.get_layerinfo(
-                prepared_path, layer=dst_layer, raise_on_nogeom=False
+        # Convert all layers found
+        for src_layer in layers:
+            # Single layer files have stem as layername
+            assert isinstance(tmp_path, Path)
+            if dst_info.is_singlelayer:
+                dst_layer = tmp_stem
+                preserve_fid = False
+            else:
+                dst_layer = src_layer
+                preserve_fid = not explodecollections
+
+            # Create empty file by adding a where clause that filters out all features
+            where = None
+            if empty:
+                where = "1=0"
+
+            options = {}
+            if fid_column is not None:
+                options["LAYER_CREATION.FID"] = fid_column
+            if geom_name is not None:
+                options["LAYER_CREATION.GEOMETRY_NAME"] = geom_name
+            gfo.copy_layer(
+                testfile_path,
+                tmp_path,
+                src_layer=src_layer,
+                dst_layer=dst_layer,
+                write_mode="add_layer",
+                where=where,
+                dst_crs=epsg,
+                reproject=True,
+                preserve_fid=preserve_fid,
+                dst_dimensions=dimensions,
+                explodecollections=explodecollections,
+                options=options,
             )
-            if prepared_info.geometrycolumn is not None:
-                gfo.update_column(
-                    prepared_path,
-                    name=prepared_info.geometrycolumn,
-                    expression=f"CastToXYZ({prepared_info.geometrycolumn}, 5.0)",
-                    layer=dst_layer,
+
+            if dimensions is not None:
+                if dimensions != "XYZ":
+                    raise ValueError(f"unimplemented dimensions: {dimensions}")
+
+                prepared_info = gfo.get_layerinfo(
+                    tmp_path, layer=dst_layer, raise_on_nogeom=False
                 )
+                if prepared_info.geometrycolumn is not None:
+                    gfo.update_column(
+                        tmp_path,
+                        name=prepared_info.geometrycolumn,
+                        expression=f"CastToXYZ({prepared_info.geometrycolumn}, 5.0)",
+                        layer=dst_layer,
+                    )
 
-    return prepared_path
+        # If the output should be zipped, zip it
+        if prepared_path.suffix == ".zip":
+            tmp_path_zipped_path = dst_dir / f"{tmp_path.name}.zip"
+            gfo.zip_geofile(tmp_path, tmp_path_zipped_path)
+            gfo.remove(tmp_path, missing_ok=True)
+            tmp_path = tmp_path_zipped_path
+
+        # Rename tmp file to prepared file
+        gfo.move(tmp_path, prepared_path)
+
+        return prepared_path
+
+    except Exception:
+        gfo.remove(prepared_path, missing_ok=True)
+        raise
+    finally:
+        prepared_lock_path.unlink(missing_ok=True)
+
+
+def set_read_only(path: Path, read_only: bool) -> None:
+    """Set the file to read-only or read-write."""
+
+    def _read_only(path: Path) -> None:
+        # Set read-only
+        path.chmod(S_IRUSR | S_IRGRP | S_IROTH)
+
+    def _read_write(path: Path) -> None:
+        # Set read-write
+        path.chmod(S_IRWXU | S_IRWXG | S_IRWXO)
+
+    if path.exists():
+        _read_only(path) if read_only else _read_write(path)
+    else:
+        raise FileNotFoundError(f"File not found: {path}")
+
+    # For some file types, extra files need to be copied
+    src_info = _geofileinfo.get_geofileinfo(path)
+    for s in src_info.suffixes_extrafiles:
+        extra_file_path = path.parent / f"{path.stem}{s}"
+        if extra_file_path.exists():
+            _read_only(extra_file_path) if read_only else _read_write(extra_file_path)
 
 
 class TestData:
@@ -245,31 +353,12 @@ class TestData:
     )
 
 
-def create_tempdir(base_dirname: str, parent_dir: Optional[Path] = None) -> Path:
-    # Parent
-    if parent_dir is None:
-        parent_dir = Path(tempfile.gettempdir())
-
-    for i in range(1, 999999):
-        try:
-            tempdir = parent_dir / f"{base_dirname}_{i:06d}"
-            tempdir.mkdir(parents=True)
-            return Path(tempdir)
-        except FileExistsError:
-            continue
-
-    raise Exception(
-        "Wasn't able to create a temporary dir with basedir: "
-        f"{parent_dir / base_dirname}"
-    )
-
-
 def assert_geodataframe_equal(
     left: gpd.GeoDataFrame,
     right: gpd.GeoDataFrame,
     check_dtype=True,
-    check_index_type: Union[bool, str] = "equiv",
-    check_column_type: Union[bool, str] = "equiv",
+    check_index_type: bool | str = "equiv",
+    check_column_type: bool | str = "equiv",
     check_frame_type=True,
     check_like=False,
     check_less_precise=False,
@@ -280,9 +369,9 @@ def assert_geodataframe_equal(
     promote_to_multi=False,
     sort_columns=False,
     sort_values=False,
-    simplify: Optional[float] = None,
+    simplify: float | None = None,
     check_geom_tolerance: float = 0.0,
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
 ):
     """
     Check that two GeoDataFrames are equal/
@@ -401,3 +490,53 @@ def assert_geodataframe_equal(
         check_crs=check_crs,
         normalize=normalize,
     )
+
+
+def plot(
+    geofiles: list[Path],
+    output_path: Path,
+    title: str | None = None,
+    clean_name: bool = True,
+):
+    # If we are running on CI server, don't plot
+    if "GITHUB_ACTIONS" in os.environ:
+        return
+
+    if mpl_figure is None or mcolors is None:
+        raise ImportError(
+            "matplotlib is not installed, but needed to plot geofiles. "
+            "Please install matplotlib."
+        )
+
+    figure = mpl_figure.Figure(figsize=((len(geofiles) + 1) * 3, 3))
+    figure.subplots(1, len(geofiles) + 1, sharex=True, sharey=True)
+    if title is not None:
+        figure.suptitle(title)
+
+    colors = mcolors.TABLEAU_COLORS
+    for geofile_idx, geofile in enumerate(geofiles):
+        # Read the geofile
+        gdf = gfo.read_file(geofile)
+        if gdf is None:
+            continue
+
+        color = list(colors.keys())[geofile_idx % len(colors)]
+        figure.axes[geofile_idx].set_aspect("equal")
+        # add hatch to the last axis
+        gdf.plot(
+            ax=figure.axes[geofile_idx],
+            color=colors[color],
+            alpha=0.5,
+        )
+        gdf.plot(
+            ax=figure.axes[len(geofiles)],
+            color=colors[color],
+            alpha=0.5,
+        )
+        figure.axes[geofile_idx].set_title(geofile.stem)
+
+    if clean_name:
+        # Replace all possibly invalid characters by "_"
+        output_path = output_path.with_name(re.sub(r"[^\w_. -]", "_", output_path.name))
+
+    figure.savefig(str(output_path), dpi=72)

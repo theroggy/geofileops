@@ -1,5 +1,5 @@
 geofiletype,   ogrdriver,        suffixes,              is_fid_zerobased, is_spatialite_based, default_spatial_index, suffixes_extrafiles
-ESRIShapefile, "ESRI Shapefile", "['.shp', '.dbf']",    True,             False,               False,                 "['.shp', '.dbf', '.shx', '.prj', '.qix', '.sbn', '.sbx']"
+ESRIShapefile, "ESRI Shapefile", "['.shp', '.dbf']",    True,             False,               False,                 "['.dbf', '.shx', '.prj', '.cpg', '.qix', '.sbn', '.sbx']"
 GeoJSON,       GeoJSON,          "['.geojson']",        True,             False,               False,                 
 GPKG,          GPKG,             "['.gpkg']",           False,            True,                True,                  "['gpkg-journal']"
 SQLite,        SQLite,           "['.sqlite']",         False,            True,                True,                  

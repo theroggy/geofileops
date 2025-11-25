@@ -5,7 +5,7 @@ import math
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +17,7 @@ A4_LONG_SIDE = 11.69
 A4_SHORT_SIDE = 8.27
 
 
-def generate_reports(results_path: Path, output_dir: Path):
+def generate_reports(results_path: Path, output_dir: Path) -> None:
     """Generate the benchmarking reports.
 
     Args:
@@ -26,12 +26,12 @@ def generate_reports(results_path: Path, output_dir: Path):
     """
     benchmark_df = pd.read_csv(results_path)
 
-    def format_run_details(input: dict) -> str:
-        if input is None or input == np.nan:
+    def format_run_details(run_details: dict) -> str:
+        if run_details is None or run_details == np.nan:  # noqa: PLW0177
             return ""
-        if isinstance(input, str):
-            input = ast.literal_eval(input)
-            result_list = [f"{key}:{input[key]}" for key in input]
+        if isinstance(run_details, str):
+            run_details = ast.literal_eval(run_details)
+            result_list = [f"{key}:{run_details[key]}" for key in run_details]
             return ";".join(result_list)
 
         return ""
@@ -109,8 +109,8 @@ def save_chart(
     df: pd.DataFrame,
     title: str,
     output_path: Path,
-    yscale: Optional[Literal["linear", "log", "symlog", "logit"]] = None,
-    y_value_formatter: Optional[str] = None,
+    yscale: Literal["linear", "log", "symlog", "logit"] | None = None,
+    y_value_formatter: str | None = None,
     print_labels_on_points: bool = False,
     size: tuple[float, float] = (8, 4),
     plot_kind: Literal[
@@ -126,9 +126,9 @@ def save_chart(
         "scatter",
         "hexbin",
     ] = "line",
-    gridlines: Optional[Literal["both", "x", "y"]] = None,
-    linestyle: Optional[str] = None,
-):
+    gridlines: Literal["both", "x", "y"] | None = None,
+    linestyle: str | None = None,
+) -> None:
     """Render and save a chart.
 
     Args:
@@ -246,7 +246,7 @@ def save_chart(
     if not output_path.exists():
         fig.savefig(str(output_path))
     else:
-        # If it exists already, only save it if it has changed
+        # If it already exists, only save it if it has changed
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_output_path = Path(tmp_dir) / output_path.name
             fig.savefig(tmp_output_path)

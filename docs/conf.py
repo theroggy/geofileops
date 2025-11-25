@@ -28,7 +28,7 @@ devdir = "./"
 # -- Project information -----------------------------------------------------
 
 project = "geofileops"
-copyright = "2024, Pieter Roggemans"
+copyright = "2025, Pieter Roggemans"
 author = "Pieter Roggemans"
 
 # The full version, including alpha/beta/rc tags
@@ -45,9 +45,11 @@ version = release = geofileops.__version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "sphinx.ext.napoleon",
+    "matplotlib.sphinxext.plot_directive",
     "sphinx_automodapi.automodapi",
+    "sphinx_copybutton",
     "sphinx.ext.autosummary",
+    "sphinx.ext.napoleon",
 ]
 
 autosummary_generate = True
@@ -78,6 +80,8 @@ exclude_patterns = [
 #
 html_theme = "pydata_sphinx_theme"
 
+html_title = f"{project} {release}"
+
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
@@ -92,7 +96,7 @@ html_theme_options = {
 }
 
 html_sidebars: dict[str, list[str]] = {
-    "getting_started": [],
+    "installation": [],
     "user_guide": [],
     "reference": [],
     "faq": [],

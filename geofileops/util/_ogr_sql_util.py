@@ -1,7 +1,7 @@
 """Module with utilities to format sql statements meant for use with ogr."""
 
+import copy
 from collections.abc import Iterable
-from typing import Optional
 
 
 class ColumnFormatter:
@@ -11,16 +11,16 @@ class ColumnFormatter:
     regarding the handling of the special "fid" column.
     """
 
-    _aliases_cache: Optional[list[str]] = None
+    _aliases_cache: list[str] | None = None
 
     def __init__(
         self,
-        columns_asked: Optional[list[str]],
+        columns_asked: list[str] | None,
         columns_in_layer: Iterable[str],
         fid_column: str,
         table_alias: str = "",
         column_alias_prefix: str = "",
-    ):
+    ) -> None:
         """Format strings with column names for use in sql statements.
 
         Args:
@@ -51,7 +51,7 @@ class ColumnFormatter:
         # Now prepare the actual column list to use
         if columns_asked is not None:
             # Add special column "fid" to available columns so it can be specified
-            columns_in_layer = list(columns_in_layer) + ["fid"]
+            columns_in_layer = [*list(columns_in_layer), "fid"]
             # Case-insensitive check if input1_columns contains columns not in layer...
             columns_in_layer_upper = {
                 column.upper(): column for column in columns_in_layer
@@ -101,7 +101,7 @@ class ColumnFormatter:
         """
         columns = list(columns)
         fid_column_indexes = [
-            idx for idx, col in enumerate(self._columns) if col.upper() == "FID"
+            idx for idx, col in enumerate(self._columns) if col.lower() == "fid"
         ]
         if self._fid_column.lower() == "fid":
             # Put CAST() around "fid"
@@ -117,7 +117,8 @@ class ColumnFormatter:
 
         return columns
 
-    def _aliases(self) -> list[str]:
+    def aliases_list(self) -> list[str]:
+        """Get the list of column aliases to be used in the select statement."""
         if self._aliases_cache is not None:
             return self._aliases_cache
 
@@ -131,14 +132,31 @@ class ColumnFormatter:
             for alias_idx, alias in enumerate(aliases):
                 if alias.lower() == "fid":
                     # If alias "fid", change it + make sure the alias isn't in use yet
-                    for idx in range(1, 100):
-                        alias_with_id = f"{alias}_{idx}"
-                        if alias_with_id not in aliases:
-                            aliases[alias_idx] = alias_with_id
-                            break
+                    aliases[alias_idx] = get_unique_fid_alias(alias, aliases)
 
         self._aliases_cache = aliases
         return self._aliases_cache
+
+    def columns_asked_list(self) -> list[str]:
+        """Get the list of columns to be used in the select statement.
+
+        The "fid" column is replaced by the actual fid column name if needed.
+        """
+        if len(self._columns) == 0:
+            return []
+
+        if self._fid_column.lower() in ("", "fid"):
+            # The fid is not saved in the file ("") or the fid column name is "fid"...
+            # so just return the asked columns as-is.
+            return copy.deepcopy(self._columns_asked)
+        else:
+            # The fid is saved in a column with a custom name, so replace "fid" by the
+            # actual fid column name.
+            cols = [
+                col if col.lower() != "fid" else self._fid_column
+                for col in self._columns_asked
+            ]
+            return cols
 
     def quoted(self) -> str:
         if len(self._columns) == 0:
@@ -153,36 +171,59 @@ class ColumnFormatter:
             return ""
         return f",{', '.join(self._columns_prefixed())}"
 
-    def prefixed_aliased(self):
+    def prefixed_aliased(self) -> str:
         if len(self._columns) == 0:
             return ""
 
         columns_prefixed_aliased = [
             f'{column_prefixed} "{column_alias}"'
             for column_prefixed, column_alias in zip(
-                self._columns_prefixed(), self._aliases()
+                self._columns_prefixed(), self.aliases_list(), strict=True
             )
         ]
         return f",{', '.join(columns_prefixed_aliased)}"
 
-    def null_aliased(self):
+    def null_aliased(self) -> str:
         if len(self._columns) == 0:
             return ""
 
-        columns_null_aliased = [f'NULL "{alias}"' for alias in self._aliases()]
+        columns_null_aliased = [f'NULL "{alias}"' for alias in self.aliases_list()]
         return f",{', '.join(columns_null_aliased)}"
 
-    def from_subselect(self, subselect_alias: str = "sub"):
+    def from_subselect(self, subselect_alias: str = "sub") -> str:
         if len(self._columns) == 0:
             return ""
 
         prefix = "" if subselect_alias == "" else f"{subselect_alias}."
-        columns_from_subselect = [f'{prefix}"{alias}"' for alias in self._aliases()]
+        columns_from_subselect = [f'{prefix}"{alias}"' for alias in self.aliases_list()]
         return f",{', '.join(columns_from_subselect)}"
 
 
-def columns_quoted(columns: list[str]):
+def columns_quoted(columns: list[str]) -> str:
     if len(columns) == 0:
         return ""
     columns_quoted = [f'"{column}"' for column in columns]
     return f",{', '.join(columns_quoted)}"
+
+
+def get_unique_fid_alias(alias: str, aliases: list[str]) -> str:
+    """Get a case-insensitively unique alias for the fid column.
+
+    Case is retained in the result, but the check whether the alias is unique is done
+    case-insensitively. Hence, for an alias "Fid", if "FID", "fid_1" and "FiD_2" are
+    already in use, the returned alias will be "Fid_3".
+
+    Args:
+        alias (str): base alias to use.
+        aliases (List[str]): list of already used aliases.
+
+    Returns:
+        str: unique alias for the fid column.
+    """
+    aliases_lower = {a.lower() for a in aliases}
+    for idx in range(1, 100):
+        alias_with_id = f"{alias}_{idx}"
+        if alias_with_id.lower() not in aliases_lower:
+            return alias_with_id
+
+    raise ValueError("Could not find unique fid alias.")
