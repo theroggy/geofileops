@@ -4,6 +4,10 @@ Mainly used for parameters with a complex structure that are typically reused in
 different functions in geofileops.
 """
 
+from pathlib import Path
+
+from geofileops import LayerInfo, fileops
+
 
 def validate_agg_columns(agg_columns: dict) -> None:
     """Validates if the agg_columns parameter is properly formed.
@@ -96,3 +100,102 @@ def validate_agg_columns(agg_columns: dict) -> None:
             f"agg_columns has invalid top-level key: {next(iter(agg_columns.keys()))}"
         )
         raise ValueError(f"{message}: {base_message}")
+
+
+def validate_params_single_layer(
+    input_path: Path,
+    output_path: Path,
+    input_layer: str | LayerInfo | None,
+    output_layer: str | None,
+    operation_name: str,
+) -> tuple[LayerInfo, str]:
+    """Validate the input parameters, return the layer names.
+
+    Args:
+        input_path (Path): path to the input file
+        output_path (Path): path to the output file
+        input_layer (Optional[Union[str, LayerInfo]]): the layer name or the LayerInfo
+            of the input file
+        output_layer (Optional[str]): the layer name of the output file
+        operation_name (str): the operation name, used to get clearer errors.
+
+    Raises:
+        ValueError: when an invalid parameter was passed.
+
+    Returns:
+        a tuple with the layers:
+        input_layer (LayerInfo), output_layer (str)
+    """
+    if output_path == input_path:
+        raise ValueError(f"{operation_name}: output_path must not equal input_path")
+    if not input_path.exists():
+        raise FileNotFoundError(f"{operation_name}: input_path not found: {input_path}")
+
+    # Get layer info
+    if not isinstance(input_layer, LayerInfo):
+        input_layer = fileops.get_layerinfo(
+            input_path, layer=input_layer, raise_on_nogeom=False
+        )
+
+    if output_layer is None:
+        output_layer = fileops.get_default_layer(output_path)
+
+    return input_layer, output_layer
+
+
+def validate_params_two_layers(
+    input1_path: Path,
+    input2_path: Path | None,
+    output_path: Path,
+    input1_layer: str | LayerInfo | None,
+    input2_layer: str | LayerInfo | None,
+    output_layer: str | None,
+    operation_name: str,
+) -> tuple[LayerInfo, LayerInfo, str]:
+    """Validate the input parameters, return the layer names.
+
+    Args:
+        input1_path (Path): path to the 1st input file
+        input2_path (Path, optional): path to the 2nd input file
+        output_path (Path): path to the output file
+        input1_layer (Optional[Union[str, LayerInfo]]): the layer name or the LayerInfo
+            of the 1st input file
+        input2_layer (Optional[Union[str, LayerInfo]]): the layer name or the LayerInfo
+            of the 2nd input file
+        output_layer (Optional[str]): the layer name of the output file
+        operation_name (str): the operation name, used to get clearer errors.
+
+    Raises:
+        ValueError: when an invalid parameter was passed.
+
+    Returns:
+        a tuple with the layers:
+        input1_layer (LayerInfo), input2_layer (LayerInfo), output_layer (str)
+    """
+    if output_path in (input1_path, input2_path):
+        raise ValueError(
+            f"{operation_name}: output_path must not equal one of input paths"
+        )
+    if not input1_path.exists():
+        raise FileNotFoundError(
+            f"{operation_name}: input1_path not found: {input1_path}"
+        )
+    if input2_path is not None and not input2_path.exists():
+        raise FileNotFoundError(
+            f"{operation_name}: input2_path not found: {input2_path}"
+        )
+
+    # Get layer info
+    if not isinstance(input1_layer, LayerInfo):
+        input1_layer = fileops.get_layerinfo(
+            input1_path, layer=input1_layer, raise_on_nogeom=False
+        )
+    if input2_path is not None and not isinstance(input2_layer, LayerInfo):
+        input2_layer = fileops.get_layerinfo(
+            input2_path, layer=input2_layer, raise_on_nogeom=False
+        )
+
+    if output_layer is None:
+        output_layer = fileops.get_default_layer(output_path)
+
+    return input1_layer, input2_layer, output_layer  # type: ignore[return-value]

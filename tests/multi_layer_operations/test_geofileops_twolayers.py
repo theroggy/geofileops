@@ -299,7 +299,7 @@ def test_difference_invalid_params(kwargs, expected_error):
 
 @pytest.mark.parametrize("subdivide_coords", [2000, 5])
 def test_difference_self(tmp_path, subdivide_coords):
-    input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
+    input1_path = test_helper.get_testfile("polygon-3overlappingcircles")
     input_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
 
@@ -609,7 +609,7 @@ def test_identity_invalid_params(kwargs, expected_error):
 @pytest.mark.parametrize("subdivide_coords", [2000, 10])
 @pytest.mark.parametrize("include_duplicates", [False, True])
 def test_identity_self(tmp_path, subdivide_coords, include_duplicates):
-    input1_path = test_helper.get_testfile("polygon-overlappingcircles-all")
+    input1_path = test_helper.get_testfile("polygon-3overlappingcircles")
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
 
@@ -928,7 +928,7 @@ def test_intersection_resultempty(tmp_path, suffix, input2_empty):
 @pytest.mark.parametrize("fid_column", [None, "fid_custom"])
 def test_intersection_self(tmp_path, subdivide, include_duplicates, fid_column):
     input1_path = test_helper.get_testfile(
-        "polygon-overlappingcircles-all", fid_column=fid_column
+        "polygon-3overlappingcircles", fid_column=fid_column
     )
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
@@ -2070,7 +2070,7 @@ def test_symmetric_difference_invalid_params(kwargs, expected_error):
 @pytest.mark.parametrize("fid_column", [None, "fid_custom"])
 def test_symmetric_difference_self(tmp_path, subdivide_coords, fid_column):
     input1_path = test_helper.get_testfile(
-        "polygon-overlappingcircles-all", fid_column=fid_column
+        "polygon-3overlappingcircles", fid_column=fid_column
     )
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
@@ -2234,10 +2234,10 @@ def test_union(
 def test_union_circles(tmp_path, suffix, epsg):
     # Prepare test data
     input1_path = test_helper.get_testfile(
-        "polygon-overlappingcircles-one", suffix=suffix, epsg=epsg
+        "polygon-3overlappingcircles-1", suffix=suffix, epsg=epsg
     )
     input2_path = test_helper.get_testfile(
-        "polygon-overlappingcircles-two+three", suffix=suffix, epsg=epsg
+        "polygon-3overlappingcircles-2+3", suffix=suffix, epsg=epsg
     )
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
@@ -2290,10 +2290,10 @@ def test_union_circles(tmp_path, suffix, epsg):
     # Union the two circles towards the single circle
     # Prepare test data
     input1_path = test_helper.get_testfile(
-        "polygon-overlappingcircles-two+three", suffix=suffix, epsg=epsg
+        "polygon-3overlappingcircles-2+3", suffix=suffix, epsg=epsg
     )
     input2_path = test_helper.get_testfile(
-        "polygon-overlappingcircles-one", suffix=suffix, epsg=epsg
+        "polygon-3overlappingcircles-1", suffix=suffix, epsg=epsg
     )
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
@@ -2445,7 +2445,7 @@ def test_union_remove_temp_files(tmp_path, remove_temp_files):
 @pytest.mark.parametrize("fid_column", [None, "fid_custom"])
 def test_union_self(tmp_path, subdivide_coords, include_duplicates, fid_column):
     input1_path = test_helper.get_testfile(
-        "polygon-overlappingcircles-all", fid_column=fid_column
+        "polygon-3overlappingcircles", fid_column=fid_column
     )
     input1_layerinfo = gfo.get_layerinfo(input1_path)
     batchsize = math.ceil(input1_layerinfo.featurecount / 2)
