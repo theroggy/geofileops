@@ -42,7 +42,7 @@ jobs:
               geofileops=0.10
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ matrix.checkout_ref }}
           sparse-checkout: |

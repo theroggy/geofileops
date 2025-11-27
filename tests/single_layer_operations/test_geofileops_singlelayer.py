@@ -1241,22 +1241,23 @@ def test_simplify(
 
 
 @pytest.mark.parametrize(
-    "algorithm",
+    "algorithm, needs_simplification",
     [
-        "lang",
-        "lang+",
-        "rdp",
-        "vw",
-        geoops.SimplifyAlgorithm.LANG,
-        geoops.SimplifyAlgorithm.LANGP,
-        geoops.SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER,
-        geoops.SimplifyAlgorithm.VISVALINGAM_WHYATT,
+        ("lang", False),
+        ("lang+", False),
+        ("rdp", False),
+        ("vw", True),
+        (geoops.SimplifyAlgorithm.LANG, False),
+        (geoops.SimplifyAlgorithm.LANGP, False),
+        (geoops.SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER, False),
+        (geoops.SimplifyAlgorithm.VISVALINGAM_WHYATT, True),
     ],
 )
-def test_simplify_algorithms(tmp_path, algorithm):
-    """
-    Rude check on supported algorithms.
-    """
+def test_simplify_algorithms(tmp_path, algorithm, needs_simplification):
+    """Rude check on supported algorithms."""
+    if needs_simplification:
+        pytest.importorskip("simplification")
+
     input_path = test_helper.get_testfile("polygon-parcel")
     output_path = tmp_path / f"{input_path.stem}_output.gpkg"
 

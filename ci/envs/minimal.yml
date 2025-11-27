@@ -19,7 +19,7 @@ dependencies:
   - pyproj =3.6  # released 2023-03-28
   - shapely =2.0  # released 2022-12-12
   # optional
-  - simplification
+  # - simplification
   # testing
   - pytest
   - pytest-cov
