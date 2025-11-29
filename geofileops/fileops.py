@@ -3,6 +3,7 @@
 import contextlib
 import enum
 import filecmp
+import locale
 import logging
 import os
 import pprint
@@ -27,7 +28,7 @@ from osgeo import gdal, ogr
 from pandas.api.types import is_integer_dtype
 from pygeoops import GeometryType, PrimitiveType  # noqa: F401
 
-from geofileops._compat import GDAL_GTE_311
+from geofileops._compat import GDAL_GTE_311, PYOGRIO_GTE_012
 from geofileops.helpers import _general_helper
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import (
@@ -44,6 +45,11 @@ try:
     import fiona
 except ImportError:
     fiona = None
+
+try:
+    import pyarrow
+except ImportError:
+    pyarrow = None
 
 logger = logging.getLogger(__name__)
 
@@ -1554,13 +1560,23 @@ def read_file(
           FROM "{input_layer}" layer
 
     The underlying library used to read the file can be choosen using the
-    "GFO_IO_ENGINE" environment variable. Possible values are "fiona" and "pyogrio".
-    This option is created as a temporary fallback to "fiona" for cases where "pyogrio"
-    gives issues, so please report issues if they are encountered. In the future support
-    for the "fiona" engine most likely will be removed. Default engine is "pyogrio".
+    "GFO_IO_ENGINE" environment variable. Possible values are "pyogrio", "pyogrio-arrow"
+    and "fiona". In the future support for the "fiona" engine most likely will be
+    removed. Default engine is "pyogrio-arrow". You can overrule whether arrow is used
+    by passing e.g. ``use_arrow=False`` as a parameter.
 
     When a file with CURVE geometries is read, they are transformed on the fly to LINEAR
     geometries, as shapely/geopandas doesn't support CURVE geometries.
+
+    `geofileops.read_file` is very similar to
+    `geopandas.read_file`/`pyogrio.read_dataframe`, but has some additional or changed
+    behaviour. Notable differences in addition to the ones mentioned above are:
+
+        - The default value of `mixed_offsets_as_utc` is False instead of True, to avoid
+          losing time zone information when reading datetime columns with mixed offsets.
+        - The `columns` parameter is case-insensitive, and columns are returned in the
+          order and casing used in the `columns` parameter.
+
 
     Args:
         path (file path): path to the file to read from. |GDAL_vsi|_ paths are also
@@ -1691,7 +1707,12 @@ def _read_file_base(
 
     # Read with the engine specified
     engine = ConfigOptions.io_engine
-    if engine == "pyogrio":
+    if engine.startswith("pyogrio"):
+        if "use_arrow" in kwargs:
+            use_arrow = bool(kwargs["use_arrow"]) if pyarrow else False
+            del kwargs["use_arrow"]
+        else:
+            use_arrow = True if pyarrow and engine.endswith("-arrow") else False
         gdf = _read_file_base_pyogrio(
             path=path,
             layer=layer,
@@ -1703,6 +1724,7 @@ def _read_file_base(
             sql_dialect=sql_dialect,
             ignore_geometry=ignore_geometry,
             fid_as_index=fid_as_index or fid_as_column,
+            use_arrow=use_arrow,
             **kwargs,
         )
     elif engine == "fiona":
@@ -1881,9 +1903,14 @@ def _read_file_base_pyogrio(
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None = None,
     ignore_geometry: bool = False,
     fid_as_index: bool = False,
+    use_arrow: bool = True,
     **kwargs: object,
 ) -> pd.DataFrame | gpd.GeoDataFrame:
     """Reads a file to a pandas Dataframe using pyogrio."""
+    # Init
+    if columns is not None:
+        columns = list(columns)
+
     # Convert rows slice object to pyogrio parameters
     if rows is not None:
         skip_features = rows.start
@@ -1891,8 +1918,17 @@ def _read_file_base_pyogrio(
     else:
         skip_features = 0
         max_features = None
-    # Arrow doesn't support filtering rows like this
-    # use_arrow = True if rows is None else False
+
+    # When reading a file type that could be written in non-utf-8 encoding, on a
+    # non-UTF8 system, disable arrow to avoid issues.
+    if use_arrow and (
+        Path(path).suffix in (".csv") and locale.getpreferredencoding(False) != "UTF-8"
+    ):
+        logger.info(
+            "arrow disabled to read layer: non-UTF8 system and file format could be "
+            f"non-UTF8 encoded: {path}"
+        )
+        use_arrow = False
 
     # If no sql_stmt specified
     columns_prepared = None
@@ -1912,14 +1948,54 @@ def _read_file_base_pyogrio(
         # If no sql + no layer specified, there should be only one layer in the file.
         if layer is None:
             layer = get_only_layer(path)
+
+        # When reading datetime columns and an older pyogrio or GDAL version, don't use
+        # arrow as this can give issues.
+        # See https://github.com/geopandas/pyogrio/issues/487
+        if (
+            use_arrow
+            and (not PYOGRIO_GTE_012 or not GDAL_GTE_311)
+            and (columns is None or len(columns) > 0)
+        ):
+            if _has_datetime_column(path, layer, columns):
+                use_arrow = False
+                logger.info(
+                    "arrow disabled to read layer: a datetime column is read, "
+                    f"which has known issues with arrow: {path}#{layer}"
+                )
+
     else:
         # Fill out placeholders, keep columns_prepared None because column filtering
         # should happen in sql_stmt.
         sql_stmt = _fill_out_sql_placeholders(
             path=path, layer=layer, sql_stmt=sql_stmt, columns=columns
         )
+
+        # When reading datetime columns, don't use arrow as this can give issues.
+        # See https://github.com/geopandas/pyogrio/issues/487
+        # Remark: as an sql_stmt is used here, it is only checked if columns is not
+        # None, because otherwise the layer name needs to become mandatory without
+        # column names being specified, which would be a breaking and really unwanted
+        # change.
+        if (
+            use_arrow
+            and (not PYOGRIO_GTE_012 or not GDAL_GTE_311)
+            and (columns is not None and len(columns) > 0)
+        ):
+            if _has_datetime_column(path, layer, columns):
+                use_arrow = False
+                logger.info(
+                    "arrow disabled to read layer: a datetime column is read, "
+                    f"which has known issues with arrow: {path}#{layer}"
+                )
+
         # Specifying a layer as well as an SQL statement in pyogrio is not supported.
         layer = None
+
+    # For pyogrio >= 0.1.2, set mixed_offsets_as_utc to False by default to
+    # avoid time zone offsets getting lost.
+    if PYOGRIO_GTE_012 and "mixed_offsets_as_utc" not in kwargs:
+        kwargs["mixed_offsets_as_utc"] = False
 
     # Read!
     columns_list = None if columns_prepared is None else list(columns_prepared)
@@ -1936,6 +2012,8 @@ def _read_file_base_pyogrio(
         sql_dialect=sql_dialect,
         read_geometry=not ignore_geometry,
         fid_as_index=fid_as_index,
+        use_arrow=use_arrow,
+        arrow_to_pandas_kwargs={"date_as_object": False},
         **kwargs,
     )
 
@@ -1950,14 +2028,36 @@ def _read_file_base_pyogrio(
         result_gdf = result_gdf.rename(columns=columns_prepared)
 
     # Cast columns that are of object type, but contain datetime.date or datetime.date
-    # to proper datetime64 columns.
-    if len(result_gdf) > 0:
+    # to proper datetime64 columns for older versions of pyogrio or GDAL.
+    if (not PYOGRIO_GTE_012 or not GDAL_GTE_311) and len(result_gdf) > 0:
         for column in result_gdf.select_dtypes(include=["object"]):
             if isinstance(result_gdf[column].iloc[0], date | datetime):
                 result_gdf[column] = pd.to_datetime(result_gdf[column])
 
     assert isinstance(result_gdf, gpd.GeoDataFrame | pd.DataFrame)
     return result_gdf
+
+
+def _has_datetime_column(
+    path: Union[str, "os.PathLike[Any]"],
+    layer: str | LayerInfo | None,
+    columns: Iterable[str] | None,
+) -> bool:
+    """Check if the layer has a datetime column."""
+    if not isinstance(layer, LayerInfo):
+        layer = get_layerinfo(path, layer=layer, raise_on_nogeom=False)
+
+    # Convert column names to upper to be able to check them case insensitive
+    columns_upper = None
+    if columns is not None:
+        columns_upper = {column.upper() for column in columns}
+
+    for column in layer.columns.values():
+        if columns_upper is None or column.name.upper() in columns_upper:
+            if column.gdal_type in {"Date", "Time", "DateTime"}:
+                return True
+
+    return False
 
 
 def _fill_out_sql_placeholders(
@@ -2053,9 +2153,9 @@ def to_file(
     The fileformat is detected based on the filepath extension.
 
     The underlying library used to write the file can be choosen using the
-    "GFO_IO_ENGINE" environment variable. Possible values are "fiona" and "pyogrio", but
-    using "fiona" is deprecated and will be ignored in a future version. The default
-    engine is "pyogrio".
+    "GFO_IO_ENGINE" environment variable. Possible values are "pyogrio", "pyogrio-arrow"
+    and "fiona". Default engine is "pyogrio-arrow". You can force/disable the use of
+    arrow by passing e.g. `use_arrow=True`.
 
     Args:
         gdf (gpd.GeoDataFrame): The GeoDataFrame to export to file.
@@ -2123,7 +2223,12 @@ def to_file(
     engine = ConfigOptions.io_engine
 
     # Write file with the correct engine
-    if engine == "pyogrio":
+    if engine.startswith("pyogrio"):
+        if "use_arrow" in kwargs:
+            use_arrow = bool(kwargs["use_arrow"]) if pyarrow else False
+            del kwargs["use_arrow"]
+        else:
+            use_arrow = True if pyarrow and engine.endswith("-arrow") else False
         return _to_file_pyogrio(
             gdf=gdf,
             path=path,
@@ -2133,6 +2238,7 @@ def to_file(
             append=append,
             index=index,
             create_spatial_index=create_spatial_index,
+            use_arrow=use_arrow,
             **kwargs,
         )
     elif engine == "fiona":
@@ -2333,6 +2439,7 @@ def _to_file_pyogrio(
     append: bool = False,
     index: bool | None = None,
     create_spatial_index: bool | None = None,
+    use_arrow: bool = True,
     **kwargs: object,
 ) -> None:
     """Writes a pandas dataframe to file using pyogrio."""
@@ -2353,6 +2460,20 @@ def _to_file_pyogrio(
                 f"{file_cols} vs {gdf_cols}"
             )
 
+    # When writing datetime columns with pyogrio < 0.12, don't use arrow as
+    # this can give issues.
+    # See https://github.com/geopandas/pyogrio/issues/487
+    if (
+        use_arrow
+        and not PYOGRIO_GTE_012
+        and len(gdf.select_dtypes(include=["datetime64"])) > 0
+    ):
+        use_arrow = False
+        logger.info(
+            "arrow disabled to write layer: a datetime column is written, "
+            f"which has known issues with arrow + pyogrio<0.12: {path}#{layer}"
+        )
+
     # Prepare kwargs to use in geopandas.to_file
     if create_spatial_index is not None:
         kwargs["SPATIAL_INDEX"] = create_spatial_index
@@ -2367,6 +2488,8 @@ def _to_file_pyogrio(
         kwargs["promote_to_multi"] = True
     if not path_info.is_singlelayer:
         kwargs["layer"] = layer
+    if use_arrow:
+        kwargs["use_arrow"] = True
 
     # Temp fix for bug in pyogrio 0.7.2 (https://github.com/geopandas/pyogrio/pull/324)
     # Logic based on geopandas.to_file

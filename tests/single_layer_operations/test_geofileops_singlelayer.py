@@ -28,6 +28,11 @@ from tests.test_helper import (
     assert_geodataframe_equal,
 )
 
+try:
+    import simplification
+except ImportError:
+    simplification = None
+
 # Init gfo module
 current_geoops_module = "unknown"
 GEOOPS_MODULES = [

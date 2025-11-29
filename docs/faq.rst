@@ -50,8 +50,8 @@ GeofileOps supports some runtime configuration options that can be set using env
 variables:
 
 - `GFO_IO_ENGINE`: the IO engine to use when reading and writing GeoDataFrames. Valid
-  options are "pyogrio" and "fiona". The "fiona" option is deprecated and will be
-  ignored in a future version. Defaults to "pyogrio".
+  options are "pyogrio", "pyogrio-arrow" and "fiona". The "fiona" option is deprecated
+  and will be ignored in a future version. Defaults to "pyogrio-arrow".
 - `GFO_ON_DATA_ERROR`: the action to take when a data error occurs while processing a
   tile during dissolve. Data errors are e.g. invalid geometries encountered/created
   during processing. Valid options are "raise" and "warn". The "warn" option will lead

@@ -29,8 +29,10 @@ class ConfigOptions:
     @classproperty
     def io_engine(cls) -> str:
         """The IO engine to use."""
-        io_engine = os.environ.get("GFO_IO_ENGINE", default="pyogrio").strip().lower()
-        supported_values = ["pyogrio", "fiona"]
+        io_engine = (
+            os.environ.get("GFO_IO_ENGINE", default="pyogrio-arrow").strip().lower()
+        )
+        supported_values = ["pyogrio", "fiona", "pyogrio-arrow"]
         if io_engine not in supported_values:
             raise ValueError(
                 f"invalid value for configoption <GFO_IO_ENGINE>: '{io_engine}', "

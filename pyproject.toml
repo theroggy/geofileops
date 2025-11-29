@@ -6,7 +6,7 @@ ignore = ["*"]
 exclude = ["local_ignore"]
 
 [[tool.mypy.overrides]]
-module = "cloudpickle.*,fiona.*,geopandas.*,matplotlib.*,osgeo.*,osgeo_utils.*,pygeos.*,pyogrio.*,psutil.*,setuptools.*,shapely.*,topojson.*"
+module = "cloudpickle.*,fiona.*,geopandas.*,matplotlib.*,osgeo.*,osgeo_utils.*,pyarrow.*,pygeos.*,pyogrio.*,psutil.*,setuptools.*,simplification.*,shapely.*,topojson.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

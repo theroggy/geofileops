@@ -119,6 +119,7 @@ def get_testfile(
     read_only: bool = False,
     fid_column: str | None = None,
     geom_name: str | None = None,
+    force_utf8: bool = False,
 ) -> Path:
     """Get a testfile, possibly converting it to another CRS, filetype, etc.
 
@@ -154,6 +155,7 @@ def get_testfile(
         explodecollections=explodecollections,
         fid_column=fid_column,
         geom_name=geom_name,
+        force_utf8=force_utf8,
     )
 
     # Make input read-only
@@ -173,6 +175,7 @@ def _get_testfile(
     explodecollections: bool = False,
     fid_column: str | None = None,
     geom_name: str | None = None,
+    force_utf8: bool = False,
 ) -> Path:
     if suffix.lower() in (".gpkg.zip", ".shp.zip") and not GDAL_GTE_311:
         pytest.skip("geo_sozip support requires gdal>=3.11")
@@ -192,9 +195,10 @@ def _get_testfile(
     empty_str = "_empty" if empty else ""
     fid_column_str = f"_{fid_column}" if fid_column is not None else ""
     geom_name_str = f"_{geom_name}" if geom_name is not None else ""
+    utf8_str = "_utf8" if force_utf8 else ""
     prepared_path = (
         dst_dir / f"{testfile_path.stem}_{epsg}_{dimensions}"
-        f"{empty_str}{fid_column_str}{geom_name_str}{suffix}"
+        f"{empty_str}{fid_column_str}{geom_name_str}{utf8_str}{suffix}"
     )
     if prepared_path.exists():
         return prepared_path
@@ -204,7 +208,7 @@ def _get_testfile(
     prepared_lock_path = Path(f"{prepared_path.as_posix()}.lock")
     try:
         _io_util.create_file_atomic_wait(
-            prepared_lock_path, time_between_attempts=0.1, timeout=60
+            prepared_lock_path, time_between_attempts=0.5, timeout=60
         )
 
         # Make sure it wasn't created by another process while waiting for the lock file
@@ -213,7 +217,8 @@ def _get_testfile(
 
         # Prepare the file in a tmp file so the file is not visible to other
         # processes until it is completely ready.
-        tmp_stem = f"{GeoPath(prepared_path).stem}_tmp"
+        is_zipped = prepared_path.suffix == ".zip"
+        tmp_stem = f"{GeoPath(prepared_path).stem}_tmp_zip-{is_zipped}"
         tmp_path = dst_dir / f"{tmp_stem}{GeoPath(prepared_path).suffix_nozip}"
         layers = gfo.listlayers(testfile_path)
         dst_info = _geofileinfo.get_geofileinfo(tmp_path)
@@ -225,10 +230,10 @@ def _get_testfile(
 
         # Convert all layers found
         for src_layer in layers:
-            # Single layer files have stem as layername
+            # Single layer files don't need a layer name
             assert isinstance(tmp_path, Path)
             if dst_info.is_singlelayer:
-                dst_layer = tmp_stem
+                dst_layer = None
                 preserve_fid = False
             else:
                 dst_layer = src_layer
@@ -244,12 +249,17 @@ def _get_testfile(
                 options["LAYER_CREATION.FID"] = fid_column
             if geom_name is not None:
                 options["LAYER_CREATION.GEOMETRY_NAME"] = geom_name
+            if force_utf8 and suffix in (".shp", ".shp.zip"):
+                options["LAYER_CREATION.ENCODING"] = "UTF-8"
+            if suffix == ".csv":
+                options["LAYER_CREATION.WRITE_BOM"] = "YES"
+            write_mode = "create" if not tmp_path.exists() else "add_layer"
             gfo.copy_layer(
                 testfile_path,
                 tmp_path,
                 src_layer=src_layer,
                 dst_layer=dst_layer,
-                write_mode="add_layer",
+                write_mode=write_mode,  # type: ignore[arg-type]
                 where=where,
                 dst_crs=epsg,
                 reproject=True,
@@ -282,7 +292,10 @@ def _get_testfile(
             tmp_path = tmp_path_zipped_path
 
         # Rename tmp file to prepared file
-        gfo.move(tmp_path, prepared_path)
+        if prepared_path.exists():
+            gfo.remove(tmp_path, missing_ok=True)
+        else:
+            gfo.move(tmp_path, prepared_path)
 
         return prepared_path
 

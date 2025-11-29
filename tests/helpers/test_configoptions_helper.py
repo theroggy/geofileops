@@ -56,7 +56,7 @@ def test_get_bool_invalidvalue():
     [
         ("GFO_IO_ENGINE", "PYOgrio", "pyogrio"),
         ("GFO_IO_ENGINE", "FIOna", "fiona"),
-        ("GFO_IO_ENGINE", None, "pyogrio"),
+        ("GFO_IO_ENGINE", None, "pyogrio-arrow"),
         ("GFO_ON_DATA_ERROR", "RAIse", "raise"),
         ("GFO_ON_DATA_ERROR", "WARn", "warn"),
         ("GFO_ON_DATA_ERROR", None, "raise"),
