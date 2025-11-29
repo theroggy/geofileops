@@ -6,7 +6,7 @@ dependencies:
   - pip
   # required
   - cloudpickle
-  - gdal =3.7  # 3.7.0 released 2023-05-03
+  - gdal =3.8  # 3.8.0 released 2023-11-13
   - geopandas-base =0.13  # first released 2023-05-06
   - libspatialite =5.1  #  released 2023-08-04
   - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
@@ -15,11 +15,12 @@ dependencies:
   - pandas =1.5  # released 2022-09-19
   - psutil
   - pygeoops =0.4  # released 2023-11-24
-  - pyogrio =0.7  # 0.7.0 released 2023-10-25
+  - pyogrio =0.8  # 0.8.0 released 2024-05-06
   - pyproj =3.6  # released 2023-03-28
   - shapely =2.0  # released 2022-12-12
   # optional
-  - simplification
+  #- pyarrow-core
+  #- simplification
   # testing
   - pytest
   - pytest-cov

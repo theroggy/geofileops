@@ -9,7 +9,6 @@ from osgeo import gdal
 from pygeoops import GeometryType
 
 import geofileops as gfo
-from geofileops._compat import GDAL_GTE_38
 from geofileops.util import _ogr_util
 from tests import test_helper
 
@@ -283,13 +282,12 @@ def test_vector_translate_sql(tmp_path, input_suffix, output_suffix):
 
 
 @pytest.mark.parametrize(
-    "input_suffix, output_suffix, geom_null_asc,"
-    "exp_null_geoms_st38, exp_null_geoms_gte38",
+    "input_suffix, output_suffix, geom_null_asc, exp_null_geoms",
     [
-        (".gpkg", ".gpkg", True, 9, 9),
-        (".gpkg", ".shp", False, 48, 9),
-        (".shp", ".gpkg", False, 48, 9),
-        (".shp", ".shp", True, 9, 9),
+        (".gpkg", ".gpkg", True, 9),
+        (".gpkg", ".shp", False, 9),
+        (".shp", ".gpkg", False, 48),
+        (".shp", ".shp", True, 9),
     ],
 )
 def test_vector_translate_sql_geom_null(
@@ -297,8 +295,7 @@ def test_vector_translate_sql_geom_null(
     input_suffix,
     output_suffix,
     geom_null_asc,
-    exp_null_geoms_st38,
-    exp_null_geoms_gte38,
+    exp_null_geoms,
 ):
     """
     If there the first row of the result has a NULL geometry in the result, all
@@ -311,12 +308,6 @@ def test_vector_translate_sql_geom_null(
     input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
     output_path = tmp_path / f"output{output_suffix}"
     input_layerinfo = gfo.get_layerinfo(input_path)
-
-    exp_null_geoms = (
-        exp_null_geoms_gte38
-        if GDAL_GTE_38 and input_suffix == ".gpkg"
-        else exp_null_geoms_st38
-    )
 
     orderby_direction = "ASC" if geom_null_asc else "DESC"
     sql_stmt = f"""

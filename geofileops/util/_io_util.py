@@ -139,7 +139,7 @@ def create_file_atomic_wait(
                     f"timeout of {timeout} secs reached, couldn't create {path}"
                 )
 
-        # Wait 100ms
+        # Wait a bit and try again
         time.sleep(time_between_attempts)
 
 

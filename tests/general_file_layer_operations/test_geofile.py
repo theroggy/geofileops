@@ -2,6 +2,7 @@
 Tests for functionalities in geofileops.general.
 """
 
+import locale
 import os
 import shutil
 from contextlib import nullcontext
@@ -19,7 +20,14 @@ from shapely import box
 
 import geofileops as gfo
 from geofileops import fileops
-from geofileops._compat import GDAL_GTE_311
+from geofileops._compat import (
+    GDAL_GTE_311,
+    PANDAS_GTE_20,
+    PANDAS_GTE_22,
+    PYOGRIO_GTE_010,
+    PYOGRIO_GTE_011,
+    PYOGRIO_GTE_012,
+)
 from geofileops.helpers._configoptions_helper import ConfigOptions
 from geofileops.util import _geofileinfo, _geoseries_util
 from geofileops.util._geopath_util import GeoPath
@@ -35,9 +43,9 @@ from tests.test_helper import (
 try:
     import fiona  # noqa: F401
 
-    ENGINES = ["fiona", "pyogrio"]
+    ENGINES = ["fiona", "pyogrio", "pyogrio-arrow"]
 except ImportError:
-    ENGINES = ["pyogrio"]
+    ENGINES = ["pyogrio", "pyogrio-arrow"]
 
 gdal.UseExceptions()
 
@@ -1193,7 +1201,7 @@ def test_copy_layer_sql(tmp_path, suffix):
     sql_stmt = f'SELECT * FROM "{src_layer}"'
     dst = tmp_path / f"output{suffix}"
     gfo.copy_layer(src, dst, src_layer=src_layer, sql_stmt=sql_stmt)
-    read_gdf = gfo.read_file(src, sql_stmt=sql_stmt)
+    read_gdf = gfo.read_file(src, sql_stmt=sql_stmt, layer=src_layer)
     assert isinstance(read_gdf, pd.DataFrame)
     if suffix != ".csv":
         assert isinstance(read_gdf, gpd.GeoDataFrame)
@@ -1941,11 +1949,14 @@ def test_read_file_columns_geometry(tmp_path, suffix, columns, geometry, engine_
     assert len(read_gdf) == exp_featurecount
 
 
-def test_read_file_curve():
+def test_read_file_curve(engine_setter):
     """Test reading a curve file.
 
     The geometry type is automatically converted to a linear one in read_file.
     """
+    if engine_setter == "pyogrio-arrow":
+        pytest.xfail("pyogrio-arrow doesn't support curve geometry")
+
     # Prepare test data
     src = test_helper.get_testfile("curvepolygon")
 
@@ -2010,7 +2021,7 @@ def test_read_file_sql(suffix, engine_setter):
 
     read_gdf = gfo.read_file(src, sql_stmt=sql_stmt)
     assert isinstance(read_gdf, pd.DataFrame)
-    if not (suffix == ".csv" and engine_setter == "pyogrio"):
+    if not (suffix == ".csv" and engine_setter.startswith("pyogrio")):
         assert isinstance(read_gdf, gpd.GeoDataFrame)
     assert len(read_gdf) == 48
 
@@ -2051,7 +2062,9 @@ def test_read_file_sql_no_geom(suffix, engine_setter):
     assert read_df.aantal.item() == 48
 
 
-@pytest.mark.parametrize("columns", [["OIDN", "UIDN"], ["OidN", "UidN"]])
+@pytest.mark.parametrize(
+    "columns", [["OIDN", "UIDN", "DATUM"], ["OidN", "UidN", "DatuM"]]
+)
 @pytest.mark.parametrize(
     "suffix, testfile, layer",
     [
@@ -2250,15 +2263,17 @@ def test_fill_out_sql_placeholders_errors(layer, sql_stmt, error):
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS_EXT)
 @pytest.mark.parametrize("dimensions", [None])
-def test_to_file(tmp_path, suffix, dimensions, engine_setter):
+def test_to_file(request, tmp_path, suffix, dimensions, engine_setter):
+    """Test reading a GPKG, write it to another file (type), read again, check result.
+
+    Note: the mainly documents the differences between the different engines and formats
+    as there are many differences in the way the data is written/read.
+    """
     # Remark: geopandas doesn't seem seem to read the Z dimension, so writing can't be
     # tested?
     # Prepare test file
-    src = test_helper.get_testfile(
-        "polygon-parcel", suffix=suffix, dimensions=dimensions
-    )
-    output_path = tmp_path / f"{GeoPath(src).stem}-output{suffix}"
-    uidn = str(2318781) if suffix == ".csv" else 2318781
+    src = test_helper.get_testfile("polygon-parcel", dimensions=dimensions)
+    uidn = 2318781
     encoding = "utf-8" if suffix == ".csv" else None
 
     # Read test file and write to tmppath
@@ -2267,31 +2282,173 @@ def test_to_file(tmp_path, suffix, dimensions, engine_setter):
     # Validate if string (encoding) is correct for data read.
     assert read_gdf.loc[read_gdf["UIDN"] == uidn]["LBLHFDTLT"].item() == "Silomaïs"
 
+    if (
+        suffix in (".gpkg.zip", ".shp.zip")
+        and engine_setter.startswith("pyogrio")
+        and not PYOGRIO_GTE_011
+    ):
+        request.node.add_marker(
+            pytest.mark.xfail(
+                reason="writing a dataframe to gpkg.zip or .shp.zip has issue"
+            )
+        )
+    if suffix == ".csv":
+        read_gdf = read_gdf.drop(columns="geometry")
+    if suffix in (".shp", ".shp.zip") and engine_setter == "fiona":
+        pytest.xfail("fiona does not support writing datetimes to shapefile")
+    if (
+        engine_setter == "pyogrio-arrow"
+        and suffix in (".shp", ".csv")
+        and not PANDAS_GTE_22
+    ):
+        request.node.add_marker(
+            pytest.mark.xfail(
+                reason=(
+                    "pyogrio-arrow with an older version of pandas doesn't roundtrip "
+                    "datetimes well"
+                )
+            )
+        )
+
+    output_path = tmp_path / f"{GeoPath(src).stem}-output{suffix}"
+    gfo.to_file(read_gdf, str(output_path))
+
+    kwargs = {}
+    if suffix == ".csv":
+        kwargs["AUTODETECT_TYPE"] = True
+    written_gdf = gfo.read_file(output_path, **kwargs)
+
+    # Validate if data is as expected after writing.
+    expected_gdf = read_gdf.copy()
+    assert len(expected_gdf) == len(written_gdf)
+
+    if suffix == ".csv":
+        # The int columns are read as int32 instead of int64.
+        expected_gdf["OIDN"] = expected_gdf["OIDN"].astype("int32")
+        expected_gdf["UIDN"] = expected_gdf["UIDN"].astype("int32")
+        expected_gdf["index"] = expected_gdf["index"].astype("int32")
+        expected_gdf["HFDTLT"] = expected_gdf["HFDTLT"].astype("int32")
+
+        # None values are read as "".
+        expected_gdf[["PM", "LBLPM"]] = expected_gdf[["PM", "LBLPM"]].fillna("")
+
+        if (
+            engine_setter == "pyogrio-arrow"
+            and not PYOGRIO_GTE_012
+            and locale.getpreferredencoding() == "UTF-8"
+        ):
+            # If the locale is not UTF-8, arrow won't be used
+            exp_local_gdf = expected_gdf.copy()
+            exp_local_gdf["DATUM"] = exp_local_gdf["DATUM"].dt.tz_localize(None)
+            assert_frame_equal(written_gdf, exp_local_gdf)
+            request.node.add_marker(
+                pytest.mark.xfail(
+                    reason="reading csv with pyogrio < 0.12 + arrow drops timezone info"
+                )
+            )
+
+        elif engine_setter == "fiona":
+            # Fiona writes/reads LENGTE as string, but seems difficult to get the same
+            # result so just skip as fiona support is not that important.
+            request.node.add_marker(
+                pytest.mark.xfail(reason="fiona writes/reads LENGTE as string")
+            )
+
+        # As there is no geometry column, a pd.Dataframe is returned
+        assert_frame_equal(written_gdf, expected_gdf)
+        return
+
+    if suffix in (".gpkg", ".gpkg.zip"):
+        if engine_setter == "fiona":
+            # Fiona doesn't seem to write EMPTY geom to gpkg, but writes None.
+            expected_gdf.loc[46, "geometry"] = None
+    elif suffix in (".shp", ".shp.zip"):
+        # Shapefile doesn't support EMPTY geometries, so it is written as None.
+        expected_gdf.loc[46, "geometry"] = None
+        # Shapefile doesn't support '' string: it is written as None.
+        expected_gdf.loc[47, "PM"] = None
+
+        # Shapefile doesn't support DateTime, so another data type needs to be used.
+        if engine_setter in ("pyogrio", "pyogrio-arrow") and not GDAL_GTE_311:
+            # "pyogrio" with GDAL < 3.11 writes to Date (which looses data)
+            expected_gdf["DATUM"] = pd.to_datetime(
+                expected_gdf["DATUM"].dt.strftime("%Y-%m-%d"), yearfirst=True
+            ).astype("datetime64[ms]")
+        else:
+            # "fiona" and "pyogrio-arrow" and "pyogrio" with GDAL >= 3.11 write to a
+            # string. Comparing the string is a pain though, as the format can differ.
+            # So convert the written to datetime for comparison.
+            assert pd.api.types.is_string_dtype(written_gdf["DATUM"])
+            written_gdf["DATUM"] = pd.to_datetime(
+                written_gdf["DATUM"], format="ISO8601"
+            ).astype("datetime64[ms, UTC]")
+
+    assert_geodataframe_equal(written_gdf, expected_gdf)
+
+    # Validate if string (encoding) is correct for data read after writing.
+    uidn = str(2318781) if suffix == ".csv" else 2318781
+    assert (
+        written_gdf.loc[written_gdf["UIDN"] == uidn]["LBLHFDTLT"].item() == "Silomaïs"
+    )
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS_EXT)
+@pytest.mark.parametrize("dimensions", [None])
+def test_to_file_2_roundtrip(tmp_path, suffix, dimensions, engine_setter):
+    # Remark: geopandas doesn't seem seem to read the Z dimension, so writing can't be
+    # tested?
+    # Prepare the test data by copying it to a file in the format asked and reading it.
+    force_utf8 = False
+    if engine_setter == "pyogrio-arrow" and suffix in (".shp", ".shp.zip"):
+        force_utf8 = True
+    src = test_helper.get_testfile(
+        "polygon-parcel", suffix=suffix, dimensions=dimensions, force_utf8=force_utf8
+    )
+    read_gdf = gfo.read_file(src)
+
     if suffix in (".gpkg.zip", ".shp.zip"):
         pytest.xfail("writing a dataframe to gpkg.zip or .shp.zip has issue")
+    if suffix == ".shp" and engine_setter == "fiona":
+        pytest.xfail("fiona writes datetimes to shapefile as Date, loosing data")
 
+    output_path = tmp_path / f"{GeoPath(src).stem}-output{suffix}"
     gfo.to_file(read_gdf, str(output_path))
     written_gdf = gfo.read_file(output_path)
 
-    # Validate if string (encoding) is correct for data read after writing.
-    assert read_gdf.loc[read_gdf["UIDN"] == uidn]["LBLHFDTLT"].item() == "Silomaïs"
-
-    assert len(read_gdf) == len(written_gdf)
+    # Validate if data is as expected after writing.
+    expected_gdf = read_gdf.copy()
+    assert len(expected_gdf) == len(written_gdf)
     if suffix == ".csv":
         # if no geometry column, a pd.Dataframe is returned
-        assert_frame_equal(written_gdf, read_gdf)
-    else:
+        assert_frame_equal(written_gdf, expected_gdf)
+        return
+    elif suffix == ".gpkg":
         if engine_setter == "fiona":
-            if suffix == ".gpkg":
-                # Fiona doesn't seem to write EMPTY geom to gpkg, but writes None.
-                read_gdf.loc[46, "geometry"] = None
-            elif suffix == ".shp":
-                # The data column is written as string with fiona.
-                written_gdf["DATUM"] = pd.to_datetime(written_gdf["DATUM"]).astype(
-                    "datetime64[ms]"
-                )
+            # Fiona doesn't seem to write EMPTY geom to gpkg, but writes None.
+            expected_gdf.loc[46, "geometry"] = None
+    elif suffix == ".shp":
+        # Shapefile doesn't support DateTime, so another data type needs to be used.
+        # - GDAL < 3.11 and "pyogrio" write to Date (which looses data)
+        # - GDAL >= 3.11, "fiona" and "pyogrio-arrow" write to a string.
+        if engine_setter in (
+            "fiona",
+            "pyogrio-arrow",
+        ) and not pd.api.types.is_string_dtype(expected_gdf["DATUM"]):
+            expected_gdf["DATUM"] = expected_gdf["DATUM"].apply(lambda x: x.isoformat())
 
-        assert_geodataframe_equal(written_gdf, read_gdf)
+        if engine_setter == "pyogrio-arrow" and not GDAL_GTE_311:
+            # For minimal tests, the datum is a datetime
+            expected_gdf["DATUM"] = pd.to_datetime(expected_gdf["DATUM"])
+            if PANDAS_GTE_20:
+                expected_gdf["DATUM"] = expected_gdf["DATUM"].dt.as_unit("ms")
+
+    assert_geodataframe_equal(written_gdf, expected_gdf)
+
+    # Validate if string (encoding) is correct for data read after writing.
+    uidn = str(2318781) if suffix == ".csv" else 2318781
+    assert (
+        written_gdf.loc[written_gdf["UIDN"] == uidn]["LBLHFDTLT"].item() == "Silomaïs"
+    )
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
@@ -2308,6 +2465,19 @@ def test_to_file_append(tmp_path, suffix, engine_setter):  # noqa: ARG001
     assert test_path.exists()
     dst_info = gfo.get_layerinfo(test_path, raise_on_nogeom=raise_on_nogeom)
     assert dst_info.featurecount == len(test_gdf) * 2
+
+
+@pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
+def test_to_file_copy_append(suffix, engine_setter):
+    """Test appending to a file after copying the file first using gdal.VectorTranslate.
+
+    First, a file is created by using `copy_file` to a new file, then the same file is
+    appended to by using `to_file` with the `append=True` parameter.
+    """
+    if suffix == ".shp":
+        if engine_setter == "pyogrio-arrow" and not GDAL_GTE_311:
+            # Only starting from GDAL 3.11, it writes DateTime to String.
+            pytest.xfail("GDAL <= 3.11 writes DateTime to Date in shapefile")
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_FILEOPS)
@@ -2766,6 +2936,7 @@ def test_to_file_nogeom(tmp_path, suffix):
         raise ValueError(f"test not implemented for suffix {suffix}")
 
 
+@pytest.mark.skipif(not PYOGRIO_GTE_010, reason="Requires pyogrio>=0.10")
 def test_to_file_vsi():
     """Test writing to a file in vsimem."""
     # Prepare test data
