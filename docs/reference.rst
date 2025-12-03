@@ -135,6 +135,7 @@ All helper functions below can be used in two ways:
    options.set_io_engine
    options.set_on_data_error
    options.set_remove_temp_files
+   options.set_sliver_tolerance
    options.set_subdivide_check_parallel_fraction
    options.set_subdivide_check_parallel_rows
    options.set_tmp_dir

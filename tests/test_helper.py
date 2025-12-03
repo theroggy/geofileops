@@ -473,6 +473,10 @@ def assert_geodataframe_equal(
         # The symmetric difference should result in all empty geometries if the
         # geometries are equal. Apply a negative buffer to the geometries with half the
         # tolerance.
+        if len(left) != len(right):
+            raise AssertionError(
+                f"left and right have different lengths: {len(left)} != {len(right)}"
+            )
         symdiff = shapely.symmetric_difference(left.geometry, right.geometry)
         symdiff_tol = symdiff.buffer(-check_geom_tolerance / 2, join_style="mitre")
         symdiff_tol_diff = symdiff_tol[~symdiff_tol.is_empty]

@@ -4,6 +4,7 @@ import datetime
 import logging
 import os
 from collections.abc import Iterable
+from contextlib import AbstractContextManager
 from types import TracebackType
 from typing import Any
 
@@ -179,7 +180,7 @@ def prepare_for_serialize(data: dict) -> dict:
     return prepared
 
 
-class TempEnv:
+class TempEnv(AbstractContextManager):
     """Context manager to temporarily set/change environment variables.
 
     Existing values for variables are backed up and reset when the scope is left,
@@ -209,7 +210,12 @@ class TempEnv:
             else:
                 os.environ[name] = str(value)
 
-    def __exit__(self, type: type, value: Exception, traceback: TracebackType) -> None:  # noqa: A002
+    def __exit__(
+        self,
+        type: type[BaseException] | None,  # noqa: A002
+        value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
         # Set variables that were backed up back to original value
         for name, env_value in self._envs_backup.items():
             # Recover backed up value

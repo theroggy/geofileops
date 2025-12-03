@@ -6,6 +6,8 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Literal
 
+from pyproj import CRS
+
 
 class classproperty(property):
     """Decorator to create class-level properties."""
@@ -45,7 +47,7 @@ class ConfigOptions:
     """
 
     @staticmethod
-    def set_copy_layer_sqlite_direct(enable: bool) -> _RestoreOriginalHandler:
+    def set_copy_layer_sqlite_direct(enable: bool | None) -> _RestoreOriginalHandler:
         """Enable option to copy data directly in SQLite in `copy_layer` when possible.
 
         If not set, this option is enabled by default.
@@ -68,8 +70,11 @@ class ConfigOptions:
             - You can also set the option by directly setting the environment variable
               `GFO_COPY_LAYER_SQLITE_DIRECT` to "TRUE" or "FALSE".
 
+        .. versionadded:: 0.11.0
+
         Args:
-            enable (bool): If True, this option is enabled.
+            enable (bool | None): If True, this option is enabled. If None, the option
+                is unset (so the default behavior is used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -91,7 +96,10 @@ class ConfigOptions:
         """
         key = "GFO_COPY_LAYER_SQLITE_DIRECT"
         original_value = os.environ.get(key)
-        os.environ[key] = "TRUE" if enable else "FALSE"
+        if enable is not None:
+            os.environ[key] = "TRUE" if enable else "FALSE"
+        elif key in os.environ:
+            del os.environ[key]
 
         return _RestoreOriginalHandler(key, original_value)
 
@@ -106,9 +114,9 @@ class ConfigOptions:
 
     @staticmethod
     def set_io_engine(
-        engine: Literal["pyogrio-arrow", "pyogrio", "fiona"],
+        engine: Literal["pyogrio-arrow", "pyogrio", "fiona"] | None,
     ) -> _RestoreOriginalHandler:
-        """Set the IO engine to use for reading and writing files.
+        """Set the IO engine to use for reading and writing files to/from GeoDataFrames.
 
         Possible options are:
 
@@ -120,13 +128,17 @@ class ConfigOptions:
               removed in a future release.
 
         Remarks:
+
             - You can also set the option temporarily by using this function as a
               context manager.
             - You can also set the option by directly setting the environment variable
               `GFO_IO_ENGINE` to one of "PYOGRIO-ARROW", "PYOGRIO", or "FIONA".
 
+        .. versionadded:: 0.11.0
+
         Args:
-            engine (Literal["pyogrio-arrow", "pyogrio", "fiona"]): The IO engine to use.
+            engine (Literal["pyogrio-arrow", "pyogrio", "fiona"] | None): The IO engine
+                to use. If None, the option is unset (so the default behavior is used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -145,11 +157,13 @@ class ConfigOptions:
                 with gfo.options.set_io_engine("pyogrio"):
                     gfo.read_file(...)
 
-
         """
         key = "GFO_IO_ENGINE"
         original_value = os.environ.get(key)
-        os.environ[key] = engine.upper()
+        if engine is not None:
+            os.environ[key] = engine.upper()
+        elif key in os.environ:
+            del os.environ[key]
 
         return _RestoreOriginalHandler(key, original_value)
 
@@ -159,6 +173,7 @@ class ConfigOptions:
 
         Returns:
             str: the IO engine to use. Possible values (lowercase):
+
                 - "pyogrio-arrow" (default if not set): use the pyogrio library via the
                   arrow batch interface.
                 - "pyogrio": use the pyogrio library via the traditional interface.
@@ -177,7 +192,9 @@ class ConfigOptions:
         return io_engine
 
     @staticmethod
-    def set_on_data_error(action: Literal["raise", "warn"]) -> _RestoreOriginalHandler:
+    def set_on_data_error(
+        action: Literal["raise", "warn"] | None,
+    ) -> _RestoreOriginalHandler:
         """Set the preferred action to take when a data error occurs.
 
         Possible options are:
@@ -195,8 +212,11 @@ class ConfigOptions:
             - You can also set the option by directly setting the environment variable
               `GFO_ON_DATA_ERROR` to one of "RAISE" or "WARN".
 
+        .. versionadded:: 0.11.0
+
         Args:
-            action (Literal["raise", "warn"]): The action to take on data error.
+            action (Literal["raise", "warn"] | None): The action to take on data error.
+                If None, the option is unset (so the default behavior is used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -218,7 +238,10 @@ class ConfigOptions:
         """
         key = "GFO_ON_DATA_ERROR"
         original_value = os.environ.get(key)
-        os.environ[key] = action.upper()
+        if action is not None:
+            os.environ[key] = action.upper()
+        elif key in os.environ:
+            del os.environ[key]
 
         return _RestoreOriginalHandler(key, original_value)
 
@@ -229,6 +252,7 @@ class ConfigOptions:
         Returns:
             str: the preferred action when a data error occurs. Possible values
                 (lowercase):
+
                 - "raise" (default if not set): raise an exception.
                 - "warn": log a warning and continue.
         """
@@ -248,7 +272,7 @@ class ConfigOptions:
         return value_cleaned
 
     @staticmethod
-    def set_remove_temp_files(enable: bool) -> _RestoreOriginalHandler:
+    def set_remove_temp_files(enable: bool | None) -> _RestoreOriginalHandler:
         """Enable or disable removal of temporary files created during operations.
 
         If not set, the option is enabled by default, so temporary files are removed
@@ -261,8 +285,12 @@ class ConfigOptions:
             - You can also set the option by directly setting the environment variable
               `GFO_REMOVE_TEMP_FILES` to "TRUE" or "FALSE".
 
+        .. versionadded:: 0.11.0
+
         Args:
-            enable (bool): If True, temporary files will be removed after operations.
+            enable (bool | None): If True, temporary files will be removed after
+                operations. If False, temporary files will be kept. If None, the option
+                is unset (so the default behavior is used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -284,7 +312,10 @@ class ConfigOptions:
         """
         key = "GFO_REMOVE_TEMP_FILES"
         original_value = os.environ.get(key)
-        os.environ[key] = "TRUE" if enable else "FALSE"
+        if enable is not None:
+            os.environ[key] = "TRUE" if enable else "FALSE"
+        elif key in os.environ:
+            del os.environ[key]
 
         return _RestoreOriginalHandler(key, original_value)
 
@@ -298,7 +329,141 @@ class ConfigOptions:
         return _get_bool("GFO_REMOVE_TEMP_FILES", default=True)
 
     @staticmethod
-    def set_subdivide_check_parallel_fraction(fraction: int) -> _RestoreOriginalHandler:
+    def set_sliver_tolerance(tolerance: float | None) -> _RestoreOriginalHandler:
+        """Tolerance to filter out slivers from overlay operations between polygons.
+
+        If 0.0, no sliver filtering is done. If negative, only slivers with tolerance
+        abs(value) are retained in the output instead of filtering them out.
+
+        If the tolerance is not set, the default depends on the ``crs``. If ``crs`` is a
+        projected CRS, the default tolerance is 0.001 CRS units (typically meters or
+        feet). If it is a geographic CRS, the default tolerance 1e-7 CRS units
+        (typically degrees). If ``crs`` is None or invalid, the default tolerance is
+        0.0, so no sliver filtering is done.
+
+        The slivers meant here are very small, often very narrow polygons that are
+        created as a side-effect of overlay operations between polygons. Due to the
+        limitations of finite-precision floating point arithmetic used in such
+        operations, a point that is "snapped" on a line segment, is sometimes not
+        exactly located on the line. When calculating e.g. an intersection, this can
+        lead to very small "sliver" polygons being created.
+
+        Most of the time, such slivers are not desired in the output. Hence, they are
+        filtered out based on certain criteria by default.
+
+        The basic algorythm used to determine if a geometry is a sliver is to use the
+        GEOS `set_precision` algorythm with a small tolerance. If the polygon becomes
+        NULL, because it is smaller/narrower than the tolerance, it is considered a
+        sliver. Note that this means the tolerance should not be interpreted as an
+        absolute minimum width of polygons to retain, as the way the `set_precision`
+        algorythm works is more complex than that.
+
+        Because the `set_precision` algorythm is relatively costly to apply, geometries
+        are first pre-filtered with a less expensive filter: the average width:
+
+        .. code_block::
+
+            average_width(geom) = 2 * area(geom) / length(geom)
+
+        This formula is an approximation that works well for long, narrow polygons, but
+        it underestimates the width for square or round polygons. Some examples:
+
+           - **a 10 x 10 meter square**: `2 * (10 * 10)  / (4 * 10) = 400 / 40 = 5`,
+             which is an underestimation, as the real average width is 10.
+           - **a 1 x 100 meter rectangle**:
+             `2 * (1 * 100) / (2 * (1 + 100)) = 200 / 202 = ~0.99`, which is almost
+             correct as the real average width is 1.
+
+        The average width being underestimated for some shapes means that some
+        geometries are marked as slivers even if they are not. Because the
+        `average_width` check is only a pre-filter, this is not a problem: such
+        geometries will still be retained if they pass the more precise `set_precision`
+        check.
+
+        Remarks:
+
+            - You can also set the option temporarily by using this function as a
+              context manager.
+            - You can also set the option by directly setting the environment variable
+              `GFO_SLIVER_TOLERANCE` to a string representing the tolerance value.
+
+        .. versionadded:: 0.11.0
+
+        Args:
+            tolerance (float | None): The sliver tolerance value. If None, the option is
+                unset (so the default behavior is used).
+
+        Examples:
+            If you want to change the default value of the option in general, you can
+            just call the function:
+
+            .. code-block:: python
+
+                gfo.options.set_sliver_tolerance(0.01)
+
+            If you want to temporarily change the option, you can use the function as a
+            context manager:
+
+            .. code-block:: python
+
+                with gfo.options.set_sliver_tolerance(0.01):
+                    gfo.intersection(...)
+
+        """
+        key = "GFO_SLIVER_TOLERANCE"
+        original_value = os.environ.get(key)
+        if tolerance is not None:
+            os.environ[key] = str(tolerance)
+        elif key in os.environ:
+            del os.environ[key]
+
+        return _RestoreOriginalHandler(key, original_value)
+
+    @staticmethod
+    def get_sliver_tolerance(crs: CRS | None) -> float:
+        """Tolerance to use to filter out slivers from overlay operations.
+
+        Args:
+            crs (CRS): The CRS of the geometries being processed. Used to determine
+                the sliver tolerance. For projected CRSes, the tolerance is in the units
+                of the CRS (e.g. meters). For geographic CRSes, the tolerance is in
+                degrees.
+
+        Returns:
+            float: the sliver tolerance to be used. If 0.0, no sliver filtering should
+                be done. If negative, only slivers with tolerance abs(value) should be
+                retained in the output instead of filtering them out.
+                If not set, the default depends on the ``crs``. If ``crs`` is a
+                projected CRS, the default tolerance is 0.001 meters. If it is a
+                geographic CRS, the default tolerance is 1etolerance 1e-7 degrees.
+                If ``crs`` is None or invalid, the default tolerance is 0.0, so no
+                sliver filtering is done.
+        """
+        try:
+            tol_str = os.environ.get("GFO_SLIVER_TOLERANCE", None)
+            if tol_str is not None:
+                return float(tol_str)
+            elif crs is None:
+                return 0.0
+            elif crs.is_projected:
+                # Only found projected CRSs so far that use meters or feet, and for both
+                # of those this tolerance is fine.
+                return 0.001
+            elif crs.is_geographic:
+                return 1e-7
+            else:  # pragma: no cover
+                return 0.0
+
+        except Exception as ex:
+            raise ValueError(
+                "invalid value for configoption <GFO_SLIVER_TOLERANCE>: "
+                "should be a number"
+            ) from ex
+
+    @staticmethod
+    def set_subdivide_check_parallel_fraction(
+        fraction: int | None,
+    ) -> _RestoreOriginalHandler:
         """For a file being checked in parallel, the fraction of features to check.
 
         The value set should be an integer representing the fraction of features to
@@ -313,8 +478,11 @@ class ConfigOptions:
               `GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION` to a string representing the
               fraction.
 
+        .. versionadded:: 0.11.0
+
         Args:
-            fraction (int): The fraction of features to check for subdivision.
+            fraction (int | None): The fraction of features to check for subdivision.
+                If None, the option is unset (so the default behavior is used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -336,7 +504,10 @@ class ConfigOptions:
         """
         key = "GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION"
         original_value = os.environ.get(key)
-        os.environ[key] = str(fraction)
+        if fraction is not None:
+            os.environ[key] = str(fraction)
+        elif key in os.environ:
+            del os.environ[key]
 
         return _RestoreOriginalHandler(key, original_value)
 
@@ -352,7 +523,7 @@ class ConfigOptions:
         return int(fraction)
 
     @staticmethod
-    def set_subdivide_check_parallel_rows(rows: int) -> _RestoreOriginalHandler:
+    def set_subdivide_check_parallel_rows(rows: int | None) -> _RestoreOriginalHandler:
         """For a file being checked in parallel, the number of rows to check.
 
         The value set should be an integer representing the minimum number of rows a
@@ -367,9 +538,12 @@ class ConfigOptions:
               `GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS` to a string representing the number of
               rows.
 
+        .. versionadded:: 0.11.0
+
         Args:
-            rows (int): The minimum number of rows a file must have to check for
-                subdivision in parallel.
+            rows (int | None): The minimum number of rows a file must have to check for
+                subdivision in parallel. If None, the option is unset (so the default
+                behavior is used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -391,7 +565,10 @@ class ConfigOptions:
         """
         key = "GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS"
         original_value = os.environ.get(key)
-        os.environ[key] = str(rows)
+        if rows is not None:
+            os.environ[key] = str(rows)
+        elif key in os.environ:
+            del os.environ[key]
 
         return _RestoreOriginalHandler(key, original_value)
 
@@ -408,7 +585,7 @@ class ConfigOptions:
         return int(rows)
 
     @staticmethod
-    def set_tmp_dir(path: str) -> _RestoreOriginalHandler:
+    def set_tmp_dir(path: str | None) -> _RestoreOriginalHandler:
         """Set the directory to use for temporary files created during processing.
 
         The value set should be a valid directory path. If not set, a subdirectory
@@ -421,8 +598,11 @@ class ConfigOptions:
             - You can also set the option by directly setting the environment variable
               `GFO_TMPDIR` to the desired temporary directory path.
 
+        .. versionadded:: 0.11.0
+
         Args:
-            path (str): The temporary directory path.
+            path (str | None): The temporary directory path. If None, the option is
+                unset (so the default behavior is used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -444,7 +624,10 @@ class ConfigOptions:
         """
         key = "GFO_TMPDIR"
         original_value = os.environ.get(key)
-        os.environ[key] = path
+        if path is not None:
+            os.environ[key] = path
+        elif key in os.environ:
+            del os.environ[key]
 
         return _RestoreOriginalHandler(key, original_value)
 
@@ -471,7 +654,7 @@ class ConfigOptions:
 
     @staticmethod
     def set_worker_type(
-        worker_type: Literal["processes", "threads", "auto"],
+        worker_type: Literal["processes", "threads", "auto"] | None,
     ) -> _RestoreOriginalHandler:
         """Set the type of worker to use for parallel processing.
 
@@ -490,9 +673,12 @@ class ConfigOptions:
             - You can also set the option by directly setting the environment variable
               `GFO_WORKER_TYPE` to one of "processes", "threads", or "auto".
 
+        .. versionadded:: 0.11.0
+
         Args:
-            worker_type (Literal["processes", "threads", "auto"]): The type of worker to
-                use.
+            worker_type (Literal["processes", "threads", "auto"] | None): The type of
+                worker to use. If None, the option is unset (so the default behavior is
+                used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -514,7 +700,10 @@ class ConfigOptions:
         """
         key = "GFO_WORKER_TYPE"
         original_value = os.environ.get(key)
-        os.environ[key] = worker_type.upper()
+        if worker_type is not None:
+            os.environ[key] = worker_type.upper()
+        elif key in os.environ:
+            del os.environ[key]
 
         return _RestoreOriginalHandler(key, original_value)
 
