@@ -4,6 +4,12 @@
 
 ### Deprecations and compatibility notes
 
+- For all spatial overlays, **sliver polygons** are now removed from the output by
+  default. Polygons are considered slivers if they are narrower than a certain
+  tolerance. By default, the tolerance is 0.001 CRS units if the CRS of the input layers
+  is a projected CRS, 1e-7 if it is a geographic CRS. More information + information how
+  to change this default tolerance can be found in the documentation of
+  [`options.set_sliver_tolerance`](https://geofileops.readthedocs.io/en/latest/api/geofileops.options.set_sliver_tolerance.html).
 - Minimum version of dependencies updated to GDAL 3.8, pyogrio 0.8, geopandas 0.13 and
   spatialite 5.1.
 
@@ -13,6 +19,7 @@
 - Add `concat` function (#746, #747)
 - Add `join` function (#751)
 - Add `add_columns` function (#768)
+- Remove polygon slivers by default for all overlay operations (#776)
 - Add `zip_geofile` and `unzip_geofile` functions (#754, #743)
 - Add `write_mode="append_add_fields"` option to `copy_layer` (#750)
 - Add an `include_duplicates` parameter to `union`, `intersection` and `identity` (#757)

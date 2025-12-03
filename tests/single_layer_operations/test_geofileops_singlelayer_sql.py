@@ -12,6 +12,7 @@ import geofileops as gfo
 from geofileops import GeometryType
 from geofileops._compat import GDAL_GTE_311
 from geofileops.util import _geoops_sql as geoops_sql
+from geofileops.util import _sqlite_util
 from geofileops.util._geopath_util import GeoPath
 from tests import test_helper
 from tests.test_helper import (
@@ -590,3 +591,81 @@ def test_select_star(tmp_path, suffix, explodecollections):
     # Now check the contents of the result file
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
+
+
+@pytest.mark.parametrize(
+    "descr, geometry, sliver_tol, is_sliver",
+    [
+        ("no sliver", Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]), 1e-8, False),
+        ("no sliver, neg tol", Polygon([(0, 0), (1, 0), (1, 1), (0, 1)]), -1e-8, False),
+        ("sliver", Polygon([(0, 0), (1, 0), (0, 1e-12)]), 1e-8, True),
+        ("sliver, neg tol", Polygon([(0, 0), (1, 0), (0, 1e-12)]), -1e-8, True),
+        (
+            "almost sliver, avg_width < 1e-8",
+            Polygon([(0, 0), (1, 0), (0, 1e-8)]),
+            1e-8,
+            False,
+        ),
+        ("just sliver", Polygon([(0, 0), (1, 0), (0, 1e-9)]), 1e-8, True),
+    ],
+)
+def test_sliver_filtering(tmp_path, descr, geometry, sliver_tol, is_sliver):
+    """Test sliver filtering in sql operations.
+
+    If the sliver tolerance is positive, slivers should be removed from the output.
+    If the sliver tolerance is negative, only slivers should be retained in the output.
+    """
+    # Prepare test data
+    test_gdf = gpd.GeoDataFrame(
+        {"descr": [descr], "avg_width": [2 * geometry.area / geometry.length]},
+        geometry=[geometry],
+        crs=test_helper.TestData.crs_epsg,
+    )
+    test_gdf["is_avg_width_st_sliver_tolerance"] = test_gdf["avg_width"] < sliver_tol
+
+    test_path = tmp_path / "test_delete_slivers_input.gpkg"
+    gfo.to_file(test_gdf, test_path)
+    test_info = gfo.get_layerinfo(test_path)
+
+    # Prepare sql statement
+    # use_avg_width_prefilter=False just to test both code paths, should give the same
+    # result.
+    sliver_where = geoops_sql._get_sliver_where(
+        table_alias=None,
+        sliver_tolerance=sliver_tol,
+        geometry_column="geom",
+        use_avg_width_prefilter=False,
+    )
+    sql_stmt = f"""
+        SELECT * FROM "{test_info.name}"
+         WHERE {sliver_where}
+    """
+
+    # Run test
+    output_path = tmp_path / "test_delete_slivers_output.gpkg"
+    _sqlite_util.create_table_as_sql(
+        input_databases={"input": test_path},
+        output_path=output_path,
+        output_layer=None,
+        output_geometrytype=None,
+        output_crs=31370,
+        sql_stmt=sql_stmt,
+    )
+
+    # Check result
+    result_layerinfo = gfo.get_layerinfo(output_path)
+    if sliver_tol >= 0:
+        # When the sliver tolerance is positive, slivers are removed from the output
+        exp_featurecount = 0 if is_sliver else 1
+    else:
+        # When the sliver tolerance is negative, only slivers are retained
+        exp_featurecount = 1 if is_sliver else 0
+    assert result_layerinfo.featurecount == exp_featurecount, f"{descr} failed"
+
+
+def test_sliver_filtering_invalid_tol():
+    """Test if invalid sliver tolerance raises error."""
+    with pytest.raises(ValueError, match="sliver_tolerance cannot be 0"):
+        geoops_sql._get_sliver_where(
+            table_alias=None, sliver_tolerance=0.0, geometry_column="geom"
+        )

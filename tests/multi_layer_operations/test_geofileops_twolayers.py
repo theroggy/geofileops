@@ -474,6 +474,7 @@ def test_export_by_distance(tmp_path, testfile, suffix):
         (".gpkg", 31370, 0.0, 10, "fid_custom"),
         (".gpkg", 31370, 0.01, 10, "fid_custom"),
         (".gpkg", 4326, 0.0, 10, None),
+        (".gpkg", 31370, 0.0, 10, None),
         (".shp", 31370, 0.0, 10, None),
     ],
 )
@@ -493,15 +494,14 @@ def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords, fid_column
     output_path = tmp_path / f"{input1_path.stem}-output{suffix}"
 
     # Test
-    with _general_util.TempEnv({"GFO_REMOVE_TEMP_FILES": False}):
-        gfo.identity(
-            input1_path=str(input1_path),
-            input2_path=str(input2_path),
-            output_path=str(output_path),
-            gridsize=gridsize,
-            batchsize=batchsize,
-            subdivide_coords=subdivide_coords,
-        )
+    gfo.identity(
+        input1_path=str(input1_path),
+        input2_path=str(input2_path),
+        output_path=str(output_path),
+        gridsize=gridsize,
+        batchsize=batchsize,
+        subdivide_coords=subdivide_coords,
+    )
 
     # Check if the output file is correctly created
     assert output_path.exists()
@@ -521,6 +521,10 @@ def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords, fid_column
     # Prepare expected gdf
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
+    # If epsg is 4326, the almost-sliver geometry in input1 will be removed because
+    # another sliver removal tolerance is applied, so remove it here as well
+    if epsg == 4326:
+        input1_gdf = input1_gdf[input1_gdf.geometry.area > 1e-10]
     exp_gdf = input1_gdf.overlay(input2_gdf, how="identity", keep_geom_type=True)
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
@@ -853,6 +857,42 @@ def test_intersection_invalid_params2(kwargs, expected_error):
         kwargs["input2_path"] = "input2.gpkg"
     with pytest.raises(ValueError, match=expected_error):
         gfo.intersection(input1_path="input1.gpkg", output_path="output.gpkg", **kwargs)
+
+
+@pytest.mark.parametrize(
+    "input1_testfile, input2_testfile, exp_featurecount",
+    [
+        ("point", "polygon-zone", 3),
+        ("polygon-zone", "point", 3),
+        ("linestring-row-trees", "polygon-zone", 17),
+        ("polygon-zone", "linestring-row-trees", 17),
+    ],
+)
+def test_intersection_other_geom_types(
+    tmp_path, input1_testfile, input2_testfile, exp_featurecount
+):
+    # Prepare test data
+    input1_path = test_helper.get_testfile(input1_testfile)
+    input2_path = test_helper.get_testfile(input2_testfile)
+
+    # Now run test
+    output_path = tmp_path / f"{input1_path.stem}_intersection_{input2_path.stem}.gpkg"
+    gfo.intersection(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+    )
+
+    # Check if the tmp file is correctly created
+    assert output_path.exists()
+    exp_spatial_index = GeofileInfo(output_path).default_spatial_index
+    assert gfo.has_spatial_index(output_path) is exp_spatial_index
+    output_layerinfo = gfo.get_layerinfo(output_path)
+    assert output_layerinfo.featurecount == exp_featurecount
+    if input1_testfile.startswith("point") or input2_testfile.startswith("point"):
+        assert output_layerinfo.geometrytype == GeometryType.MULTIPOINT
+    else:
+        assert output_layerinfo.geometrytype == GeometryType.MULTILINESTRING
 
 
 def test_intersection_output_path_exists():
@@ -1391,8 +1431,8 @@ def test_join_nearest(tmp_path, suffix, epsg):
     assert gfo.has_spatial_index(output_path) is exp_spatial_index
     input2_layerinfo = gfo.get_layerinfo(input2_path)
     output_layerinfo = gfo.get_layerinfo(output_path)
-    expected_featurecount = nb_nearest * (input1_layerinfo.featurecount - 1)
-    assert output_layerinfo.featurecount == expected_featurecount
+    exp_featurecount = nb_nearest * (input1_layerinfo.featurecount - 1)
+    assert output_layerinfo.featurecount == exp_featurecount
     exp_columns = len(input1_columns) + len(input2_layerinfo.columns) + 2 + 1
     assert len(output_layerinfo.columns) == exp_columns
     assert output_layerinfo.geometrytype == GeometryType.MULTIPOLYGON
@@ -1558,8 +1598,11 @@ def test_select_two_layers(tmp_path, suffix, epsg, gridsize):
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)
 @pytest.mark.parametrize("input_nogeom", ["input1", "input2", "both"])
+@pytest.mark.parametrize("remove_slivers", [False, True])
 @pytest.mark.filterwarnings("ignore:.*Field format '' not supported.*")
-def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
+def test_select_two_layers_input_without_geom(
+    tmp_path, suffix, input_nogeom, remove_slivers
+):
     # Prepare test file with geom
     input_geom_path = test_helper.get_testfile("polygon-parcel", suffix=suffix)
 
@@ -1587,6 +1630,9 @@ def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
         layer2 = '"{input2_layer}" layer2'
         exp_output_geom = True
         exp_featurecount = 37
+        if remove_slivers:
+            # The empty geometry is filtered out if remove_slivers is True
+            exp_featurecount -= 1
     elif input_nogeom == "input2":
         input1_path = input_geom_path
         input2_path = input_nogeom_path
@@ -1596,6 +1642,9 @@ def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
         layer2 = '"{input2_layer}" layer2'
         exp_output_geom = True
         exp_featurecount = 37
+        if remove_slivers:
+            # The empty geometry is filtered out if remove_slivers is True
+            exp_featurecount -= 1
     elif input_nogeom == "both":
         input1_path = input_nogeom_path
         input2_path = input_nogeom_path
@@ -1631,6 +1680,7 @@ def test_select_two_layers_input_without_geom(tmp_path, suffix, input_nogeom):
         input2_path=input2_path,
         output_path=output_path,
         sql_stmt=sql_stmt,
+        remove_slivers=remove_slivers,
         batchsize=exp_featurecount / 2,
     )
 
@@ -2012,6 +2062,10 @@ def test_symmetric_difference(
     # Prepare expected gdf
     input1_gdf = gfo.read_file(input1_path)
     input2_gdf = gfo.read_file(input2_path)
+    # If epsg is 4326, the almost-sliver geometry in input2 will be removed because
+    # another sliver removal tolerance is applied, so remove it here as well
+    if epsg == 4326:
+        input2_gdf = input2_gdf[input2_gdf.geometry.area > 1e-10]
     exp_gdf = input1_gdf.overlay(
         input2_gdf, how="symmetric_difference", keep_geom_type=True
     )
@@ -2101,9 +2155,9 @@ def test_symmetric_difference_self(tmp_path, subdivide_coords, fid_column):
     [
         (".gpkg", 31370, 0.01, "ST_Area(geom) > 1000", True, True, 2000, None, 62),
         (".shp", 31370, 0.0, "ST_Area(geom) > 1000", False, True, 2000, None, 59),
-        (".gpkg", 4326, 0.0, None, False, False, 2000, "fid_custom", 73),
+        (".gpkg", 4326, 0.0, None, False, False, 2000, "fid_custom", 72),
         (".gpkg", 31370, 0.0, None, False, False, 10, "fid_custom", 73),
-        (".gpkg", 4326, 0.0, None, False, True, 2000, "fid_custom", 73),
+        (".gpkg", 4326, 0.0, None, False, True, 2000, "fid_custom", 72),
         (".gpkg", 31370, 0.0, None, False, True, 10, "fid_custom", 73),
     ],
 )
@@ -2195,6 +2249,10 @@ def test_union(
     # Prepare expected result
     input1_gdf = gfo.read_file(input1_path, fid_as_index=keep_fid)
     input2_gdf = gfo.read_file(input2_path, fid_as_index=keep_fid)
+    # If epsg is 4326, the almost-sliver geometry in input1 will be removed because
+    # another sliver removal tolerance is applied, so remove it here as well
+    if epsg == 4326:
+        input1_gdf = input1_gdf[input1_gdf.geometry.area > 1e-10]
     if keep_fid:
         input1_gdf["l1_fid"] = input1_gdf.index
         input2_gdf["l2_fid"] = input2_gdf.index
