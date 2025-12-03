@@ -18,7 +18,7 @@ from pyproj import CRS, Transformer
 from shapely.geometry import box
 
 import geofileops as gfo
-from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers._options import ConfigOptions
 from geofileops.util import _sqlite_userdefined
 from geofileops.util._general_util import MissingRuntimeDependencyError
 
@@ -548,7 +548,7 @@ def get_columns(
     finally:
         conn.close()
         conn = None
-        if ConfigOptions.remove_temp_files and tmp_dir is not None:
+        if ConfigOptions.get_remove_temp_files and tmp_dir is not None:
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     time_taken = time.perf_counter() - start
