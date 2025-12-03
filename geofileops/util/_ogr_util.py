@@ -16,7 +16,7 @@ from pygeoops import GeometryType
 import geofileops as gfo
 from geofileops import fileops
 from geofileops._compat import GDAL_GTE_3101, GDAL_GTE_3114
-from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers._options import ConfigOptions
 from geofileops.util._general_util import MissingRuntimeDependencyError
 from geofileops.util._geopath_util import GeoPath
 
@@ -481,7 +481,7 @@ def vector_translate(
     # with enable_debug=True nothing is logged. In addition, after
     # gdal.ConfigurePythonLogging is called, the CPL_LOG config setting is ignored.
     if "CPL_LOG" not in config_options:
-        gdal_cpl_log_dir = ConfigOptions.tmp_dir / "gdal_cpl_log"
+        gdal_cpl_log_dir = ConfigOptions.get_tmp_dir / "gdal_cpl_log"
         gdal_cpl_log_dir.mkdir(parents=True, exist_ok=True)
         fd, gdal_cpl_log = tempfile.mkstemp(suffix=".log", dir=gdal_cpl_log_dir)
         os.close(fd)

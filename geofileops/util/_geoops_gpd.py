@@ -32,7 +32,7 @@ import geofileops as gfo
 from geofileops import LayerInfo, fileops
 from geofileops._compat import PANDAS_GTE_22
 from geofileops.helpers import _general_helper, _parameter_helper
-from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers._options import ConfigOptions
 from geofileops.util import (
     _general_util,
     _geoops_sql,
@@ -1248,7 +1248,7 @@ def dissolve(  # noqa: D417
                 )
 
     # Check what we need to do in an error occurs
-    on_data_error = ConfigOptions.on_data_error
+    on_data_error = ConfigOptions.get_on_data_error
 
     # Now start dissolving
     # --------------------

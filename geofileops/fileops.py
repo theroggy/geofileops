@@ -30,7 +30,7 @@ from pygeoops import GeometryType, PrimitiveType  # noqa: F401
 
 from geofileops._compat import GDAL_GTE_311, PYOGRIO_GTE_012
 from geofileops.helpers import _general_helper
-from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers._options import ConfigOptions
 from geofileops.util import (
     _geofileinfo,
     _geoseries_util,
@@ -1139,6 +1139,7 @@ def add_columns(
 
     If `output_path` is specified, but `output_layer` is None, the output layer name is
     determined like this for file types that support multiple layers:
+
        - if the input layer contains a single spatial layer, :func:`get_default_layer`
          on `output_path` will be used to determine `output_layer`.
        - otherwise, the input layername is used/retained.
@@ -1493,6 +1494,7 @@ def update_column(
     .. |spatialite_reference_link| raw:: html
 
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
     """  # noqa: E501
     # Init
     logger.info(f"Update column {name} in {path}#{layer}")
@@ -1579,7 +1581,7 @@ def read_file(
 
 
     Args:
-        path (file path): path to the file to read from. |GDAL_vsi|_ paths are also
+        path (file path): path to the file to read from. `GDAL_vsi`_ paths are also
             supported.
         layer (str, optional): The layer to read. If None and there is only one layer in
             the file it is read, otherwise an error is thrown. Defaults to None.
@@ -1595,7 +1597,7 @@ def read_file(
             recommended. Defaults to None, then all rows are returned.
         where (str, optional): where clause to filter features in layer by attribute
             values. If the datasource natively supports sql, its specific SQL dialect
-            should be used (eg. SQLite and GeoPackage: `SQLITE`_, PostgreSQL). If it
+            should be used (eg. SQLite and GeoPackage: "SQLITE", PostgreSQL). If it
             doesn't, the `OGRSQL WHERE`_ syntax should be used. Note that it is not
             possible to overrule the SQL dialect, this is only possible when you use the
             SQL parameter. Examples: ``"ISO_A3 = 'CAN'"``,
@@ -1706,7 +1708,7 @@ def _read_file_base(
         fid_as_column = True
 
     # Read with the engine specified
-    engine = ConfigOptions.io_engine
+    engine = ConfigOptions.get_io_engine
     if engine.startswith("pyogrio"):
         if "use_arrow" in kwargs:
             use_arrow = bool(kwargs["use_arrow"]) if pyarrow else False
@@ -1884,7 +1886,7 @@ def _read_file_base_fiona(
     finally:
         if (
             tmp_fid_path is not None
-            and ConfigOptions.remove_temp_files
+            and ConfigOptions.get_remove_temp_files
             and tmp_fid_path.parent.exists()
         ):
             shutil.rmtree(tmp_fid_path.parent, ignore_errors=True)
@@ -2220,7 +2222,7 @@ def to_file(
     if force_output_geometrytype is not None and force_output_geometrytype.is_multitype:  # type: ignore[union-attr]
         force_multitype = True
 
-    engine = ConfigOptions.io_engine
+    engine = ConfigOptions.get_io_engine
 
     # Write file with the correct engine
     if engine.startswith("pyogrio"):
@@ -2969,11 +2971,12 @@ def copy_layer(
     """Copy a layer from a source to a destination dataset.
 
     Typical use cases:
-      - convert a file from one fileformat to another
-      - reproject a layer to another spatial reference
-      - export a subset of a layer using the `where` or `sql_stmt` parameter
-      - add a layer to an existing file as a new layer (`write_mode="add_layer"`)
-      - append a layer to an existing layer (`write_mode="append"`)
+
+        - convert a file from one fileformat to another
+        - reproject a layer to another spatial reference
+        - export a subset of a layer using the `where` or `sql_stmt` parameter
+        - add a layer to an existing file as a new layer (`write_mode="add_layer"`)
+        - append a layer to an existing layer (`write_mode="append"`)
 
     If an `sql_stmt` is specified, the sqlite query can contain following placeholders
     that will be automatically replaced for you:
@@ -2996,6 +2999,7 @@ def copy_layer(
         { "<option_type>.<option_name>": <option_value> }
 
     The option types can be any of the following:
+
         - LAYER_CREATION: layer creation option (lco)
         - DATASET_CREATION: dataset creation option (dsco)
         - INPUT_OPEN: input dataset open option (oo)
@@ -3173,7 +3177,7 @@ def copy_layer(
         and dst_crs is None
         and Path(src).exists()
         and Path(dst).exists()
-        and ConfigOptions.copy_layer_sqlite_direct
+        and ConfigOptions.get_copy_layer_sqlite_direct
     ):
         # TODO: sql_stmt?, access_mode="create", create_spatial_index, dst_crs?
         try:

@@ -114,3 +114,28 @@ Classes
    PrimitiveType
    SimplifyAlgorithm
    TempEnv
+
+.. _reference-runtime-options:
+
+Runtime Options
+---------------
+
+Geofileps has several runtime options that can be used to tune its behavior. These can
+be set using the helper functions below. The runtime options are saved to and read from
+environment variables, so setting the environment variables directly is also possible.
+
+All helper functions below can be used in two ways:
+   1. Permanently set the option by calling the function directly.
+   2. Temporarily set the option by using the function as a context manager.
+
+.. autosummary::
+   :toctree: api/
+
+   options.set_copy_layer_sqlite_direct
+   options.set_io_engine
+   options.set_on_data_error
+   options.set_remove_temp_files
+   options.set_subdivide_check_parallel_fraction
+   options.set_subdivide_check_parallel_rows
+   options.set_tmp_dir
+   options.set_worker_type

@@ -238,3 +238,16 @@ dataset like this:
     """
     stats_df = gfo.read_file(path="file.gpkg", sql_stmt=sql_stmt)
     stats_df.to_excel("stats.xlsx", index=False)
+
+
+Runtime Options
+---------------
+Geofileops has several runtime options that can be used to tune its behavior. These can
+be set using the :mod:`geofileops.options` module.
+
+Some options can help with debugging, like disabling the removal of temporary files,
+others can help improve performance depending on the use case, like setting the
+type of workers to use.
+
+Information about all runtime options and how to use them can be found here:
+:ref:`Runtime Options<reference-runtime-options>`.

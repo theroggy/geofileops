@@ -1749,7 +1749,7 @@ def simplify(
 
     The result is written to the output file specified.
 
-    Several `algorithm`s are available.
+    Several ``algorithm``s are available.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -2467,6 +2467,7 @@ def identity(
     If ``input2_path`` is None, a self-identity is performed. This means the 1st input
     layer is used for both inputs but interactions between the same rows in this layer
     are ignored. The output can be influenced via the ``include_duplicates`` parameter:
+
         - If True (the default), the logic explained above is applied as-such. The
           result is that each (part of a) geometry that has an intersection is
           duplicated in the output with the attribute column values "switched". Hence,
@@ -2479,7 +2480,8 @@ def identity(
         - If False, only one of the duplicates is kept in the
           output with the column values only available "in one direction".
 
-    Notes:
+    Remarks:
+
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
@@ -2711,6 +2713,7 @@ def intersection(
     input layer is used for both inputs but interactions between the same rows in this
     layer are ignored. The output can be influenced with the ``include_duplicates``
     parameter:
+
         - If True (the default), the logic described above is applied as-such. The
           result is that each geometry is duplicated in the output with the attribute
           column values "switched". Hence, each intersecting pair of geometries A and B
@@ -2721,7 +2724,8 @@ def intersection(
         - If ``include_duplicates`` is False, only one of the duplicates is kept in the
           output with the column values only saved "in one direction".
 
-    Notes:
+    Remarks:
+
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
@@ -2731,6 +2735,7 @@ def intersection(
           ``subdivide_coords`` parameter.
 
     Alternative names:
+
         - GeoPandas: overlay(how="intersection")
 
     Args:
@@ -3101,6 +3106,7 @@ def join_nearest(
 
     In addition to the columns requested via the ``input*_columns`` parameters, the
     following columns will be in the output file as well:
+
         - pos (int): relative rank (sorted by distance): the closest item will be #1,
           the second closest item will be #2 and so on.
         - distance (float): if the dataset is in a planar (= projected) crs,
@@ -3584,6 +3590,7 @@ def union(
 
     Union needs to be interpreted here as such: the output layer will contain the
     combination of all of the following operations:
+
         - The pairwise intersection between the two layers.
         - The (parts of) features of layer 1 that don't have any intersection with layer
           2.
@@ -3594,6 +3601,7 @@ def union(
     layer is used for both inputs but interactions between the same rows in this layer
     are ignored. The output can be influenced with the ``include_duplicates``
     parameter:
+
         - If True (the default), the logic explained above is applied as-such. The
           result is that each geometry is duplicated in the output with the attribute
           column values "switched". Hence, each intersecting pair of geometries A and B
@@ -3608,7 +3616,8 @@ def union(
         - If False, only one of the duplicates is kept in the output with the column
           values only available "in one direction".
 
-    Notes:
+    Remarks:
+
         - The result will contain the attribute columns from both input layers. The
           attribute values wont't be changed, so columns like area,... will have to be
           recalculated manually if this is wanted.
@@ -3619,6 +3628,7 @@ def union(
 
 
     Alternative names:
+
         - GeoPandas: overlay(how="union")
 
     Args:
@@ -3825,7 +3835,12 @@ def union_full_self(
 
     See Also:
         * :func:`union`: calculate the pairwise union of two layers
-    """
+
+    .. |spatialite_reference_link| raw:: html
+
+        <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
+
+    """  # noqa: E501
     logger = logging.getLogger("geofileops.union_full_self")
     logger.info(f"Start, with input: {input_path}, output: {output_path}")
 

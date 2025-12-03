@@ -21,6 +21,7 @@ if hasattr(gpd_compat, "USE_PYGEOS"):
 
 from geofileops.fileops import *  # noqa: F403
 from geofileops.geoops import *  # noqa: F403
+from geofileops.helpers._options import ConfigOptions as options  # noqa: F401
 from geofileops.helpers.layerstyles import *  # noqa: F403
 from geofileops.util._general_util import TempEnv  # noqa: F401
 from geofileops.util._geofileinfo import get_driver  # noqa: F401

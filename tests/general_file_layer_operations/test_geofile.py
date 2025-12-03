@@ -28,7 +28,7 @@ from geofileops._compat import (
     PYOGRIO_GTE_011,
     PYOGRIO_GTE_012,
 )
-from geofileops.helpers._configoptions_helper import ConfigOptions
+from geofileops.helpers._options import ConfigOptions
 from geofileops.util import _geofileinfo, _geoseries_util
 from geofileops.util._geopath_util import GeoPath
 from tests import test_helper
@@ -252,7 +252,7 @@ def test_add_columns(tmp_path, output_stem, do_updates, suffix):
 
     # This is the test dir that most likely will be created during the operation. Make
     # sure it doesn't exist yet.
-    tmp_dir = ConfigOptions.tmp_dir / "add_columns_000001"
+    tmp_dir = ConfigOptions.get_tmp_dir / "add_columns_000001"
     shutil.rmtree(tmp_dir, ignore_errors=True)
 
     output_path = None if output_stem is None else tmp_path / f"{output_stem}{suffix}"
