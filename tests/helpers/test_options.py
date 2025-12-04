@@ -1,5 +1,6 @@
 """Tests for functionalities in _configoptions_helper."""
 
+import multiprocessing
 import os
 import tempfile
 
@@ -56,6 +57,9 @@ def test_get_bool_invalidvalue():
         ("GFO_IO_ENGINE", "PYOgrio", "pyogrio"),
         ("GFO_IO_ENGINE", "FIOna", "fiona"),
         ("GFO_IO_ENGINE", None, "pyogrio-arrow"),
+        ("GFO_NB_PARALLEL", "4", 4),
+        ("GFO_NB_PARALLEL", "0", multiprocessing.cpu_count()),
+        ("GFO_NB_PARALLEL", "-1", multiprocessing.cpu_count()),
         ("GFO_ON_DATA_ERROR", "RAIse", "raise"),
         ("GFO_ON_DATA_ERROR", "WARn", "warn"),
         ("GFO_ON_DATA_ERROR", None, "raise"),
@@ -73,6 +77,8 @@ def test_get_option(key, value, expected):
     with gfo.TempEnv({key: value}):
         if key == "GFO_IO_ENGINE":
             result = ConfigOptions.get_io_engine
+        elif key == "GFO_NB_PARALLEL":
+            result = ConfigOptions.get_nb_parallel(None)
         elif key == "GFO_ON_DATA_ERROR":
             result = ConfigOptions.get_on_data_error
         elif key == "GFO_REMOVE_TEMP_FILES":
@@ -89,6 +95,11 @@ def test_get_option(key, value, expected):
     "key, invalid_value, expected_error",
     [
         ("GFO_IO_ENGINE", "invalid", "invalid value for configoption <GFO_IO_ENGINE>"),
+        (
+            "GFO_NB_PARALLEL",
+            "invalid",
+            "invalid value for configoption <GFO_NB_PARALLEL>",
+        ),
         (
             "GFO_ON_DATA_ERROR",
             "invalid",
@@ -123,6 +134,8 @@ def test_get_option_invalid(key, invalid_value, expected_error):
     ):
         if key == "GFO_IO_ENGINE":
             _ = ConfigOptions.get_io_engine
+        elif key == "GFO_NB_PARALLEL":
+            _ = ConfigOptions.get_nb_parallel(None)
         elif key == "GFO_ON_DATA_ERROR":
             _ = ConfigOptions.get_on_data_error
         elif key == "GFO_REMOVE_TEMP_FILES":
@@ -228,6 +241,36 @@ def test_set_io_engine() -> None:
     # Test setting the option temporarily using context manager
     with gfo.options.set_io_engine("pyogrio-arrow"):
         assert os.environ[key] == "PYOGRIO-ARROW"
+
+    # After exiting the context manager, the environment variable should be removed
+    assert key not in os.environ
+
+
+def test_set_nb_parallel() -> None:
+    """Test the nb_parallel option setter."""
+    # Make sure the environment variable is not set at the start of the test
+    key = "GFO_NB_PARALLEL"
+    if key in os.environ:
+        del os.environ[key]
+
+    # Test setting the option permanently
+    gfo.options.set_nb_parallel(4)
+    assert os.environ[key] == "4"
+
+    # Test setting the option temporarily using context manager
+    with gfo.options.set_nb_parallel(2):
+        assert os.environ[key] == "2"
+
+    # After exiting the context manager, the value should be restored to the last
+    # permanent setting (which was 4)
+    assert os.environ[key] == "4"
+
+    # Clean up by setting with None
+    gfo.options.set_nb_parallel(None)
+
+    # Test setting the option temporarily using context manager
+    with gfo.options.set_nb_parallel(8):
+        assert os.environ[key] == "8"
 
     # After exiting the context manager, the environment variable should be removed
     assert key not in os.environ

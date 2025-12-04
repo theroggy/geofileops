@@ -1,3 +1,5 @@
+"""Tests for geofileops.util._geoops_sql module."""
+
 import pytest
 
 import geofileops as gfo

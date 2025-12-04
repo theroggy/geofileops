@@ -42,7 +42,7 @@ def dissolve_within_distance(
     close_internal_gaps: bool = False,
     input_layer: str | None = None,
     output_layer: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -90,8 +90,10 @@ def dissolve_within_distance(
             contain only one layer. Defaults to None.
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -407,7 +409,7 @@ def apply(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -449,8 +451,10 @@ def apply(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -529,7 +533,7 @@ def apply_vectorized(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -573,8 +577,10 @@ def apply_vectorized(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -644,7 +650,7 @@ def buffer(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -702,8 +708,10 @@ def buffer(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -907,7 +915,7 @@ def convexhull(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -939,8 +947,10 @@ def convexhull(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -983,7 +993,7 @@ def delete_duplicate_geometries(
     explodecollections: bool = False,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -1024,8 +1034,10 @@ def delete_duplicate_geometries(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -1071,7 +1083,7 @@ def dissolve(
     output_layer: str | None = None,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -1202,8 +1214,10 @@ def dissolve(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -1307,7 +1321,7 @@ def isvalid(
     columns: list[str] | None = None,
     explodecollections: bool = False,
     validate_attribute_data: bool = False,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> bool:
@@ -1337,8 +1351,10 @@ def isvalid(
             Defaults to False.
         validate_attribute_data (bool, optional): True to validate if all attribute data
             can be read. Defaults to False.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -1391,7 +1407,7 @@ def makevalid(
     where_post: str | None = None,
     precision: float | None = None,
     validate_attribute_data: bool = False,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -1435,8 +1451,10 @@ def makevalid(
         validate_attribute_data (bool, optional): True to validate if all attribute data
             can be read. Raises an exception if an error is found, as this type of error
             cannot be fixed using makevalid. Defaults to False.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -1586,7 +1604,7 @@ def select(
     force_output_geometrytype: GeometryType | str | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = True,
-    nb_parallel: int = 1,
+    nb_parallel: int | None = 1,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -1621,8 +1639,10 @@ def select(
             the precision. Defaults to 0.0.
         keep_empty_geoms (bool, optional): True to keep rows with empty/null geometries
             in the output. Defaults to True.
-        nb_parallel (int, optional): the number of parallel processes to use. If -1, all
-            available cores are used. Defaults to 1.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to 1.
             If ``nb_parallel`` != 1, make sure your query still returns correct results
             if it is executed per batch of rows instead of in one go on the entire
             layer.
@@ -1752,7 +1772,7 @@ def simplify(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -1798,8 +1818,10 @@ def simplify(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -1869,7 +1891,7 @@ def clip(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 15000,
     force: bool = False,
@@ -1930,8 +1952,10 @@ def clip(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -2097,7 +2121,7 @@ def difference(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -2157,8 +2181,10 @@ def difference(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -2224,7 +2250,7 @@ def erase(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -2267,7 +2293,7 @@ def export_by_location(
     output_layer: str | None = None,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 7500,
     force: bool = False,
@@ -2324,8 +2350,10 @@ def export_by_location(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -2392,7 +2420,7 @@ def export_by_distance(
     output_layer: str | None = None,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -2424,8 +2452,10 @@ def export_by_distance(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -2482,7 +2512,7 @@ def identity(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -2563,8 +2593,10 @@ def identity(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -2637,7 +2669,7 @@ def split(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -2687,7 +2719,7 @@ def intersect(
     output_layer: str | None = None,
     explodecollections: bool = False,
     gridsize: float = 0.0,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -2732,7 +2764,7 @@ def intersection(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 15000,
     force: bool = False,
@@ -2818,8 +2850,10 @@ def intersection(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -2895,7 +2929,7 @@ def join(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = 1,
+    nb_parallel: int | None = 1,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -2943,8 +2977,10 @@ def join(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to 1.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to 1.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -3004,7 +3040,7 @@ def join_by_location(
     output_layer: str | None = None,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -3074,8 +3110,10 @@ def join_by_location(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -3138,7 +3176,7 @@ def join_nearest(
     input2_columns: list[str] | None = None,
     input2_columns_prefix: str = "l2_",
     output_layer: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -3195,8 +3233,10 @@ def join_nearest(
             Defaults to "l2\_".
         output_layer (str, optional): output layer name. If None, the ``output_path``
             stem is used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -3251,7 +3291,7 @@ def select_two_layers(
     gridsize: float = 0.0,
     remove_slivers: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = 1,
+    nb_parallel: int | None = 1,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -3306,10 +3346,13 @@ def select_two_layers(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use. If -1, all
-            available cores are used. Defaults to 1. If ``nb_parallel`` != 1, make sure
-            your query still returns correct results if it is executed per batch of rows
-            instead of in one go on the entire layer.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to 1.
+            If ``nb_parallel`` != 1, make sure your query still returns correct results
+            if it is executed per batch of rows instead of in one go on the entire
+            layer.
         batchsize (int, optional): indicative number of rows to process per batch.
             A smaller batch size, possibly in combination with a smaller
             ``nb_parallel``, will reduce the memory usage.
@@ -3487,7 +3530,7 @@ def symmetric_difference(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -3560,8 +3603,10 @@ def symmetric_difference(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -3637,7 +3682,7 @@ def union(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -3732,8 +3777,10 @@ def union(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. ``explodecollections``. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
@@ -3807,7 +3854,7 @@ def union_full_self(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -3896,8 +3943,10 @@ def union_full_self(
         where_post (str, optional): SQL filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): the number of parallel processes to use.
-            Defaults to -1: use all available CPUs.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): indicative number of rows to process per batch.
             A smaller batch size, possibly in combination with a
             smaller ``nb_parallel``, will reduce the memory usage.
