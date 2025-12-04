@@ -852,7 +852,7 @@ def rename_layer(
         datasource_layer = _get_layer(datasource, layer)
         layername = datasource_layer.GetName()
 
-        if not datasource_layer.TestCapability(gdal.ogr.OLCRename):
+        if not datasource_layer.TestCapability(ogr.OLCRename):
             raise ValueError(f"rename_layer not supported for {path}#{layer}")
 
         # If the layer name only differs in case, we need to rename it first to a
@@ -906,7 +906,7 @@ def rename_column(
     try:
         datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
         datasource_layer = datasource.GetLayer(layerinfo.name)
-        if not datasource_layer.TestCapability(gdal.ogr.OLCAlterFieldDefn):
+        if not datasource_layer.TestCapability(ogr.OLCAlterFieldDefn):
             raise ValueError(f"rename_column not supported for {path}")
         layer_defn = datasource_layer.GetLayerDefn()
 
@@ -921,22 +921,14 @@ def rename_column(
             field_index = layer_defn.GetFieldIndex(column_name)
             field_defn = layer_defn.GetFieldDefn(field_index)
             renamed_field = gdal.ogr.FieldDefn(temp_column_name, field_defn.GetType())
-            datasource_layer.AlterFieldDefn(
-                field_index,
-                renamed_field,
-                gdal.ogr.ALTER_NAME_FLAG,
-            )
+            _ogr_rename_column_with_retry(datasource_layer, field_index, renamed_field)
             column_name = f"{temp_column_name}"
 
         # Rename column
         field_index = layer_defn.GetFieldIndex(column_name)
         field_defn = layer_defn.GetFieldDefn(field_index)
         renamed_field = gdal.ogr.FieldDefn(new_column_name, field_defn.GetType())
-        datasource_layer.AlterFieldDefn(
-            field_index,
-            renamed_field,
-            gdal.ogr.ALTER_NAME_FLAG,
-        )
+        _ogr_rename_column_with_retry(datasource_layer, field_index, renamed_field)
 
     except Exception as ex:
         # If it is the ValueError thrown above, just raise
@@ -950,6 +942,36 @@ def rename_column(
         raise
     finally:
         datasource = None
+
+
+def _ogr_rename_column_with_retry(
+    ogr_layer: ogr.Layer,
+    field_index: int,
+    renamed_field: ogr.FieldDefn,
+    max_retries: int = 3,
+) -> None:
+    """Rename a column of an OGR Layer with retries in case of some errors.
+
+    Args:
+        ogr_layer (ogr.Layer): the OGR layer.
+        field_index (int): the index of the field to rename.
+        renamed_field (ogr.FieldDefn): the new field definition.
+        max_retries (int, optional): maximum number of retries. Defaults to 3.
+    """
+    for retry_count in range(max_retries):
+        try:
+            ogr_layer.AlterFieldDefn(field_index, renamed_field, ogr.ALTER_NAME_FLAG)
+            break
+        except RuntimeError as ex:
+            if (
+                retry_count == max_retries - 1
+                or "attempt to write a readonly database" not in str(ex)
+            ):
+                # No more retries or other error... raise
+                raise ex
+
+            # Sleep before retrying
+            time.sleep(0.5 * (retry_count + 1))
 
 
 class DataType(enum.Enum):
