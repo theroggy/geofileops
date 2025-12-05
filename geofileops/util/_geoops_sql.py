@@ -4,7 +4,6 @@ import json
 import logging
 import logging.config
 import math
-import multiprocessing
 import os
 import re
 import string
@@ -60,7 +59,7 @@ def buffer(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -125,7 +124,7 @@ def convexhull(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -174,7 +173,7 @@ def delete_duplicate_geometries(  # noqa: D417
     explodecollections: bool,
     keep_empty_geoms: bool,
     where_post: str | None,
-    nb_parallel: int,
+    nb_parallel: int | None,
     batchsize: int,
     force: bool,
     operation_prefix: str = "",
@@ -259,7 +258,7 @@ def isvalid(
     columns: list[str] | None = None,
     explodecollections: bool = False,
     validate_attribute_data: bool = False,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> bool:
@@ -339,7 +338,7 @@ def makevalid(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -418,7 +417,7 @@ def select(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     preserve_fid: bool | None = None,
-    nb_parallel: int = 1,
+    nb_parallel: int | None = 1,
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
@@ -483,7 +482,7 @@ def simplify(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -539,7 +538,7 @@ def _single_layer_vector_operation(
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None,
     preserve_fid: bool | None,
     gpkg_needed: bool,
-    nb_parallel: int,
+    nb_parallel: int | None,
     batchsize: int,
     force: bool,
     tmp_basedir: Path | None,
@@ -566,7 +565,10 @@ def _single_layer_vector_operation(
         sql_dialect (Optional[Literal["SQLITE", "OGRSQL"]]): _description_
         preserve_fid (Optional[bool]): Whether to preserve the fid column if possible.
         gpkg_needed (bool): True if the input needs to be converted to a GeoPackage.
-        nb_parallel (int): _description_
+        nb_parallel (int | None): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`.
         batchsize (int): _description_
         force (bool): _description_
         tmp_basedir (Optional[Path]): The directory to create the temporary
@@ -937,7 +939,7 @@ def clip(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 15000,
     force: bool = False,
@@ -1054,7 +1056,7 @@ def difference(  # noqa: D417
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -1349,7 +1351,7 @@ def _subdivide_layer(
     operation_prefix: str = "",
     tmp_basedir: Path | None,
     keep_fid: bool = True,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
 ) -> Path | None:
     """Subdivide a layer if needed.
@@ -1365,7 +1367,10 @@ def _subdivide_layer(
         subdivide_coords (int): number of coordinates to aim for. A layer is subdivided
             if it has at least 1 geometry with > `subdivide_coords` * 2 coordinates.
         keep_fid (bool): True to retain the fid column in the output file.
-        nb_parallel (int, optional): _description_. Defaults to -1.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
         batchsize (int, optional): _description_. Defaults to -1.
         operation_prefix (str, optional): Prefix to use in logging,... Defaults to "".
         tmp_basedir (Optional[Path], optional): The directory to create the temporary
@@ -1533,7 +1538,7 @@ def export_by_location(
     output_layer: str | None = None,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 10000,
     force: bool = False,
@@ -1729,7 +1734,7 @@ def export_by_distance(
     output_layer: str | None = None,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -1800,7 +1805,7 @@ def intersection(  # noqa: D417
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 15000,
     force: bool = False,
@@ -2101,7 +2106,7 @@ def join(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = 1,
+    nb_parallel: int | None = 1,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -2182,7 +2187,7 @@ def join_by_location(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
     output_with_spatial_index: bool | None = None,
@@ -2575,7 +2580,7 @@ def join_nearest(
     input2_columns_prefix: str = "l2_",
     output_layer: str | None = None,
     explodecollections: bool = False,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -2696,7 +2701,7 @@ def select_two_layers(
     gridsize: float = 0.0,
     remove_slivers: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = 1,
+    nb_parallel: int | None = 1,
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
@@ -2747,7 +2752,7 @@ def identity(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = 1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -2908,7 +2913,7 @@ def symmetric_difference(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -3084,7 +3089,7 @@ def union(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
@@ -3293,7 +3298,7 @@ def _two_layer_vector_operation(
     gridsize: float,
     remove_slivers: bool,
     where_post: str | None,
-    nb_parallel: int,
+    nb_parallel: int | None,
     batchsize: int,
     force: bool,
     tmp_basedir: Path | None,
@@ -3339,7 +3344,10 @@ def _two_layer_vector_operation(
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): [description]. Defaults to -1.
+        nb_parallel (int | None): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller nb_parallel, will reduce the memory usage.
@@ -4348,7 +4356,7 @@ def _prepare_processing_params(
     input1_path: Path,
     input1_layer: LayerInfo,
     tmp_dir: Path | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     input1_layer_alias: str | None = None,
     input1_is_subdivided: bool = False,
@@ -4488,7 +4496,7 @@ def _prepare_processing_params(
 
 def _determine_nb_batches(
     nb_rows_input_layer: int,
-    nb_parallel: int,
+    nb_parallel: int | None,
     batchsize: int,
     is_twolayer_operation: bool,
     cpu_count: int | None = None,
@@ -4497,7 +4505,10 @@ def _determine_nb_batches(
 
     Args:
         nb_rows_input_layer (int): number of input rows
-        nb_parallel (int): recommended number of workers
+        nb_parallel (int | None): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`.
         batchsize (int): recommended number of rows per batch
         is_twolayer_operation (bool): True if optimization for a two layer operation,
             False if it involves a single layer operation.
@@ -4510,19 +4521,17 @@ def _determine_nb_batches(
     # If no or 1 input rows or if 1 parallel worker is asked
     # Remark: especially for 'select' operation, if nb_parallel is 1 nb_batches should
     # be 1 (select might give wrong results)
-    if nb_rows_input_layer <= 1 or nb_parallel == 1:
+    nb_parallel_config = ConfigOptions.get_nb_parallel(nb_parallel, cpu_count)
+    if nb_rows_input_layer <= 1 or nb_parallel_config == 1:
         return (1, 1)
 
-    if cpu_count is None:
-        cpu_count = multiprocessing.cpu_count()
-
-    # Determine the optimal number of parallel workers
-    if nb_parallel == -1:
+    # If no explicit number of parallel workers specified, determine the optimal number
+    if nb_parallel is None or nb_parallel != nb_parallel_config:
         # If no batch size specified, put at least 100 rows in a batch
         min_rows_per_batch = 100 if batchsize <= 0 else batchsize
 
         max_parallel = max(int(nb_rows_input_layer / min_rows_per_batch), 1)
-        nb_parallel = min(cpu_count, max_parallel)
+        nb_parallel = min(nb_parallel_config, max_parallel)
 
     # Determine optimal number of batches
     if nb_parallel > 1:

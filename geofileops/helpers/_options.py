@@ -1,5 +1,6 @@
 """Helper class to access the geofileops runtime options."""
 
+import multiprocessing
 import os
 import tempfile
 from contextlib import AbstractContextManager
@@ -190,6 +191,88 @@ class ConfigOptions:
             )
 
         return io_engine
+
+    @staticmethod
+    def set_nb_parallel(nb_parallel: int | None) -> _RestoreOriginalHandler:
+        """Set the preferred number of parallel workers to be used.
+
+        If not set or set to <= 0, the number of available CPU cores will be used.
+        If set to a positive value, that value is the preferred number of workers.
+
+        Remarks:
+
+            - You can also set the option temporarily by using this function as a
+              context manager.
+            - You can also set the option by directly setting the environment variable
+              `GFO_NB_PARALLEL` to a string representing the number of CPU cores to use.
+
+        .. versionadded:: 0.11.0
+
+        Args:
+            nb_parallel (int | None): The preferred number of workers. If None, the
+                option is unset (so the default behavior will be used).
+
+        Examples:
+            If you want to change the default value of the option in general, you can
+            just call it as a function:
+
+            .. code-block:: python
+
+                gfo.options.set_nb_parallel(10)
+
+
+            If you want to temporarily change the option, you can use it as a context
+            manager:
+
+            .. code-block:: python
+
+                with gfo.options.set_nb_parallel(10):
+                    gfo.intersection(...)
+
+        """
+        key = "GFO_NB_PARALLEL"
+        original_value = os.environ.get(key)
+        if nb_parallel is not None:
+            os.environ[key] = str(nb_parallel)
+        elif key in os.environ:
+            del os.environ[key]
+
+        return _RestoreOriginalHandler(key, original_value)
+
+    @staticmethod
+    def get_nb_parallel(
+        nb_parallel_overrule: int | None, nb_cpu_cores: int | None = None
+    ) -> int:
+        """Get the preferred number of workers to use for processing.
+
+        Args:
+            nb_parallel_overrule (int | None): If not None, the value specified
+                overrules the configuration option.
+            nb_cpu_cores (int | None): The number of CPU cores available. If None, this
+                is determined automatically.
+
+        Returns:
+            int: The preferred number of workers to use for processing.
+        """
+        if nb_parallel_overrule is not None:
+            nb_parallel = nb_parallel_overrule
+        else:
+            try:
+                nb_parallel = int(os.environ.get("GFO_NB_PARALLEL", default="0"))
+            except ValueError as ex:
+                raise ValueError(
+                    "invalid value for configoption <GFO_NB_PARALLEL>: "
+                    f"'{os.environ.get('GFO_NB_PARALLEL')}'"
+                ) from ex
+
+        # If nb_parallel <= 0, use the number of available CPU cores
+        if nb_parallel <= 0:
+            if nb_cpu_cores is not None:
+                nb_parallel = nb_cpu_cores
+            else:
+                nb_parallel = multiprocessing.cpu_count()
+
+        return nb_parallel
 
     @staticmethod
     def set_on_data_error(

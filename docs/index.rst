@@ -25,7 +25,7 @@ as possible:
 * process data in batches
 * subdivide/merge complex geometries on the fly
 * process data in different passes
-* use all available CPUs
+* use all available CPU cores
 
 The following chart gives an impression of the speed improvement that can be expected
 when processing larger files. The `benchmarks <https://github.com/geofileops/geobenchmark>`_

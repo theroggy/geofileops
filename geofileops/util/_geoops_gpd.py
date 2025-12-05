@@ -125,7 +125,7 @@ class ParallelizationConfig:
 
 def _determine_nb_batches(
     nb_rows_total: int,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     parallelization_config: ParallelizationConfig | None = None,
 ) -> tuple[int, int]:
@@ -133,13 +133,16 @@ def _determine_nb_batches(
 
     Args:
         nb_rows_total (int): The total number of rows that will be processed
-        nb_parallel (int): The level of parallelization requested.
-            If -1, tries to use all resources available.
-        batchsize (int): indicative number of rows to process per batch.
+        nb_parallel (int | None, optional): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`. Defaults to None.
+        batchsize (int, optional): indicative number of rows to process per batch.
             If -1: (try to) determine optimal size automatically using the heuristics in
-            'parallelization_config'.
+            'parallelization_config'. Defaults to -1.
         parallelization_config (ParallelizationConfig, optional): Configuration
-            parameters to use to suggest parallelisation parameters.
+            parameters to use to suggest parallelisation parameters. If None, default
+            parameters are used. Defaults to None.
 
     Returns:
         Tuple[int, int]: Tuple of (nb_parallel, nb_batches)
@@ -156,14 +159,15 @@ def _determine_nb_batches(
 
     # If the number of rows is really low, just use one batch
     if (
-        nb_parallel < 1
+        (nb_parallel is None or nb_parallel <= 0)
         and batchsize < 1
         and nb_rows_total <= config_local.min_rows_per_batch
     ):
         return (1, 1)
 
-    if nb_parallel <= 0:
-        nb_parallel = config_local.cpu_count
+    nb_parallel = ConfigOptions.get_nb_parallel(
+        nb_parallel_overrule=nb_parallel, nb_cpu_cores=config_local.cpu_count
+    )
 
     if logger.isEnabledFor(logging.DEBUG):
         mem_usable = _general_util.formatbytes(config_local.bytes_usable)
@@ -258,7 +262,7 @@ class ProcessingParams:
 def _prepare_processing_params(
     input_path: Path,
     input_layer: LayerInfo,
-    nb_parallel: int,
+    nb_parallel: int | None,
     batchsize: int,
     parallelization_config: ParallelizationConfig | None = None,
     tmp_dir: Path | None = None,
@@ -379,7 +383,7 @@ def apply(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
     parallelization_config: ParallelizationConfig | None = None,
@@ -428,7 +432,7 @@ def apply_vectorized(  # noqa: D417
     gridsize: float,
     keep_empty_geoms: bool,
     where_post: str | None,
-    nb_parallel: int,
+    nb_parallel: int | None,
     batchsize: int,
     force: bool,
     parallelization_config: ParallelizationConfig | None,
@@ -491,7 +495,7 @@ def buffer(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
@@ -545,7 +549,7 @@ def convexhull(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -585,7 +589,7 @@ def makevalid(
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
     validate_attribute_data: bool = False,  # noqa: ARG001
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -642,7 +646,7 @@ def simplify(
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
 ) -> None:
@@ -687,7 +691,7 @@ def _apply_geooperation_to_layer(
     gridsize: float,  # = 0.0
     keep_empty_geoms: bool,  # = False
     where_post: str | None,  # = None
-    nb_parallel: int,  # = -1
+    nb_parallel: int | None,  # = -1
     batchsize: int,  # = -1
     force: bool,  # = False
     tmp_basedir: Path | None,
@@ -749,7 +753,10 @@ def _apply_geooperation_to_layer(
         where_post (str, optional): sql filter to apply after all other processing,
             including e.g. explodecollections. It should be in sqlite syntax and
             |spatialite_reference_link| functions can be used. Defaults to None.
-        nb_parallel (int, optional): [description]. Defaults to -1.
+        nb_parallel (int | None): the number of parallel workers to use.
+            If None, the preference set in the nb_parallel configuration option is used,
+            which defaults to the number of CPU cores available. For more information,
+            see :func:`options.set_nb_parallel`.
         batchsize (int, optional): indicative number of rows to process per
             batch. A smaller batch size, possibly in combination with a
             smaller nb_parallel, will reduce the memory usage.
@@ -1105,7 +1112,7 @@ def dissolve(  # noqa: D417
     output_layer: str | None = None,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     force: bool = False,
     operation_prefix: str = "",
@@ -1294,7 +1301,7 @@ def dissolve(  # noqa: D417
             if nb_parallel == -1:
                 nb_cpu = multiprocessing.cpu_count()
                 nb_parallel = nb_cpu  # int(1.25 * nb_cpu)
-                logger.debug(f"Nb cpus found: {nb_cpu}, nb_parallel: {nb_parallel}")
+                logger.debug(f"{nb_cpu=}, {nb_parallel=}")
         else:
             # Else, create a grid based on the number of tiles wanted as result
             # Use a margin of 1 meter around the bounds

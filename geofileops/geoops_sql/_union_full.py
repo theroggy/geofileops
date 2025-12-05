@@ -32,7 +32,7 @@ def union_full_self(
     explodecollections: bool = False,
     gridsize: float = 0.0,
     where_post: str | None = None,
-    nb_parallel: int = -1,
+    nb_parallel: int | None = None,
     batchsize: int = -1,
     subdivide_coords: int = 2000,
     force: bool = False,
