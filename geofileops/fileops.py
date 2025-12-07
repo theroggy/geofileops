@@ -39,6 +39,7 @@ from geofileops.util import (
     _ogr_util,
     _sqlite_util,
 )
+from geofileops.util._general_util import retry
 from geofileops.util._geopath_util import GeoPath
 
 try:
@@ -96,6 +97,18 @@ PRJ_EPSG_31370 = (
     'AUTHORITY["EPSG",31370]'
     "]"
 )
+
+FILE_LOCKED_ERRORS = [
+    "attempt to write a readonly database",
+    "file used by other process",
+]
+
+RETRY_LOCKED_FILE_KWARGS = {
+    "max_tries": 5,
+    "delay_incremental": 0.5,
+    "exceptions": (RuntimeError,),
+    "match": FILE_LOCKED_ERRORS,
+}
 
 
 def listlayers(
@@ -560,6 +573,7 @@ def get_default_layer(path: Union[str, "os.PathLike[Any]"]) -> str:
     return GeoPath(path).stem
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def execute_sql(
     path: Union[str, "os.PathLike[Any]"],
     sql_stmt: str,
@@ -568,6 +582,8 @@ def execute_sql(
     """Execute a SQL statement (DML or DDL) on the file.
 
     To run SELECT SQL statements on a file, use :meth:`~read_file`.
+
+    If the function fails due to the file being locked, it will retry a number of times.
 
     Args:
         path (PathLike): The path to the file.
@@ -601,6 +617,7 @@ def execute_sql(
         datasource = None
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def create_spatial_index(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | LayerInfo | None = None,
@@ -610,6 +627,8 @@ def create_spatial_index(
     no_geom_ok: bool = False,
 ) -> None:
     """Create a spatial index on the layer specified.
+
+    If the function fails due to the file being locked, it will retry a number of times.
 
     Args:
         path (PathLike): The file path.
@@ -760,12 +779,15 @@ def has_spatial_index(
             datasource = None
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def remove_spatial_index(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | LayerInfo | None = None,
     datasource: gdal.Dataset | None = None,
 ) -> None:
     """Remove the spatial index from the layer specified.
+
+    If the function fails due to the file being locked, it will retry a number of times.
 
     Args:
         path (PathLike): The file path.
@@ -821,6 +843,7 @@ def remove_spatial_index(
             datasource = None
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def rename_layer(
     path: Union[str, "os.PathLike[Any]"], new_layer: str, layer: str | None = None
 ) -> None:
@@ -828,6 +851,8 @@ def rename_layer(
 
     `rename_layer` can only be used on file types that support multiple layers, so
     for drivers that have the `GDAL_DCAP_MULTIPLE_VECTOR_LAYERS` capability.
+
+    If the rename fails due to the file being locked, it will retry a number of times.
 
     Args:
         path (PathLike): The file path.
@@ -852,7 +877,7 @@ def rename_layer(
         datasource_layer = _get_layer(datasource, layer)
         layername = datasource_layer.GetName()
 
-        if not datasource_layer.TestCapability(gdal.ogr.OLCRename):
+        if not datasource_layer.TestCapability(ogr.OLCRename):
             raise ValueError(f"rename_layer not supported for {path}#{layer}")
 
         # If the layer name only differs in case, we need to rename it first to a
@@ -871,6 +896,7 @@ def rename_layer(
         datasource = None
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def rename_column(
     path: Union[str, "os.PathLike[Any]"],
     column_name: str,
@@ -878,6 +904,8 @@ def rename_column(
     layer: str | None = None,
 ) -> None:
     """Rename the column specified.
+
+    If the rename fails due to the file being locked, it will retry a number of times.
 
     Args:
         path (PathLike): the file path.
@@ -906,7 +934,7 @@ def rename_column(
     try:
         datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
         datasource_layer = datasource.GetLayer(layerinfo.name)
-        if not datasource_layer.TestCapability(gdal.ogr.OLCAlterFieldDefn):
+        if not datasource_layer.TestCapability(ogr.OLCAlterFieldDefn):
             raise ValueError(f"rename_column not supported for {path}")
         layer_defn = datasource_layer.GetLayerDefn()
 
@@ -922,9 +950,7 @@ def rename_column(
             field_defn = layer_defn.GetFieldDefn(field_index)
             renamed_field = gdal.ogr.FieldDefn(temp_column_name, field_defn.GetType())
             datasource_layer.AlterFieldDefn(
-                field_index,
-                renamed_field,
-                gdal.ogr.ALTER_NAME_FLAG,
+                field_index, renamed_field, ogr.ALTER_NAME_FLAG
             )
             column_name = f"{temp_column_name}"
 
@@ -932,11 +958,7 @@ def rename_column(
         field_index = layer_defn.GetFieldIndex(column_name)
         field_defn = layer_defn.GetFieldDefn(field_index)
         renamed_field = gdal.ogr.FieldDefn(new_column_name, field_defn.GetType())
-        datasource_layer.AlterFieldDefn(
-            field_index,
-            renamed_field,
-            gdal.ogr.ALTER_NAME_FLAG,
-        )
+        datasource_layer.AlterFieldDefn(field_index, renamed_field, ogr.ALTER_NAME_FLAG)
 
     except Exception as ex:
         # If it is the ValueError thrown above, just raise
@@ -948,6 +970,7 @@ def rename_column(
         # It is another error... add some more context
         ex.args = (f"rename_column error: {ex} for {path}#{layerinfo.name}",)
         raise
+
     finally:
         datasource = None
 
@@ -973,6 +996,7 @@ class DataType(enum.Enum):
     """Column with numeric data: exact decimal data."""
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def add_column(
     path: Union[str, "os.PathLike[Any]"],
     name: str,
@@ -992,6 +1016,8 @@ def add_column(
     The column will be added and updated in-place to the geofile. When the
     geofile is located on a network drive, this can be slow. If this is the case,
     it is recommended to use :meth:`~add_columns` to add the column(s) instead.
+
+    If the function fails due to the file being locked, it will retry a number of times.
 
     Args:
         path (PathLike): Path to the geofile.
@@ -1124,6 +1150,7 @@ def add_column(
             logger.info(f"Ready, add_column of {name} took {took:.2f}")
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def add_columns(
     path: Union[str, "os.PathLike[Any]"],
     new_columns: list[
@@ -1154,6 +1181,8 @@ def add_columns(
        - if the input layer contains a single spatial layer, :func:`get_default_layer`
          on `output_path` will be used to determine `output_layer`.
        - otherwise, the input layername is used/retained.
+
+    If the function fails due to the file being locked, it will retry a number of times.
 
     .. versionadded:: 0.11.0
 
@@ -1415,10 +1444,13 @@ def _validate_datatype(datatype: str | DataType) -> str:
     return type_str
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def drop_column(
     path: Union[str, "os.PathLike[Any]"], column_name: str, layer: str | None = None
 ) -> None:
     """Drop the column specified.
+
+    If the function fails due to the file being locked, it will retry a number of times.
 
     Args:
         path (PathLike): The file path.
@@ -1455,6 +1487,7 @@ def drop_column(
         datasource = None
 
 
+@retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
 def update_column(
     path: Union[str, "os.PathLike[Any]"],
     name: str,
@@ -1463,6 +1496,8 @@ def update_column(
     where: str | None = None,
 ) -> None:
     """Update a column from a layer of the geofile.
+
+    If the function fails due to the file being locked, it will retry a number of times.
 
     Args:
         path (PathLike): Path to the geofile.

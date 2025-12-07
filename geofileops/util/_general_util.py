@@ -3,7 +3,9 @@
 import datetime
 import logging
 import os
-from collections.abc import Iterable
+import re
+import time
+from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager
 from types import TracebackType
 from typing import Any
@@ -178,6 +180,70 @@ def prepare_for_serialize(data: dict) -> dict:
             prepared[key] = str(value)
 
     return prepared
+
+
+def retry(
+    max_tries: int,
+    delay_fixed: float | None = None,
+    delay_incremental: float | None = None,
+    exceptions: tuple[type[BaseException], ...] = (Exception,),
+    match: Iterable[str] | str | None = None,
+) -> Callable:
+    """Decorator to retry a function a number of times in case of an exception.
+
+    Args:
+        max_tries (int): maximum number of times the function is attempted.
+        delay_fixed (float, optional): fixed delay in seconds between retries.
+            If None, no fixed dalay is applied. Defaults to None.
+        delay_incremental (float, optional): delay in seconds that increases between
+            retries like this: delay = `delay_incremental` * <try_count>. If None,
+            no incremental delay is applied. Defaults to None.
+        exceptions (tuple[type[BaseException], ...], optional): types of exceptions to
+            retry on. Defaults to (Exception,).
+        match (Iterable[str] | str, optional): if specified, only exceptions with
+            messages matching the given regular expression(s) are retried.
+            Defaults to None.
+    """
+    if match is not None and isinstance(match, str):
+        match = [match]
+
+    def decorator(func: Callable) -> Callable:
+        def wrapper(*args, **kwargs) -> Callable:  # noqa: ANN002, ANN003
+            for try_count in range(max_tries):
+                try:
+                    result = func(*args, **kwargs)
+                    return result
+                except Exception as ex:
+                    if (
+                        try_count >= (max_tries - 1)
+                        or not isinstance(ex, exceptions)
+                        or (
+                            match is not None
+                            and not any(re.search(m, str(ex)) for m in match)
+                        )
+                    ):
+                        # No more retries... raise
+                        raise ex
+
+                    logger.info(
+                        f"Retrying function {func.__name__} due to exception: {ex}. "
+                        f"Try {try_count + 1} of {max_tries}."
+                    )
+                    # Sleep if needed
+                    delay = 0.0
+                    if delay_fixed is not None:
+                        delay = delay_fixed
+                    elif delay_incremental is not None:
+                        delay += delay_incremental * (try_count + 1)
+
+                    if delay > 0:
+                        time.sleep(delay)
+
+            raise RuntimeError("Error in retry decorator. Should not be reached.")
+
+        return wrapper
+
+    return decorator
 
 
 class TempEnv(AbstractContextManager):

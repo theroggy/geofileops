@@ -60,7 +60,6 @@ General layer operations
 .. autosummary::
    :toctree: api/
 
-   append_to
    add_column
    add_columns
    add_layerstyle

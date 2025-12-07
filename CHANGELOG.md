@@ -42,6 +42,8 @@
 - Add configuration option to be able to set a global preference for `nb_parallel`.
   Can be set with `geofileops.options.set_nb_parallel()` (#784)
 - Add checks on invalid values in the getters in `ConfigOptions` (#711)
+- For most general layer operation that update a file, if it fails because the file is
+  locked, retry a few times (#785)
 - Ensure that the featurecount is properly cached in GPKG files, also for older GDAL
   versions + small refactor (#693)
 - Improve support for custom fid columns in gpkg (#771)
