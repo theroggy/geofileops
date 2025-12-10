@@ -46,6 +46,17 @@ def test_create_gfo_tmp_dir_env_invalid():
         pass
 
 
+def test_warn_if_low_mem():
+    """Test the low memory warning function."""
+    # Set the threshold to a high value to trigger the warning
+    min_memory_available = 9999 * 1024 * 1024 * 1024 * 1024  # 9999 TB
+    with _general_util.TempEnv(
+        {"GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD": str(min_memory_available)}
+    ):
+        with pytest.warns(UserWarning, match="Low memory available"):
+            _general_helper.warn_if_low_mem(called_from="test_warn_if_low_mem")
+
+
 @pytest.mark.parametrize(
     "worker_type, input_layer_featurecount, expected",
     [

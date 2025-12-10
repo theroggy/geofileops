@@ -3,6 +3,8 @@
 import multiprocessing
 import os
 import tempfile
+from pathlib import Path
+from typing import Any, Union
 
 import pytest
 from pyproj import CRS
@@ -57,6 +59,8 @@ def test_get_bool_invalidvalue():
         ("GFO_IO_ENGINE", "PYOgrio", "pyogrio"),
         ("GFO_IO_ENGINE", "FIOna", "fiona"),
         ("GFO_IO_ENGINE", None, "pyogrio-arrow"),
+        ("GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD", "1000", 1000),
+        ("GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD", None, 500 * 1024 * 1024),
         ("GFO_NB_PARALLEL", "4", 4),
         ("GFO_NB_PARALLEL", "0", multiprocessing.cpu_count()),
         ("GFO_NB_PARALLEL", "-1", multiprocessing.cpu_count()),
@@ -77,6 +81,8 @@ def test_get_option(key, value, expected):
     with gfo.TempEnv({key: value}):
         if key == "GFO_IO_ENGINE":
             result = ConfigOptions.get_io_engine
+        elif key == "GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD":
+            result = ConfigOptions.get_low_mem_available_warn_threshold
         elif key == "GFO_NB_PARALLEL":
             result = ConfigOptions.get_nb_parallel(None)
         elif key == "GFO_ON_DATA_ERROR":
@@ -95,6 +101,11 @@ def test_get_option(key, value, expected):
     "key, invalid_value, expected_error",
     [
         ("GFO_IO_ENGINE", "invalid", "invalid value for configoption <GFO_IO_ENGINE>"),
+        (
+            "GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD",
+            "invalid",
+            "invalid value for configoption <GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD>",
+        ),
         (
             "GFO_NB_PARALLEL",
             "invalid",
@@ -116,6 +127,16 @@ def test_get_option(key, value, expected):
             "invalid value for configoption <GFO_SLIVER_TOLERANCE>",
         ),
         (
+            "GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION",
+            "invalid",
+            "invalid value for configoption <GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION>",
+        ),
+        (
+            "GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS",
+            "invalid",
+            "invalid value for configoption <GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS>",
+        ),
+        (
             "GFO_TMPDIR",
             "   ",
             "GFO_TMPDIR='' environment variable found which is not supported",
@@ -134,6 +155,8 @@ def test_get_option_invalid(key, invalid_value, expected_error):
     ):
         if key == "GFO_IO_ENGINE":
             _ = ConfigOptions.get_io_engine
+        elif key == "GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD":
+            _ = ConfigOptions.get_low_mem_available_warn_threshold
         elif key == "GFO_NB_PARALLEL":
             _ = ConfigOptions.get_nb_parallel(None)
         elif key == "GFO_ON_DATA_ERROR":
@@ -142,6 +165,10 @@ def test_get_option_invalid(key, invalid_value, expected_error):
             _ = ConfigOptions.get_remove_temp_files
         elif key == "GFO_SLIVER_TOLERANCE":
             _ = ConfigOptions.get_sliver_tolerance(None)
+        elif key == "GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION":
+            _ = ConfigOptions.get_subdivide_check_parallel_fraction
+        elif key == "GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS":
+            _ = ConfigOptions.get_subdivide_check_parallel_rows
         elif key == "GFO_TMPDIR":
             _ = ConfigOptions.get_tmp_dir
         elif key == "GFO_WORKER_TYPE":
@@ -241,6 +268,36 @@ def test_set_io_engine() -> None:
     # Test setting the option temporarily using context manager
     with gfo.options.set_io_engine("pyogrio-arrow"):
         assert os.environ[key] == "PYOGRIO-ARROW"
+
+    # After exiting the context manager, the environment variable should be removed
+    assert key not in os.environ
+
+
+def test_set_low_mem_available_warn_threshold() -> None:
+    """Test the low_mem_available_warn_threshold option setter."""
+    # Make sure the environment variable is not set at the start of the test
+    key = "GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD"
+    if key in os.environ:
+        del os.environ[key]
+
+    # Test setting the option permanently
+    gfo.options.set_low_mem_available_warn_threshold(2000000)
+    assert os.environ[key] == "2000000"
+
+    # Test setting the option temporarily using context manager
+    with gfo.options.set_low_mem_available_warn_threshold(1000000):
+        assert os.environ[key] == "1000000"
+
+    # After exiting the context manager, the value should be restored to the last
+    # permanent setting (which was 2000000)
+    assert os.environ[key] == "2000000"
+
+    # Clean up by setting with None
+    gfo.options.set_low_mem_available_warn_threshold(None)
+
+    # Test setting the option temporarily using context manager
+    with gfo.options.set_low_mem_available_warn_threshold(500000):
+        assert os.environ[key] == "500000"
 
     # After exiting the context manager, the environment variable should be removed
     assert key not in os.environ
@@ -453,6 +510,31 @@ def test_set_tmp_dir() -> None:
         assert os.environ[key] == "/tmp/geofileops_temp2"
 
     # After exiting the context manager, the environment variable should be removed
+    assert key not in os.environ
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/tmp/geofileops_test_str",
+        r"C:\geofileops_test_path",
+        Path("/tmp/geofileops_test_path"),
+        Path(r"C:\geofileops_test_path"),
+    ],
+)
+def test_set_tmp_dir_pathlike(path: Union[str, "os.PathLike[Any]"]) -> None:
+    """Test the tmp_dir option setter with Path input."""
+    # Make sure the environment variable is not set at the start of the test
+    key = "GFO_TMPDIR"
+    if key in os.environ:
+        del os.environ[key]
+
+    # Test setting the option permanently
+    gfo.options.set_tmp_dir(path)
+    assert os.environ[key] == str(path)
+
+    # Clean up by setting with None
+    gfo.options.set_tmp_dir(None)
     assert key not in os.environ
 
 

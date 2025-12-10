@@ -844,6 +844,9 @@ def _apply_geooperation_to_layer(
             f"Start processing ({process_params.nb_parallel} "
             f"{worker_type}, batch size: {process_params.batchsize})"
         )
+        # Warn about low memory availability if needed
+        _general_helper.warn_if_low_mem(called_from=operation_name)
+
         with _processing_util.PooledExecutorFactory(
             worker_type=worker_type,
             max_workers=process_params.nb_parallel,
@@ -903,6 +906,10 @@ def _apply_geooperation_to_layer(
                 operation=operation.value,
                 nb_parallel=process_params.nb_parallel,
             )
+
+            # Warn about low memory availability if needed
+            _general_helper.warn_if_low_mem(called_from=f"{operation_name}_loop")
+
             for future in futures.as_completed(future_to_batch_id):
                 try:
                     message = future.result()
@@ -1256,6 +1263,9 @@ def dissolve(  # noqa: D417
 
     # Check what we need to do in an error occurs
     on_data_error = ConfigOptions.get_on_data_error
+
+    # Warn about low memory availability if needed
+    _general_helper.warn_if_low_mem(called_from=operation_name)
 
     # Now start dissolving
     # --------------------
@@ -1795,6 +1805,9 @@ def _dissolve_polygons_pass(
         _general_util.report_progress(
             start_time, nb_batches_done, nb_batches, "dissolve"
         )
+        # Warn about low memory availability if needed
+        _general_helper.warn_if_low_mem(called_from="dissolve, loop")
+
         for future in futures.as_completed(future_to_batch_id):
             try:
                 # If the calculate gave results

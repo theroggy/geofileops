@@ -46,6 +46,7 @@
   locked, retry a few times (#785)
 - Ensure that the featurecount is properly cached in GPKG files, also for older GDAL
   versions + small refactor (#693)
+- Give warnings when memory avalability drops blow a threshold (#789)
 - Improve support for custom fid columns in gpkg (#771)
 - Add `worker_type` used to progress logging (#715)
 - Write gdal log files to `GFO_TMPDIR` if specified (#727)
