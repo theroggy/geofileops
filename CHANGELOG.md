@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## 0.11.0 (yyyy-mm-dd)
+## 0.11.0 (2025-12-10)
 
 ### Deprecations and compatibility notes
 
