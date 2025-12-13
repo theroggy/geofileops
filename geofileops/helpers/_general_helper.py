@@ -1,12 +1,15 @@
 """General helper functions, specific for geofileops."""
 
 import shutil
+import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+import psutil
+
 from geofileops.helpers._options import ConfigOptions
-from geofileops.util import _io_util
+from geofileops.util import _general_util, _io_util
 
 
 @contextmanager
@@ -51,3 +54,20 @@ def worker_type_to_use(input_layer_featurecount: int) -> str:
         return "threads"
 
     return "processes"
+
+
+def warn_if_low_mem(called_from: str | None = None) -> None:
+    """Warning if the low memory thresshold is reached.
+
+    Returns:
+        called_from (str | None): String added in the warning that gives an indication
+            where the low memory warning was triggered. Defaults to None.
+    """
+    min_memory_available = ConfigOptions.get_low_mem_available_warn_threshold
+    virtual_available = psutil.virtual_memory().available
+    if virtual_available < min_memory_available:
+        virtual_available_str = _general_util.formatbytes(virtual_available)
+        warning_msg = f"Low memory available: {virtual_available_str}"
+        if called_from:
+            warning_msg += f" ({called_from=})"
+        warnings.warn(warning_msg, stacklevel=2)

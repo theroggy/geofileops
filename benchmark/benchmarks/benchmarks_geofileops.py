@@ -134,6 +134,8 @@ def dissolve_nogroupby(tmp_dir: Path) -> RunResult:
     # Go!
     start_time = datetime.now()
     output_path = tmp_dir / f"{input_path.stem}_diss_nogroupby.gpkg"
+    # with gfo.TempEnv({"GFO_IO_ENGINE": "pyogrio-arrow"}):
+    # with gfo.TempEnv({"GDAL_NUM_THREADS": 1}):
     gfo.dissolve(
         input_path=input_path,
         output_path=output_path,
@@ -141,6 +143,7 @@ def dissolve_nogroupby(tmp_dir: Path) -> RunResult:
         nb_parallel=nb_parallel,
         force=True,
     )
+
     result = RunResult(
         package=_get_package(),
         package_version=_get_version(),
@@ -415,12 +418,23 @@ def intersection_complexpoly_complexpoly(tmp_dir: Path) -> RunResult:
     function_name = inspect.currentframe().f_code.co_name  # type: ignore[union-attr]
 
     bbox = (30_000.123, 170_000.123, 250_000, 250_000)
+    crs = 31370
     input1_path, input1_descr = testdata.create_testfile(
-        bbox=bbox, geoms=3, polys_per_geom=4, points_per_poly=30_000, dst_dir=tmp_dir
+        bbox=bbox,
+        geoms=3,
+        polys_per_geom=4,
+        points_per_poly=30_000,
+        crs=crs,
+        dst_dir=tmp_dir,
     )
     bbox = (31_000.123, 171_000.123, 250_000, 250_000)
     input2_path, input2_descr = testdata.create_testfile(
-        bbox=bbox, geoms=3, polys_per_geom=4, points_per_poly=30_000, dst_dir=tmp_dir
+        bbox=bbox,
+        geoms=3,
+        polys_per_geom=4,
+        points_per_poly=30_000,
+        crs=crs,
+        dst_dir=tmp_dir,
     )
 
     # Go!

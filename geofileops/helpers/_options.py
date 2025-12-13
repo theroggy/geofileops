@@ -5,7 +5,7 @@ import os
 import tempfile
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, Union
 
 from pyproj import CRS
 
@@ -191,6 +191,85 @@ class ConfigOptions:
             )
 
         return io_engine
+
+    @staticmethod
+    def set_low_mem_available_warn_threshold(
+        min_bytes_available: int | None,
+    ) -> _RestoreOriginalHandler:
+        """Set the threshold to start warning for low available memory.
+
+        If not set, warnings are given once less than 500 MB of memory is available.
+
+        Warnings are given for all functions that use multiprocessing, and the memory
+        availability check is ran every time before a new batch is started. Note that
+        this is only a warning: the operation will still be attempted even if low on
+        memory. Also note that a warning is not guaranteed to be given, as memory
+        usage of worker processes can increase (a lot) between checks, either due to
+        geofileops processing or external factors.
+
+        Remarks:
+
+            - You can also set the option temporarily by using this function as a
+              context manager.
+            - You can also set the option by directly setting the environment variable
+              `GFO_MIN_MEMORY_AVAILABLE_WARNING` to a string representing the number of
+              bytes.
+
+        .. versionadded:: 0.11.0
+
+        Args:
+            min_bytes_available (int | None): The minimum amount of memory (in bytes)
+                that should be available before giving warnings. If None, the option
+                is unset (so the default behavior is used).
+
+        Examples:
+            If you want to change the default value of the option in general, you can
+            just call it as a function:
+
+            .. code-block:: python
+
+                gfo.options.set_memory_available_warn_threshold(800 * 1024 * 1024)
+
+
+            If you want to temporarily change the option, you can use it as a context
+            manager:
+
+            .. code-block:: python
+
+                with gfo.options.set_memory_available_warn_threshold(800 * 1024 * 1024):
+                    gfo.dissolve(...)
+
+        """
+        key = "GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD"
+        original_value = os.environ.get(key)
+        if min_bytes_available is not None:
+            os.environ[key] = str(min_bytes_available)
+        elif key in os.environ:
+            del os.environ[key]
+
+        return _RestoreOriginalHandler(key, original_value)
+
+    @classproperty
+    def get_low_mem_available_warn_threshold(cls) -> int | None:
+        """Get the threshold to start warning for low available memory.
+
+        Returns:
+            float | None: The minimum amount of memory (in bytes) that should be
+                available before giving warnings. Defaults to None.
+        """
+        fraction_str = os.environ.get("GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD")
+        if fraction_str is None:
+            return 500 * 1024 * 1024  # 500 MB
+        else:
+            try:
+                fraction = int(fraction_str)
+            except ValueError as ex:
+                raise ValueError(
+                    "invalid value for configoption "
+                    f"<GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD>: '{fraction_str}'"
+                ) from ex
+
+            return fraction
 
     @staticmethod
     def set_nb_parallel(nb_parallel: int | None) -> _RestoreOriginalHandler:
@@ -601,9 +680,19 @@ class ConfigOptions:
         Returns:
             int: The fraction of features to check for subdivision. Defaults to 5.
         """
-        fraction = os.environ.get("GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION", default="5")
+        fraction_str = os.environ.get(
+            "GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION", default="5"
+        )
 
-        return int(fraction)
+        try:
+            fraction = int(fraction_str)
+        except ValueError as ex:
+            raise ValueError(
+                "invalid value for configoption "
+                f"<GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION>: '{fraction_str}'"
+            ) from ex
+
+        return fraction
 
     @staticmethod
     def set_subdivide_check_parallel_rows(rows: int | None) -> _RestoreOriginalHandler:
@@ -663,12 +752,22 @@ class ConfigOptions:
             int: The minimum number of rows a file must have to check for subdivision in
                 parallel. Defaults to 500000.
         """
-        rows = os.environ.get("GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS", default="500000")
+        rows_str = os.environ.get("GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS", default="500000")
 
-        return int(rows)
+        try:
+            rows = int(rows_str)
+        except ValueError as ex:
+            raise ValueError(
+                "invalid value for configoption "
+                f"<GFO_SUBDIVIDE_CHECK_PARALLEL_ROWS>: '{rows_str}'"
+            ) from ex
+
+        return rows
 
     @staticmethod
-    def set_tmp_dir(path: str | None) -> _RestoreOriginalHandler:
+    def set_tmp_dir(
+        path: Union[str, "os.PathLike[Any]"] | None,
+    ) -> _RestoreOriginalHandler:
         """Set the directory to use for temporary files created during processing.
 
         The value set should be a valid directory path. If not set, a subdirectory
@@ -684,8 +783,8 @@ class ConfigOptions:
         .. versionadded:: 0.11.0
 
         Args:
-            path (str | None): The temporary directory path. If None, the option is
-                unset (so the default behavior is used).
+            path (PathLike | str | None): The temporary directory path. If None, the
+                option is unset (so the default behavior is used).
 
         Examples:
             If you want to change the default value of the option in general, you can
@@ -708,6 +807,8 @@ class ConfigOptions:
         key = "GFO_TMPDIR"
         original_value = os.environ.get(key)
         if path is not None:
+            if not isinstance(path, str):
+                path = str(path)
             os.environ[key] = path
         elif key in os.environ:
             del os.environ[key]
