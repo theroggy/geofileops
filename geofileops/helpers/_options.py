@@ -523,7 +523,7 @@ class ConfigOptions:
         Because the `set_precision` algorythm is relatively costly to apply, geometries
         are first pre-filtered with a less expensive filter: the average width:
 
-        .. code_block::
+        .. code-block:: python
 
             average_width(geom) = 2 * area(geom) / length(geom)
 

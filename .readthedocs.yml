@@ -8,9 +8,9 @@ version: 2
 # Set the version of os and other tools you might need
 # Using mambaforge solves excessive memory use issues
 build:
-  os: "ubuntu-24.04"
+  os: "ubuntu-lts-latest"
   tools:
-    python: "miniconda-latest"
+    python: "mambaforge-latest"
     
 # Build documentation in the docs/ directory with Sphinx
 sphinx:

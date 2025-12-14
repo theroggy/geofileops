@@ -1780,7 +1780,7 @@ def simplify(
 
     The result is written to the output file specified.
 
-    Several ``algorithm``s are available.
+    Check out the ``algorithm`` parameter for the different algorithms available.
 
     If ``explodecollections`` is False and the input and output file type is GeoPackage,
     the fid will be preserved. In other cases this will typically not be the case.
@@ -3859,7 +3859,7 @@ def union_full_self(
     subdivide_coords: int = 2000,
     force: bool = False,
 ) -> None:
-    """Calculates the "full" union of the features in a layer.
+    r"""Calculates the "full" union of the features in a layer.
 
     .. warning::
        This function is experimental and may be changed and/or renamed in a future
@@ -3903,7 +3903,7 @@ def union_full_self(
             options are:
 
             - "COLUMNS": the output won't contain any intersections between geometries.
-              The `columns` in the output are prefixed with "i1_", "i2_", etc., where
+              The `columns` in the output are prefixed with "i1\_", "i2\_", etc., where
               for each extra intersection on a location a new set of prefixed columns is
               created. E.g. for an input layer with 1 column "test" where a location is
               covered by 3 input features, the output will contain 3 columns: "i1_test",
