@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python =3.12
+  - pip  # Is apparently needed even though there are no pip packages specified
   # required
   - cloudpickle
   - gdal

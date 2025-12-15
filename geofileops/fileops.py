@@ -1639,7 +1639,7 @@ def read_file(
 
 
     Args:
-        path (file path): path to the file to read from. `GDAL_vsi`_ paths are also
+        path (file path): path to the file to read from. |GDAL_vsi| paths are also
             supported.
         layer (str, optional): The layer to read. If None and there is only one layer in
             the file it is read, otherwise an error is thrown. Defaults to None.
@@ -1656,7 +1656,7 @@ def read_file(
         where (str, optional): where clause to filter features in layer by attribute
             values. If the datasource natively supports sql, its specific SQL dialect
             should be used (eg. SQLite and GeoPackage: "SQLITE", PostgreSQL). If it
-            doesn't, the `OGRSQL WHERE`_ syntax should be used. Note that it is not
+            doesn't, the |OGRSQL WHERE| syntax should be used. Note that it is not
             possible to overrule the SQL dialect, this is only possible when you use the
             SQL parameter. Examples: ``"ISO_A3 = 'CAN'"``,
             ``"POP_EST > 10000000 AND POP_EST < 100000000"``. Defaults to None.
@@ -2227,10 +2227,12 @@ def to_file(
             to (try to) force the output to. Defaults to None.
             Mark: compared to other functions in gfo with this parameter, the behaviour
             here is limited to the following:
+
                 - for empty input gdf's, a standard geometry type (eg. Polygon,...) can
                   be used to force the geometry column to be of that type.
                 - if force_output_geometrytype is a MULTI type, parameter
                   force_multitype becomes True.
+
         force_multitype (bool, optional): force the geometry type to a multitype
             for file types that require one geometrytype per layer.
             Defaults to False.
@@ -3054,6 +3056,7 @@ def copy_layer(
 
     The options parameter can be used to pass any type of options to GDAL in
     the following form:
+
         { "<option_type>.<option_name>": <option_value> }
 
     The option types can be any of the following:
