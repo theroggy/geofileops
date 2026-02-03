@@ -12,6 +12,7 @@ import geopandas.testing as gpd_testing
 import pytest
 import shapely
 import shapely.geometry as sh_geom
+from osgeo import gdal
 
 import geofileops as gfo
 from geofileops._compat import GDAL_GTE_311, PYTHON_313
@@ -34,7 +35,7 @@ except ImportError:
 data_dir = Path(__file__).parent.resolve() / "data"
 data_url = "https://raw.githubusercontent.com/geofileops/geofileops/main/tests/data"
 
-EPSGS = [31370, 4326]
+EPSGS = [31370, 4326, None]
 GRIDSIZE_DEFAULT = 0.0
 SUFFIXES_FILEOPS = [".gpkg", ".shp", ".csv"]
 SUFFIXES_FILEOPS_EXT = [".gpkg", ".gpkg.zip", ".shp.zip", ".shp", ".csv"]
@@ -112,7 +113,7 @@ def get_testfile(
     testfile: str,
     dst_dir: Path | None = None,
     suffix: str = ".gpkg",
-    epsg: int = 31370,
+    epsg: int | None = 31370,
     empty: bool = False,
     dimensions: str | None = None,
     explodecollections: bool = False,
@@ -128,7 +129,7 @@ def get_testfile(
         dst_dir: Destination directory where the prepared testfile should be stored.
             If None, the path to the readonly cached version of the file is returned.
         suffix: Suffix of the prepared testfile (e.g. .gpkg, .shp, .csv, etc)
-        epsg: EPSG code of the prepared testfile
+        epsg: EPSG code of the prepared testfile. If None, the crs is set to None.
         empty: If True, prepare an empty testfile (no features)
         dimensions: If not None, prepare the testfile with the given dimensions
             (e.g. 'XYZ')
@@ -169,7 +170,7 @@ def _get_testfile(
     testfile: str,
     dst_dir: Path | None = None,
     suffix: str = ".gpkg",
-    epsg: int = 31370,
+    epsg: int | None = 31370,
     empty: bool = False,
     dimensions: str | None = None,
     explodecollections: bool = False,
@@ -179,6 +180,8 @@ def _get_testfile(
 ) -> Path:
     if suffix.lower() in (".gpkg.zip", ".shp.zip") and not GDAL_GTE_311:
         pytest.skip("geo_sozip support requires gdal>=3.11")
+    if epsg is None and not GDAL_GTE_311:
+        pytest.skip("Setting CRS to None requires gdal>=3.11")
 
     # Prepare original filepath.
     testfile_path = data_dir / f"{testfile}.gpkg"
@@ -283,6 +286,12 @@ def _get_testfile(
                         expression=f"CastToXYZ({prepared_info.geometrycolumn}, 5.0)",
                         layer=dst_layer,
                     )
+
+        if epsg is None:
+            # Set epsg to None if needed
+            tmp2_path = tmp_path.with_stem(f"{tmp_path.stem}2")
+            gdal.Run("vector", "edit", input=tmp_path, output=tmp2_path, crs="none")
+            tmp_path = tmp2_path
 
         # If the output should be zipped, zip it
         if prepared_path.suffix == ".zip":

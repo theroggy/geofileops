@@ -2132,11 +2132,19 @@ def _dissolve_polygons(
         # Add geoindex_column to the notonborder_gdf if asked
         if geoindex_column is not None:
             crs = notonborder_gdf.crs
-            transformer = Transformer.from_crs(crs.geodetic_crs, crs, always_xy=True)
-            crs_bounds = transformer.transform_bounds(*crs.area_of_use.bounds)
-            notonborder_gdf[geoindex_column] = notonborder_gdf.hilbert_distance(
-                crs_bounds
-            )
+            if crs is not None and crs.area_of_use is not None:
+                transformer = Transformer.from_crs(
+                    crs.geodetic_crs, crs, always_xy=True
+                )
+                crs_bounds = transformer.transform_bounds(*crs.area_of_use.bounds)
+                notonborder_gdf[geoindex_column] = notonborder_gdf.hilbert_distance(
+                    crs_bounds
+                )
+            else:
+                # Use representative point x coordinate as fallback.
+                notonborder_gdf[geoindex_column] = shapely.get_x(
+                    notonborder_gdf.geometry.representative_point()
+                )
 
         gfo.to_file(
             notonborder_gdf,
