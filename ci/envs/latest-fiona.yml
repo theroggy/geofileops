@@ -12,7 +12,7 @@ dependencies:
   # - nomkl  # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
   - numpy
   - packaging
-  - pandas
+  - pandas <3
   - psutil
   - pygeoops
   - pyogrio

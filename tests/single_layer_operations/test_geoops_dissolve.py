@@ -280,7 +280,7 @@ def test_dissolve_linestrings_aggcolumns_json(tmp_path, agg_columns):
     "expected_featurecount",
     [
         (".gpkg", 31370, False, ["GEWASgroep"], True, 0.0, "", 26),
-        (".gpkg", 31370, False, "GEWASgroep", True, 0.0, "", 26),
+        (".gpkg", None, False, "GEWASgroep", True, 0.0, "", 26),
         (".gpkg", 31370, False, ["GEWASgroep"], True, 0.01, "", 24),
         (".gpkg", 31370, False, ["GEWASGROEP"], False, 0.0, "", 6),
         (".gpkg.zip", 31370, True, ["GEWASGROEP"], False, 0.0, "", 6),
@@ -315,22 +315,21 @@ def test_dissolve_polygons(
 
     # Prepare test data
     dst_dir = tmp_path if suffix == ".shp" else None
-    test_path = test_helper.get_testfile(
+    input_path = test_helper.get_testfile(
         "polygon-parcel", suffix=suffix, epsg=epsg, dst_dir=dst_dir
     )
     if explode_input:
         # A bug caused in the past that the output was forced to the same type as the
         # input. If input was simple Polygon, this cause invalid output because
         # MultiPolygons were forced to Simple Polygons.
-        input_path = tmp_path / f"input{suffix}"
+        input2_path = tmp_path / f"input{suffix}"
         gfo.copy_layer(
-            src=test_path,
-            dst=input_path,
+            src=input_path,
+            dst=input2_path,
             explodecollections=True,
             force_output_geometrytype=GeometryType.POLYGON,
         )
-    else:
-        input_path = test_path
+        input_path = input2_path
 
     # Use a small enough batchsize so the dissolves uses multiple passes.
     input_layerinfo = gfo.get_layerinfo(input_path)

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.11.1 (????-??-??)
+
+### Bugs fixed
+
+- Fix `dissolve` on an input file without crs (#794)
+- Fix writing csv files on non-UTF8 systems (#797)
+
 ## 0.11.0 (2025-12-10)
 
 ### Deprecations and compatibility notes

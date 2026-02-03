@@ -58,7 +58,7 @@ def set_geoops_module(geoops_module: str):
 def basic_combinations_to_test(
     geoops_modules: list[str] = GEOOPS_MODULES,
     testfiles: list[str] = TESTFILES,
-    epsgs: list[int] = EPSGS,
+    epsgs: list[int | None] = EPSGS,
     suffixes: list[str] = SUFFIXES_GEOOPS,
 ) -> list[Any]:
     """
@@ -226,6 +226,7 @@ def test_buffer_basic(
             "GDAL < 3.9 (at least) writes 3D geometries even though "
             "force_geometrytype='MULTIPOLYGON' for buffer operation."
         )
+
     # Prepare test data
     input_path = test_helper.get_testfile(
         testfile,
@@ -241,9 +242,13 @@ def test_buffer_basic(
     set_geoops_module(geoops_module)
     input_layerinfo = fileops.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
-    assert input_layerinfo.crs is not None
+    if epsg is not None:
+        assert input_layerinfo.crs is not None
     distance = 1
-    if input_layerinfo.crs.is_projected is False:
+    is_geographic = (
+        input_layerinfo.crs is not None and not input_layerinfo.crs.is_projected
+    )
+    if is_geographic:
         # 1 degree = 111 km or 111000 m
         distance /= 111000
 
@@ -288,7 +293,7 @@ def test_buffer_basic(
     output_gdf = fileops.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
     # Check less precise for geographic CRS (WGS84)
-    check_less_precise = not input_layerinfo.crs.is_projected
+    check_less_precise = is_geographic
     assert_geodataframe_equal(
         output_gdf,
         expected_gdf,
@@ -1194,9 +1199,11 @@ def test_simplify(
     set_geoops_module(geoops_module)
     input_layerinfo = fileops.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
-    assert input_layerinfo.crs is not None
     # 1 degree = 111 km or 111000 m
-    tolerance = 5 if input_layerinfo.crs.is_projected else 5 / 111000
+    is_geographic = (
+        input_layerinfo.crs is not None and not input_layerinfo.crs.is_projected
+    )
+    tolerance = 5 if not is_geographic else 5 / 111000
     keep_empty_geoms_prepped = False if keep_empty_geoms is None else keep_empty_geoms
 
     # Prepare expected result
