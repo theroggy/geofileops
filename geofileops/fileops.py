@@ -2521,20 +2521,26 @@ def _to_file_pyogrio(
                 "destination layer doesn't have the same columns as gdf: "
                 f"{file_cols} vs {gdf_cols}"
             )
+    if use_arrow:
+        if not PYOGRIO_GTE_012 and len(gdf.select_dtypes(include=["datetime64"])) > 0:
+            # When writing datetime columns with pyogrio < 0.12, don't use arrow as
+            # this can give issues.
+            # See https://github.com/geopandas/pyogrio/issues/487
+            use_arrow = False
+            logger.info(
+                "arrow disabled to write layer: a datetime column is written, "
+                f"which has known issues with arrow + pyogrio<0.12: {path}#{layer}"
+            )
 
-    # When writing datetime columns with pyogrio < 0.12, don't use arrow as
-    # this can give issues.
-    # See https://github.com/geopandas/pyogrio/issues/487
-    if (
-        use_arrow
-        and not PYOGRIO_GTE_012
-        and len(gdf.select_dtypes(include=["datetime64"])) > 0
-    ):
-        use_arrow = False
-        logger.info(
-            "arrow disabled to write layer: a datetime column is written, "
-            f"which has known issues with arrow + pyogrio<0.12: {path}#{layer}"
-        )
+        if (
+            Path(path).suffix == ".csv"
+            and locale.getpreferredencoding(False) != "UTF-8"
+        ):
+            use_arrow = False
+            logger.info(
+                "arrow disabled to write layer: non-UTF8 system and file format could "
+                f"be non-UTF8 encoded: {path}"
+            )
 
     # Prepare kwargs to use in geopandas.to_file
     if create_spatial_index is not None:
