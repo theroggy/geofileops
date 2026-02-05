@@ -6,6 +6,7 @@
 
 - Fix `dissolve` on an input file without crs (#794)
 - Fix writing csv files on non-UTF8 systems (#797)
+- Fix incorrect result of difference in some rare cases (#799)
 
 ## 0.11.0 (2025-12-10)
 
