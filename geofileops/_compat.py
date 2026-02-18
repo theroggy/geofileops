@@ -29,6 +29,7 @@ GEOS_GTE_313 = version.parse(shapely.geos_version_string) >= version.parse("3.13
 
 PANDAS_GTE_20 = version.parse(pd.__version__) >= version.parse("2.0")
 PANDAS_GTE_22 = version.parse(pd.__version__) >= version.parse("2.2")
+PANDAS_GTE_30 = version.parse(pd.__version__) >= version.parse("3.0")
 
 PYOGRIO_GTE_010 = version.parse(pyogrio.__version__) >= version.parse("0.10")
 PYOGRIO_GTE_011 = version.parse(pyogrio.__version__) >= version.parse("0.11")

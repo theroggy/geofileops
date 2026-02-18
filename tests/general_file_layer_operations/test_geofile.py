@@ -10,6 +10,7 @@ from itertools import product
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pytest
 import shapely.geometry as sh_geom
@@ -24,6 +25,7 @@ from geofileops._compat import (
     GDAL_GTE_311,
     PANDAS_GTE_20,
     PANDAS_GTE_22,
+    PANDAS_GTE_30,
     PYOGRIO_GTE_010,
     PYOGRIO_GTE_011,
     PYOGRIO_GTE_012,
@@ -1493,7 +1495,10 @@ def test_get_layer_geometrytypes(suffix):
     src = test_helper.get_testfile("polygon-parcel", suffix=suffix)
     geometrytypes = gfo.get_layer_geometrytypes(str(src))
     if suffix == ".shp":
-        assert geometrytypes == ["POLYGON", "MULTIPOLYGON", None]
+        if PANDAS_GTE_30:
+            assert geometrytypes == ["POLYGON", "MULTIPOLYGON", np.nan]
+        else:
+            assert geometrytypes == ["POLYGON", "MULTIPOLYGON", None]
     else:
         assert geometrytypes == ["POLYGON", "MULTIPOLYGON"]
 
@@ -1890,7 +1895,18 @@ def test_read_file(suffix, dimensions, engine_setter):  # noqa: ARG001
         (["OIDN", "GEWASGROEP", "lengte"], "IGNORE"),
     ],
 )
-def test_read_file_columns_geometry(tmp_path, suffix, columns, geometry, engine_setter):  # noqa: ARG001
+def test_read_file_columns_geometry(tmp_path, suffix, columns, geometry, engine_setter):
+    if (
+        engine_setter == "pyogrio"
+        and geometry == "NO"
+        and suffix == ".gpkg"
+        and PANDAS_GTE_30
+    ):
+        pytest.xfail(
+            "pyogrio without arrow gives an issue writing GPKG without geometry with "
+            "pandas >= 3"
+        )
+
     # Prepare test data
     # For multi-layer filetype, use 2-layer file for better test coverage
     src_info = _geofileinfo.get_geofileinfo(suffix)

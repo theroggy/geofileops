@@ -1,6 +1,4 @@
-"""
-Tests for operations that are executed using a sql statement on two layers.
-"""
+"""Tests for operations that are executed using a sql statement on two layers."""
 
 import math
 import os
@@ -17,7 +15,12 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops._compat import GDAL_GTE_311, GEOPANDAS_110, GEOPANDAS_GTE_10
+from geofileops._compat import (
+    GDAL_GTE_311,
+    GEOPANDAS_110,
+    GEOPANDAS_GTE_10,
+    PANDAS_GTE_30,
+)
 from geofileops.util import _general_util, _geofileinfo, _sqlite_util
 from geofileops.util import _geoops_sql as geoops_sql
 from geofileops.util._geofileinfo import GeofileInfo
@@ -588,8 +591,9 @@ def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords, fid_column
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     # Remove rows where geometry is empty or None
@@ -2131,8 +2135,9 @@ def test_symmetric_difference(
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     # Remove rows where geometry is empty or None
@@ -2319,8 +2324,9 @@ def test_union(
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     if explodecollections:
@@ -2392,8 +2398,9 @@ def test_union_circles(tmp_path, suffix, epsg):
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
 
     assert_geodataframe_equal(
         output_gdf,
@@ -2450,8 +2457,9 @@ def test_union_circles(tmp_path, suffix, epsg):
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
 
     assert_geodataframe_equal(
         output_gdf,

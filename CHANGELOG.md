@@ -2,6 +2,10 @@
 
 ## 0.11.1 (????-??-??)
 
+### Improvements
+
+- Small fix to support pandas 3.0 (#798)
+
 ### Bugs fixed
 
 - Fix `dissolve` on an input file without crs (#794)
