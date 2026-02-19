@@ -1,6 +1,4 @@
-"""
-Tests for operations that are executed using a sql statement on two layers.
-"""
+"""Tests for operations that are executed using a sql statement on two layers."""
 
 import math
 import os
@@ -17,7 +15,12 @@ import shapely.geometry as sh_geom
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops._compat import GDAL_GTE_311, GEOPANDAS_110, GEOPANDAS_GTE_10
+from geofileops._compat import (
+    GDAL_GTE_311,
+    GEOPANDAS_110,
+    GEOPANDAS_GTE_10,
+    PANDAS_GTE_30,
+)
 from geofileops.util import _general_util, _geofileinfo, _sqlite_util
 from geofileops.util import _geoops_sql as geoops_sql
 from geofileops.util._geofileinfo import GeofileInfo
@@ -214,6 +217,65 @@ def test_difference(
 
     # Make sure the output still has rows, otherwise the test isn't super useful
     assert len(output_gdf) > 0
+
+
+@pytest.mark.parametrize("subdivide_coords", [2000, 4])
+def test_difference_empty(tmp_path, subdivide_coords):
+    """Specific test case for difference that incorrectly resulted in an empty geometry.
+
+    The underlying issue is that in rare cases GEOS unary_union results in an empty
+    geometry when the input geometries are very small and/or have very close vertices.
+
+    In `gfo.difference` all geometries from input2 are ST_Union'ed before performing the
+    ST_Difference with input1. Hence, for this rare case, the geometry to difference
+    with becomes empty (or NULL in spatialite). Because ST_difference(..., NULL) returns
+    NULL, the resulting geometry becomes NULL as well.
+    Because the ST_Union problem typically happens with very small or very close
+    vertices, it is more logical to retain the original input1 polygon rather than
+    having it disappear.
+    """
+    # Prepare test data
+    input1_path = tmp_path / "input1.gpkg"
+    input1_poly_wkt = "POLYGON ((184000 191000, 185000 191000, 185000 192000, 184000 192000, 184000 191000))"  # noqa: E501
+    input1_gdf = gpd.GeoDataFrame(
+        {"id": [1], "geometry": [shapely.from_wkt(input1_poly_wkt)]},
+        crs=31370,
+    )
+    gfo.to_file(input1_gdf, input1_path)
+
+    # The polygon to difference with is a special case that at the time of writing
+    # results in an empty geometry when unioned...
+    diff_poly1_wkt = "POLYGON ((184293.20931495726 191412.37075890973, 184293.23465140502 191412.3245224961, 184293.23465140507 191412.324522496, 184293.20931495726 191412.37075890973))"  # noqa: E501
+    diff_poly1 = shapely.from_wkt(diff_poly1_wkt)
+
+    diff_poly2_wkt = "POLYGON ((184293.23465140502 191412.3245224961, 184297.14 191403.80000000002, 184293.23465140496 191412.32452249623, 184293.23465140502 191412.3245224961))"  # noqa: E501  # noqa: E501
+    diff_poly2 = shapely.from_wkt(diff_poly2_wkt)
+
+    # Check that the union indeed results in an empty geometry
+    if not diff_poly1.union(diff_poly2).is_empty:
+        pytest.skip(
+            "Test case is no longer valid because the union of the difference "
+            "polygons is not empty anymore."
+        )
+
+    input2_path = tmp_path / "input_diff.gpkg"
+    input2_gdf = gpd.GeoDataFrame(
+        {"id": [1, 2], "geometry": [diff_poly1, diff_poly2]}, crs=31370
+    )
+    gfo.to_file(input2_gdf, input2_path)
+
+    output_path = tmp_path / "output.gpkg"
+    gfo.difference(
+        input1_path=input1_path,
+        input2_path=input2_path,
+        output_path=output_path,
+        subdivide_coords=subdivide_coords,
+    )
+
+    # Compare result with geopandas
+    assert output_path.exists()
+    result_gdf = gfo.read_file(output_path)
+    assert_geodataframe_equal(result_gdf, input1_gdf)
 
 
 def test_difference_explodecollections(tmp_path):
@@ -529,8 +591,9 @@ def test_identity(tmp_path, suffix, epsg, gridsize, subdivide_coords, fid_column
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     # Remove rows where geometry is empty or None
@@ -2072,8 +2135,9 @@ def test_symmetric_difference(
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     # Remove rows where geometry is empty or None
@@ -2260,8 +2324,9 @@ def test_union(
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
     if gridsize != 0.0:
         exp_gdf.geometry = shapely.set_precision(exp_gdf.geometry, grid_size=gridsize)
     if explodecollections:
@@ -2333,8 +2398,9 @@ def test_union_circles(tmp_path, suffix, epsg):
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
 
     assert_geodataframe_equal(
         output_gdf,
@@ -2391,8 +2457,9 @@ def test_union_circles(tmp_path, suffix, epsg):
     renames = dict(zip(exp_gdf.columns, output_gdf.columns, strict=True))
     exp_gdf = exp_gdf.rename(columns=renames)
     # For text columns, gfo gives None rather than np.nan for missing values.
-    for column in exp_gdf.select_dtypes(include="O").columns:
-        exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
+    if not PANDAS_GTE_30:
+        for column in exp_gdf.select_dtypes(include="O").columns:
+            exp_gdf[column] = exp_gdf[column].replace({np.nan: None})
 
     assert_geodataframe_equal(
         output_gdf,

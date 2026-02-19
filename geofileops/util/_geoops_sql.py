@@ -1225,7 +1225,8 @@ def difference(  # noqa: D417
                 SELECT * FROM (
                 SELECT IFNULL(
                         ( SELECT IFNULL(
-                                    IIF(COUNT(layer2_sub.rowid) = 0,
+                                    IIF(COUNT(layer2_sub.rowid) = 0
+                                            OR ST_Union(layer2_sub.{{input2_geometrycolumn}}) IS NULL,
                                         layer1.{{input1_geometrycolumn}},
                                         ST_CollectionExtract(
                                             ST_difference(
@@ -1276,7 +1277,8 @@ def difference(  # noqa: D417
                         SELECT fid_1 AS layer1_rowid_orig
                                 ,IFNULL(
                                 ( SELECT IFNULL(
-                                            IIF(COUNT(layer2_sub.rowid) = 0,
+                                            IIF(COUNT(layer2_sub.rowid) = 0
+                                                    OR ST_Union(layer2_sub.{{input2_geometrycolumn}}) IS NULL,
                                                 layer1_subdiv.{{input1_subdiv_geometrycolumn}},
                                                 ST_CollectionExtract(
                                                     ST_difference(

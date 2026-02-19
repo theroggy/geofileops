@@ -1,9 +1,8 @@
-"""
-Tests for functionalities in ogr_util.
-"""
+"""Tests for functionalities in ogr_util."""
 
 import os
 
+import numpy as np
 import pytest
 from osgeo import gdal
 from pygeoops import GeometryType
@@ -279,6 +278,32 @@ def test_vector_translate_sql(tmp_path, input_suffix, output_suffix):
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert len(input_layerinfo.columns) == len(output_layerinfo.columns)
     assert input_layerinfo.featurecount == input_layerinfo.featurecount
+
+
+def test_vector_translate_sql_st_minx(tmp_path):
+    input_path = test_helper.get_testfile("polygon-parcel")
+    layer = gfo.get_only_layer(input_path)
+    sql_stmt = f'SELECT ST_MinX(CastToXYZ(geom)) AS minx FROM "{layer}"'
+
+    output_path = tmp_path / "output.gpkg"
+    _ogr_util.vector_translate(input_path, output_path, sql_stmt=sql_stmt)
+
+    # Check output file
+    assert output_path.exists()
+    input_layerinfo = gfo.get_layerinfo(input_path)
+    output_layerinfo = gfo.get_layerinfo(output_path, raise_on_nogeom=False)
+    assert len(output_layerinfo.columns) == 1
+    assert input_layerinfo.featurecount == input_layerinfo.featurecount
+
+    # Check output data
+    output_gdf = gfo.read_file(output_path)
+    assert "minx" in output_gdf.columns
+    nans = np.isnan(output_gdf["minx"])
+    assert len(output_gdf.loc[nans]) == 1, (
+        f"There should be one NaN value in minx column: {output_gdf['minx']=}"
+    )
+    output_non_nan_gdf = output_gdf.loc[~nans]
+    assert all(output_non_nan_gdf["minx"] > 1)
 
 
 @pytest.mark.parametrize(

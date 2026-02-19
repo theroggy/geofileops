@@ -463,6 +463,27 @@ def test_execute_sql(tmp_path):
     assert info.featurecount == info_input.featurecount - nb_deleted
 
 
+def test_execute_sql_CastToXYZ(tmp_path):
+    test_path = test_helper.get_testfile(testfile="polygon-parcel", dst_dir=tmp_path)
+
+    # Make sure input geometries do not have Z values
+    test_gdf = gfo.read_file(test_path)
+    assert not test_gdf.geometry.iloc[0].has_z
+
+    # Run CastToXYZ to add Z values
+    info_input = gfo.get_layerinfo(test_path)
+    geom_name = info_input.geometrycolumn
+    layer = info_input.name
+    sql_stmt = f'UPDATE "{layer}" SET {geom_name} = CastToXYZ({geom_name}, 5.0)'
+    sqlite_util.execute_sql(test_path, sql_stmt=sql_stmt)
+
+    # Verify if Z values were added
+    read_gdf = gfo.read_file(test_path)
+    assert read_gdf is not None
+    assert len(read_gdf) == info_input.featurecount
+    assert read_gdf.geometry.iloc[0].has_z
+
+
 def test_execute_sql_invalid(tmp_path):
     test_path = test_helper.get_testfile(testfile="polygon-parcel", dst_dir=tmp_path)
 
