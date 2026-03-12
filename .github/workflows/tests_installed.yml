@@ -35,7 +35,7 @@ jobs:
         python: ["3.12"]
         env: ["installed"]
         include:
-          - checkout_ref: "v0.11.0"
+          - checkout_ref: "v0.11.1"
             # nomkl: openblas instead of mkl saves 600 MB. Linux OK, but 50% slower on Windows and OSX!
             install_extra_args: >-
               nomkl
