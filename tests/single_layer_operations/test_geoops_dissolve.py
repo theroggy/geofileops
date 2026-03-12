@@ -723,7 +723,7 @@ def test_dissolve_polygons_tiles_empty(tmp_path, suffix, nb_parallel):
     bounds = (
         bounds[0] - 1,
         bounds[1] - 1,
-        bounds[2] + 1 + width,
+        bounds[2] + 2 + width,
         bounds[3] + 1,
     )
     tiles_gdf = gpd.GeoDataFrame(
