@@ -58,13 +58,13 @@ jobs:
             os: macos-latest
             dev: false
             python: "3.12"
-            
+
     steps:
       - uses: actions/checkout@v6
 
       # - name: Set environment variables
       #   run: echo "PYTHONTRACEMALLOC=1" >> $GITHUB_ENV
-        
+
       - name: Install Conda environment with Micromamba
         uses: mamba-org/setup-micromamba@v2
         with:
@@ -74,7 +74,13 @@ jobs:
           create-args: >-
             python=${{ matrix.python }}
             ${{ matrix.extra }}
-        
+
+      - name: Print versions
+        run: >-
+          python -c "import sys; print('Python version:', sys.version)"
+          && python -c "from osgeo import gdal; print('GDAL version:', gdal.__version__)"
+          && python -c "import geofileops as gfo; print('geofileops version:', gfo.__version__)"
+
       - name: Test
         run: >-
           pytest
@@ -83,4 +89,3 @@ jobs:
           xml tests/
 
       - uses: codecov/codecov-action@v5
-      
