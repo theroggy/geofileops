@@ -8,6 +8,7 @@ from osgeo import gdal
 from pygeoops import GeometryType
 
 import geofileops as gfo
+from geofileops._compat import GDAL_GTE_313
 from geofileops.util import _ogr_util
 from tests import test_helper
 
@@ -307,33 +308,39 @@ def test_vector_translate_sql_st_minx(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "input_suffix, output_suffix, geom_null_asc, exp_null_geoms",
+    "input_suffix, output_suffix, geom_null_asc",
     [
-        (".gpkg", ".gpkg", True, 9),
-        (".gpkg", ".shp", False, 9),
-        (".shp", ".gpkg", False, 48),
-        (".shp", ".shp", True, 9),
+        (".gpkg", ".gpkg", True),
+        (".gpkg", ".shp", False),
+        (".shp", ".gpkg", False),
+        (".shp", ".shp", True),
     ],
 )
 def test_vector_translate_sql_geom_null(
-    tmp_path,
-    input_suffix,
-    output_suffix,
-    geom_null_asc,
-    exp_null_geoms,
+    request, tmp_path, input_suffix, output_suffix, geom_null_asc
 ):
+    """Test of case where a SQL query results in some NULL geometries.
+
+    - Added for a bug that if the first row of the result was a NULL geometry, all
+      geometries became NULL. Was fixed in GDAL 3.8 for most cases.
+         -> https://github.com/geofileops/geofileops/issues/308
+    - A lot later, the remaining problem for .shp input and .gpkg output was reported.
+      It was fixed in GDAL 3.13.0.
+         -> https://github.com/OSGeo/gdal/issues/14113
     """
-    If there the first row of the result has a NULL geometry in the result, all
-    geometries become NULL. Using ORDER BY geom IS NULL controls this.
-       -> https://github.com/geofileops/geofileops/issues/308
-    Has been partly solved in gdal 3.8: for SQLITE query on geopackage it is OK, on a
-    .shp file the problem is still there.
-    """
+    if not GDAL_GTE_313 and input_suffix == ".shp" and output_suffix == ".gpkg":
+        reason = (
+            "NULL geometries as first output rows gives issues for .shp input and "
+            ".gpkg output in GDAL versions < 3.13.0"
+        )
+        request.node.add_marker(pytest.mark.xfail(reason=reason))
+
     # Prepare test file
     input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
     output_path = tmp_path / f"output{output_suffix}"
     input_layerinfo = gfo.get_layerinfo(input_path)
 
+    # Using `ORDER BY geom IS NULL` controls if the NULL geometries are first or last.
     orderby_direction = "ASC" if geom_null_asc else "DESC"
     sql_stmt = f"""
         SELECT * FROM (
@@ -363,7 +370,7 @@ def test_vector_translate_sql_geom_null(
 
     output_gdf = gfo.read_file(output_path)
     assert "geometry" in output_gdf.columns
-    assert len(output_gdf.loc[output_gdf.geometry.isna()]) == exp_null_geoms
+    assert len(output_gdf.loc[output_gdf.geometry.isna()]) == 9
 
 
 @pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)
