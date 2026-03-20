@@ -13,6 +13,7 @@ on:
       - "docs/**"
       - "perftests/**"
       - ".github/workflows/tests_installed.yml"
+      - ".github/workflows/tests_installed_micromamba.yml"
       - ".github/workflows/perftests.yml"
       - "*.md"
       - "*.yml"

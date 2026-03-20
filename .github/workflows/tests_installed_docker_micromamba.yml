@@ -1,0 +1,67 @@
+name: Docker micromamba Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+env:
+  MICROMAMBA_DOCKER: 1
+
+# cancel running jobs on new commit to PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  Tests_docker_micromamba:
+    name: gfo ${{ matrix.checkout_ref }}, python ${{ matrix.python }}, ${{ matrix.os }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python: ["3.12"]
+        include:
+          - checkout_ref: "v0.11.x"
+            gfo_version: "0.11"
+        container:
+          - "mambaorg/micromamba:latest"
+
+    container:
+      image: ${{ matrix.container }}
+      options: --user=root
+
+    steps:
+    - name: Checkout tests
+      uses: actions/checkout@v6
+      with:
+          ref: ${{ matrix.checkout_ref }}
+          sparse-checkout: |
+            ci
+            tests
+
+    - name: Install geofileops and test dependencies
+      shell: _entrypoint.sh /bin/bash --noprofile --norc -eo pipefail {0}
+      # nomkl: openblas instead of mkl saves 600 MB. Linux OK, but 50% slower on Windows and OSX!
+      run: |
+        micromamba info
+        which micromamba
+        micromamba install -y -n base geofileops=${{ matrix.gfo_version }} nomkl pyarrow simplification pytest pytest-cov
+        micromamba clean --all --yes
+
+    - name: Print versions
+      shell: _entrypoint.sh /bin/bash --noprofile --norc -eo pipefail {0}
+      run: >-
+        python -c "import sys; print('Python version:', sys.version)"
+        && python -c "from osgeo import gdal; print('GDAL version:', gdal.__version__)"
+        && python -c "import geofileops as gfo; print('geofileops version:', gfo.__version__)"
+
+    - name: Run Tests
+      shell: _entrypoint.sh /bin/bash --noprofile --norc -eo pipefail {0}
+      run: |
+        pytest --color=yes --cov=geofileops --cov-append --cov-report term-missing --cov-report xml tests/
+    
