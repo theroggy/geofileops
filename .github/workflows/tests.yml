@@ -67,7 +67,7 @@ jobs:
       #   run: echo "PYTHONTRACEMALLOC=1" >> $GITHUB_ENV
 
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v2
+        uses: mamba-org/setup-micromamba@v3
         with:
           # Any version from https://github.com/mamba-org/micromamba-releases
           micromamba-version: "2.5.0-1"
@@ -89,4 +89,4 @@ jobs:
           --cov=geofileops --cov-append --cov-report term-missing --cov-report 
           xml tests/
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
