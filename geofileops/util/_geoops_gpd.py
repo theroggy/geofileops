@@ -2317,7 +2317,7 @@ def _dissolve(
         kwargs = {"include_groups": False} if PANDAS_GTE_22 else {}
         agg_data = (
             data.groupby(**groupby_kwargs)  # type: ignore[call-overload]
-            .apply(lambda g: group_flatten_json_list(g), **kwargs)
+            .apply(group_flatten_json_list, **kwargs)
             .to_frame(name="__DISSOLVE_TOJSON")
         )
     else:

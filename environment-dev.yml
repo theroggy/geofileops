@@ -28,10 +28,10 @@ dependencies:
   - pytest
   - pytest-cov
   # linting
-  - mypy ==1.18.2
+  - mypy ==1.20.0
   - pandas-stubs
   - pre-commit
-  - ruff ==0.13.3
+  - ruff ==0.15.9
   - types-pillow
   # docs
   - pydata-sphinx-theme

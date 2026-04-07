@@ -55,7 +55,7 @@ def generate_reports(results_path: Path, output_dir: Path) -> None:
             ]
             package_operation_df["run_details"] = package_operation_df[
                 "run_details"
-            ].apply(lambda x: format_run_details(x))
+            ].apply(format_run_details)
             package_operation_df = package_operation_df.set_index(
                 ["package_version", "run_details"]
             )

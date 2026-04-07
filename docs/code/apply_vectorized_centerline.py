@@ -29,9 +29,7 @@ poly_gdf.to_file(poly_path)
 
 centerline_path = tmp_dir / "fancy_t_centerlines.gpkg"
 gfo.apply_vectorized(
-    input_path=poly_path,
-    output_path=centerline_path,
-    func=lambda geom: pygeoops.centerline(geom),
+    input_path=poly_path, output_path=centerline_path, func=pygeoops.centerline
 )
 centerlines_gdf = gpd.read_file(centerline_path)
 poly_gdf.plot(ax=ax, color=GRAY, alpha=0.3)
