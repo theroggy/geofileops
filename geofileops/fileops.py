@@ -1113,15 +1113,6 @@ def add_column(
             datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
             _ogr_util.StartTransaction(datasource)
             datasource.ExecuteSQL(sql_stmt)
-
-            # check if column was really added
-            datasource_layer = datasource.GetLayer(layer)
-            layer_defn = datasource_layer.GetLayerDefn()
-            field_index = layer_defn.GetFieldIndex(name)
-            if field_index == -1:
-                raise RuntimeError(
-                    f"add_column of {name=}, {type=} failed for {path}#{layer}"
-                )
         else:
             logger.warning(f"Column {name} existed already in {path}#{layer}")
 
@@ -1136,6 +1127,16 @@ def add_column(
             datasource.ExecuteSQL(sql_stmt, dialect="SQLITE")
 
         _ogr_util.CommitTransaction(datasource)
+
+        # check if column was really added
+        datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
+        datasource_layer = datasource.GetLayer(layer)
+        layer_defn = datasource_layer.GetLayerDefn()
+        field_index = layer_defn.GetFieldIndex(name)
+        if field_index == -1:
+            raise RuntimeError(
+                f"add_column of {name=}, {type=} failed for {path}#{layer}"
+            )
 
     except Exception as ex:
         _ogr_util.RollbackTransaction(datasource)
@@ -1295,7 +1296,7 @@ def add_columns(
         if tmp_dir is not None:
             # Add columns to tmp copy
             output_tmp_path = tmp_dir / Path(path).name
-            copy(path, output_tmp_path)
+            copy(path, output_tmp_path, keep_permissions=False)
         else:
             # Add columns in place
             output_tmp_path = path  # type: ignore[assignment]

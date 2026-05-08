@@ -76,13 +76,13 @@ def points_gdf():
     return gdf
 
 
-@pytest.mark.parametrize("suffix", [".gpkg", ".shp"])
+@pytest.mark.parametrize("suffix", [".gpkg", ".shp", ".sqlite"])
 def test_add_column(tmp_path, suffix):
     test_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix
     )
-    layer = "parcels" if suffix == ".gpkg" else None
-    geom_column = "geom" if suffix == ".gpkg" else "geometry"
+    layer = "parcels" if suffix in [".gpkg", ".sqlite"] else None
+    geom_column = "geom" if suffix in [".gpkg", ".sqlite"] else "geometry"
 
     # The area column shouldn't be in the test file yet
     layerinfo = gfo.get_layerinfo(path=test_path, layer=layer)
@@ -98,8 +98,10 @@ def test_add_column(tmp_path, suffix):
     assert "AREA" in layerinfo.columns
 
     gdf = gfo.read_file(test_path)
+    # area_col = "area" if suffix == ".sqlite" else "AREA"
+    oppervl_col = "oppervl" if suffix == ".sqlite" else "OPPERVL"
     assert round(gdf["AREA"].astype("float")[0], 1) == round(
-        gdf["OPPERVL"].astype("float")[0], 1
+        gdf[oppervl_col].astype("float")[0], 1
     )
 
     # Add perimeter column
@@ -113,7 +115,7 @@ def test_add_column(tmp_path, suffix):
 
     gdf = gfo.read_file(test_path)
     assert round(gdf["AREA"].astype("float")[0], 1) == round(
-        gdf["OPPERVL"].astype("float")[0], 1
+        gdf[oppervl_col].astype("float")[0], 1
     )
 
     info = gfo.get_layerinfo(test_path)
@@ -123,13 +125,18 @@ def test_add_column(tmp_path, suffix):
     gfo.add_column(test_path, name=existing_column, type="TEXT")
 
     # Force update on an existing column
-    assert gdf["HFDTLT"][0] == "1"
+    hfdtlt_col = "hfdtlt" if suffix == ".sqlite" else "HFDTLT"
+    assert gdf[hfdtlt_col][0] == "1"
     expression = "5"
     gfo.add_column(
-        test_path, name="HFDTLT", type="TEXT", expression=expression, force_update=True
+        test_path,
+        name=hfdtlt_col,
+        type="TEXT",
+        expression=expression,
+        force_update=True,
     )
     gdf = gfo.read_file(test_path)
-    assert gdf["HFDTLT"][0] == "5"
+    assert gdf[hfdtlt_col][0] == "5"
 
 
 @pytest.mark.parametrize(
@@ -431,6 +438,59 @@ def test_add_columns_output_layer(
         assert output_type.startswith(exp_type), (
             f"Column {col_name}: expected {exp_type}, got {output_type}"
         )
+
+
+@pytest.mark.parametrize(
+    "testfile, suffix, output_path, exp_permission_error",
+    [
+        ("polygon-parcel", ".shp", "output_file", False),
+        ("polygon-parcel", ".shp", None, True),
+        ("polygon-parcel", ".gpkg", "output_file", False),
+        ("polygon-parcel", ".gpkg", None, True),
+    ],
+)
+def test_add_columns_readonly_input(
+    tmp_path, testfile, suffix, output_path, exp_permission_error
+):
+    """Test that add_columns works when the input file is read-only."""
+    test_path = test_helper.get_testfile(testfile, dst_dir=tmp_path, suffix=suffix)
+
+    # Make the file read-only
+    test_helper.set_read_only(test_path, True)
+
+    # Columns to add
+    new_columns = [("new_column", "string")]
+
+    # Test
+    if exp_permission_error:
+        handler = pytest.raises(RuntimeError, match="Permission denied")
+    else:
+        handler = nullcontext()
+
+    with handler:
+        if output_path is not None:
+            output_path = tmp_path / f"output_file{suffix}"
+        gfo.add_columns(
+            test_path,
+            new_columns=new_columns,
+            output_path=output_path,
+        )
+
+        # Check if columns were added
+        if output_path is None:
+            output_path = test_path
+        output_layerinfo = gfo.get_layerinfo(
+            path=output_path, layer=gfo.get_default_layer(output_path)
+        )
+        for col_name, col_type in new_columns:
+            assert col_name in output_layerinfo.columns
+            exp_type = (
+                col_type if isinstance(col_type, str) else col_type.value
+            ).lower()
+            output_type = output_layerinfo.columns[col_name].gdal_type.lower()
+            assert output_type.startswith(exp_type), (
+                f"Column {col_name}: expected {exp_type}, got {output_type}"
+            )
 
 
 def test_append_to(tmp_path):

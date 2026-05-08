@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.11.2
+
+### Bugs fixed
+
+- Fix `permission denied` error when using add_columns with output_path
+  on read-only files (#813)
+
 ## 0.11.1 (2026-02-22)
 
 ### Improvements
