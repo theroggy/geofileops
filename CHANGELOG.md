@@ -1,9 +1,10 @@
 # CHANGELOG
 
-## 0.11.2
+## 0.11.2 (2026-05-08)
 
 ### Bugs fixed
 
+- Fix `add_column` failing for plain sqlite files (#818)
 - Fix `permission denied` error when using add_columns with output_path
   on read-only files (#813)
 
