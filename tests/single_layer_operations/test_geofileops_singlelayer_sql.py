@@ -10,7 +10,7 @@ from shapely.geometry import Polygon
 
 import geofileops as gfo
 from geofileops import GeometryType
-from geofileops._compat import GDAL_GTE_311
+from geofileops._compat import GDAL_GTE_311, GDAL_GTE_313
 from geofileops.util import _geoops_sql as geoops_sql
 from geofileops.util import _sqlite_util
 from geofileops.util._geopath_util import GeoPath
@@ -167,16 +167,27 @@ def test_isvalid(tmp_path, suffix, epsg):
     else:
         input_path = input_tmp_path
 
-    # Now run test
-    output_path = tmp_path / f"output{suffix}"
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
+
+    expected_featurecount = input_layerinfo.featurecount
+    if GDAL_GTE_313 and suffix in (".shp", ".shp.zip"):
+        # For shapefile, starting from GDAL 3.13.0, GDAL fixes some types of invalid
+        # geometries on the file while reading it. In the test file there is one such
+        # example:
+        #   - a polygon where the outer ring self-intersects because a vertex of the
+        #     ring touches the middle of another edge rather than touching another
+        #     vertex.
+        expected_featurecount -= 1
+
+    # Now run test
+    output_path = tmp_path / f"output{suffix}"
     gfo.isvalid(input_path=input_path, output_path=output_path, batchsize=batchsize)
 
-    # Now check if the tmp file is correctly created
+    # Now check if the output file is correctly created
     assert output_path.exists() is True
     result_layerinfo = gfo.get_layerinfo(output_path)
-    assert input_layerinfo.featurecount == result_layerinfo.featurecount
+    assert result_layerinfo.featurecount == expected_featurecount
     assert len(input_layerinfo.columns) == len(result_layerinfo.columns) - 2
 
     output_gdf = gfo.read_file(output_path, fid_as_index=preserve_fid)
@@ -190,12 +201,12 @@ def test_isvalid(tmp_path, suffix, epsg):
         input_path=input_path, batchsize=batchsize, validate_attribute_data=True
     )
 
-    # Now check if the tmp file is correctly created
+    # Now check if the file is correctly created
     output_auto_path = tmp_path / f"{GeoPath(input_path).stem}_isvalid{suffix}"
     assert output_auto_path.exists()
     result_auto_layerinfo = gfo.get_layerinfo(output_auto_path)
-    assert input_layerinfo.featurecount == result_auto_layerinfo.featurecount
     assert len(input_layerinfo.columns) == len(result_auto_layerinfo.columns) - 2
+    assert result_auto_layerinfo.featurecount == expected_featurecount
 
     output_auto_gdf = gfo.read_file(output_auto_path)
     assert output_auto_gdf["geometry"][0] is not None
