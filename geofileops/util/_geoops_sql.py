@@ -7,7 +7,6 @@ import math
 import os
 import re
 import string
-import time
 import warnings
 from collections.abc import Iterable
 from concurrent import futures
@@ -1455,7 +1454,7 @@ def _has_complex_geoms(path: Path, layer: LayerInfo, max_coords: int) -> bool:
     Returns:
         bool: True if the layer has complex geometries, False otherwise.
     """
-    start = time.perf_counter()
+    start = datetime.now()
 
     sql_template = f"""
         SELECT 1 FROM "{layer.name}" layer
@@ -1528,9 +1527,9 @@ def _has_complex_geoms(path: Path, layer: LayerInfo, max_coords: int) -> bool:
                     pool.shutdown(wait=True, cancel_futures=True)
                     break
 
-    took = time.perf_counter() - start
-    if took > 0:
-        logger.info(f"{complex_found=}, check took {took:.2f}s")
+    took = datetime.now() - start
+    if took.total_seconds() > 0:
+        logger.info(f"{complex_found=}, check took {took}")
 
     return complex_found
 

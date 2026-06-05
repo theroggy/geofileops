@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.11.3 (????-??-??)
+
+### Bugs fixed
+
+- Fix `add_column` for csv files on windows (#823)
+
 ## 0.11.2 (2026-05-08)
 
 ### Bugs fixed
