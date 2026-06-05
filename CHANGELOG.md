@@ -2,6 +2,11 @@
 
 ## 0.11.3 (????-??-??)
 
+# Improvements
+
+- Improve performance of `add_columns` if columns already exist for large file on
+  (relatively) slow network locations (#821)
+
 ### Bugs fixed
 
 - Fix `add_column` for csv files on windows (#823)

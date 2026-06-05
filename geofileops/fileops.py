@@ -1280,7 +1280,13 @@ def add_columns(
             "new_columns should be a non-empty list of tuples, each with 2 or 3 "
             "elements: [(name, type, optional expression),...]"
         )
+    start = datetime.now()
+
+    # Check if columns need to be added and/or updated.
+    add_needed = False
     updates_needed = False
+    layerinfo = get_layerinfo(path, layer, raise_on_nogeom=False)
+    columns_upper = [column.upper() for column in layerinfo.columns]
     for new_column in new_columns:
         if not isinstance(new_column, tuple) or len(new_column) not in (2, 3):
             raise TypeError(
@@ -1289,6 +1295,18 @@ def add_columns(
             )
         if len(new_column) >= 3 and new_column[2] is not None:
             updates_needed = True
+        if new_column[0].upper() not in columns_upper:
+            add_needed = True
+
+    # If no add needed and no updates need to be forced... not a lot to do!
+    if not add_needed and not (updates_needed and force_update):
+        if output_path is not None and output_path != path:
+            logger.info(f"Nothing to add or update, just copy to {output_path}")
+            copy(path, output_path)
+
+        return
+
+    logger.info(f"Start add_columns on {path}")
 
     # Set some config options to improve performance for GPKG if updates are done
     if updates_needed and Path(path).suffix.lower() == ".gpkg":
@@ -1314,8 +1332,6 @@ def add_columns(
         else:
             # Add columns in place
             output_tmp_path = path  # type: ignore[assignment]
-
-        start = datetime.now()
 
         # Get layerinfo and determine `layer` and `output_layer` if not specified
         # Remark: don't reuse the opened datasource here, because then the layer info
@@ -1353,7 +1369,7 @@ def add_columns(
                 sql_stmt = f'ALTER TABLE "{layer}" ADD COLUMN "{name}" {type_str}'
                 datasource.ExecuteSQL(sql_stmt)
 
-            # check if the columns were really added
+            # Check if the columns were really added
             if column_added:
                 datasource_layer = datasource.GetLayer(layer)
                 layer_defn = datasource_layer.GetLayerDefn()

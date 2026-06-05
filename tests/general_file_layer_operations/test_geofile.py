@@ -440,6 +440,28 @@ def test_add_columns_output_layer(
         )
 
 
+def test_add_columns_output_path_existing_col(tmp_path):
+    """Test with an output_path specified and the new columns exist already."""
+    test_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
+    output_path = tmp_path / "output.gpkg"
+
+    # Add a column to the test file
+    gfo.add_column(test_path, name="new_column", type="string")
+
+    # Now add columns again with the same column name, but with an output path specified
+    gfo.add_columns(
+        test_path,
+        new_columns=[("new_column", "string")],
+        output_path=output_path,
+        force_update=True,
+    )
+
+    # Check if the column was added to the output file
+    assert output_path.exists()
+    output_layerinfo = gfo.get_layerinfo(path=output_path)
+    assert "new_column" in output_layerinfo.columns
+
+
 @pytest.mark.parametrize(
     "testfile, suffix, output_path, exp_permission_error",
     [
