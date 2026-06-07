@@ -1,7 +1,5 @@
 """Tests regarding spatial indexes in/on data sources."""
 
-import os
-
 import pytest
 from osgeo import gdal
 
@@ -9,7 +7,7 @@ import geofileops as gfo
 from geofileops import fileops
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
-from tests.test_helper import SUFFIXES_FILEOPS
+from tests.test_helper import RUNS_AS_ROOT, SUFFIXES_FILEOPS
 
 
 @pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
@@ -37,8 +35,8 @@ def test_create_spatial_index(request, tmp_path, suffix, read_only):
     test_helper.set_read_only(test_path, read_only)
 
     if read_only:
-        if os.environ.get("MICROMAMBA_DOCKER") == "1":
-            reason = "On Micromamba Docker create index on read-only file doesn't raise"
+        if RUNS_AS_ROOT:
+            reason = "If running as root, create index on read-only file doesn't raise"
             request.node.add_marker(pytest.mark.xfail(reason=reason))
         # Create spatial index on read-only file should give error
         with pytest.raises(RuntimeError, match="create_spatial_index error"):
@@ -75,9 +73,9 @@ def test_create_spatial_index_force_rebuild(request, tmp_path, suffix, read_only
         gfo.create_spatial_index(path=test_path, exist_ok=True)
         assert qix_path.stat().st_mtime == qix_modified_time_orig
         if read_only:
-            if os.environ.get("MICROMAMBA_DOCKER") == "1":
+            if RUNS_AS_ROOT:
                 reason = (
-                    "On Micromamba Docker create index on read-only file doesn't raise"
+                    "If running as root, create index on read-only file doesn't raise"
                 )
                 request.node.add_marker(pytest.mark.xfail(reason=reason))
             # Create spatial index on read-only file should give error
@@ -91,9 +89,9 @@ def test_create_spatial_index_force_rebuild(request, tmp_path, suffix, read_only
         has_spatial_index = gfo.has_spatial_index(path=test_path)
         assert has_spatial_index is True
         if read_only:
-            if os.environ.get("MICROMAMBA_DOCKER") == "1":
+            if RUNS_AS_ROOT:
                 reason = (
-                    "On Micromamba Docker create index on read-only file doesn't raise"
+                    "If running as root, create index on read-only file doesn't raise"
                 )
                 request.node.add_marker(pytest.mark.xfail(reason=reason))
             # Create spatial index on read-only file should give error

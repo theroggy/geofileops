@@ -1,6 +1,4 @@
-"""
-Helper functions for all tests.
-"""
+"""Helper functions for all tests."""
 
 import os
 import re
@@ -31,6 +29,8 @@ try:
 except ImportError:
     mcolors = None  # type: ignore[assignment]
     mpl_figure = None  # type: ignore[assignment]
+
+RUNS_AS_ROOT = True if hasattr(os, "geteuid") and os.geteuid() == 0 else False
 
 data_dir = Path(__file__).parent.resolve() / "data"
 data_url = "https://raw.githubusercontent.com/geofileops/geofileops/main/tests/data"

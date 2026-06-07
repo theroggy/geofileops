@@ -7,9 +7,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  MICROMAMBA_DOCKER: 1
-
 # cancel running jobs on new commit to PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -33,6 +30,7 @@ jobs:
 
     container:
       image: ${{ matrix.container }}
+      # Run the container with root user to avoid checkout giving errors.
       options: --user=root
 
     steps:
