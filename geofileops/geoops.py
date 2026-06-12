@@ -1315,7 +1315,7 @@ def export_by_bounds(
 def isvalid(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]", None] = None,
-    only_invalid: bool = True,  # noqa: ARG001
+    only_invalid: bool = True,
     input_layer: str | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
@@ -1327,18 +1327,26 @@ def isvalid(
 ) -> bool:
     """Checks for all geometries in the geofile if they are valid.
 
-    The results are written to the output file.
+    If there are no invalid geometries, no output file will be created and `isvalid`
+    will return True. If there are invalid geometries `isvalid` returns False and the
+    output file contains a row for each invalid geometry. Each row will contain the
+    following information:
 
-    If ``explodecollections`` is False and the input and output file type is GeoPackage,
-    the fid will be preserved. In other cases this will typically not be the case.
+    - **geometry column**: contains a point where the invalidity occurs. For example,
+      for a self-intersecting polygon, this will be the point where the
+      self-intersection occurs. If the geometry is valid, this will be null.
+    - **isvalid**: a boolean column indicating if the geometry is valid or not.
+    - **reason**: if the geometry is invalid, this column contains a text with the
+      reason why the geometry is invalid. If the geometry is valid, this will be null.
+    - The other columns from the input file, depending on the ``columns`` parameter.
 
     Args:
         input_path (PathLike): The input file.
         output_path (PathLike, optional): The output file path. If not
             specified the result will be written in a new file alongside the
             input file. Defaults to None.
-        only_invalid (bool, optional): if True, only put invalid results in the
-            output file. Deprecated: always treated as True.
+        only_invalid (bool, optional): is deprecated and will be removed in a future
+            version. The output will always contain only invalid geometries.
         input_layer (str, optional): input layer name. If None, ``input_path`` should
             contain only one layer. Defaults to None.
         output_layer (str, optional): output layer name. If None, the ``output_path``
@@ -1347,8 +1355,8 @@ def isvalid(
             columns are retained. In addition to standard columns, it is also possible
             to specify "fid", a unique index available in all input files. Note that the
             "fid" will be aliased eg. to "fid_1". Defaults to None.
-        explodecollections (bool, optional): True to output only simple geometries.
-            Defaults to False.
+        explodecollections (bool, optional): is deprecated and will be removed in a
+            future version.
         validate_attribute_data (bool, optional): True to validate if all attribute data
             can be read. Defaults to False.
         nb_parallel (int | None, optional): the number of parallel workers to use.
@@ -1377,6 +1385,21 @@ def isvalid(
         input_geopath = GeoPath(input_path)
         output_path = input_geopath.with_stem(f"{input_geopath.stem}_isvalid")
 
+    if not only_invalid:
+        warnings.warn(
+            "the only_invalid parameter is deprecated and will be removed in a future "
+            "version: the output will always contain only invalid geometries",
+            FutureWarning,
+            stacklevel=2,
+        )
+    if explodecollections:
+        warnings.warn(
+            "the explodecollections parameter is deprecated and will be removed in a "
+            "future version",
+            FutureWarning,
+            stacklevel=2,
+        )
+
     # Go!
     logger = logging.getLogger("geofileops.isvalid")
     logger.info(f"Start, on {input_path}")
@@ -1386,7 +1409,7 @@ def isvalid(
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,
-        explodecollections=explodecollections,
+        explodecollections=False,
         validate_attribute_data=validate_attribute_data,
         nb_parallel=nb_parallel,
         batchsize=batchsize,

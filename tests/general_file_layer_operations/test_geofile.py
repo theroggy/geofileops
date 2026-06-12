@@ -1,6 +1,4 @@
-"""
-Tests for functionalities in geofileops.general.
-"""
+"""Tests for functionalities in geofileops.general."""
 
 import locale
 import os
@@ -13,11 +11,10 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
-import shapely.geometry as sh_geom
 from osgeo import gdal
 from pandas.testing import assert_frame_equal
 from pygeoops import GeometryType
-from shapely import box
+from shapely import GeometryCollection, MultiPolygon, Point, Polygon, box
 
 import geofileops as gfo
 from geofileops import fileops
@@ -69,7 +66,7 @@ def points_gdf():
     nb_points = 10
     gdf = gpd.GeoDataFrame(
         [
-            {"geometry": sh_geom.Point(x, y), "value1": x + y, "value2": x * y}
+            {"geometry": Point(x, y), "value1": x + y, "value2": x * y}
             for x, y in zip(range(nb_points), range(nb_points), strict=True)
         ],
         crs="epsg:4326",
@@ -796,7 +793,7 @@ def test_copy_layer_append_bounds(tmp_path, suffix, copy_layer_sqlite_direct):
     )
 
     # Check total bounds
-    exp_total_bounds = sh_geom.MultiPolygon(
+    exp_total_bounds = MultiPolygon(
         [box(*layer1_info.total_bounds), box(*layer2_info.total_bounds)]
     ).bounds
     exp_total_bounds_rounded = [round(coord) for coord in exp_total_bounds]
@@ -1265,9 +1262,7 @@ def test_copy_layer_reproject(tmp_path, suffix, src_crs):
     # Check if dst file actually seems to contain lat lon coordinates
     dst_gdf = gfo.read_file(dst)
     first_geom = dst_gdf.geometry[0]
-    first_poly = (
-        first_geom if isinstance(first_geom, sh_geom.Polygon) else first_geom.geoms[0]
-    )
+    first_poly = first_geom if isinstance(first_geom, Polygon) else first_geom.geoms[0]
     assert first_poly.exterior is not None
     for x, y in first_poly.exterior.coords:
         assert x < 100 and y < 100
@@ -2066,7 +2061,7 @@ def test_read_file_curve(engine_setter):
     # Test
     read_gdf = gfo.read_file(src)
     assert isinstance(read_gdf, gpd.GeoDataFrame)
-    assert isinstance(read_gdf.geometry[0], sh_geom.Polygon)
+    assert isinstance(read_gdf.geometry[0], Polygon)
 
 
 def test_read_file_invalid_params(tmp_path, engine_setter):  # noqa: ARG001
@@ -2712,17 +2707,11 @@ def test_to_file_fid_append_to(tmp_path, engine_setter):  # noqa: ARG001
     # Prepare test data
     suffix = ".gpkg"
     test1_gdf = gpd.GeoDataFrame(
-        [
-            {"geometry": sh_geom.Point(0, 1), "fid": 2},
-            {"geometry": sh_geom.Point(0, 1), "fid": 3},
-        ],
+        [{"geometry": Point(0, 1), "fid": 2}, {"geometry": Point(0, 1), "fid": 3}],
         crs="epsg:31370",
     )
     test2_gdf = gpd.GeoDataFrame(
-        [
-            {"geometry": sh_geom.Point(0, 1), "fid": 5},
-            {"geometry": sh_geom.Point(0, 1), "fid": 6},
-        ],
+        [{"geometry": Point(0, 1), "fid": 5}, {"geometry": Point(0, 1), "fid": 6}],
         crs="epsg:31370",
     )
     output1_path = tmp_path / f"output1{suffix}"
@@ -2795,10 +2784,7 @@ def test_to_file_force_geometrytype_multitype(tmp_path, engine_setter):  # noqa:
 def test_to_file_geomempty(tmp_path, suffix, engine_setter):  # noqa: ARG001
     # Test for gdf with an empty polygon + a polygon
     test_gdf = gpd.GeoDataFrame(
-        geometry=[
-            sh_geom.GeometryCollection(),
-            test_helper.TestData.polygon_with_island,
-        ],
+        geometry=[GeometryCollection(), test_helper.TestData.polygon_with_island],
         crs=31370,
     )
     # By default, get_geometrytypes ignores the type of empty geometries.
@@ -2824,7 +2810,7 @@ def test_to_file_geomempty(tmp_path, suffix, engine_setter):  # noqa: ARG001
         # When written to Geopackage... the empty geometries are actually saved
         # as None. When read again they are None for fiona and empty for pyogrio.
         assert test_read_gdf.geometry[0] is None or test_read_gdf.geometry[0].is_empty
-        assert isinstance(test_read_gdf.geometry[1], sh_geom.Polygon)
+        assert isinstance(test_read_gdf.geometry[1], Polygon)
 
         # So the geometrytype of the resulting GeoDataFrame is also POLYGON
         assert len(test_read_geometrytypes) == 1
@@ -2844,19 +2830,31 @@ def test_to_file_geomnone(tmp_path, suffix, engine_setter):  # noqa: ARG001
 
     # Now check the result if the data is still the same after being read again
     test_read_gdf = gfo.read_file(output_none_path)
+
     # Result is the same as the original input
     assert test_read_gdf.geometry[0] is None
-    assert isinstance(test_read_gdf.geometry[1], sh_geom.Polygon)
+    expected_type = Polygon if suffix != ".shp" else (Polygon, MultiPolygon)
+    assert isinstance(test_read_gdf.geometry[1], expected_type)
+
     # The geometrytype of the column in the file is also the same as originaly
     test_file_geometrytype = gfo.get_layerinfo(output_none_path).geometrytype
     if suffix == ".shp":
         assert test_file_geometrytype == GeometryType.MULTIPOLYGON
     else:
         assert test_file_geometrytype == test_geometrytypes[0]
+
     # The result type in the geodataframe is also the same as originaly
     test_read_geometrytypes = _geoseries_util.get_geometrytypes(test_read_gdf.geometry)
     assert len(test_gdf) == len(test_read_gdf)
-    assert test_read_geometrytypes == test_geometrytypes
+    if suffix == ".shp":
+        # For shapefile, it depends on the gdal and/or pyogrio version, so don't check
+        # the exact result.
+        assert test_read_geometrytypes in (
+            [GeometryType.MULTIPOLYGON],
+            [GeometryType.POLYGON],
+        )
+    else:
+        assert test_read_geometrytypes == test_geometrytypes
 
 
 @pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])

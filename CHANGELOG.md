@@ -1,12 +1,14 @@
 # CHANGELOG
 
-## 0.11.3 (????-??-??)
+## 0.11.3 (2026-06-12)
 
 # Improvements
 
-- Improve performance of `add_columns` if columns already exist for large file on
+- Improve performance of `add_columns` if columns already exists for large file on
   (relatively) slow network locations (#821)
+- Improve doc of `isvalid` + add warnings for redundant params (#826)
 
+- Fix some tests when reading shapefiles with GDAL >= 3.13 (#826)
 ### Bugs fixed
 
 - Fix `add_column` for csv files on windows (#823)

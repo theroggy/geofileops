@@ -197,11 +197,12 @@ def test_isvalid(tmp_path, suffix, epsg):
         assert output_gdf.iloc[0:2].index.sort_values().tolist() == [1, 3]
 
     # Do operation, without specifying output path
-    gfo.isvalid(
+    retval = gfo.isvalid(
         input_path=input_path, batchsize=batchsize, validate_attribute_data=True
     )
 
-    # Now check if the file is correctly created
+    # Now check if the results as correct
+    assert retval is False
     output_auto_path = tmp_path / f"{GeoPath(input_path).stem}_isvalid{suffix}"
     assert output_auto_path.exists()
     result_auto_layerinfo = gfo.get_layerinfo(output_auto_path)
@@ -211,6 +212,20 @@ def test_isvalid(tmp_path, suffix, epsg):
     output_auto_gdf = gfo.read_file(output_auto_path)
     assert output_auto_gdf["geometry"][0] is not None
     assert output_auto_gdf["isvalid"][0] == 0
+
+
+def test_isvalid_no_invalid_geoms(tmp_path):
+    """Test isvalid operation on a file without invalid geometries."""
+    # Prepare test data
+    input_path = test_helper.get_testfile("polygon-parcel")
+
+    # Now run test
+    output_path = tmp_path / f"output{input_path.suffix}"
+    retval = gfo.isvalid(input_path=input_path, output_path=output_path)
+
+    # Now check if the output file is correctly created
+    assert retval is True
+    assert not output_path.exists()
 
 
 @pytest.mark.parametrize("suffix", SUFFIXES_GEOOPS)

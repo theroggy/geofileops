@@ -295,7 +295,7 @@ def isvalid(
         tmp_basedir=None,
     )
 
-    # Check the number of invalid files
+    # Check the number of invalid geoms
     nb_invalid_geoms = 0
     if output_path.exists():
         nb_invalid_geoms = gfo.get_layerinfo(output_path, output_layer).featurecount
