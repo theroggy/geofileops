@@ -3369,7 +3369,8 @@ def remove_overlaps(
     |spatialite_reference_link| raw:: html
         <a href="https://www.gaia-gis.it/gaia-sins/spatialite-sql-latest.html" target="_blank">spatialite reference</a>
     """  # noqa: E501
-    logger = logging.getLogger("geofileops.remove_overlaps")
+    operation_name = "remove_overlaps"
+    logger = logging.getLogger(f"geofileops.{operation_name}")
     logger.info(f"Start, on {input_path} to {output_path}")
 
     return _geoops_sql.difference(
@@ -3389,6 +3390,7 @@ def remove_overlaps(
         subdivide_coords=0,
         force=force,
         extra_self_difference_filter=remove_filter,
+        operation_prefix=f"{operation_name}-",
     )
 
 
