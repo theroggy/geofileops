@@ -30,6 +30,24 @@ def get_layerstyles(
     Returns:
         pd.DataFrame: the styles found.
     """
+    if not _has_layerstyles_table(path):
+        return pd.DataFrame(
+            columns=[
+                "id",
+                "f_table_catalog",
+                "f_table_schema",
+                "f_table_name",
+                "f_geometry_column",
+                "styleName",
+                "styleQML",
+                "styleSLD",
+                "useAsDefault",
+                "description",
+                "owner",
+                "ui",
+            ]
+        )
+
     layer_styles_df = fileops.read_file(path, layer="layer_styles", fid_as_index=True)
     layer_styles_df.index.name = "id"
     if layer is not None:
