@@ -1,20 +1,24 @@
 # CHANGELOG
 
-## 0.11.4 (????-??-??)
+## 0.11.4 (2026-07-15)
 
-# Improvements
+### Improvements
 
 - Also remove repeated points in `makevalid` (#829)
 
+### Bugs fixed
+
+- Fix error in `get_layerstyles` if the layer_styles table does not exist (#834)
+
 ## 0.11.3 (2026-06-12)
 
-# Improvements
+### Improvements
 
 - Improve performance of `add_columns` if columns already exists for large file on
   (relatively) slow network locations (#821)
 - Improve doc of `isvalid` + add warnings for redundant params (#826)
-
 - Fix some tests when reading shapefiles with GDAL >= 3.13 (#826)
+
 ### Bugs fixed
 
 - Fix `add_column` for csv files on windows (#823)
