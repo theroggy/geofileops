@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.11.4 (????-??-??)
+
+# Improvements
+
+- Also remove repeated points in `makevalid` (#829)
+
 ## 0.11.3 (2026-06-12)
 
 # Improvements

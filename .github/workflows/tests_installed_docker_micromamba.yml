@@ -35,7 +35,7 @@ jobs:
 
     steps:
     - name: Checkout tests
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
           ref: ${{ matrix.checkout_ref }}
           sparse-checkout: |

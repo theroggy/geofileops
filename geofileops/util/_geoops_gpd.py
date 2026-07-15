@@ -610,13 +610,18 @@ def makevalid(
         ) or input_layer.geometrytypename.startswith(force_output_geometrytype):
             keep_collapsed = False
 
+    def makevalid_func(geom: BaseGeometry) -> BaseGeometry:
+        return shapely.remove_repeated_points(
+            pygeoops.make_valid(
+                geom, keep_collapsed=keep_collapsed, only_if_invalid=True
+            )
+        )
+
     apply_vectorized(
         input_path=Path(input_path),
         output_path=Path(output_path),
         operation_name="makevalid",
-        func=lambda geom: pygeoops.make_valid(
-            geom, keep_collapsed=keep_collapsed, only_if_invalid=True
-        ),
+        func=makevalid_func,
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,

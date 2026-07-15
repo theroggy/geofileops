@@ -361,14 +361,18 @@ def makevalid(
     # ----------------------------------------------
     # Only apply makevalid if the geometry is truly invalid, this is faster.
     # GEOSMakeValid crashes with EMPTY input, so check this first.
+    # If the polygon is valid, remove repeated points.
+    # Note: GEOSMakeValid on a valid polygon doesn't remove repeated points, on an
+    # invalid polygon it does seem to remove them.
     operation = """
         IIF({geometrycolumn} IS NULL OR ST_IsEmpty({geometrycolumn}) <> 0,
             NULL,
             IIF(ST_IsValid({geometrycolumn}) = 1,
-                {geometrycolumn},
+                RemoveRepeatedPoints({geometrycolumn}),
                 GEOSMakeValid({geometrycolumn}, 0)
             )
-        )"""
+        )
+        """
 
     # Now we can prepare the entire statement
     sql_template = f"""

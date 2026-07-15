@@ -1436,15 +1436,17 @@ def makevalid(
 ) -> None:
     """Makes all geometries in the input file valid.
 
-    Writes the result to the output path.
+    In addition, repeated points in the geometries are removed (geofileops >= 0.11.4).
+
+    The result is written to the ``output_path`` specified.
+
+    If ``explodecollections`` is False and the input and output file type is GeoPackage,
+    the fid will be preserved. In other cases this will typically not be the case.
 
     Alternative names:
 
         - QGIS: fix geometries
         - shapely, geopandas: make_valid
-
-    If ``explodecollections`` is False and the input and output file type is GeoPackage,
-    the fid will be preserved. In other cases this will typically not be the case.
 
     Args:
         input_path (PathLike): The input file.
