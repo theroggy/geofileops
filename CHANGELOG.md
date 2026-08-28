@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.12.0 (????-??-??)
+
+### Deprecations and compatibility notes
+
+- In get_layerstyles, return a list of dataclasses instead of as dataframe (#833)
+
 ## 0.11.4 (2026-07-15)
 
 ### Improvements
