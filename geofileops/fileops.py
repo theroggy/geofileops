@@ -2788,7 +2788,7 @@ def cmp(
 def copy(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
-    keep_permissions: bool = True,
+    keep_permissions: bool = False,
 ) -> None:
     """Copies the geofile from src to dst.
 
@@ -2799,7 +2799,7 @@ def copy(
         src (PathLike): the file to copy. |GDAL_vsi| paths are not supported.
         dst (PathLike): the location to copy the file(s) to.
         keep_permissions (bool, optional): True to keep the file permissions of the
-            source file. Defaults to True.
+            source file. Defaults to False.
 
     .. |GDAL_vsi| raw:: html
 
@@ -2839,18 +2839,35 @@ def copy(
 
 
 def move(
-    src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]
+    src: Union[str, "os.PathLike[Any]"],
+    dst: Union[str, "os.PathLike[Any]"],
+    on_keep_permissions_error: str = "ignore",
 ) -> None:
     """Moves the geofile from src to dst.
 
     If the source file is a geofile containing of multiple files (eg. .shp) all files
     are moved.
 
+    If the file is on the same filesystem, the file is renamed. If it is on a different
+    filesystem, the file is copied and then deleted from the source location. The
+    function tries to keep the file permissions and metadata of the source file, but if
+    it fails, behaviour depends on the value of `on_keep_permissions_error`.
+
     Args:
         src (PathLike): the file to move
         dst (PathLike): the location to move the file(s) to
+        on_keep_permissions_error (str): What to do if keeping permissions fails.
+            Options are:
+
+                - "ignore" (default): silently try to move without retaining permissions
+                  and metadata.
+                - "warn": log a warning and try to move without retaining permissions
+                  and metadata.
+                - "raise": raise the exception and stop moving the file(s).
     """
     # Check input parameters
+    if on_keep_permissions_error not in ["warn", "ignore", "raise"]:
+        raise ValueError(f"Invalid value for {on_keep_permissions_error=}")
     src = Path(src)
     dst = Path(dst)
     src_info = _geofileinfo.get_geofileinfo(src)
@@ -2871,11 +2888,33 @@ def move(
             dst_tmp = dst.parent / f"{dst.stem}{suffix}"
 
         if srcfile.exists():
-            shutil.move(str(srcfile), dst_tmp)
+            try:
+                shutil.move(str(srcfile), dst_tmp)
+            except PermissionError as ex:
+                if on_keep_permissions_error == "raise":
+                    raise ex
+                elif on_keep_permissions_error == "warn":
+                    warnings.warn(
+                        f"PermissionError while moving {srcfile} to {dst_tmp}: {ex}, "
+                        "try to move without retaining permissions and metadata.",
+                        stacklevel=2,
+                    )
+                shutil.move(str(srcfile), dst_tmp, copy_function=shutil.copyfile)
 
     # Move the main file last, so that checks if the geofile exists are only
     # True once all files have been moved.
-    shutil.move(str(src), dst)
+    try:
+        shutil.move(str(src), dst)
+    except PermissionError as ex:
+        if on_keep_permissions_error == "raise":
+            raise ex
+        elif on_keep_permissions_error == "warn":
+            warnings.warn(
+                f"PermissionError while moving {src} to {dst}: {ex}, try to move "
+                "without retaining permissions and metadata.",
+                stacklevel=2,
+            )
+        shutil.move(str(src), dst, copy_function=shutil.copyfile)
 
 
 def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False) -> None:

@@ -5,6 +5,10 @@
 ### Deprecations and compatibility notes
 
 - In get_layerstyles, return a list of dataclasses instead of as dataframe (#833)
+- For `copy`, the default value of `keep_permissions` is now `False` (#838).
+- For `move`, if moving the file while keeping permissions and metadata fails, the
+  default behaviour is now that the file is moved without retaining them. This behaviour
+  can be chosen using the new `on_keep_permissions_error` parameter. (#838)
 
 ## 0.11.4 (2026-07-15)
 
