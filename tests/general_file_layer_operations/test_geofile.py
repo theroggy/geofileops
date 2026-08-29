@@ -1475,6 +1475,36 @@ def test_copy(tmp_path, suffix, keep_permissions):
         assert dst.with_suffix(".shx").exists()
 
 
+@pytest.mark.skipif(os.name == "nt", reason="os.chmod is a no-op on windows")
+def test_copy_keep_permissions_chmod_not_supported(tmp_path, monkeypatch):
+    """gfo.copy(keep_permissions=True) fails on filesystems that don't support chmod.
+
+    E.g. on a cifs/smb mount, shutil.copy tries to replicate the source permission
+    bits via os.chmod, which isn't supported, so the copy raises PermissionError even
+    though the file content was already fully written. This is simulated here via
+    monkeypatching os.chmod, so the test doesn't depend on an actual cifs mount being
+    available.
+    """
+    src = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path, suffix=".gpkg")
+
+    def chmod_not_permitted(*_args, **_kwargs):
+        raise PermissionError("[Errno 1] Operation not permitted")
+
+    monkeypatch.setattr(os, "chmod", chmod_not_permitted)
+
+    dst = tmp_path / f"copy_{src.name}"
+    with pytest.raises(PermissionError):
+        gfo.copy(src, dst, keep_permissions=True)
+
+    # The file content was copied despite the exception being raised.
+    assert dst.exists()
+
+    # With keep_permissions=False, os.chmod isn't used, so the copy succeeds.
+    dst2 = tmp_path / f"ok_{src.name}"
+    gfo.copy(src, dst2, keep_permissions=False)
+    assert dst2.exists()
+
+
 def test_copy_error(tmp_path):
     src = tmp_path / "non_existing_file.gpkg"
     dst = tmp_path / "output.gpkg"
@@ -1887,6 +1917,80 @@ def test_move(tmp_path, suffix):
             type=gfo.DataType.REAL,
             expression="ST_perimeter(geom)",
         )
+
+
+@pytest.mark.parametrize("on_keep_permissions_error", ["invalid", "", None])
+def test_move_invalid_on_keep_permissions_error(on_keep_permissions_error):
+    with pytest.raises(
+        ValueError,
+        match="Invalid value for on_keep_permissions_error",
+    ):
+        gfo.move(
+            "non_existing_file.gpkg",
+            "output.gpkg",
+            on_keep_permissions_error=on_keep_permissions_error,
+        )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="os.chmod is a no-op on windows")
+@pytest.mark.parametrize("suffix", [".gpkg", ".shp"])
+@pytest.mark.parametrize("on_keep_permissions_error", ["ignore", "warn", "raise"])
+def test_move_chmod_not_supported(
+    tmp_path, monkeypatch, on_keep_permissions_error, suffix
+):
+    """gfo.move fails to keep permissions on filesystems that don't support chmod.
+
+    E.g. on a cifs/smb mount, shutil.move tries to replicate the source permission
+    bits via os.chmod, which isn't supported, so the move raises PermissionError even
+    though the file content was already fully written. This is simulated here via
+    monkeypatching os.rename and os.chmod, so the test doesn't depend on an actual
+    cifs mount being available.
+
+    suffix ".shp" is included to also cover moving the extra files (.shx, .dbf,...)
+    that a shapefile consists of, next to the main file.
+    """
+    src = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path, suffix=suffix)
+
+    def rename_cross_device(*_args, **_kwargs):
+        # Force shutil.move to use its copy+remove fallback, like it does when
+        # src and dst are on different filesystems.
+        raise OSError("Invalid cross-device link")
+
+    def chmod_not_permitted(*_args, **_kwargs):
+        raise PermissionError("[Errno 1] Operation not permitted")
+
+    monkeypatch.setattr(os, "rename", rename_cross_device)
+    monkeypatch.setattr(os, "chmod", chmod_not_permitted)
+
+    dst = tmp_path / f"output_{src.name}"
+    if on_keep_permissions_error == "raise":
+        with pytest.raises(PermissionError):
+            gfo.move(src, dst, on_keep_permissions_error=on_keep_permissions_error)
+        # src wasn't removed yet, as the exception stopped the move.
+        assert src.exists()
+        if suffix == ".shp":
+            # The extra files are moved before the main file, in the order defined
+            # in suffixes_extrafiles ([".dbf", ".shx",...]), so the error occurs on
+            # the first extra file (.dbf) and neither it nor the main .shp file are
+            # fully moved to dst.
+            assert dst.with_suffix(".dbf").exists()
+            assert not dst.with_suffix(".shx").exists()
+            assert not dst.exists()
+        else:
+            # The file content was copied despite the exception being raised.
+            assert dst.exists()
+    else:
+        if on_keep_permissions_error == "warn":
+            with pytest.warns(UserWarning, match="PermissionError while moving"):
+                gfo.move(src, dst, on_keep_permissions_error=on_keep_permissions_error)
+        else:
+            gfo.move(src, dst, on_keep_permissions_error=on_keep_permissions_error)
+
+        # The move succeeded anyway, without keeping the file permissions.
+        assert not src.exists()
+        assert dst.exists()
+        if suffix == ".shp":
+            assert dst.with_suffix(".shx").exists()
 
 
 def test_update_column(tmp_path):

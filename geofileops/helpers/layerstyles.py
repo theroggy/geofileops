@@ -1,6 +1,8 @@
 """Module to save layer styles in Geopackage files."""
 
 import sqlite3
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -12,9 +14,47 @@ gdal.UseExceptions()
 ogr.UseExceptions()
 
 
+@dataclass
+class LayerStyle:
+    """Class to hold information about a layer style.
+
+    In practice, the fields map to the QGIS GeoPackage styling extension columns, but
+    use Python-friendly names where possible.
+
+    Attributes:
+        id: Unique style identifier in the ``layer_styles`` table.
+        table_catalog: Catalog name of the styled table (typically empty in GPKG).
+        table_schema: Schema name of the styled table (typically empty in GPKG).
+        layer: Name of the styled feature layer.
+        geometry_column: Name of the styled geometry column.
+        name: Style name as shown in QGIS.
+        qml: Style definition in QML format.
+        sld: Style definition in SLD format.
+        use_as_default: True if this style is marked as default for the layer.
+        description: Optional human-readable description.
+        owner: Optional owner/author of the style.
+        ui: Optional UI form/config payload.
+        update_time: Last update timestamp if available.
+    """
+
+    id: int
+    table_catalog: str
+    table_schema: str
+    layer: str
+    geometry_column: str
+    name: str
+    qml: str
+    sld: str
+    use_as_default: bool
+    description: str
+    owner: str
+    ui: str
+    update_time: datetime | None = None
+
+
 def get_layerstyles(
     path: Path, layer: str | None = None, name: str | None = None
-) -> pd.DataFrame:
+) -> list[LayerStyle]:
     """Get the layer styles saved in the geofile.
 
     Only styles saved according to the QGIS Geopackage styling extension are read:
@@ -28,25 +68,10 @@ def get_layerstyles(
             regardless of their name are returned. Defaults to None.
 
     Returns:
-        pd.DataFrame: the styles found.
+        list[LayerStyle]: the styles found.
     """
     if not _has_layerstyles_table(path):
-        return pd.DataFrame(
-            columns=[
-                "id",
-                "f_table_catalog",
-                "f_table_schema",
-                "f_table_name",
-                "f_geometry_column",
-                "styleName",
-                "styleQML",
-                "styleSLD",
-                "useAsDefault",
-                "description",
-                "owner",
-                "ui",
-            ]
-        )
+        return []
 
     layer_styles_df = fileops.read_file(path, layer="layer_styles", fid_as_index=True)
     layer_styles_df.index.name = "id"
@@ -55,7 +80,28 @@ def get_layerstyles(
     if name is not None:
         layer_styles_df = layer_styles_df.loc[layer_styles_df["styleName"] == name]
 
-    return layer_styles_df
+    layer_styles = [
+        LayerStyle(
+            id=int(row.Index),
+            table_catalog=row.f_table_catalog,
+            table_schema=row.f_table_schema,
+            layer=row.f_table_name,
+            geometry_column=row.f_geometry_column,
+            name=row.styleName,
+            qml=row.styleQML,
+            sld=row.styleSLD,
+            use_as_default=bool(row.useAsDefault),
+            description=row.description,
+            owner=row.owner,
+            ui=row.ui,
+            update_time=row.update_time.to_pydatetime()
+            if not pd.isna(row.update_time)
+            else None,
+        )
+        for row in layer_styles_df.itertuples(index=True)
+    ]
+
+    return layer_styles
 
 
 def add_layerstyle(
@@ -95,15 +141,18 @@ def add_layerstyle(
     use_as_default_str = 1 if use_as_default else 0
 
     # Get existing layer styles
-    layer_styles_df = get_layerstyles(path, layer=layer, name=name)
+    layer_styles = get_layerstyles(path, layer=layer, name=name)
 
     # If the layer style already exists: error
-    if len(layer_styles_df) > 0:
-        styles_found = (
-            layer_styles_df[["f_table_name", "styleName"]]
-            .reset_index()
-            .to_dict(orient="records")
-        )
+    if len(layer_styles) > 0:
+        styles_found = [
+            {
+                "id": layer_style.id,
+                "layer": layer_style.layer,
+                "name": layer_style.name,
+            }
+            for layer_style in layer_styles
+        ]
         raise ValueError(f"layer style already exists: {styles_found}")
 
     # Insert style

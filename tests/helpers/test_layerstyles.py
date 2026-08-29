@@ -36,8 +36,8 @@ def test_add_get_remove_layer_styles(tmp_path):
         qml=qml,
         use_as_default=True,
     )
-    layerstyles_df = gfo.get_layerstyles(test_path)
-    assert len(layerstyles_df) == 1
+    styles = gfo.get_layerstyles(test_path)
+    assert len(styles) == 1
 
     # Adding the same style again should give an error
     with pytest.raises(ValueError, match="layer style already exists: "):
@@ -51,8 +51,8 @@ def test_add_get_remove_layer_styles(tmp_path):
 
     # Remove the style again
     gfo.remove_layerstyle(test_path, id=1)
-    layerstyles_df = gfo.get_layerstyles(test_path)
-    assert len(layerstyles_df) == 0
+    styles = gfo.get_layerstyles(test_path)
+    assert len(styles) == 0
 
     # Removing a style that doesn't exist is OK
     gfo.remove_layerstyle(test_path, id=1)
