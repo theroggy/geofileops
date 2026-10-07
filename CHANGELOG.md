@@ -13,6 +13,7 @@
 ### Improvements
 
 - Make `dissolve` with `agg_columns` faster and more efficient (#841)
+- Reduce temp space needed to dissolve large files (#844)
 - Temporary files created by sqlite are now also placed in the temporary directories
   as used by geofileops. More information can be found in the documentation of
   `set_tmp_dir` (#840)

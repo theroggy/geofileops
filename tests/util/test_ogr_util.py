@@ -104,6 +104,41 @@ def test_read_cpl_log(tmp_path):
     assert len(log_lines) == len(test_log_lines) - 2
 
 
+def test_vector_translate_disk_full_error_includes_disk_space_diagnostics(
+    tmp_path, monkeypatch, caplog
+):
+    input_path = test_helper.get_testfile("polygon-parcel")
+    output_path = tmp_path / "output.gpkg"
+
+    def raise_translate_error(*_args, **_kwargs):
+        raise RuntimeError("VectorTranslate failed")
+
+    monkeypatch.setattr(_ogr_util.gdal, "VectorTranslate", raise_translate_error)
+    monkeypatch.setattr(
+        _ogr_util,
+        "read_cpl_log",
+        lambda _path: (["CPLError: database or disk is full"], []),
+    )
+    monkeypatch.setattr(_ogr_util, "_validate_file", lambda *_args: None)
+    monkeypatch.setattr(_ogr_util, "formatbytes", lambda _bytes: "12.34 GB")
+
+    with pytest.raises(_ogr_util.GDALError) as error:
+        _ogr_util.vector_translate(input_path, output_path)
+
+    error_text = str(error.value)
+    assert "Disk-space diagnostics" in error_text
+    assert "Input path" in error_text
+    assert "Output path" in error_text
+    normalized_error_text = error_text.replace("\\", "/")
+    assert input_path.parent.as_posix() in normalized_error_text
+    assert tmp_path.as_posix() in normalized_error_text
+    assert "GeofileOps temp directory" in error_text
+    assert "free=12.34 GB" in error_text
+    assert "bytes" not in error_text
+    assert "filesystem=" not in error_text
+    assert "disk-full error" in caplog.text
+
+
 def test_set_config_options():
     # Init
     test1_config_notset = "TEST_CONFIG_OPTION_1"

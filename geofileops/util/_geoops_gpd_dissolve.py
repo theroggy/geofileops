@@ -668,6 +668,22 @@ def dissolve(  # noqa: D417
                     options["LAYER_CREATION.SPATIAL_INDEX"] = False
                 output_tmp_final_path = tmp_dir / name
 
+                if groupby_columns:
+                    # Create a groupby index if groupby columns are specified.
+                    # For an input file of 16 GB adding the groupby index (of 1.5 GB)
+                    # reduced temp space used by SQLite to 12 GB instead of 26 GB.
+                    groupby_columns_sql = ", ".join(
+                        f'"{column}"' for column in groupby_columns
+                    )
+                    fileops.execute_sql(
+                        output_tmp_path,
+                        sql_stmt=(
+                            'CREATE INDEX IF NOT EXISTS "groupby_idx" '
+                            f'ON "{output_layer}" ({groupby_columns_sql})'
+                        ),
+                        sql_dialect="SQLITE",
+                    )
+
                 _ogr_util.vector_translate(
                     input_path=output_tmp_path,
                     output_path=output_tmp_final_path,

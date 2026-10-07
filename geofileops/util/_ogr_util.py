@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 import tempfile
 import warnings
 from collections.abc import Iterable
@@ -17,7 +18,7 @@ import geofileops as gfo
 from geofileops import fileops
 from geofileops._compat import GDAL_GTE_3101, GDAL_GTE_3114
 from geofileops.helpers._options import ConfigOptions
-from geofileops.util._general_util import MissingRuntimeDependencyError
+from geofileops.util._general_util import MissingRuntimeDependencyError, formatbytes
 from geofileops.util._geopath_util import GeoPath
 
 # Make sure only one instance per process is running
@@ -170,6 +171,80 @@ def read_cpl_log(path: Path) -> tuple[list[str], list[str]]:
                 lines_error.append(line)
 
     return (lines_cleaned, lines_error)
+
+
+def _is_disk_full_error(error_text: str) -> bool:
+    error_text = error_text.lower()
+    return any(
+        marker in error_text
+        for marker in (
+            "no space left on device",
+            "database or disk is full",
+            "disk full",
+            "disk is full",
+            "disk quota exceeded",
+            "enospc",
+        )
+    )
+
+
+def _get_disk_space_diagnostics(
+    input_path: Union[str, "os.PathLike[Any]"],
+    output_path: Union[str, "os.PathLike[Any]"],
+    config_options: dict[str, Any],
+) -> list[str]:
+    path_candidates: list[tuple[str, str | os.PathLike[Any] | None]] = [
+        ("Input path", input_path),
+        ("Output path", output_path),
+        (
+            "GDAL CPL_TMPDIR",
+            config_options.get("CPL_TMPDIR") or gdal.GetConfigOption("CPL_TMPDIR"),
+        ),
+        ("SQLite SQLITE_TMPDIR", os.environ.get("SQLITE_TMPDIR")),
+        ("TMPDIR", os.environ.get("TMPDIR")),
+        ("TMP", os.environ.get("TMP")),
+        ("TEMP", os.environ.get("TEMP")),
+        ("Python temp directory", tempfile.gettempdir()),
+        ("SQLite default temp directory", "/var/tmp"),
+        ("SQLite default temp directory", "/tmp"),
+        ("SQLite default temp directory", "/usr/tmp"),
+    ]
+
+    diagnostics = []
+    checked_paths: dict[Path, list[str]] = {}
+    try:
+        path_candidates.append(("GeofileOps temp directory", ConfigOptions.get_tmp_dir))
+    except Exception as ex:
+        diagnostics.append(f"GeofileOps temp directory could not be resolved: {ex}")
+
+    for label, raw_path in path_candidates:
+        if raw_path is None:
+            continue
+
+        path_str = os.fsdecode(raw_path)
+        if "://" in path_str or path_str.startswith(("/vsi", "PG:")):
+            diagnostics.append(
+                f"{label}: {path_str} (non-local path; check its storage quota)"
+            )
+            continue
+
+        path = Path(path_str).expanduser()
+        if label == "SQLite default temp directory" and not path.exists():
+            continue
+        if path.exists() and not path.is_dir():
+            path = path.parent
+        while not path.exists() and path.parent != path:
+            path = path.parent
+        checked_paths.setdefault(path, []).append(f"{label}: {path_str}")
+
+    for path, labels in checked_paths.items():
+        try:
+            usage = shutil.disk_usage(path)
+            diagnostics.append(f"{', '.join(labels)}; free={formatbytes(usage.free)}")
+        except OSError as ex:
+            diagnostics.append(f"{', '.join(labels)}; disk usage unavailable: {ex}")
+
+    return diagnostics
 
 
 def StartTransaction(datasource: gdal.Dataset) -> bool:
@@ -667,6 +742,20 @@ def vector_translate(
 
         # Read cpl_log file
         log_lines, log_errors = read_cpl_log(gdal_cpl_log_path)
+        if _is_disk_full_error("\n".join([str(ex), *log_lines])):
+            disk_space_details = _get_disk_space_diagnostics(
+                input_path, output_path, config_options
+            )
+            if disk_space_details:
+                details_text = "\n".join(
+                    f"    {detail}" for detail in disk_space_details
+                )
+                message += f"\nDisk-space diagnostics:\n{details_text}"
+                logger.error(
+                    "VectorTranslate failed with a disk-full error. Relevant "
+                    "filesystem free-space information:\n%s",
+                    "\n".join(disk_space_details),
+                )
 
         raise GDALError(
             message, log_details=log_lines, error_details=log_errors
