@@ -4,6 +4,7 @@
 
 ### Deprecations and compatibility notes
 
+- Limit the number of positional arguments to maximum 5 (#843)
 - In get_layerstyles, return a list of dataclasses instead of as dataframe (#833)
 - For `copy`, the default value of `keep_permissions` is now `False` (#838)
 - For `move`, if moving the file while keeping permissions and metadata fails, the

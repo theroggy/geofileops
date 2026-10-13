@@ -311,6 +311,7 @@ class VectorTranslateInfo:
         self,
         input_path: Union[str, "os.PathLike[Any]"],
         output_path: Union[str, "os.PathLike[Any]"],
+        *,
         input_layers: list[str] | str | None = None,
         output_layer: str | None = None,
         access_mode: str | None = None,
@@ -387,6 +388,7 @@ def vector_translate_by_info(info: VectorTranslateInfo) -> bool:
 def vector_translate(
     input_path: Union[str, "os.PathLike[Any]"],
     output_path: Union[str, "os.PathLike[Any]"],
+    *,
     input_layers: list[str] | str | None = None,
     output_layer: str | None = None,
     access_mode: str | None = None,

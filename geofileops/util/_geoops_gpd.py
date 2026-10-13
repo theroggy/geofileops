@@ -56,6 +56,7 @@ class ParallelizationConfig:
 
     def __init__(
         self,
+        *,
         bytes_basefootprint: int = 50 * 1024 * 1024,
         bytes_per_row: int = 1000,
         min_rows_per_batch: int = 1000,
@@ -254,6 +255,7 @@ class ProcessingParams:
 def _prepare_processing_params(
     input_path: Path,
     input_layer: LayerInfo,
+    *,
     nb_parallel: int | None,
     batchsize: int,
     parallelization_config: ParallelizationConfig | None = None,
@@ -365,6 +367,7 @@ def apply(
     input_path: Path,
     output_path: Path,
     func: Callable[[Any], Any],
+    *,
     operation_name: str | None = None,
     only_geom_input: bool = True,
     input_layer: str | LayerInfo | None = None,
@@ -476,6 +479,7 @@ def buffer(
     output_path: Path,
     distance: float,
     quadrantsegments: int = 5,
+    *,
     endcap_style: BufferEndCapStyle = BufferEndCapStyle.ROUND,
     join_style: BufferJoinStyle = BufferJoinStyle.ROUND,
     mitre_limit: float = 5.0,
@@ -534,6 +538,7 @@ def buffer(
 def convexhull(
     input_path: Path,
     output_path: Path,
+    *,
     input_layer: str | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
@@ -572,11 +577,12 @@ def convexhull(
 def makevalid(
     input_path: Path,
     output_path: Path,
+    *,
     input_layer: str | LayerInfo | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: str | None | GeometryType = None,
+    force_output_geometrytype: str | GeometryType | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
@@ -635,6 +641,7 @@ def simplify(
     output_path: Path,
     tolerance: float,
     algorithm: SimplifyAlgorithm = SimplifyAlgorithm.RAMER_DOUGLAS_PEUCKER,
+    *,
     lookahead: int = 8,
     input_layer: str | None = None,
     output_layer: str | None = None,
@@ -680,6 +687,7 @@ def _apply_geooperation_to_layer(
     output_path: Path,
     operation: GeoOperation,
     operation_params: dict,
+    *,
     input_layer: str | LayerInfo | None,  # = None
     columns: list[str] | None,  # = None
     output_layer: str | None,  # = None
@@ -987,6 +995,7 @@ def _apply_geooperation(
     output_path: Path,
     operation: GeoOperation,
     operation_params: dict,
+    *,
     input_layer: LayerInfo,
     output_layer: str | None = None,
     columns: list[str] | None = None,

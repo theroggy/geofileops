@@ -26,6 +26,7 @@ def union_full_self(
     input_path: Path,
     output_path: Path,
     intersections_as: UnionFullSelfTypes,
+    *,
     input_layer: str | LayerInfo | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,

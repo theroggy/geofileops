@@ -109,6 +109,7 @@ def add_layerstyle(
     layer: str,
     name: str,
     qml: str,
+    *,
     sld: str = "",
     use_as_default: bool = False,
     description: str = "",

@@ -562,6 +562,7 @@ def copy_table(
     output_path: Union[str, "os.PathLike[Any]"],
     input_table: str,
     output_table: str,
+    *,
     columns: Iterable[str] | None = None,
     where: str | None = None,
     preserve_fid: bool = False,
@@ -701,6 +702,7 @@ def create_table_as_sql(
     input_databases: dict[str, Path],
     output_path: Path,
     sql_stmt: str,
+    *,
     output_layer: str,
     output_geometrytype: GeometryType | None,
     output_crs: int,
@@ -921,8 +923,10 @@ def create_table_as_sql(
                 "unique constraint failed:"
             ) and ex_message.endswith(".fid"):
                 ex.args = (
-                    f"{ex}: avoid this by not selecting or aliasing fid "
-                    '("select * will select fid!)',
+                    (
+                        f"{ex}: avoid this by not selecting or aliasing fid "
+                        '("select * will select fid!)'
+                    ),
                 )
             raise
 

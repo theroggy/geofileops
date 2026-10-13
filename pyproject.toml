@@ -73,8 +73,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ANN", "D"]
-"perftests/*" = ["ANN", "D"]
+"benchmark/*" = ["ANN", "D", "PLR0917"]
+"tests/*" = ["ANN", "D", "PLR0917"]
+"perftests/*" = ["ANN", "D", "PLR0917"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

@@ -18,8 +18,10 @@ from tests.test_helper import SUFFIXES_GEOOPS, SUFFIXES_GEOOPS_EXT
     "clip_geometry, exp_featurecount",
     [
         (
-            "Polygon ((156072 196691, 156036 196836, 156326 196927, 156368 196750, "
-            "156072 196691))",
+            (
+                "Polygon ((156072 196691, 156036 196836, 156326 196927, 156368 196750, "
+                "156072 196691))"
+            ),
             22,
         ),
         ((156036, 196691, 156368, 196927), 25),
