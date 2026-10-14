@@ -198,6 +198,7 @@ def test_sqlite_temp_file_location(tmp_path, sqlite_tmpdir_mode, use_gfo_tmpdir)
                     "set": str(sqlite_tmpdir),
                 }[sqlite_tmpdir_mode],
                 "GFO_TMPDIR": gfo_tmpdir,
+                "GFO_TMPDIR_COMPRESS": None,
             }
         ),
         _general_helper.create_gfo_tmp_dir("sqlite_tmpdir") as operation_tmp_dir,
@@ -238,6 +239,9 @@ def test_sqlite_temp_file_location(tmp_path, sqlite_tmpdir_mode, use_gfo_tmpdir)
             subprocess_env["GFO_TEST_OPERATION_DIR"] = str(operation_tmp_dir)
             if use_gfo_tmpdir and sqlite_tmpdir_mode == "empty":
                 subprocess_env["GFO_TEST_GFO_DIR"] = gfo_tmpdir
+
+            # Starting from SQLite 3.54.0, sqlite uses an anonymous temporary file for
+            # TEMP storage by default instead of a file starting with "etilqs_".
             subprocess_script = """
 import os
 import sqlite3
@@ -259,14 +263,14 @@ operation_dir = Path(os.environ["GFO_TEST_OPERATION_DIR"]).resolve()
 conn = sqlite3.connect(os.environ["GFO_TEST_DATABASE"])
 try:
     conn.execute("PRAGMA temp_store=FILE")
+    if conn.execute("PRAGMA temp_store").fetchone()[0] != 1:
+        print("SQLite build does not support file-backed TEMP storage")
+        raise SystemExit(77)
     open_files_before = open_temp_file_paths()
     conn.execute("CREATE TEMP TABLE temp_data (payload BLOB)")
     conn.execute("INSERT INTO temp_data VALUES (randomblob(16 * 1024 * 1024))")
-    temp_files = {
-        path for path in open_temp_file_paths() - open_files_before
-        if path.name.startswith("etilqs_")
-    }
-    assert temp_files, "SQLite did not create an observable disk TEMP file"
+    temp_files = open_temp_file_paths() - open_files_before
+    assert temp_files, "SQLite did not open an observable disk TEMP file"
     actual_dirs = {path.parent.resolve() for path in temp_files}
     if expected_dir:
         assert actual_dirs == {Path(expected_dir).resolve()}
@@ -278,10 +282,20 @@ try:
 finally:
     conn.close()
 """
-            subprocess.run(
+            result = subprocess.run(
                 [sys.executable, "-c", subprocess_script],
-                check=True,
+                check=False,
+                capture_output=True,
+                text=True,
                 env=subprocess_env,
+            )
+            if result.returncode == 77:
+                pytest.skip(result.stdout.strip())
+            assert result.returncode == 0, (
+                "SQLite temp-file subprocess failed:\n"
+                f"return code: {result.returncode}\n"
+                f"stdout: {result.stdout}\n"
+                f"stderr: {result.stderr}"
             )
         elif sys.platform == "win32":
             conn = sqlite_util.connect(database_path, use_spatialite=False)

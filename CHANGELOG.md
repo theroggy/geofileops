@@ -1,11 +1,11 @@
 # CHANGELOG
 
-## 0.12.0 (????-??-??)
+## 0.12.0 (2026-10-14)
 
 ### Deprecations and compatibility notes
 
 - Limit the number of positional arguments to maximum 5 (#843)
-- In get_layerstyles, return a list of dataclasses instead of as dataframe (#833)
+- In `get_layerstyles`, return a list of dataclasses instead of as DataFrame (#833)
 - For `copy`, the default value of `keep_permissions` is now `False` (#838)
 - For `move`, if moving the file while keeping permissions and metadata fails, the
   default behaviour is now that the file is moved without retaining them. This behaviour
@@ -14,15 +14,17 @@
 ### Improvements
 
 - Make `dissolve` with `agg_columns` faster and more efficient (#841)
-- Reduce temp space needed to dissolve large files (#844)
+- Reduce temp space needed to `dissolve` large files (#844)
 - Temporary files created by sqlite are now also placed in the temporary directories
   as used by geofileops. More information can be found in the documentation of
   `set_tmp_dir` (#840)
+- Add optional temporary-directory compression via `GFO_TMPDIR_COMPRESS`, supporting
+  NTFS on Windows and Btrfs on Linux (#846)
 
 ### Bugs fixed
 
-- Fix dissolve if a groupby column contains None values and agg_columns is being used
-  (#839).
+- Fix `dissolve` if a `groupby` column contains None values and `agg_columns` is being
+  used (#839)
 
 ## 0.11.4 (2026-07-15)
 

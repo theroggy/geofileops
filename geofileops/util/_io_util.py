@@ -2,13 +2,93 @@
 
 import logging
 import os
+import subprocess
+import sys
 import tempfile
 import time
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Union
 
 import geofileops as gfo
+
+
+def enable_directory_compression(
+    path: Path, compression: bool | str | None = True
+) -> bool:
+    """Set compression for files newly created in a directory.
+
+    Existing files are not explicitly processed. On Windows, NTFS uses its default
+    compression algorithm. On Linux, Btrfs supports the ``zlib``, ``lzo``, and
+    ``zstd`` algorithms; ``True`` selects ``zstd`` and ``False`` disables compression.
+
+    Args:
+        path (Path): The directory to configure for compression.
+        compression (bool | str | None): Whether to enable or disable compression, a
+            Btrfs algorithm, or None to leave the directory unchanged. Defaults to
+            True.
+
+    Raises:
+        ValueError: if a string algorithm is used on Windows or an unsupported
+            algorithm is specified.
+        OSError or subprocess.CalledProcessError: if Windows compression setup fails.
+    """
+    if compression is None:
+        return True
+
+    if sys.platform == "win32":
+        if isinstance(compression, str):
+            raise ValueError(
+                "GFO_TMPDIR_COMPRESS algorithm strings are not supported on Windows"
+            )
+        command = [
+            "compact.exe",
+            "/c" if compression else "/u",
+            "/q",
+            str(path),
+        ]
+    elif sys.platform == "linux":
+        algorithm = (
+            "none"
+            if compression is False
+            else "zstd"
+            if compression is True
+            else compression
+        )
+        if algorithm not in ("none", "zlib", "lzo", "zstd"):
+            raise ValueError(
+                f"unsupported Btrfs compression algorithm: {algorithm!r}; "
+                "expected one of 'none', 'zlib', 'lzo', or 'zstd'"
+            )
+        command = [
+            "btrfs",
+            "property",
+            "set",
+            str(path),
+            "compression",
+            algorithm,
+        ]
+    else:
+        warnings.warn(
+            f"Directory compression is not supported on platform {sys.platform!r}",
+            stacklevel=2,
+        )
+        return False
+
+    try:
+        subprocess.run(command, check=True, capture_output=True, text=True)
+    except (OSError, subprocess.CalledProcessError) as ex:
+        if sys.platform == "win32":
+            raise
+        details = getattr(ex, "stderr", None) or str(ex)
+        warnings.warn(
+            f"Could not set compression for temporary directory {path}: {details}",
+            stacklevel=2,
+        )
+        return False
+
+    return True
 
 
 def create_tempdir(base_dirname: str, parent_dir: Path | None = None) -> Path:

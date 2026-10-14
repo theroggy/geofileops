@@ -2,12 +2,15 @@
 
 import multiprocessing
 import os
+import sys
 import tempfile
 from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any, Literal, Union
 
 from pyproj import CRS
+
+_TMP_DIR_COMPRESSION_ATTEMPTS: set[tuple[Path, bool | str]] = set()
 
 
 class classproperty(property):
@@ -765,6 +768,64 @@ class ConfigOptions:
         return rows
 
     @staticmethod
+    def set_tmp_dir_compress(compress: bool | str | None) -> _RestoreOriginalHandler:
+        """Set compression for newly created files in the temporary directory.
+
+        If unset or set to an empty string, the filesystem's compression setting is
+        left unchanged. Boolean True enables compression and False disables it.
+
+        On Linux, a string can select the Btrfs algorithm: ``zlib``, ``lzo``, or
+        ``zstd``. On Windows, algorithm strings are not supported and True enables
+        default NTFS compression.
+
+        The value can also be set directly through the ``GFO_TMPDIR_COMPRESS``
+        environment variable. If unset, compression is not changed.
+
+        Args:
+            compress (bool | str | None): Whether to enable or disable compression, a
+                Btrfs algorithm on Linux, or None to unset the option.
+        """
+        key = "GFO_TMPDIR_COMPRESS"
+        original_value = os.environ.get(key)
+        if isinstance(compress, bool):
+            os.environ[key] = "TRUE" if compress else "FALSE"
+        elif compress is not None:
+            os.environ[key] = compress
+        elif key in os.environ:
+            del os.environ[key]
+
+        return _RestoreOriginalHandler(key, original_value)
+
+    @classproperty
+    def get_tmp_dir_compress(cls) -> bool | str | None:
+        """Get the compression setting for the temporary directory.
+
+        Returns:
+            bool | str | None: None if unset or empty, False to disable, True for
+                platform-default compression, or a Btrfs algorithm on Linux.
+
+        Raises:
+            ValueError: if the configured value is not a supported boolean or Linux
+                Btrfs algorithm.
+        """
+        key = "GFO_TMPDIR_COMPRESS"
+        value = os.environ.get(key, default="")
+        value_cleaned = value.strip().lower()
+        if value_cleaned == "":
+            return None
+
+        if value_cleaned in ("1", "yes", "true", "0", "no", "false"):
+            return _get_bool(key, default=False)
+
+        if sys.platform == "linux" and value_cleaned in ("zlib", "lzo", "zstd"):
+            return value_cleaned
+
+        raise ValueError(
+            f"invalid value for configoption <{key}>: '{value}', expected a boolean"
+            " or, on Linux, one of 'zlib', 'lzo', or 'zstd'"
+        )
+
+    @staticmethod
     def set_tmp_dir(
         path: Union[str, "os.PathLike[Any]"] | None,
     ) -> _RestoreOriginalHandler:
@@ -832,6 +893,7 @@ class ConfigOptions:
             Path: The directory to use for temporary files. Defaults to a "geofileops"
                 subdirectory in the system temp directory.
         """
+        compression = cls.get_tmp_dir_compress
         tmp_dir_str = os.environ.get("GFO_TMPDIR")
         if tmp_dir_str is None:
             tmpdir = Path(tempfile.gettempdir()) / "geofileops"
@@ -843,6 +905,16 @@ class ConfigOptions:
             tmpdir = Path(tmp_dir_str.strip())
 
         tmpdir.mkdir(parents=True, exist_ok=True)
+        if compression is not None:
+            cache_key = (tmpdir.resolve(), compression)
+            if cache_key not in _TMP_DIR_COMPRESSION_ATTEMPTS:
+                from geofileops.util._io_util import (  # noqa: PLC0415
+                    enable_directory_compression,
+                )
+
+                enable_directory_compression(tmpdir, compression)
+                _TMP_DIR_COMPRESSION_ATTEMPTS.add(cache_key)
+
         return tmpdir
 
     @staticmethod

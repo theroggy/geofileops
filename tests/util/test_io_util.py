@@ -1,8 +1,10 @@
-"""
-Tests for functionalities in _io_util.
-"""
+"""Tests for functionalities in _io_util."""
 
+import subprocess
+import sys
 import tempfile
+
+import pytest
 
 from geofileops.util import _io_util
 
@@ -31,6 +33,130 @@ def test_create_tempdir_custom_dir(tmp_path):
     tempdir = _io_util.create_tempdir("testje", parent_dir=tmp_path)
     assert tempdir.exists()
     assert str(tempdir).startswith(str(tmp_path))
+
+
+@pytest.mark.parametrize(
+    "compression, expected_algorithm",
+    [
+        (True, "zstd"),
+        (False, "none"),
+        ("zlib", "zlib"),
+        ("lzo", "lzo"),
+        ("zstd", "zstd"),
+    ],
+)
+@pytest.mark.skipif(sys.platform != "linux", reason="Btrfs compression is Linux-only")
+def test_enable_directory_compression_btrfs(
+    monkeypatch, tmp_path, compression, expected_algorithm
+):
+    commands = []
+    monkeypatch.setattr(
+        _io_util.subprocess,
+        "run",
+        lambda command, **kwargs: commands.append((command, kwargs)),
+    )
+
+    _io_util.enable_directory_compression(tmp_path, compression)
+
+    assert commands == [
+        (
+            [
+                "btrfs",
+                "property",
+                "set",
+                str(tmp_path),
+                "compression",
+                expected_algorithm,
+            ],
+            {"check": True, "capture_output": True, "text": True},
+        )
+    ]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="NTFS compression is Windows-only")
+def test_enable_directory_compression_windows(monkeypatch, tmp_path):
+    commands = []
+    monkeypatch.setattr(
+        _io_util.subprocess,
+        "run",
+        lambda command, **kwargs: commands.append((command, kwargs)),
+    )
+
+    _io_util.enable_directory_compression(tmp_path)
+
+    assert commands == [
+        (
+            ["compact.exe", "/c", "/q", str(tmp_path)],
+            {"check": True, "capture_output": True, "text": True},
+        )
+    ]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="NTFS compression is Windows-only")
+def test_disable_directory_compression_windows(monkeypatch, tmp_path):
+    commands = []
+    monkeypatch.setattr(
+        _io_util.subprocess,
+        "run",
+        lambda command, **_kwargs: commands.append(command),
+    )
+
+    _io_util.enable_directory_compression(tmp_path, False)
+
+    assert commands == [["compact.exe", "/u", "/q", str(tmp_path)]]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only option behavior")
+def test_enable_directory_compression_windows_rejects_algorithm(tmp_path):
+    with pytest.raises(ValueError, match="algorithm strings are not supported"):
+        _io_util.enable_directory_compression(tmp_path, "zstd")
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Btrfs compression is Linux-only")
+def test_enable_directory_compression_btrfs_warns_on_failure(monkeypatch, tmp_path):
+    def fail(command, **_kwargs):
+        raise subprocess.CalledProcessError(1, command, stderr="not a Btrfs filesystem")
+
+    monkeypatch.setattr(_io_util.subprocess, "run", fail)
+
+    with pytest.warns(UserWarning, match="not a Btrfs filesystem"):
+        _io_util.enable_directory_compression(tmp_path)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="Btrfs compression is Linux-only")
+def test_enable_directory_compression_runs_each_call(monkeypatch, tmp_path):
+    commands = []
+    monkeypatch.setattr(
+        _io_util.subprocess,
+        "run",
+        lambda command, **_kwargs: commands.append(command),
+    )
+
+    _io_util.enable_directory_compression(tmp_path)
+    _io_util.enable_directory_compression(tmp_path)
+
+    assert len(commands) == 2
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="NTFS compression is Windows-only")
+def test_enable_directory_compression_windows_propagates_failure(monkeypatch, tmp_path):
+    def fail(command, **_kwargs):
+        raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(_io_util.subprocess, "run", fail)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        _io_util.enable_directory_compression(tmp_path)
+
+
+def test_enable_directory_compression_unset_is_noop(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        _io_util.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("subprocess should not be called"),
+    )
+
+    _io_util.enable_directory_compression(tmp_path, None)
 
 
 def test_create_file_atomic(tmp_path):
