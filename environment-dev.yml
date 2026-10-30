@@ -20,9 +20,9 @@ dependencies:
   - pyproj
   - shapely >=2
   # optional
-  # - fiona  # Not needed anymore
+  - duckdb
   - matplotlib-base
-  - pyarrow-core
+  - pyarrow
   - simplification
   # testing
   - pytest

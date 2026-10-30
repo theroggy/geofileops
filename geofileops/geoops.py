@@ -11,6 +11,9 @@ from typing import TYPE_CHECKING, Any, Literal, Union
 from pygeoops import GeometryType
 
 from geofileops import fileops
+from geofileops.geoops_duckdb import buffer as _duckdb_buffer
+from geofileops.geoops_duckdb import convexhull as _duckdb_convexhull
+from geofileops.geoops_duckdb import should_use_duckdb
 from geofileops.geoops_sql import _union_full
 from geofileops.helpers import _general_helper
 from geofileops.util import (
@@ -813,6 +816,30 @@ def buffer(
         f"(distance: {distance}, quadrantsegments: {quadrantsegments})"
     )
 
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+    if should_use_duckdb([input_path], output_path):
+        return _duckdb_buffer(
+            input_path=input_path,
+            output_path=output_path,
+            distance=distance,
+            quadrantsegments=quadrantsegments,
+            endcap_style=endcap_style,
+            join_style=join_style,
+            mitre_limit=mitre_limit,
+            single_sided=single_sided,
+            input_layer=input_layer,
+            output_layer=output_layer,
+            columns=columns,
+            explodecollections=explodecollections,
+            gridsize=gridsize,
+            keep_empty_geoms=keep_empty_geoms,
+            where_post=where_post,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            force=force,
+        )
+
     if (
         endcap_style == BufferEndCapStyle.ROUND
         and join_style == BufferJoinStyle.ROUND
@@ -820,8 +847,8 @@ def buffer(
     ):
         # If default buffer options for spatialite, use the faster SQL version
         return _geoops_sql.buffer(
-            input_path=Path(input_path),
-            output_path=Path(output_path),
+            input_path=input_path,
+            output_path=output_path,
             distance=distance,
             quadrantsegments=quadrantsegments,
             input_layer=input_layer,
@@ -838,8 +865,8 @@ def buffer(
     else:
         # If special buffer options, use geopandas version
         return _geoops_gpd.buffer(
-            input_path=Path(input_path),
-            output_path=Path(output_path),
+            input_path=input_path,
+            output_path=output_path,
             distance=distance,
             quadrantsegments=quadrantsegments,
             endcap_style=endcap_style,
@@ -973,9 +1000,27 @@ def convexhull(
     logger = logging.getLogger("geofileops.convexhull")
     logger.info(f"Start, on {input_path}")
 
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+    if should_use_duckdb([input_path], output_path):
+        return _duckdb_convexhull(
+            input_path=input_path,
+            output_path=output_path,
+            input_layer=input_layer,
+            output_layer=output_layer,
+            columns=columns,
+            explodecollections=explodecollections,
+            gridsize=gridsize,
+            keep_empty_geoms=keep_empty_geoms,
+            where_post=where_post,
+            nb_parallel=nb_parallel,
+            batchsize=batchsize,
+            force=force,
+        )
+
     return _geoops_sql.convexhull(
-        input_path=Path(input_path),
-        output_path=Path(output_path),
+        input_path=input_path,
+        output_path=output_path,
         input_layer=input_layer,
         output_layer=output_layer,
         columns=columns,

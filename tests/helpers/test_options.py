@@ -62,6 +62,10 @@ def test_get_bool_invalidvalue():
         ("GFO_IO_ENGINE", "PYOgrio", "pyogrio"),
         ("GFO_IO_ENGINE", "FIOna", "fiona"),
         ("GFO_IO_ENGINE", None, "pyogrio-arrow"),
+        ("GFO_GEOOPS_SQL_BACKEND", "AUTO", "auto"),
+        ("GFO_GEOOPS_SQL_BACKEND", "SQLITE", "sqlite"),
+        ("GFO_GEOOPS_SQL_BACKEND", "DUCKDB", "duckdb"),
+        ("GFO_GEOOPS_SQL_BACKEND", None, "auto"),
         ("GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD", "1000", 1000),
         ("GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD", None, 500 * 1024 * 1024),
         ("GFO_NB_PARALLEL", "4", 4),
@@ -88,6 +92,8 @@ def test_get_option(key, value, expected):
     with gfo.TempEnv({key: value}):
         if key == "GFO_IO_ENGINE":
             result = ConfigOptions.get_io_engine
+        elif key == "GFO_GEOOPS_SQL_BACKEND":
+            result = ConfigOptions.get_geoops_sql_backend
         elif key == "GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD":
             result = ConfigOptions.get_low_mem_available_warn_threshold
         elif key == "GFO_NB_PARALLEL":
@@ -110,6 +116,11 @@ def test_get_option(key, value, expected):
     "key, invalid_value, expected_error",
     [
         ("GFO_IO_ENGINE", "invalid", "invalid value for configoption <GFO_IO_ENGINE>"),
+        (
+            "GFO_GEOOPS_SQL_BACKEND",
+            "invalid",
+            "invalid value for configoption <GFO_GEOOPS_SQL_BACKEND>",
+        ),
         (
             "GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD",
             "invalid",
@@ -173,6 +184,8 @@ def test_get_option_invalid(key, invalid_value, expected_error):
     ):
         if key == "GFO_IO_ENGINE":
             _ = ConfigOptions.get_io_engine
+        elif key == "GFO_GEOOPS_SQL_BACKEND":
+            _ = ConfigOptions.get_geoops_sql_backend
         elif key == "GFO_LOW_MEM_AVAILABLE_WARN_THRESHOLD":
             _ = ConfigOptions.get_low_mem_available_warn_threshold
         elif key == "GFO_NB_PARALLEL":
@@ -195,6 +208,14 @@ def test_get_option_invalid(key, invalid_value, expected_error):
             _ = ConfigOptions.get_worker_type
         else:
             raise ValueError(f"Unexpected key: {key}")
+
+
+def test_set_geoops_sql_backend():
+    with gfo.TempEnv({"GFO_GEOOPS_SQL_BACKEND": None}):
+        assert ConfigOptions.get_geoops_sql_backend == "auto"
+        with gfo.options.set_geoops_sql_backend("duckdb"):
+            assert ConfigOptions.get_geoops_sql_backend == "duckdb"
+        assert ConfigOptions.get_geoops_sql_backend == "auto"
 
 
 @pytest.mark.parametrize(

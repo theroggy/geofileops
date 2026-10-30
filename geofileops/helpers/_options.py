@@ -196,6 +196,47 @@ class ConfigOptions:
         return io_engine
 
     @staticmethod
+    def set_geoops_sql_backend(
+        backend: Literal["auto", "sqlite", "duckdb"] | None,
+    ) -> _RestoreOriginalHandler:
+        """Set the backend for SQL-based geometry operations.
+
+        ``"auto"`` selects the backend based on the input and output formats. ``None``
+        unsets the option and restores automatic selection.
+
+        The option can also be set through the ``GFO_GEOOPS_SQL_BACKEND`` environment
+        variable. Possible values are ``AUTO``, ``SQLITE``, and ``DUCKDB``.
+
+        Args:
+            backend: The backend to use, or None to restore automatic selection.
+        """
+        key = "GFO_GEOOPS_SQL_BACKEND"
+        original_value = os.environ.get(key)
+        if backend is not None:
+            os.environ[key] = backend.upper()
+        elif key in os.environ:
+            del os.environ[key]
+
+        return _RestoreOriginalHandler(key, original_value)
+
+    @classproperty
+    def get_geoops_sql_backend(cls) -> str:
+        """The backend for SQL-based geometry operations.
+
+        Returns:
+            str: ``"auto"``, ``"sqlite"``, or ``"duckdb"``. Defaults to ``"auto"``.
+        """
+        backend = os.environ.get("GFO_GEOOPS_SQL_BACKEND", "auto").strip().lower()
+        supported_values = ["auto", "sqlite", "duckdb"]
+        if backend not in supported_values:
+            raise ValueError(
+                "invalid value for configoption <GFO_GEOOPS_SQL_BACKEND>: "
+                f"'{backend}', should be one of {supported_values}"
+            )
+
+        return backend
+
+    @staticmethod
     def set_low_mem_available_warn_threshold(
         min_bytes_available: int | None,
     ) -> _RestoreOriginalHandler:

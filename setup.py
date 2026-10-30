@@ -37,7 +37,7 @@ setuptools.setup(
         "pyproj",
         "shapely>=2",
     ],
-    extras_require={"full": ["simplification"]},
+    extras_require={"full": ["simplification"], "duckdb": ["duckdb"]},
     classifiers=[
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: BSD License",
