@@ -1,5 +1,7 @@
 """Tests regarding spatial indexes in/on data sources."""
 
+import sqlite3
+
 import pytest
 from osgeo import gdal
 
@@ -7,12 +9,12 @@ import geofileops as gfo
 from geofileops import fileops
 from geofileops.util._geofileinfo import GeofileInfo
 from tests import test_helper
-from tests.test_helper import SUFFIXES_FILEOPS
+from tests.test_helper import RUNS_AS_ROOT, SUFFIXES_FILEOPS
 
 
 @pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
 @pytest.mark.parametrize("read_only", [True, False])
-def test_create_spatial_index(tmp_path, suffix, read_only):
+def test_create_spatial_index(request, tmp_path, suffix, read_only):
     test_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix, read_only=read_only
     )
@@ -29,19 +31,23 @@ def test_create_spatial_index(tmp_path, suffix, read_only):
     # Remove spatial index
     gfo.remove_spatial_index(path=test_path, layer=layer)
     has_spatial_index = gfo.has_spatial_index(path=test_path, layer=layer)
-    assert has_spatial_index is False
+    assert not has_spatial_index
 
     # Set read-only status before testing create_spatial_index
     test_helper.set_read_only(test_path, read_only)
 
     if read_only:
+        if RUNS_AS_ROOT:
+            reason = "If running as root, create index on read-only file doesn't raise"
+            request.node.add_marker(pytest.mark.xfail(reason=reason))
+        # Create spatial index on read-only file should give error
         with pytest.raises(RuntimeError, match="create_spatial_index error"):
             gfo.create_spatial_index(path=test_path, layer=layer)
     else:
         # Create spatial index
         gfo.create_spatial_index(path=test_path, layer=layer)
         has_spatial_index = gfo.has_spatial_index(path=test_path, layer=layer)
-        assert has_spatial_index is True
+        assert has_spatial_index
 
         # Spatial index if it already exists by default gives error
         with pytest.raises(Exception, match="spatial index already exists"):
@@ -51,7 +57,7 @@ def test_create_spatial_index(tmp_path, suffix, read_only):
 
 @pytest.mark.parametrize("suffix", [s for s in SUFFIXES_FILEOPS if s != ".csv"])
 @pytest.mark.parametrize("read_only", [True, False])
-def test_create_spatial_index_force_rebuild(tmp_path, suffix, read_only):
+def test_create_spatial_index_force_rebuild(request, tmp_path, suffix, read_only):
     test_path = test_helper.get_testfile(
         "polygon-parcel", dst_dir=tmp_path, suffix=suffix, read_only=read_only
     )
@@ -69,6 +75,12 @@ def test_create_spatial_index_force_rebuild(tmp_path, suffix, read_only):
         gfo.create_spatial_index(path=test_path, exist_ok=True)
         assert qix_path.stat().st_mtime == qix_modified_time_orig
         if read_only:
+            if RUNS_AS_ROOT:
+                reason = (
+                    "If running as root, create index on read-only file doesn't raise"
+                )
+                request.node.add_marker(pytest.mark.xfail(reason=reason))
+            # Create spatial index on read-only file should give error
             with pytest.raises(RuntimeError, match="create_spatial_index error"):
                 gfo.create_spatial_index(path=test_path, force_rebuild=True)
         else:
@@ -79,6 +91,12 @@ def test_create_spatial_index_force_rebuild(tmp_path, suffix, read_only):
         has_spatial_index = gfo.has_spatial_index(path=test_path)
         assert has_spatial_index is True
         if read_only:
+            if RUNS_AS_ROOT:
+                reason = (
+                    "If running as root, create index on read-only file doesn't raise"
+                )
+                request.node.add_marker(pytest.mark.xfail(reason=reason))
+            # Create spatial index on read-only file should give error
             with pytest.raises(RuntimeError, match="create_spatial_index error"):
                 gfo.create_spatial_index(path=test_path, force_rebuild=True)
         else:
@@ -223,29 +241,36 @@ def test_has_spatial_index_unsupported(suffix):
         _ = gfo.has_spatial_index(src)
 
 
-def test_remove_spatial_index(tmp_path):
+@pytest.mark.parametrize("with_datasource", [False, True])
+def test_remove_spatial_index(tmp_path, with_datasource):
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
     gfo.create_spatial_index(src, exist_ok=True)
     assert gfo.has_spatial_index(src)
+    layer_info = fileops.get_layerinfo(src)
+    rtree_table = f"rtree_{layer_info.name}_{layer_info.geometrycolumn}"
+    rtree_shadow_tables = {
+        f"{rtree_table}_{suffix}" for suffix in ("node", "parent", "rowid")
+    }
 
-    # Remove spatial index and check result
-    gfo.remove_spatial_index(src)
-    assert not gfo.has_spatial_index(src)
+    sql_tables = "SELECT name FROM sqlite_master WHERE type = 'table'"
+    with sqlite3.connect(src) as conn:
+        tables_before = {row[0] for row in conn.execute(sql_tables)}
+    assert rtree_shadow_tables <= tables_before
 
-
-def test_remove_spatial_index_datasource(tmp_path):
-    # Prepare test data
-    src = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
-    gfo.create_spatial_index(src, exist_ok=True)
-    assert gfo.has_spatial_index(src)
-
-    # Remove spatial index and check result
-    datasource = gdal.OpenEx(str(src), gdal.OF_VECTOR | gdal.OF_UPDATE)
-    gfo.remove_spatial_index(src, datasource=datasource)
-
-    # Check result
-    assert not gfo.has_spatial_index(src)
-    # Datasource should not be closed by has_spatial_index
-    assert datasource is not None
     datasource = None
+    if with_datasource:
+        datasource = gdal.OpenEx(str(src), gdal.OF_VECTOR | gdal.OF_UPDATE)
+
+    # Remove spatial index and check result
+    gfo.remove_spatial_index(src, datasource=datasource)
+    assert not gfo.has_spatial_index(src)
+
+    with sqlite3.connect(src) as conn:
+        tables_after = {row[0] for row in conn.execute(sql_tables)}
+    assert not rtree_shadow_tables & tables_after
+
+    if with_datasource:
+        # The datasource should remain open after removing the index.
+        assert datasource is not None
+        datasource = None

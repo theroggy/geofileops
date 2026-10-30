@@ -238,6 +238,7 @@ class LayerInfo:
 
     def __init__(
         self,
+        *,
         name: str,
         featurecount: int,
         total_bounds: tuple[float, float, float, float],
@@ -621,6 +622,7 @@ def execute_sql(
 def create_spatial_index(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | LayerInfo | None = None,
+    *,
     cache_size_mb: int | None = 128,
     exist_ok: bool = False,
     force_rebuild: bool = False,
@@ -1003,6 +1005,7 @@ def add_column(
     type: DataType | str,  # noqa: A002
     expression: str | float | None = None,
     expression_dialect: str | None = None,
+    *,
     layer: str | None = None,
     force_update: bool = False,
     width: int | None = None,
@@ -1095,7 +1098,7 @@ def add_column(
 
     type_str = _validate_datatype(type)
 
-    start = time.perf_counter()
+    start = datetime.now()
     layerinfo = get_layerinfo(path, layer, raise_on_nogeom=False)
     layer = layerinfo.name
 
@@ -1104,6 +1107,7 @@ def add_column(
     try:
         # If column doesn't exist yet, create it
         columns_upper = [column.upper() for column in layerinfo.columns]
+        column_added = False
         if name.upper() not in columns_upper:
             logger.info(f"Add column {name} to {path}#{layer}")
             width_str = f"({width})" if width is not None else ""
@@ -1113,15 +1117,7 @@ def add_column(
             datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
             _ogr_util.StartTransaction(datasource)
             datasource.ExecuteSQL(sql_stmt)
-
-            # check if column was really added
-            datasource_layer = datasource.GetLayer(layer)
-            layer_defn = datasource_layer.GetLayerDefn()
-            field_index = layer_defn.GetFieldIndex(name)
-            if field_index == -1:
-                raise RuntimeError(
-                    f"add_column of {name=}, {type=} failed for {path}#{layer}"
-                )
+            column_added = True
         else:
             logger.warning(f"Column {name} existed already in {path}#{layer}")
 
@@ -1129,6 +1125,9 @@ def add_column(
         if expression is not None and (
             name not in layerinfo.columns or force_update is True
         ):
+            if not column_added:
+                logger.info(f"Update column {name} on {path}#{layer}")
+
             if datasource is None:
                 datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_UPDATE)
                 _ogr_util.StartTransaction(datasource)
@@ -1136,6 +1135,25 @@ def add_column(
             datasource.ExecuteSQL(sql_stmt, dialect="SQLITE")
 
         _ogr_util.CommitTransaction(datasource)
+
+        # Verify if column was really correctly added
+        if column_added and datasource is not None:
+            datasource_layer = datasource.GetLayer(layer)
+            layer_defn = datasource_layer.GetLayerDefn()
+            field_index = layer_defn.GetFieldIndex(name)
+            if field_index == -1:
+                # For some file formats, the column is only visible after reopening the
+                # file.
+                datasource_layer = None
+                datasource = None
+                datasource = gdal.OpenEx(str(path), nOpenFlags=gdal.OF_READONLY)
+                datasource_layer = datasource.GetLayer(layer)
+                layer_defn = datasource_layer.GetLayerDefn()
+                field_index = layer_defn.GetFieldIndex(name)
+                if field_index == -1:
+                    raise RuntimeError(
+                        f"add_column of {name=}, {type=} failed for {path}#{layer}"
+                    )
 
     except Exception as ex:
         _ogr_util.RollbackTransaction(datasource)
@@ -1145,9 +1163,9 @@ def add_column(
         datasource = None
 
         # Log time taken if it was slow.
-        took = time.perf_counter() - start
-        if took > 2:  # pragma: no cover
-            logger.info(f"Ready, add_column of {name} took {took:.2f}")
+        took = datetime.now() - start
+        if took.total_seconds() > 2:  # pragma: no cover
+            logger.info(f"Ready, add_column of {name} took {took}")
 
 
 @retry(**RETRY_LOCKED_FILE_KWARGS)  # type: ignore[arg-type]
@@ -1265,7 +1283,13 @@ def add_columns(
             "new_columns should be a non-empty list of tuples, each with 2 or 3 "
             "elements: [(name, type, optional expression),...]"
         )
+    start = datetime.now()
+
+    # Check if columns need to be added and/or updated.
+    add_needed = False
     updates_needed = False
+    layerinfo = get_layerinfo(path, layer, raise_on_nogeom=False)
+    columns_upper = [column.upper() for column in layerinfo.columns]
     for new_column in new_columns:
         if not isinstance(new_column, tuple) or len(new_column) not in (2, 3):
             raise TypeError(
@@ -1274,6 +1298,18 @@ def add_columns(
             )
         if len(new_column) >= 3 and new_column[2] is not None:
             updates_needed = True
+        if new_column[0].upper() not in columns_upper:
+            add_needed = True
+
+    # If no add needed and no updates need to be forced... not a lot to do!
+    if not add_needed and not (updates_needed and force_update):
+        if output_path is not None and output_path != path:
+            logger.info(f"Nothing to add or update, just copy to {output_path}")
+            copy(path, output_path)
+
+        return
+
+    logger.info(f"Start add_columns on {path}")
 
     # Set some config options to improve performance for GPKG if updates are done
     if updates_needed and Path(path).suffix.lower() == ".gpkg":
@@ -1295,12 +1331,10 @@ def add_columns(
         if tmp_dir is not None:
             # Add columns to tmp copy
             output_tmp_path = tmp_dir / Path(path).name
-            copy(path, output_tmp_path)
+            copy(path, output_tmp_path, keep_permissions=False)
         else:
             # Add columns in place
             output_tmp_path = path  # type: ignore[assignment]
-
-        start = time.perf_counter()
 
         # Get layerinfo and determine `layer` and `output_layer` if not specified
         # Remark: don't reuse the opened datasource here, because then the layer info
@@ -1338,7 +1372,7 @@ def add_columns(
                 sql_stmt = f'ALTER TABLE "{layer}" ADD COLUMN "{name}" {type_str}'
                 datasource.ExecuteSQL(sql_stmt)
 
-            # check if the columns were really added
+            # Check if the columns were really added
             if column_added:
                 datasource_layer = datasource.GetLayer(layer)
                 layer_defn = datasource_layer.GetLayerDefn()
@@ -1411,9 +1445,9 @@ def add_columns(
             datasource = None
 
             # Log time taken if it was slow.
-            took = time.perf_counter() - start
-            if took > 2:  # pragma: no cover
-                logger.info(f"Ready, add_columns of {name} took {took:.2f}")
+            took = datetime.now() - start
+            if took.total_seconds() > 2:  # pragma: no cover
+                logger.info(f"Ready, add_columns of {name} took {took}")
 
 
 def _validate_datatype(datatype: str | DataType) -> str:
@@ -1557,7 +1591,7 @@ def update_column(
     # Init
     logger.info(f"Update column {name} in {path}#{layer}")
 
-    start = time.perf_counter()
+    start = datetime.now()
     layerinfo = get_layerinfo(path, layer)
     columns_upper = [column.upper() for column in layerinfo.columns]
     if layerinfo.geometrycolumn is not None:
@@ -1582,15 +1616,16 @@ def update_column(
         datasource = None
 
         # Log time taken if it was slow.
-        took = time.perf_counter() - start
-        if took > 2:  # pragma: no cover
-            logger.info(f"Ready, update_column of {name} took {took:.2f}")
+        took = datetime.now() - start
+        if took.total_seconds() > 2:  # pragma: no cover
+            logger.info(f"Ready, update_column of {name} took {took}")
 
 
 def read_file(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     columns: Iterable[str] | None = None,
+    *,
     bbox: tuple[float, float, float, float] | None = None,
     rows: slice | None = None,
     where: str | None = None,
@@ -1716,6 +1751,7 @@ def read_file_nogeom(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     columns: Iterable[str] | None = None,
+    *,
     bbox: tuple[float, float, float, float] | None = None,
     rows: slice | None = None,
     sql_stmt: str | None = None,
@@ -1747,6 +1783,7 @@ def _read_file_base(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     columns: Iterable[str] | None = None,
+    *,
     bbox: tuple[float, float, float, float] | None = None,
     rows: slice | None = None,
     where: str | None = None,
@@ -1817,6 +1854,7 @@ def _read_file_base_fiona(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     columns: Iterable[str] | None = None,
+    *,
     bbox: tuple[float, float, float, float] | None = None,
     rows: slice | None = None,
     where: str | None = None,
@@ -1956,6 +1994,7 @@ def _read_file_base_pyogrio(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | LayerInfo | None = None,
     columns: Iterable[str] | None = None,
+    *,
     bbox: tuple[float, float, float, float] | None = None,
     rows: slice | None = None,
     where: str | None = None,
@@ -2201,6 +2240,7 @@ def to_file(
     path: Union[str, "os.PathLike[Any]"],
     layer: str | None = None,
     force_output_geometrytype: GeometryType | str | None = None,
+    *,
     force_multitype: bool = False,
     append: bool = False,
     append_timeout_s: int = 600,
@@ -2324,6 +2364,7 @@ def _to_file_fiona(
     gdf: pd.DataFrame | gpd.GeoDataFrame,
     path: Union[str, "os.PathLike[Any]"],
     layer: str,
+    *,
     force_output_geometrytype: GeometryType | str | None = None,
     force_multitype: bool = False,
     append: bool = False,
@@ -2397,6 +2438,7 @@ def _to_file_fiona(
         gdf: gpd.GeoDataFrame,
         path: Union[str, "os.PathLike[Any]"],
         layer: str,
+        *,
         index: bool | None = None,
         force_output_geometrytype: str | None = None,
         force_multitype: bool = False,
@@ -2496,6 +2538,7 @@ def _to_file_pyogrio(
     gdf: gpd.GeoDataFrame,
     path: Union[str, "os.PathLike[Any]"],
     layer: str,
+    *,
     force_output_geometrytype: GeometryType | str | None = None,
     force_multitype: bool = False,
     append: bool = False,
@@ -2757,7 +2800,7 @@ def cmp(
 def copy(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
-    keep_permissions: bool = True,
+    keep_permissions: bool = False,
 ) -> None:
     """Copies the geofile from src to dst.
 
@@ -2768,7 +2811,7 @@ def copy(
         src (PathLike): the file to copy. |GDAL_vsi| paths are not supported.
         dst (PathLike): the location to copy the file(s) to.
         keep_permissions (bool, optional): True to keep the file permissions of the
-            source file. Defaults to True.
+            source file. Defaults to False.
 
     .. |GDAL_vsi| raw:: html
 
@@ -2808,18 +2851,35 @@ def copy(
 
 
 def move(
-    src: Union[str, "os.PathLike[Any]"], dst: Union[str, "os.PathLike[Any]"]
+    src: Union[str, "os.PathLike[Any]"],
+    dst: Union[str, "os.PathLike[Any]"],
+    on_keep_permissions_error: str = "ignore",
 ) -> None:
     """Moves the geofile from src to dst.
 
     If the source file is a geofile containing of multiple files (eg. .shp) all files
     are moved.
 
+    If the file is on the same filesystem, the file is renamed. If it is on a different
+    filesystem, the file is copied and then deleted from the source location. The
+    function tries to keep the file permissions and metadata of the source file, but if
+    it fails, behaviour depends on the value of `on_keep_permissions_error`.
+
     Args:
         src (PathLike): the file to move
         dst (PathLike): the location to move the file(s) to
+        on_keep_permissions_error (str): What to do if keeping permissions fails.
+            Options are:
+
+                - "ignore" (default): silently try to move without retaining permissions
+                  and metadata.
+                - "warn": log a warning and try to move without retaining permissions
+                  and metadata.
+                - "raise": raise the exception and stop moving the file(s).
     """
     # Check input parameters
+    if on_keep_permissions_error not in ["warn", "ignore", "raise"]:
+        raise ValueError(f"Invalid value for {on_keep_permissions_error=}")
     src = Path(src)
     dst = Path(dst)
     src_info = _geofileinfo.get_geofileinfo(src)
@@ -2840,11 +2900,33 @@ def move(
             dst_tmp = dst.parent / f"{dst.stem}{suffix}"
 
         if srcfile.exists():
-            shutil.move(str(srcfile), dst_tmp)
+            try:
+                shutil.move(str(srcfile), dst_tmp)
+            except PermissionError as ex:
+                if on_keep_permissions_error == "raise":
+                    raise ex
+                elif on_keep_permissions_error == "warn":
+                    warnings.warn(
+                        f"PermissionError while moving {srcfile} to {dst_tmp}: {ex}, "
+                        "try to move without retaining permissions and metadata.",
+                        stacklevel=2,
+                    )
+                shutil.move(str(srcfile), dst_tmp, copy_function=shutil.copyfile)
 
     # Move the main file last, so that checks if the geofile exists are only
     # True once all files have been moved.
-    shutil.move(str(src), dst)
+    try:
+        shutil.move(str(src), dst)
+    except PermissionError as ex:
+        if on_keep_permissions_error == "raise":
+            raise ex
+        elif on_keep_permissions_error == "warn":
+            warnings.warn(
+                f"PermissionError while moving {src} to {dst}: {ex}, try to move "
+                "without retaining permissions and metadata.",
+                stacklevel=2,
+            )
+        shutil.move(str(src), dst, copy_function=shutil.copyfile)
 
 
 def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False) -> None:
@@ -2878,6 +2960,7 @@ def remove(path: Union[str, "os.PathLike[Any]"], missing_ok: bool = False) -> No
 def append_to(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
+    *,
     src_layer: str | None = None,
     dst_layer: str | None = None,
     src_crs: int | str | None = None,
@@ -2968,6 +3051,7 @@ def append_to(
 def convert(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
+    *,
     src_layer: str | None = None,
     dst_layer: str | None = None,
     src_crs: str | int | None = None,
@@ -3012,6 +3096,7 @@ def convert(
 def copy_layer(
     src: Union[str, "os.PathLike[Any]"],
     dst: Union[str, "os.PathLike[Any]"],
+    *,
     src_layer: str | LayerInfo | None = None,
     dst_layer: str | None = None,
     write_mode: Literal[

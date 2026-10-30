@@ -2,9 +2,9 @@ cff-version: 1.2.0
 message: If you use this software, please cite it as below.
 type: software
 title: geofileops
-version: 0.9.0
-date-released: 2024-05-26
-doi: 10.5281/zenodo.10340100
+version: 0.11.3
+date-released: 2026-06-12
+doi: 10.5281/zenodo.20670571
 abstract: GeofileOps is Python toolbox to process large vector files faster.
 url: https://github.com/geofileops/geofileops
 repository-code: https://github.com/geofileops/geofileops

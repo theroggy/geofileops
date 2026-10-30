@@ -1095,9 +1095,7 @@ def test_makevalid_gridsize_extra(
 
 @pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
 def test_makevalid_gridsize_topoerror(tmp_path, geoops_module):
-    """
-    Test on a specific valid polygon that gives a topologyerror when gridsize is set.
-    """
+    """Test a specific valid polygon that gives a topologyerror when gridsize is set."""
     # The only currently known test case only works with geos 3.12. sql implementation
     # doesn't handle this case properly.
     if (
@@ -1164,6 +1162,49 @@ def test_makevalid_invalidparams():
             gridsize=1,
             precision=1,
         )
+
+
+@pytest.mark.parametrize("geoops_module", GEOOPS_MODULES)
+def test_makevalid_repeated_points(tmp_path, geoops_module):
+    """Test that makevalid removes repeated points from a (valid) polygon.
+
+    Note that GEOS makevalid doesn't remove repeated points, so geofileops removing
+    repeated points is a custom behavior.
+    """
+    # Prepare test data
+    set_geoops_module(geoops_module)
+    poly_repeated_valid = shapely.from_wkt("POLYGON ((0 0, 1 0, 1 1, 1 1, 0 1, 0 0))")
+    assert poly_repeated_valid.is_valid
+    poly_repeated_invalid = shapely.from_wkt(
+        "POLYGON ((0 0, 1 0, 1 1, 1 1, 0 1, 0 0), (0.5 0.5, 0.5 0.5, 0.5 0.5, 0.5 0.5))"
+    )
+    assert not poly_repeated_invalid.is_valid
+    geoms = [None, poly_repeated_valid, poly_repeated_invalid]
+    test_data = {"descr": ["repeated_points"] * len(geoms), "geometry": geoms}
+    test_gdf = gpd.GeoDataFrame(test_data, crs=31370)
+    input_path = tmp_path / "input.gpkg"
+    fileops.to_file(test_gdf, input_path)
+
+    # Now run test
+    output_path = tmp_path / "output.gpkg"
+    geoops.makevalid(
+        input_path=input_path, output_path=output_path, keep_empty_geoms=True
+    )
+
+    # Check result
+    output_gdf = fileops.read_file(output_path)
+    assert len(output_gdf) == len(geoms)
+
+    assert output_gdf.geometry.iloc[0] is None
+    experted_coords = shapely.count_coordinates(
+        shapely.remove_repeated_points(output_gdf.geometry.iloc[1])
+    )
+    assert len(output_gdf.geometry.iloc[1].geoms[0].exterior.coords) == experted_coords
+    assert output_gdf.geometry.iloc[2].is_valid
+    expected_coords = shapely.count_coordinates(
+        shapely.remove_repeated_points(output_gdf.geometry.iloc[2])
+    )
+    assert shapely.count_coordinates(output_gdf.geometry.iloc[2]) == expected_coords
 
 
 @pytest.mark.parametrize(

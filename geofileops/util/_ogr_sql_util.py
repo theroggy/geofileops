@@ -206,6 +206,18 @@ def columns_quoted(columns: list[str]) -> str:
     return f",{', '.join(columns_quoted)}"
 
 
+def get_unique_columnname(column_name: str, existing_columns: Iterable[str]) -> str:
+    """Return a case-insensitively unique column name, adding a numeric suffix."""
+    existing_columns_lower = {column.lower() for column in existing_columns}
+    existing_columns_lower.add("fid")
+    candidate = column_name
+    suffix = 0
+    while candidate.lower() in existing_columns_lower:
+        suffix += 1
+        candidate = f"{column_name}_{suffix}"
+    return candidate
+
+
 def get_unique_fid_alias(alias: str, aliases: list[str]) -> str:
     """Get a case-insensitively unique alias for the fid column.
 

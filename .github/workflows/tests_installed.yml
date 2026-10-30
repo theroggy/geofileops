@@ -41,14 +41,14 @@ jobs:
               nomkl
               geofileops=0.11
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.checkout_ref }}
           sparse-checkout: |
             ci
             tests
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v2
+        uses: mamba-org/setup-micromamba@v3
         with:
           # Any version from https://github.com/mamba-org/micromamba-releases
           micromamba-version: "2.5.0-1"
@@ -56,6 +56,12 @@ jobs:
           create-args: >-
             python=${{ matrix.python }}
             ${{ matrix.install_extra_args }}
+
+      - name: Print versions
+        run: >-
+          python -c "import sys; print('Python version:', sys.version)"
+          && python -c "from osgeo import gdal; print('GDAL version:', gdal.__version__)"
+          && python -c "import geofileops as gfo; print('geofileops version:', gfo.__version__)"
 
       - name: Test
         run: |

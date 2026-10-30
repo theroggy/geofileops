@@ -137,3 +137,15 @@ def test_get_unique_fid_aliases():
     # The function only tries up to 100 suffixes
     with pytest.raises(ValueError, match="Could not find unique fid alias"):
         _ogr_sql_util.get_unique_fid_alias("fid", [f"fid_{i}" for i in range(1, 100)])
+
+
+def test_get_unique_columnname():
+    assert _ogr_sql_util.get_unique_columnname("__gfo_dissolved_id", []) == (
+        "__gfo_dissolved_id"
+    )
+    assert (
+        _ogr_sql_util.get_unique_columnname(
+            "__gfo_dissolved_id", ["__GFO_DISSOLVED_ID", "__gfo_dissolved_id_1", "fid"]
+        )
+        == "__gfo_dissolved_id_2"
+    )

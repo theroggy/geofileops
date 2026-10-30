@@ -1327,8 +1327,10 @@ def test_prepare_spatial_relations_filter():
     # Test extra queries that should work
     ok_queries = [
         "intersects is False",
-        "(intersects is False and within is True) and crosses is False"
-        "(((T******** is False)))",
+        (
+            "(intersects is False and within is True) and crosses is False"
+            "(((T******** is False)))"
+        ),
     ]
     for query in ok_queries:
         relation_filter = geoops_sql._prepare_spatial_relation_filter(query)

@@ -138,4 +138,5 @@ All helper functions below can be used in two ways:
    options.set_subdivide_check_parallel_fraction
    options.set_subdivide_check_parallel_rows
    options.set_tmp_dir
+   options.set_tmp_dir_compress
    options.set_worker_type

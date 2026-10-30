@@ -1,5 +1,62 @@
 # CHANGELOG
 
+## 0.12.0 (2026-10-14)
+
+### Deprecations and compatibility notes
+
+- Limit the number of positional arguments to maximum 5 (#843)
+- In `get_layerstyles`, return a list of dataclasses instead of as DataFrame (#833)
+- For `copy`, the default value of `keep_permissions` is now `False` (#838)
+- For `move`, if moving the file while keeping permissions and metadata fails, the
+  default behaviour is now that the file is moved without retaining them. This behaviour
+  can be chosen using the new `on_keep_permissions_error` parameter. (#838)
+
+### Improvements
+
+- Make `dissolve` with `agg_columns` faster and more efficient (#841)
+- Reduce temp space needed to `dissolve` large files (#844)
+- Temporary files created by sqlite are now also placed in the temporary directories
+  as used by geofileops. More information can be found in the documentation of
+  `set_tmp_dir` (#840)
+- Add optional temporary-directory compression via `GFO_TMPDIR_COMPRESS`, supporting
+  NTFS on Windows and Btrfs on Linux (#846)
+
+### Bugs fixed
+
+- Fix `dissolve` if a `groupby` column contains None values and `agg_columns` is being
+  used (#839)
+
+## 0.11.4 (2026-07-15)
+
+### Improvements
+
+- Also remove repeated points in `makevalid` (#829)
+
+### Bugs fixed
+
+- Fix error in `get_layerstyles` if the layer_styles table does not exist (#834)
+
+## 0.11.3 (2026-06-12)
+
+### Improvements
+
+- Improve performance of `add_columns` if columns already exists for large file on
+  (relatively) slow network locations (#821)
+- Improve doc of `isvalid` + add warnings for redundant params (#826)
+- Fix some tests when reading shapefiles with GDAL >= 3.13 (#826)
+
+### Bugs fixed
+
+- Fix `add_column` for csv files on windows (#823)
+
+## 0.11.2 (2026-05-08)
+
+### Bugs fixed
+
+- Fix `add_column` failing for plain sqlite files (#818)
+- Fix `permission denied` error when using add_columns with output_path
+  on read-only files (#813)
+
 ## 0.11.1 (2026-02-22)
 
 ### Improvements

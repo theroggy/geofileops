@@ -7,7 +7,6 @@ import math
 import os
 import re
 import string
-import time
 import warnings
 from collections.abc import Iterable
 from concurrent import futures
@@ -52,6 +51,7 @@ def buffer(
     output_path: Path,
     distance: float,
     quadrantsegments: int = 5,
+    *,
     input_layer: str | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
@@ -117,6 +117,7 @@ def buffer(
 def convexhull(
     input_path: Path,
     output_path: Path,
+    *,
     input_layer: str | LayerInfo | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
@@ -165,6 +166,7 @@ def convexhull(
 def delete_duplicate_geometries(  # noqa: D417
     input_path: Path,
     output_path: Path,
+    *,
     input_layer: str | LayerInfo | None,
     output_layer: str | None,
     columns: list[str] | None,
@@ -253,6 +255,7 @@ def delete_duplicate_geometries(  # noqa: D417
 def isvalid(
     input_path: Path,
     output_path: Path,
+    *,
     input_layer: str | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
@@ -296,7 +299,7 @@ def isvalid(
         tmp_basedir=None,
     )
 
-    # Check the number of invalid files
+    # Check the number of invalid geoms
     nb_invalid_geoms = 0
     if output_path.exists():
         nb_invalid_geoms = gfo.get_layerinfo(output_path, output_layer).featurecount
@@ -330,11 +333,12 @@ def isvalid(
 def makevalid(
     input_path: Path,
     output_path: Path,
+    *,
     input_layer: str | LayerInfo | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
     explodecollections: bool = False,
-    force_output_geometrytype: str | None | GeometryType = None,
+    force_output_geometrytype: str | GeometryType | None = None,
     gridsize: float = 0.0,
     keep_empty_geoms: bool = False,
     where_post: str | None = None,
@@ -362,14 +366,18 @@ def makevalid(
     # ----------------------------------------------
     # Only apply makevalid if the geometry is truly invalid, this is faster.
     # GEOSMakeValid crashes with EMPTY input, so check this first.
+    # If the polygon is valid, remove repeated points.
+    # Note: GEOSMakeValid on a valid polygon doesn't remove repeated points, on an
+    # invalid polygon it does seem to remove them.
     operation = """
         IIF({geometrycolumn} IS NULL OR ST_IsEmpty({geometrycolumn}) <> 0,
             NULL,
             IIF(ST_IsValid({geometrycolumn}) = 1,
-                {geometrycolumn},
+                RemoveRepeatedPoints({geometrycolumn}),
                 GEOSMakeValid({geometrycolumn}, 0)
             )
-        )"""
+        )
+        """
 
     # Now we can prepare the entire statement
     sql_template = f"""
@@ -409,6 +417,7 @@ def select(
     output_path: Path,
     sql_stmt: str,
     sql_dialect: Literal["SQLITE", "OGRSQL"] | None = "SQLITE",
+    *,
     input_layer: str | LayerInfo | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
@@ -475,6 +484,7 @@ def simplify(
     input_path: Path,
     output_path: Path,
     tolerance: float,
+    *,
     input_layer: str | LayerInfo | None = None,
     output_layer: str | None = None,
     columns: list[str] | None = None,
@@ -525,6 +535,7 @@ def _single_layer_vector_operation(
     input_path: Path,
     output_path: Path,
     sql_template: str,
+    *,
     geom_selected: bool | None,
     operation_name: str,
     input_layer: str | LayerInfo | None,
@@ -940,6 +951,7 @@ def clip(
     input_path: Path,
     clip_path: Path,
     output_path: Path,
+    *,
     input_layer: str | LayerInfo | None = None,
     input_columns: list[str] | None = None,
     clip_layer: str | None = None,
@@ -1056,6 +1068,7 @@ def difference(  # noqa: D417
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
+    *,
     overlay_self: bool,
     input1_layer: str | LayerInfo | None = None,
     input1_columns: list[str] | None = None,
@@ -1455,7 +1468,7 @@ def _has_complex_geoms(path: Path, layer: LayerInfo, max_coords: int) -> bool:
     Returns:
         bool: True if the layer has complex geometries, False otherwise.
     """
-    start = time.perf_counter()
+    start = datetime.now()
 
     sql_template = f"""
         SELECT 1 FROM "{layer.name}" layer
@@ -1528,9 +1541,9 @@ def _has_complex_geoms(path: Path, layer: LayerInfo, max_coords: int) -> bool:
                     pool.shutdown(wait=True, cancel_futures=True)
                     break
 
-    took = time.perf_counter() - start
-    if took > 0:
-        logger.info(f"{complex_found=}, check took {took:.2f}s")
+    took = datetime.now() - start
+    if took.total_seconds() > 0:
+        logger.info(f"{complex_found=}, check took {took}")
 
     return complex_found
 
@@ -1540,6 +1553,7 @@ def export_by_location(
     input_to_compare_with_path: Path,
     output_path: Path,
     spatial_relations_query: str,
+    *,
     min_area_intersect: float | None = None,
     area_inters_column_name: str | None = None,
     input_layer: str | LayerInfo | None = None,
@@ -1738,6 +1752,7 @@ def export_by_distance(
     input_to_compare_with_path: Path,
     output_path: Path,
     max_distance: float,
+    *,
     input1_layer: str | LayerInfo | None = None,
     input1_columns: list[str] | None = None,
     input2_layer: str | LayerInfo | None = None,
@@ -1803,6 +1818,7 @@ def intersection(  # noqa: D417
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
+    *,
     overlay_self: bool,
     include_duplicates: bool,
     input1_layer: str | LayerInfo | None = None,
@@ -2103,6 +2119,7 @@ def join(
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
+    *,
     input1_on: list[str] | str,
     input2_on: list[str] | str,
     join_type: str = "INNER",
@@ -2183,6 +2200,7 @@ def join_by_location(
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
+    *,
     spatial_relations_query: str = "intersects is True",
     discard_nonmatching: bool = True,
     min_area_intersect: float | None = None,
@@ -2340,6 +2358,7 @@ def join_by_location(
 
 
 def _prepare_filter_by_location_params(
+    *,
     query: str,
     geom1: str = "layer1.{input1_geometrycolumn}",
     geom2: str = "layer2.{input2_geometrycolumn}",
@@ -2579,6 +2598,7 @@ def join_nearest(
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
+    *,
     nb_nearest: int,
     distance: float | None,
     expand: bool | None,
@@ -2699,6 +2719,7 @@ def select_two_layers(
     input2_path: Path,
     output_path: Path,
     sql_stmt: str,
+    *,
     input1_layer: str | None = None,
     input1_columns: list[str] | None = None,
     input1_columns_prefix: str = "l1_",
@@ -2750,6 +2771,7 @@ def identity(
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
+    *,
     overlay_self: bool,
     include_duplicates: bool,
     input1_layer: str | LayerInfo | None = None,
@@ -2912,6 +2934,7 @@ def symmetric_difference(
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
+    *,
     overlay_self: bool,
     input1_layer: str | LayerInfo | None = None,
     input1_columns: list[str] | None = None,
@@ -3087,6 +3110,7 @@ def union(
     input1_path: Path,
     input2_path: Path,
     output_path: Path,
+    *,
     overlay_self: bool,
     include_duplicates: bool,
     input1_layer: str | LayerInfo | None = None,
@@ -3294,8 +3318,8 @@ def _two_layer_vector_operation(
     input2_path: Path,
     output_path: Path,
     sql_template: str,
-    operation_name: str,
     *,
+    operation_name: str,
     input1_layer: str | LayerInfo | None,
     input1_columns: list[str] | None,
     input1_columns_prefix: str,
@@ -3889,6 +3913,7 @@ def _determine_column_types(
     input_column_types: dict[str, str] | None,
     input1_path: Path,
     input2_path: Path,
+    *,
     input1_layer: LayerInfo,
     input2_layer: LayerInfo,
     sql_template: str,
@@ -4131,6 +4156,7 @@ def _calculate_two_layers(
     input_databases: dict[str, Path],
     output_path: Path,
     sql_stmt: str,
+    *,
     output_layer: str,
     explodecollections: bool,
     force_output_geometrytype: GeometryType | None,
@@ -4191,6 +4217,7 @@ def _calculate_two_layers(
 def _convert_to_spatialite_based(
     input1_path: Path,
     input1_layer: LayerInfo,
+    *,
     tmp_dir: Path,
     unzip_gpkg: bool,
     input2_path: Path | None = None,
@@ -4373,6 +4400,7 @@ def _finalize_output(
 def _prepare_processing_params(
     input1_path: Path,
     input1_layer: LayerInfo,
+    *,
     tmp_dir: Path | None = None,
     nb_parallel: int | None = None,
     batchsize: int = -1,
@@ -4597,6 +4625,7 @@ def _determine_nb_batches(
 def dissolve_singlethread(  # noqa: D417
     input_path: Path,
     output_path: Path,
+    *,
     groupby_columns: str | Iterable[str] | None = None,
     agg_columns: dict | None = None,
     explodecollections: bool = False,

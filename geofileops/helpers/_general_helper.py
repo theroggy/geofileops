@@ -1,5 +1,6 @@
 """General helper functions, specific for geofileops."""
 
+import os
 import shutil
 import warnings
 from collections.abc import Iterator
@@ -21,27 +22,61 @@ def create_gfo_tmp_dir(
     The directory and its contents are removed when the context is exited, unless
     `ConfigOptions.remove_temp_files` is set to False.
 
+    If GFO_TMPDIR has been set and SQLITE_TMPDIR is unset, SQLite will use the
+    configured temporary directory (the parent of the per-operation directory) for
+    temporary files, so the location remains available after the operation ends.
+    On Windows, this behaviour is accomplished by temporarily setting the TMP
+    environment variable to the temporary directory (which can have side-effects).
+    If SQLITE_TMPDIR is set to a non-empty value on windows, TMP will be temporarily
+    overridden by this value instead.
+    On other operating systems, this behaviour is accomplished by temporarily
+    setting the SQLITE_TMPDIR environment variable.
+
     Args:
         base_dirname (str): The base name of the temporary directory to create. The
             following characters are replaced to "_": "/", " ".
         parent_dir (Path | None, optional): The parent directory to create the
             temporary directory in. If None, the directory specified in the environment
-            variable `GFO_TMPDIR` is used. If that  that does not exist, a "geofileops"
+            variable `GFO_TMPDIR` is used. If `GFO_TMPDIR` is not set, a "geofileops"
             subdirectory in :func:`tempfile.gettempdir` is used. Defaults to None.
 
     Returns:
         Path: The path to the created temporary directory.
     """
+    sqlite_tmpdir_orig = os.environ.get("SQLITE_TMPDIR")
+    if sqlite_tmpdir_orig is not None and not Path(sqlite_tmpdir_orig).exists():
+        raise ValueError(
+            f"SQLITE_TMPDIR='{sqlite_tmpdir_orig}' environment variable points to a "
+            "path that does not exist"
+        )
+
     if parent_dir is None:
         parent_dir = ConfigOptions.get_tmp_dir
     base_dirname = base_dirname.replace("/", "_").replace(" ", "_")
 
     tmp_dir = _io_util.create_tempdir(base_dirname, parent_dir)
+
+    # Keep SQLite temp files in the stable custom temp directory, not the per-operation
+    # directory, when SQLITE_TMPDIR is unset.
+    tmp_orig = os.environ.get("TMP")
+    if os.environ.get("GFO_TMPDIR") and sqlite_tmpdir_orig != "":
+        if os.name == "nt":
+            os.environ["TMP"] = sqlite_tmpdir_orig or str(parent_dir)
+        elif sqlite_tmpdir_orig is None:
+            os.environ["SQLITE_TMPDIR"] = str(parent_dir)
+
     try:
         yield tmp_dir
     finally:
         if ConfigOptions.get_remove_temp_files:
             shutil.rmtree(tmp_dir, ignore_errors=True)
+        if os.name == "nt":
+            if tmp_orig is None:
+                os.environ.pop("TMP", None)
+            else:
+                os.environ["TMP"] = tmp_orig
+        elif sqlite_tmpdir_orig is None:
+            os.environ.pop("SQLITE_TMPDIR", None)
 
 
 def worker_type_to_use(input_layer_featurecount: int) -> str:

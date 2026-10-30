@@ -8,6 +8,7 @@ from osgeo import gdal
 from pygeoops import GeometryType
 
 import geofileops as gfo
+from geofileops._compat import GDAL_GTE_313
 from geofileops.util import _ogr_util
 from tests import test_helper
 
@@ -101,6 +102,41 @@ def test_read_cpl_log(tmp_path):
     assert len(error_lines) == 2
     # There are two lines with no usefull data, thay will be ignored
     assert len(log_lines) == len(test_log_lines) - 2
+
+
+def test_vector_translate_disk_full_error_includes_disk_space_diagnostics(
+    tmp_path, monkeypatch, caplog
+):
+    input_path = test_helper.get_testfile("polygon-parcel")
+    output_path = tmp_path / "output.gpkg"
+
+    def raise_translate_error(*_args, **_kwargs):
+        raise RuntimeError("VectorTranslate failed")
+
+    monkeypatch.setattr(_ogr_util.gdal, "VectorTranslate", raise_translate_error)
+    monkeypatch.setattr(
+        _ogr_util,
+        "read_cpl_log",
+        lambda _path: (["CPLError: database or disk is full"], []),
+    )
+    monkeypatch.setattr(_ogr_util, "_validate_file", lambda *_args: None)
+    monkeypatch.setattr(_ogr_util, "formatbytes", lambda _bytes: "12.34 GB")
+
+    with pytest.raises(_ogr_util.GDALError) as error:
+        _ogr_util.vector_translate(input_path, output_path)
+
+    error_text = str(error.value)
+    assert "Disk-space diagnostics" in error_text
+    assert "Input path" in error_text
+    assert "Output path" in error_text
+    normalized_error_text = error_text.replace("\\", "/")
+    assert input_path.parent.as_posix() in normalized_error_text
+    assert tmp_path.as_posix() in normalized_error_text
+    assert "GeofileOps temp directory" in error_text
+    assert "free=12.34 GB" in error_text
+    assert "bytes" not in error_text
+    assert "filesystem=" not in error_text
+    assert "disk-full error" in caplog.text
 
 
 def test_set_config_options():
@@ -307,33 +343,39 @@ def test_vector_translate_sql_st_minx(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "input_suffix, output_suffix, geom_null_asc, exp_null_geoms",
+    "input_suffix, output_suffix, geom_null_asc",
     [
-        (".gpkg", ".gpkg", True, 9),
-        (".gpkg", ".shp", False, 9),
-        (".shp", ".gpkg", False, 48),
-        (".shp", ".shp", True, 9),
+        (".gpkg", ".gpkg", True),
+        (".gpkg", ".shp", False),
+        (".shp", ".gpkg", False),
+        (".shp", ".shp", True),
     ],
 )
 def test_vector_translate_sql_geom_null(
-    tmp_path,
-    input_suffix,
-    output_suffix,
-    geom_null_asc,
-    exp_null_geoms,
+    request, tmp_path, input_suffix, output_suffix, geom_null_asc
 ):
+    """Test of case where a SQL query results in some NULL geometries.
+
+    - Added for a bug that if the first row of the result was a NULL geometry, all
+      geometries became NULL. Was fixed in GDAL 3.8 for most cases.
+         -> https://github.com/geofileops/geofileops/issues/308
+    - A lot later, the remaining problem for .shp input and .gpkg output was reported.
+      It was fixed in GDAL 3.13.0.
+         -> https://github.com/OSGeo/gdal/issues/14113
     """
-    If there the first row of the result has a NULL geometry in the result, all
-    geometries become NULL. Using ORDER BY geom IS NULL controls this.
-       -> https://github.com/geofileops/geofileops/issues/308
-    Has been partly solved in gdal 3.8: for SQLITE query on geopackage it is OK, on a
-    .shp file the problem is still there.
-    """
+    if not GDAL_GTE_313 and input_suffix == ".shp" and output_suffix == ".gpkg":
+        reason = (
+            "NULL geometries as first output rows gives issues for .shp input and "
+            ".gpkg output in GDAL versions < 3.13.0"
+        )
+        request.node.add_marker(pytest.mark.xfail(reason=reason))
+
     # Prepare test file
     input_path = test_helper.get_testfile("polygon-parcel", suffix=input_suffix)
     output_path = tmp_path / f"output{output_suffix}"
     input_layerinfo = gfo.get_layerinfo(input_path)
 
+    # Using `ORDER BY geom IS NULL` controls if the NULL geometries are first or last.
     orderby_direction = "ASC" if geom_null_asc else "DESC"
     sql_stmt = f"""
         SELECT * FROM (
@@ -363,7 +405,7 @@ def test_vector_translate_sql_geom_null(
 
     output_gdf = gfo.read_file(output_path)
     assert "geometry" in output_gdf.columns
-    assert len(output_gdf.loc[output_gdf.geometry.isna()]) == exp_null_geoms
+    assert len(output_gdf.loc[output_gdf.geometry.isna()]) == 9
 
 
 @pytest.mark.parametrize("input_suffix", test_helper.SUFFIXES_GEOOPS)

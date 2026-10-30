@@ -2,7 +2,9 @@
 
 import multiprocessing
 import os
+import sys
 import tempfile
+import warnings
 from pathlib import Path
 from typing import Any, Union
 
@@ -12,6 +14,7 @@ from pyproj import CRS
 import geofileops as gfo
 from geofileops.helpers import _options
 from geofileops.helpers._options import ConfigOptions
+from geofileops.util import _io_util
 
 
 @pytest.mark.parametrize(
@@ -70,6 +73,10 @@ def test_get_bool_invalidvalue():
         ("GFO_REMOVE_TEMP_FILES", "TRUe", True),
         ("GFO_REMOVE_TEMP_FILES", "FALse", False),
         ("GFO_REMOVE_TEMP_FILES", None, True),
+        ("GFO_TMPDIR_COMPRESS", "TRUe", True),
+        ("GFO_TMPDIR_COMPRESS", "FALse", False),
+        ("GFO_TMPDIR_COMPRESS", "", None),
+        ("GFO_TMPDIR_COMPRESS", None, None),
         ("GFO_WORKER_TYPE", "THReads", "threads"),
         ("GFO_WORKER_TYPE", "PROcesses", "processes"),
         ("GFO_WORKER_TYPE", "AUTo", "auto"),
@@ -89,6 +96,8 @@ def test_get_option(key, value, expected):
             result = ConfigOptions.get_on_data_error
         elif key == "GFO_REMOVE_TEMP_FILES":
             result = ConfigOptions.get_remove_temp_files
+        elif key == "GFO_TMPDIR_COMPRESS":
+            result = ConfigOptions.get_tmp_dir_compress
         elif key == "GFO_WORKER_TYPE":
             result = ConfigOptions.get_worker_type
         else:
@@ -122,6 +131,11 @@ def test_get_option(key, value, expected):
             "invalid value for bool configoption <GFO_REMOVE_TEMP_FILES>",
         ),
         (
+            "GFO_TMPDIR_COMPRESS",
+            "invalid",
+            "invalid value for configoption <GFO_TMPDIR_COMPRESS>",
+        ),
+        (
             "GFO_SLIVER_TOLERANCE",
             "not_a_number",
             "invalid value for configoption <GFO_SLIVER_TOLERANCE>",
@@ -149,8 +163,12 @@ def test_get_option(key, value, expected):
     ],
 )
 def test_get_option_invalid(key, invalid_value, expected_error):
+    env = {key: invalid_value}
+    if key != "GFO_TMPDIR_COMPRESS":
+        env["GFO_TMPDIR_COMPRESS"] = None
+
     with (
-        gfo.TempEnv({key: invalid_value}),
+        gfo.TempEnv(env),
         pytest.raises(ValueError, match=expected_error),
     ):
         if key == "GFO_IO_ENGINE":
@@ -163,6 +181,8 @@ def test_get_option_invalid(key, invalid_value, expected_error):
             _ = ConfigOptions.get_on_data_error
         elif key == "GFO_REMOVE_TEMP_FILES":
             _ = ConfigOptions.get_remove_temp_files
+        elif key == "GFO_TMPDIR_COMPRESS":
+            _ = ConfigOptions.get_tmp_dir_compress
         elif key == "GFO_SLIVER_TOLERANCE":
             _ = ConfigOptions.get_sliver_tolerance(None)
         elif key == "GFO_SUBDIVIDE_CHECK_PARALLEL_FRACTION":
@@ -200,17 +220,45 @@ def test_get_sliver_tolerance(tolerance, crs, expected):
 
 def test_get_tmp_dir(tmp_path):
     """Test ConfigOptions.tmp_dir property."""
-    with gfo.TempEnv({"GFO_TMPDIR": str(tmp_path)}):
+    with gfo.TempEnv({"GFO_TMPDIR": str(tmp_path), "GFO_TMPDIR_COMPRESS": None}):
         assert ConfigOptions.get_tmp_dir == tmp_path
 
     # If GFO_TMPDIR is not set, a "geofileops" subdirectory in the system temp dir is
     # used.
-    with gfo.TempEnv({"GFO_TMPDIR": None}):
+    with gfo.TempEnv({"GFO_TMPDIR": None, "GFO_TMPDIR_COMPRESS": None}):
         tmp_dir = ConfigOptions.get_tmp_dir
         assert tmp_dir.exists()
         assert tmp_dir.name == "geofileops"
         tempdir = tempfile.gettempdir()
         assert str(tmp_dir).startswith(tempdir)
+
+
+def test_get_tmp_dir_caches_compression_attempts(monkeypatch, tmp_path):
+    calls = []
+
+    def warn_and_fail(path, compression):
+        calls.append((path, compression))
+        warnings.warn("compression unavailable", UserWarning, stacklevel=2)
+        return False
+
+    monkeypatch.setattr(_io_util, "enable_directory_compression", warn_and_fail)
+
+    with gfo.TempEnv({"GFO_TMPDIR": str(tmp_path), "GFO_TMPDIR_COMPRESS": "TRUE"}):
+        with pytest.warns(
+            UserWarning, match="compression unavailable"
+        ) as true_warnings:
+            _ = ConfigOptions.get_tmp_dir
+            _ = ConfigOptions.get_tmp_dir
+
+        with gfo.options.set_tmp_dir_compress(False):
+            with pytest.warns(
+                UserWarning, match="compression unavailable"
+            ) as false_warnings:
+                _ = ConfigOptions.get_tmp_dir
+
+    assert len(true_warnings) == 1
+    assert len(false_warnings) == 1
+    assert calls == [(tmp_path, True), (tmp_path, False)]
 
 
 def test_set_copy_layer_sqlite_direct() -> None:
@@ -511,6 +559,42 @@ def test_set_tmp_dir() -> None:
 
     # After exiting the context manager, the environment variable should be removed
     assert key not in os.environ
+
+
+def test_set_tmp_dir_compress() -> None:
+    key = "GFO_TMPDIR_COMPRESS"
+    if key in os.environ:
+        del os.environ[key]
+
+    gfo.options.set_tmp_dir_compress(True)
+    assert os.environ[key] == "TRUE"
+
+    gfo.options.set_tmp_dir_compress(False)
+    assert os.environ[key] == "FALSE"
+
+    with gfo.options.set_tmp_dir_compress("zstd"):
+        assert os.environ[key] == "zstd"
+
+    assert os.environ[key] == "FALSE"
+
+    gfo.options.set_tmp_dir_compress(None)
+    assert key not in os.environ
+
+
+@pytest.mark.parametrize("value", ["zlib", "lzo", "zstd", "ZSTD"])
+@pytest.mark.skipif(sys.platform != "linux", reason="Btrfs algorithms are Linux-only")
+def test_get_tmp_dir_compress_btrfs(value):
+    with gfo.TempEnv({"GFO_TMPDIR_COMPRESS": value}):
+        assert ConfigOptions.get_tmp_dir_compress == value.lower()
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only option behavior")
+def test_get_tmp_dir_compress_rejects_windows_algorithm():
+    with (
+        gfo.TempEnv({"GFO_TMPDIR_COMPRESS": "zstd"}),
+        pytest.raises(ValueError, match="expected a boolean"),
+    ):
+        _ = ConfigOptions.get_tmp_dir_compress
 
 
 @pytest.mark.parametrize(

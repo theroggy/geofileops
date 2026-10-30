@@ -1,6 +1,4 @@
-"""
-Tests for functionalities in helpers.layer_styles.
-"""
+"""Tests for functionalities in helpers.layer_styles."""
 
 import pytest
 
@@ -21,9 +19,10 @@ def test_add_get_remove_layer_styles(tmp_path):
     test_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
 
     assert not layerstyles._has_layerstyles_table(test_path)
+    assert len(gfo.get_layerstyles(test_path)) == 0
     layerstyles._init_layerstyles(test_path)
     assert layerstyles._has_layerstyles_table(test_path)
-
+    assert len(gfo.get_layerstyles(test_path)) == 0
     # Add layer style to "parcel" layer
     with (test_helper.data_dir / "polygonstyle.sld").open() as file:
         sld = file.read()
@@ -37,8 +36,8 @@ def test_add_get_remove_layer_styles(tmp_path):
         qml=qml,
         use_as_default=True,
     )
-    layerstyles_df = gfo.get_layerstyles(test_path)
-    assert len(layerstyles_df) == 1
+    styles = gfo.get_layerstyles(test_path)
+    assert len(styles) == 1
 
     # Adding the same style again should give an error
     with pytest.raises(ValueError, match="layer style already exists: "):
@@ -52,8 +51,8 @@ def test_add_get_remove_layer_styles(tmp_path):
 
     # Remove the style again
     gfo.remove_layerstyle(test_path, id=1)
-    layerstyles_df = gfo.get_layerstyles(test_path)
-    assert len(layerstyles_df) == 0
+    styles = gfo.get_layerstyles(test_path)
+    assert len(styles) == 0
 
     # Removing a style that doesn't exist is OK
     gfo.remove_layerstyle(test_path, id=1)

@@ -1,9 +1,8 @@
-"""
-Tests for dissolve operation.
-"""
+"""Tests for dissolve operation."""
 
 import json
 import math
+import sqlite3
 from pathlib import Path
 
 import geopandas as gpd
@@ -16,7 +15,12 @@ import shapely.geometry as sh_geom
 import geofileops as gfo
 from geofileops import GeometryType
 from geofileops._compat import GDAL_GTE_311
-from geofileops.util import _general_util, _geofileinfo, _geoops_sql
+from geofileops.util import (
+    _general_util,
+    _geofileinfo,
+    _geoops_gpd_dissolve,
+    _geoops_sql,
+)
 from geofileops.util._geofileinfo import GeofileInfo
 from geofileops.util._geopath_util import GeoPath
 from tests import test_helper
@@ -577,31 +581,58 @@ def test_dissolve_invalid_params(
             )
 
 
-def test_dissolve_polygons_groupby_None(tmp_path):
-    """
-    Test dissolve polygons with a column with None values. There was once an issue
-    that the type of the column with None Values always ended up as a REAL column after
-    the dissolve/group by instead of the original type.
-    """
+@pytest.mark.parametrize(
+    "agg_columns",
+    [
+        None,
+        {"columns": [{"column": "GEWASGROEP", "agg": "count", "as": "parcel_count"}]},
+    ],
+)
+@pytest.mark.parametrize("mixed_none", [False, True])
+@pytest.mark.parametrize(
+    "groupby_columns", ["none_values", ["none_values", "GEWASGROEP"]]
+)
+def test_dissolve_polygons_groupby_None(
+    tmp_path, agg_columns, mixed_none, groupby_columns
+):
+    """Test dissolve for polygons with a groupby column with None values.
 
+    Issues covered:
+      - once, the type of the column with None Values always ended up as a REAL column
+        after the dissolve/group by instead of the original type.
+      - once, using agg_columns with None values caused the rows with None values to
+        disappear from the result.
+    """
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
     gfo.add_column(input_path, name="none_values", type=gfo.DataType.TEXT)
     input_layerinfo = gfo.get_layerinfo(input_path)
     batchsize = math.ceil(input_layerinfo.featurecount / 2)
+    if mixed_none:
+        layer = input_layerinfo.name
+        gfo.execute_sql(
+            input_path,
+            sql_stmt=f"""
+                UPDATE "{layer}"
+                   SET none_values = GEWASGROEP
+                 WHERE GEWASGROEP = 'Grasland'
+            """,
+            sql_dialect="SQLITE",
+        )
 
     # Run test
     output_path = tmp_path / "output.gpkg"
     gfo.dissolve(
         input_path=input_path,
         output_path=output_path,
-        groupby_columns="none_values",
+        groupby_columns=groupby_columns,
+        agg_columns=agg_columns,
         explodecollections=True,
         nb_parallel=2,
         batchsize=batchsize,
     )
 
-    # Now check if the tmp file is correctly created
+    # Now check if the output file is correctly created
     assert output_path.exists()
     output_layerinfo = gfo.get_layerinfo(output_path)
     assert output_layerinfo.geometrytype == GeometryType.POLYGON
@@ -610,12 +641,31 @@ def test_dissolve_polygons_groupby_None(tmp_path):
         == input_layerinfo.columns["none_values"].gdal_type
     )
 
+    # The total area of the output geometries should match the total area of the input.
+    output_gdf = gfo.read_file(output_path)
+    input_area = gfo.read_file(input_path).geometry.area.sum()
+    assert output_gdf.geometry.area.sum() == pytest.approx(input_area, rel=1e-9)
+
+    # Check if the columns and numbers of output rows are correct.
+    if isinstance(groupby_columns, list):
+        assert "GEWASGROEP" in output_layerinfo.columns
+    if agg_columns is not None:
+        assert "parcel_count" in output_layerinfo.columns
+    if mixed_none:
+        assert output_gdf["none_values"].isna().any()
+        assert (output_gdf["none_values"] == "Grasland").any()
+        assert output_layerinfo.featurecount == (
+            25 if groupby_columns == "none_values" else 26
+        )
+    else:
+        assert output_layerinfo.featurecount == (
+            24 if groupby_columns == "none_values" else 26
+        )
+
 
 @pytest.mark.parametrize("worker_type", ["threads", "processes"])
 def test_dissolve_polygons_process_threads(tmp_path, worker_type):
-    """
-    Test dissolve polygons with different worker types.
-    """
+    """Test dissolve polygons with different worker types."""
     # Prepare test data
     input_path = test_helper.get_testfile("polygon-parcel", dst_dir=tmp_path)
     input_layerinfo = gfo.get_layerinfo(input_path)
@@ -920,3 +970,81 @@ def test_dissolve_polygons_aggcolumns_json(tmp_path, agg_columns):
     else:
         # fid_orig column is added in json
         assert len(grasland_json_firstrow) == len(agg_columns["json"]) + 1
+
+
+def test_dissolve_polygons_aggcolumns_json_multiple_tiles(tmp_path):
+    input_path = test_helper.get_testfile("polygon-parcel")
+    output_path = tmp_path / "polygon-parcel-json-multiple-tiles.gpkg"
+    attribute_column = _general_util.align_casing(
+        "lblhfdtlt", gfo.get_layerinfo(input_path).columns
+    )
+
+    gfo.dissolve(
+        input_path=input_path,
+        output_path=output_path,
+        groupby_columns=["GEWASgroep"],
+        agg_columns={"json": [attribute_column]},
+        explodecollections=False,
+        nb_squarish_tiles=2,
+        nb_parallel=2,
+    )
+
+    source_gdf = gfo.read_file(input_path, fid_as_index=True)
+    output_gdf = gfo.read_file(output_path)
+    assert "tile_id" in output_gdf.columns
+
+    for json_value in output_gdf["json"]:
+        json_rows = [json.loads(value) for value in json.loads(json_value)]
+        source_fids = [int(row["fid_orig"]) for row in json_rows]
+        assert len(source_fids) == len(set(source_fids))
+        for json_row in json_rows:
+            source_row = source_gdf.loc[int(json_row["fid_orig"])]
+            source_value = source_row[attribute_column]
+            if pd.isna(source_value):
+                assert json_row[attribute_column] is None
+            else:
+                assert json_row[attribute_column] == source_value
+
+
+def test_dissolve_source_fid_relations(tmp_path):
+    relation_column = "dissolved_id"
+    source_path = tmp_path / "source.gpkg"
+    destination_path = tmp_path / "destination.gpkg"
+    source_gdf = gpd.GeoDataFrame(
+        {relation_column: ["source-1"], "geometry": [shapely.Point(0, 0)]},
+        crs="EPSG:4326",
+    )
+    destination_gdf = gpd.GeoDataFrame(
+        {relation_column: ["destination-1"], "geometry": [shapely.Point(1, 1)]},
+        crs="EPSG:4326",
+    )
+    gfo.to_file(source_gdf, source_path, layer="data")
+    gfo.to_file(destination_gdf, destination_path, layer="data")
+
+    _geoops_gpd_dissolve._write_dissolve_source_fids(
+        source_path,
+        source_gdf,
+        relation_column,
+        {"source-1": {10, 11}},
+    )
+    _geoops_gpd_dissolve._write_dissolve_source_fids(
+        destination_path,
+        destination_gdf,
+        relation_column,
+        {"destination-1": {20}},
+    )
+
+    assert _geoops_gpd_dissolve._read_dissolve_source_fids(
+        source_path, ["source-1", "missing"]
+    ) == {"source-1": {10, 11}}
+
+    _geoops_gpd_dissolve._append_dissolve_source_fids(
+        source_path, destination_path, "data"
+    )
+    with sqlite3.connect(destination_path) as connection:
+        relations = connection.execute(
+            "SELECT dissolved_id, original_fid "
+            "FROM __gfo_dissolve_source_fids "
+            "ORDER BY dissolved_id, original_fid"
+        ).fetchall()
+    assert relations == [("destination-1", 20), ("source-1", 10), ("source-1", 11)]
