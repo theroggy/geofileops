@@ -655,6 +655,7 @@ def _single_layer_vector_operation(
             nb_parallel=nb_parallel,
             batchsize=batchsize,
             batch_filter_column=batch_filter_column,
+            is_cpu_bound=False,
         )
         # If None is returned, just stop.
         if processing_params is None or processing_params.batches is None:
@@ -4409,8 +4410,26 @@ def _prepare_processing_params(
     batch_filter_column: str = "rowid",
     input2_path: Path | None = None,
     input2_layer: LayerInfo | None = None,
+    is_cpu_bound: bool = True,
 ) -> ProcessingParams | None:
-    # Prepare batches to process
+    """Prepare processing parameters for batch processing of geospatial data.
+
+    Args:
+        input1_path (Path): Path to the first input geospatial file.
+        input1_layer (LayerInfo): Layer information for the first input.
+        tmp_dir (Path | None, optional): Temporary directory for intermediate files.
+        nb_parallel (int | None, optional): Number of parallel processes.
+        batchsize (int, optional): Size of each batch.
+        input1_layer_alias (str | None, optional): Alias for the first input layer.
+        input1_is_subdivided (bool, optional): Whether the first input is subdivided.
+        batch_filter_column (str, optional): Column used for batch filtering.
+        input2_path (Path | None, optional): Path to the second input geospatial file.
+        input2_layer (LayerInfo | None, optional): Layer information for the second input.
+        is_cpu_bound (bool, optional): Whether the operation is CPU-bound.
+
+    Returns:
+        ProcessingParams | None: Prepared processing parameters or None if not applicable.
+    """
     nb_rows_input_layer = input1_layer.featurecount
     input2_layername = None if input2_layer is None else input2_layer.name
 
@@ -4473,10 +4492,26 @@ def _prepare_processing_params(
                 # fast distribution in batches
                 batch_info_list = []
                 start_id = min_rowid
+
                 offset_per_batch = round((max_rowid - min_rowid) / nb_batches)
+
                 for batch_id in range(nb_batches):
                     batch_info_list.append((batch_id, start_id))
-                    start_id += offset_per_batch
+
+                    if is_cpu_bound or nb_batches <= 3 or nb_batches > nb_parallel:
+                        start_id += offset_per_batch
+                        continue
+
+                    # If the operation is not CPU bound, adjust the batch sizes so the
+                    # batches become gradually larger and appending can start sooner
+                    if batch_id < 2:
+                        # The first 2 batches small, so append can start soon
+                        correction_factor = 0.4
+                    else:
+                        # Gradually increase the size of the subsequent batches
+                        correction_factor += 0.6 * 2 / (nb_batches - 2)
+                    print(f"{batch_id=}, {correction_factor=}")
+                    start_id += round(offset_per_batch * correction_factor)
 
                 batch_info_df = pd.DataFrame(
                     batch_info_list, columns=["batch_id", "start_id"]
