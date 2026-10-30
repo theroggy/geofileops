@@ -6,6 +6,7 @@ from benchmark import benchmarker
 def main() -> None:
     """Run the benchmark function(s)."""
     functions_to_run: list[str] | None = [
+        "buffer",
         # "buffer_spatialite",
         # "clip",
         # "clip_agri_complexpoly",
@@ -20,11 +21,13 @@ def main() -> None:
         # "join_by_location_intersects",
         # "symmetric_difference_complexpolys_agri",
         # "union",
-        "union_full_self",
+        # "union_full_self",
     ]
     # Run all benchmark functions
-    functions_to_run = None
-    benchmarker.run_benchmarks(["benchmarks_geofileops"], functions_to_run)
+    # functions_to_run = None
+    benchmarker.run_benchmarks(
+        modules=["benchmarks_geofileops"], functions=functions_to_run
+    )
 
 
 if __name__ == "__main__":
