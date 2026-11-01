@@ -53,6 +53,12 @@ class TestFile(enum.Enum):
         "agriprc_2019.gpkg",
         "agri parcels (~500k poly)",
     )
+    SEALED_2019 = (
+        3,
+        "https://www.landbouwvlaanderen.be/bestanden/gis/AI_verharding_2019_1.zip",
+        "sealedsurfaces_2019.gpkg",
+        "Sealed surfaces 2019",
+    )
 
     def __init__(
         self,
@@ -91,7 +97,7 @@ class TestFile(enum.Enum):
             f"TestFile {self.name} contains {testfile_info.featurecount} rows."
         )
         count_kilo = f"{int(testfile_info.featurecount / 1000)}k"
-        description = f"agri parcels ({count_kilo} polys)"
+        description = f"{self.descr} ({count_kilo} polys)"
 
         return (testfile_path, description)
 
