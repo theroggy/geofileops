@@ -6,7 +6,7 @@ from benchmark import benchmarker
 def main() -> None:
     """Run the benchmark function(s)."""
     functions_to_run: list[str] | None = [
-        "buffer",
+        "buffer_sealed",
         # "buffer_spatialite",
         # "clip",
         # "clip_agri_complexpoly",

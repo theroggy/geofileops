@@ -49,6 +49,28 @@ def buffer(tmp_dir: Path) -> RunResult:
     return result
 
 
+def buffer_sealed(tmp_dir: Path) -> RunResult:
+    # Init
+    input_path, input_descr = testdata.TestFile.SEALED_2019.get_file(tmp_dir)
+
+    # Go!
+    start_time = datetime.now()
+    output_path = tmp_dir / f"{input_path.stem}_buf.gpkg"
+    gfo.buffer(input_path, output_path, distance=1, nb_parallel=nb_parallel, force=True)
+    result = RunResult(
+        package=_get_package(),
+        package_version=_get_version(),
+        operation="buffer_sealed",
+        secs_taken=(datetime.now() - start_time).total_seconds(),
+        operation_descr=f"buffer on {input_descr}",
+        run_details={"nb_cpu": nb_parallel},
+    )
+
+    # Cleanup and return
+    output_path.unlink()
+    return result
+
+
 def buffer_spatialite(tmp_dir: Path) -> RunResult:
     # Init
     input_path, input_descr = testdata.TestFile.AGRIPRC_2018.get_file(tmp_dir)
