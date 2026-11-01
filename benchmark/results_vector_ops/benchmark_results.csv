@@ -116,3 +116,4 @@ run_datetime,package,package_version,operation,operation_descr,secs_taken,max_me
 2026-10-30 21:11:02.310022,geofileops,0.12.0,symmetric_difference_complexpolys_agri,symmetric_difference_complexpolys_agri between 3 multipolys of 4 * 30k coords and agri parcels (515k polys),38.12354,1243504640,"{'nb_cpu': 12, 'os': 'Windows'}"
 2026-10-30 21:12:20.407382,geofileops,0.12.0,union,union between agri parcels (515k polys) and agri parcels (521k polys),78.000128,2069983232,"{'nb_cpu': 12, 'os': 'Windows'}"
 2026-10-30 21:13:32.376233,geofileops,0.12.0,union_full_self_attr_cols,union_full_self_attr_cols on agri parcels (515k polys),71.831951,3863511040,"{'nb_cpu': 12, 'os': 'Windows'}"
+2026-11-01 09:03:01.898241,geofileops,0.12.0,buffer_sealed,buffer on Sealed surfaces 2019 (3458k polys),91.917249,3298586624,"{'nb_cpu': 12, 'os': 'Windows'}"
