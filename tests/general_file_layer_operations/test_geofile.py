@@ -50,11 +50,6 @@ except ImportError:
 
 gdal.UseExceptions()
 
-# if GDAL_GTE_38 and not GDAL_GTE_39:
-#     pytest.skip(
-#         "These tests crash with GDAL>=3.8 and GDAL<3.9", allow_module_level=True
-#     )
-
 
 @pytest.fixture(scope="module", params=ENGINES)
 def engine_setter(request):
