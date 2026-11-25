@@ -25,6 +25,7 @@ filterwarnings = [
     "ignore: Non-conformant content for record 0 in column",
     "ignore: Non-conformant content for record 1 in column",
     "ignore: Using GFO_IO_ENGINE=fiona is deprecated",
+    "ignore:'crs' was not provided.*:UserWarning",
 ]
 
 [tool.ruff]

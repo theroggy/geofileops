@@ -254,7 +254,9 @@ def test_buffer_basic(
 
     # Prepare expected result
     expected_gdf = fileops.read_file(input_path)
-    expected_gdf.geometry = expected_gdf.geometry.buffer(distance, resolution=5)
+    expected_gdf.geometry = shapely.buffer(
+        expected_gdf.geometry.array, distance, quad_segs=5
+    )
     # Default value for keep_empty_geoms is False
     keep_empty_geoms_prepped = False if keep_empty_geoms is None else keep_empty_geoms
     expected_gdf = test_helper.prepare_expected_result(
@@ -566,7 +568,9 @@ def test_buffer_negative(
 
         # Prepare expected result
         expected_gdf = fileops.read_file(input_path)
-        expected_gdf.geometry = expected_gdf.geometry.buffer(distance, resolution=5)
+        expected_gdf.geometry = shapely.buffer(
+            expected_gdf.geometry.array, distance, quad_segs=5
+        )
         expected_gdf = test_helper.prepare_expected_result(
             expected_gdf,
             gridsize=gridsize,
@@ -615,7 +619,9 @@ def test_buffer_negative_explode(tmp_path, geoops_module):
     output_gdf = fileops.read_file(output_path)
 
     expected_gdf = fileops.read_file(input_path)
-    expected_gdf.geometry = expected_gdf.geometry.buffer(distance, resolution=5)
+    expected_gdf.geometry = shapely.buffer(
+        expected_gdf.geometry.array, distance, quad_segs=5
+    )
     expected_gdf = test_helper.prepare_expected_result(
         expected_gdf, explodecollections=True, keep_empty_geoms=keep_empty_geoms
     )
@@ -647,7 +653,9 @@ def test_buffer_negative_where_explode(
     distance = -10
 
     expected_gdf = fileops.read_file(input_path)
-    expected_gdf.geometry = expected_gdf.geometry.buffer(distance, resolution=5)
+    expected_gdf.geometry = shapely.buffer(
+        expected_gdf.geometry.array, distance, quad_segs=5
+    )
     expected_gdf = test_helper.prepare_expected_result(
         expected_gdf,
         keep_empty_geoms=keep_empty_geoms,
@@ -758,7 +766,9 @@ def test_buffer_shp_to_gpkg(
 
     # Prepare expected result
     expected_gdf = fileops.read_file(input_path)
-    expected_gdf.geometry = expected_gdf.geometry.buffer(distance, resolution=5)
+    expected_gdf.geometry = shapely.buffer(
+        expected_gdf.geometry.array, distance, quad_segs=5
+    )
     expected_gdf = test_helper.prepare_expected_result(
         expected_gdf, keep_empty_geoms=keep_empty_geoms
     )

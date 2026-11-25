@@ -10,6 +10,7 @@ from pathlib import Path
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import pyogrio
 import pytest
 from osgeo import gdal
 from pandas.testing import assert_frame_equal
@@ -48,6 +49,11 @@ except ImportError:
     ENGINES = ["pyogrio", "pyogrio-arrow"]
 
 gdal.UseExceptions()
+
+# if GDAL_GTE_38 and not GDAL_GTE_39:
+#     pytest.skip(
+#         "These tests crash with GDAL>=3.8 and GDAL<3.9", allow_module_level=True
+#     )
 
 
 @pytest.fixture(scope="module", params=ENGINES)
@@ -160,6 +166,18 @@ def test_add_column(tmp_path, suffix):
         (".shp", "Real", True, "Real"),
         (".shp", "Invalid", True, "String"),
     ],
+)
+@pytest.mark.filterwarnings(
+    "ignore:Field format 'INVALID' not supported:RuntimeWarning"
+)
+@pytest.mark.filterwarnings(
+    "ignore:geometry column .* of type 'INVALID' ignored:RuntimeWarning"
+)
+@pytest.mark.filterwarnings(
+    "ignore:Unsupported column type 'BLOB'. Defaulting to VARCHAR:RuntimeWarning"
+)
+@pytest.mark.filterwarnings(
+    "ignore:Unsupported column type 'INVALID'. Defaulting to VARCHAR:RuntimeWarning"
 )
 def test_add_column_types(
     tmp_path, suffix, col_type, col_type_supported, exp_gdal_type
@@ -749,7 +767,9 @@ def test_copy_layer_add_layer_shp(tmp_path):
     "suffix, copy_layer_sqlite_direct",
     [(".gpkg", True), (".gpkg", False), (".shp", False)],
 )
-def test_copy_layer_append_bounds(tmp_path, suffix, copy_layer_sqlite_direct):
+def test_copy_layer_append_bounds(
+    tmp_path, monkeypatch, suffix, copy_layer_sqlite_direct
+):
     """Test appending rows and checking the total bounds of the result file."""
     if copy_layer_sqlite_direct and suffix != ".gpkg":
         raise ValueError("copy_layer_sqlite_direct can only be True for .gpkg files.")
@@ -773,14 +793,29 @@ def test_copy_layer_append_bounds(tmp_path, suffix, copy_layer_sqlite_direct):
     layer1_info = gfo.get_layerinfo(layer1_path, layer=layer1)
     layer2_info = gfo.get_layerinfo(layer2_path, layer=layer2)
 
-    # Append layer2 to layer1 file
-    gfo.copy_layer(
-        src=str(layer2_path),
-        dst=str(layer1_path),
-        src_layer=layer2,
-        dst_layer=layer1,
-        write_mode="append",
-    )
+    # Append layer2 to layer1 file. To be sure the direct sql path is used, we
+    # monkeypatch the copy_table function.
+    force_output_geometrytype = None if copy_layer_sqlite_direct else "MultiPolygon"
+    copy_table_orig = fileops._sqlite_util.copy_table
+    successful_direct_copies = 0
+
+    def copy_table_spy(*args, **kwargs):
+        nonlocal successful_direct_copies
+        result = copy_table_orig(*args, **kwargs)
+        successful_direct_copies += 1
+        return result
+
+    monkeypatch.setattr(fileops._sqlite_util, "copy_table", copy_table_spy)
+    with ConfigOptions.set_copy_layer_sqlite_direct(copy_layer_sqlite_direct):
+        gfo.copy_layer(
+            src=str(layer2_path),
+            dst=str(layer1_path),
+            src_layer=layer2,
+            dst_layer=layer1,
+            write_mode="append",
+            force_output_geometrytype=force_output_geometrytype,
+        )
+    assert successful_direct_copies == copy_layer_sqlite_direct
 
     # Check result
     result_layers = gfo.listlayers(layer1_path)
@@ -1216,6 +1251,7 @@ def test_copy_layer_layer(tmp_path, layer):
         (".shp", ".sqlite", False, False),
     ],
 )
+@pytest.mark.filterwarnings("ignore:Feature id [0-9]+ not preserved:RuntimeWarning")
 def test_copy_layer_preserve_fid(
     tmp_path,
     src_suffix: str,
@@ -3076,7 +3112,7 @@ def test_to_file_index(tmp_path, points_gdf, suffix, engine_setter):  # noqa: AR
     # named MultiIndex
     p_gdf = points_gdf.copy()
     p_gdf["value3"] = p_gdf["value2"] - p_gdf["value1"]
-    p_gdf.set_index(["value1", "value2"], inplace=True)
+    p_gdf = p_gdf.set_index(["value1", "value2"])
     gdf = gpd.GeoDataFrame(p_gdf, geometry=p_gdf.geometry)
     do_checks(gdf, index_is_used=True)
 
@@ -3165,6 +3201,14 @@ def test_to_file_nogeom(tmp_path, suffix):
 @pytest.mark.skipif(not PYOGRIO_GTE_010, reason="Requires pyogrio>=0.10")
 def test_to_file_vsi():
     """Test writing to a file in vsimem."""
+    # /vsimem is only shared between libraries using the same libgdal. If pyogrio
+    # is installed from a wheel it bundles its own GDAL, so a file written via
+    # pyogrio is not visible to the osgeo.gdal bindings (and vice versa).
+    if pyogrio.__gdal_version_string__ != gdal.__version__:
+        pytest.skip(
+            "pyogrio and osgeo use different GDAL libraries, so /vsimem is not shared"
+        )
+
     # Prepare test data
     src = test_helper.get_testfile("polygon-parcel")
     read_gdf = gfo.read_file(src)

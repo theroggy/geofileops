@@ -1041,10 +1041,15 @@ def test_dissolve_source_fid_relations(tmp_path):
     _geoops_gpd_dissolve._append_dissolve_source_fids(
         source_path, destination_path, "data"
     )
-    with sqlite3.connect(destination_path) as connection:
+    # Remark: a sqlite3.Connection used as context manager only commits/rolls back,
+    # it does NOT close the connection, so close it explicitly.
+    connection = sqlite3.connect(destination_path)
+    try:
         relations = connection.execute(
             "SELECT dissolved_id, original_fid "
             "FROM __gfo_dissolve_source_fids "
             "ORDER BY dissolved_id, original_fid"
         ).fetchall()
+    finally:
+        connection.close()
     assert relations == [("destination-1", 20), ("source-1", 10), ("source-1", 11)]

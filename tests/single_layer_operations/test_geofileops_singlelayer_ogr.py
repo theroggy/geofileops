@@ -151,7 +151,10 @@ def test_warp(tmp_path):
     output_gdf = gfo.read_file(output_path)
     assert output_gdf["geometry"][0] is not None
     output_bounds = output_gdf.total_bounds
-    assert output_bounds[0] >= warped_min
-    assert output_bounds[1] >= warped_min
-    assert output_bounds[2] <= warped_max
-    assert output_bounds[3] <= warped_max
+    # Allow a small tolerance: depending on the GDAL version/build, warping can
+    # result in coordinates a tiny bit outside the target bounds (e.g. -1e-13)
+    bounds_tolerance = 1e-9
+    assert output_bounds[0] >= warped_min - bounds_tolerance
+    assert output_bounds[1] >= warped_min - bounds_tolerance
+    assert output_bounds[2] <= warped_max + bounds_tolerance
+    assert output_bounds[3] <= warped_max + bounds_tolerance

@@ -13,6 +13,7 @@ on:
       - "docs/**"
       - "perftests/**"
       - ".github/workflows/tests_installed.yml"
+      - ".github/workflows/tests_installed_uv.yml"
       - ".github/workflows/tests_installed_micromamba.yml"
       - ".github/workflows/perftests.yml"
       - "*.md"
@@ -38,7 +39,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         dev: [false]
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
         env: ["latest"]
         # Use openblas instead of mkl saves 600 MB. Linux OK, 50% slower on Windows and OSX!
         extra: ["nomkl"]
@@ -46,19 +47,19 @@ jobs:
           - env: nightly-deps
             os: ubuntu-latest
             dev: false
-            python: "3.12"
+            python: "3.13"
+          - env: latest-fiona
+            os: windows-latest
+            dev: false
+            python: "3.13"
+          - env: latest
+            os: macos-latest
+            dev: false
+            python: "3.13"
           - env: minimal
             os: ubuntu-latest
             dev: false
             python: "3.10"
-          - env: latest-fiona
-            os: windows-latest
-            dev: false
-            python: "3.12"
-          - env: latest
-            os: macos-latest
-            dev: false
-            python: "3.12"
 
     steps:
       - uses: actions/checkout@v7
@@ -70,11 +71,21 @@ jobs:
         uses: mamba-org/setup-micromamba@v3
         with:
           # Any version from https://github.com/mamba-org/micromamba-releases
-          micromamba-version: "2.5.0-1"
+          micromamba-version: "2.10.0-0"
           environment-file: ci/envs/${{ matrix.env }}.yml
           create-args: >-
             python=${{ matrix.python }}
             ${{ matrix.extra }}
+
+      # The gdal-master channel only provides gdal itself, so pyogrio is installed
+      # from conda-forge built against an older libgdal soname. Rebuild pyogrio from
+      # source so it is compiled against the gdal master version in the environment.
+      - name: Rebuild pyogrio from source against the installed GDAL
+        if: matrix.env == 'nightly-deps'
+        run: >-
+          python -m pip install
+          --force-reinstall --no-deps --no-binary :all:
+          pyogrio
 
       - name: Print versions
         run: >-

@@ -4450,7 +4450,7 @@ def _prepare_processing_params(
                 path=input1_path, sql_stmt=sql_stmt, sql_dialect="SQLITE"
             )
 
-            batch_info_df.reset_index(names=["batch_id"], inplace=True)
+            batch_info_df = batch_info_df.reset_index(names=["batch_id"])
             nb_batches = len(batch_info_df)
 
         else:

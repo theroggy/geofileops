@@ -1031,9 +1031,10 @@ def _apply_geooperation(
     # Run operation if data read
     if len(data_gdf) > 0:
         if operation is GeoOperation.BUFFER:
-            data_gdf.geometry = data_gdf.geometry.buffer(
+            data_gdf.geometry = shapely.buffer(
+                data_gdf.geometry.array,
                 distance=operation_params["distance"],
-                resolution=operation_params["quadrantsegments"],
+                quad_segs=operation_params["quadrantsegments"],
                 cap_style=operation_params["endcap_style"].value,
                 join_style=operation_params["join_style"].value,
                 mitre_limit=operation_params["mitre_limit"],
@@ -1068,7 +1069,7 @@ def _apply_geooperation(
         for fid_number in range(1, 100):
             new_name = f"{fid_column}_{fid_number}"
             if new_name not in columns_lower_lookup:
-                data_gdf = data_gdf.rename(columns={fid_column: new_name}, copy=False)
+                data_gdf = data_gdf.rename(columns={fid_column: new_name})
 
     if gridsize != 0.0:
         data_gdf.geometry = _geoseries_util.set_precision(

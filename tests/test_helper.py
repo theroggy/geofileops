@@ -2,11 +2,13 @@
 
 import os
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from stat import S_IRGRP, S_IROTH, S_IRUSR, S_IRWXG, S_IRWXO, S_IRWXU
 
 import geopandas as gpd
 import geopandas.testing as gpd_testing
+import pandas as pd
 import pytest
 import shapely
 import shapely.geometry as sh_geom
@@ -249,7 +251,17 @@ def _get_testfile(
 
             options = {}
             if fid_column is not None:
-                options["LAYER_CREATION.FID"] = fid_column
+                driver = gdal.GetDriverByName(dst_info.driver)
+                layer_creation_options = (
+                    None
+                    if driver is None
+                    else driver.GetMetadataItem("DS_LAYER_CREATIONOPTIONLIST")
+                )
+                if layer_creation_options is not None and any(
+                    option.attrib.get("name", "").upper() == "FID"
+                    for option in ET.fromstring(layer_creation_options).iter("Option")
+                ):
+                    options["LAYER_CREATION.FID"] = fid_column
             if geom_name is not None:
                 options["LAYER_CREATION.GEOMETRY_NAME"] = geom_name
             if force_utf8 and suffix in (".shp", ".shp.zip"):
@@ -503,6 +515,33 @@ def assert_geodataframe_equal(
 
         right.geometry = left.geometry
 
+    # For object/string columns, treat None and NaN as equal: depending on the
+    # engine used to read a geofile (e.g. pyogrio) and on the pandas version,
+    # missing text values can be None or NaN (pandas>=3 uses the "str" dtype with
+    # NaN for missing values).
+    geometry_name = left.geometry.name if isinstance(left, gpd.GeoDataFrame) else None
+    text_columns = [
+        column
+        for column in left.columns
+        if column != geometry_name
+        and (
+            pd.api.types.is_object_dtype(left[column])
+            or pd.api.types.is_string_dtype(left[column])
+        )
+        and (
+            pd.api.types.is_object_dtype(right[column])
+            or pd.api.types.is_string_dtype(right[column])
+        )
+    ]
+    if text_columns:
+        left = left.copy()
+        right = right.copy()
+        for column in text_columns:
+            left[column] = left[column].astype(object).where(left[column].notna(), None)
+            right[column] = (
+                right[column].astype(object).where(right[column].notna(), None)
+            )
+
     gpd_testing.assert_geodataframe_equal(
         left=left,
         right=right,
@@ -548,17 +587,17 @@ def plot(
 
         color = list(colors.keys())[geofile_idx % len(colors)]
         figure.axes[geofile_idx].set_aspect("equal")
-        # add hatch to the last axis
-        gdf.plot(
-            ax=figure.axes[geofile_idx],
-            color=colors[color],
-            alpha=0.5,
-        )
-        gdf.plot(
-            ax=figure.axes[len(geofiles)],
-            color=colors[color],
-            alpha=0.5,
-        )
+        if not gdf.empty:
+            gdf.plot(
+                ax=figure.axes[geofile_idx],
+                color=colors[color],
+                alpha=0.5,
+            )
+            gdf.plot(
+                ax=figure.axes[len(geofiles)],
+                color=colors[color],
+                alpha=0.5,
+            )
         figure.axes[geofile_idx].set_title(geofile.stem)
 
     if clean_name:

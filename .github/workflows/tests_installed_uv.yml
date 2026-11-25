@@ -1,0 +1,75 @@
+# This workflow will install the latest version of geofileops and run will run its tests
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: TestsOnInstalled - uv
+
+on:
+  workflow_dispatch:
+  schedule:
+    # every Monday at 5:40 AM
+    - cron: "40 5 * * 1"
+  push:
+    paths:
+      - ".github/workflows/tests_installed_uv.yml"
+  pull_request:
+    paths: 
+      - ".github/workflows/tests_installed_uv.yml"
+
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  TestsOnInstalled:    
+    name: ${{ matrix.checkout_ref }}, python ${{ matrix.python }}, ${{ matrix.os }}
+    timeout-minutes: 30
+    runs-on: "ubuntu-latest"
+    defaults:
+      run:
+        shell: bash -l {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python: ["3.13"]
+        include:
+          # Use the maintenance branch (and not the tag) as checkout_ref, so test
+          # fixes can be cherry-picked to it
+          - checkout_ref: "v0.12.x"
+            gfo_version: "0.12"
+
+    steps:
+      - name: Checkout tests for label ${{ matrix.checkout_ref }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.checkout_ref }}
+          sparse-checkout: |
+            tests
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install GDAL and spatialite (ubuntu-latest default)
+        run: |
+          # Install system packages
+          sudo apt-get update -qq
+          sudo apt-get install -y gdal-bin libgdal-dev libsqlite3-mod-spatialite
+          echo "System GDAL version: $(gdal-config --version)"
+          echo "✅ GDAL $(gdal-config --version) installed"
+        
+      - name: Install geofileops via uv
+        run: |
+          uv venv --python ${{ matrix.python }}
+          # Use ~=X.Y.0 (and not ~=X.Y) so geofileops stays within the same minor version
+          # as checkout_ref (PEP 440: ~=0.12 would also allow e.g. 0.13).
+          uv pip install "gdal==$(gdal-config --version)" "geofileops~=${{ matrix.gfo_version }}.0" pytest
+
+      - name: Print installed versions
+        run: |
+          uv run python -c "import sys; import geofileops as gfo; from osgeo import gdal; print(f'Python {sys.version}'); print(f'geofileops {gfo.__version__}'); print(f'GDAL {gdal.__version__}')"
+          uv pip list
+      - name: Run tests
+        run: |
+          uv run pytest --color=yes tests/

@@ -747,8 +747,8 @@ def test_create_table_as_sql_single_input(tmp_path):
 
     # Prepare expected result
     expected_gdf = fileops.read_file(input_path, columns=["HFDTLT"])
-    expected_gdf.geometry = expected_gdf.geometry.buffer(
-        distance, resolution=resolution
+    expected_gdf.geometry = shapely.buffer(
+        expected_gdf.geometry.array, distance, quad_segs=resolution
     )
 
     sql_stmt = f"""
@@ -797,11 +797,12 @@ def test_get_gpkg_contents(database_connection):
     input_path = test_helper.get_testfile(testfile="polygon-parcel")
     database = sqlite_util.connect(input_path) if database_connection else input_path
 
-    gpkg_contents = sqlite_util.get_gpkg_contents(database=database)
-
-    if database_connection:
-        database.close()
-        database = None
+    try:
+        gpkg_contents = sqlite_util.get_gpkg_contents(database=database)
+    finally:
+        if database_connection:
+            database.close()
+            database = None
 
     # Check results
     layer = gfo.get_only_layer(input_path)
@@ -825,13 +826,14 @@ def test_get_gpkg_geometry_column_info(database_connection):
     layer = gfo.get_only_layer(input_path)
     database = sqlite_util.connect(input_path) if database_connection else input_path
 
-    geometry_column_info = sqlite_util.get_gpkg_geometry_column_info(
-        database=database, table_name=layer
-    )
-
-    if database_connection:
-        database.close()
-        database = None
+    try:
+        geometry_column_info = sqlite_util.get_gpkg_geometry_column_info(
+            database=database, table_name=layer
+        )
+    finally:
+        if database_connection:
+            database.close()
+            database = None
 
     # Check result
     layer_info = gfo.get_layerinfo(input_path)
@@ -857,20 +859,23 @@ def test_load_spatialite():
     test_path = test_helper.get_testfile("polygon-parcel")
     conn = sqlite3.connect(test_path)
 
-    sqlite_util.load_spatialite(conn, enable_gpkg_mode=True)
+    try:
+        sqlite_util.load_spatialite(conn, enable_gpkg_mode=True)
 
-    # Verify if spatialite extension is loaded by checking versions
-    sql = "SELECT spatialite_version(), geos_version()"
-    spatialite_version, geos_version = conn.execute(sql).fetchone()
+        # Verify if spatialite extension is loaded by checking versions
+        sql = "SELECT spatialite_version(), geos_version()"
+        spatialite_version, geos_version = conn.execute(sql).fetchone()
 
-    assert spatialite_version is not None
-    assert geos_version is not None
+        assert spatialite_version is not None
+        assert geos_version is not None
 
-    # Verify if GPKG mode is enabled
-    sql = "SELECT GetGpkgMode();"
-    gpkg_mode = conn.execute(sql).fetchone()[0]
+        # Verify if GPKG mode is enabled
+        sql = "SELECT GetGpkgMode();"
+        gpkg_mode = conn.execute(sql).fetchone()[0]
 
-    assert gpkg_mode == 1
+        assert gpkg_mode == 1
+    finally:
+        conn.close()
 
 
 def test_load_spatialite_gpkgmode_failed():
@@ -881,7 +886,10 @@ def test_load_spatialite_gpkgmode_failed():
     test_path = test_helper.get_testfile("polygon-parcel", suffix=".sqlite")
     conn = sqlite3.connect(test_path)
 
-    with pytest.raises(
-        RuntimeError, match="Failed to enable GPKG mode in mod_spatialite"
-    ):
-        sqlite_util.load_spatialite(conn, enable_gpkg_mode=True)
+    try:
+        with pytest.raises(
+            RuntimeError, match="Failed to enable GPKG mode in mod_spatialite"
+        ):
+            sqlite_util.load_spatialite(conn, enable_gpkg_mode=True)
+    finally:
+        conn.close()

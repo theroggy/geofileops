@@ -16,6 +16,10 @@ dependencies:
   - pandas
   - psutil
   - pygeoops
+  # pyogrio from conda-forge is built against an older libgdal soname than the
+  # gdal-master channel provides, so in the test workflow pyogrio is rebuilt from
+  # source against the installed gdal (the gdal package provides gdal-config and
+  # headers needed for that).
   - pyogrio
   - pyproj
   - shapely >=2

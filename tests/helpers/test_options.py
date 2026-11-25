@@ -1,4 +1,4 @@
-"""Tests for functionalities in _configoptions_helper."""
+"""Tests for functionalities in options."""
 
 import multiprocessing
 import os

@@ -1272,7 +1272,7 @@ def _dissolve_polygons(
     if "index" in diss_gdf.columns and (
         groupby_columns is None or "index" not in groupby_columns
     ):
-        diss_gdf.drop("index", axis=1, inplace=True)
+        diss_gdf = diss_gdf.drop("index", axis=1)
 
     # If explodecollections is True and For polygons, explode multi-geometries.
     # If needed they will be 'collected' afterwards to multipolygons again.
@@ -1333,7 +1333,7 @@ def _dissolve_polygons(
         )
         bbox_lines_gdf = gpd.GeoDataFrame(geometry=bbox_lines, crs=input_gdf.crs)
         onborder_gdf = gpd.sjoin(diss_gdf, bbox_lines_gdf, predicate="intersects")
-        onborder_gdf.drop("index_right", axis=1, inplace=True)
+        onborder_gdf = onborder_gdf.drop("index_right", axis=1)
 
         notonborder_gdf = diss_gdf[~diss_gdf.index.isin(onborder_gdf.index)].copy()
 

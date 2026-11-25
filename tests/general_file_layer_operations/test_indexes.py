@@ -254,8 +254,13 @@ def test_remove_spatial_index(tmp_path, with_datasource):
     }
 
     sql_tables = "SELECT name FROM sqlite_master WHERE type = 'table'"
-    with sqlite3.connect(src) as conn:
+    # Remark: a sqlite3.Connection used as context manager only commits/rolls back,
+    # it does NOT close the connection, so close it explicitly.
+    conn = sqlite3.connect(src)
+    try:
         tables_before = {row[0] for row in conn.execute(sql_tables)}
+    finally:
+        conn.close()
     assert rtree_shadow_tables <= tables_before
 
     datasource = None
@@ -266,8 +271,11 @@ def test_remove_spatial_index(tmp_path, with_datasource):
     gfo.remove_spatial_index(src, datasource=datasource)
     assert not gfo.has_spatial_index(src)
 
-    with sqlite3.connect(src) as conn:
+    conn = sqlite3.connect(src)
+    try:
         tables_after = {row[0] for row in conn.execute(sql_tables)}
+    finally:
+        conn.close()
     assert not rtree_shadow_tables & tables_after
 
     if with_datasource:
